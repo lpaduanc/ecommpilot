@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class StoreResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'platform' => $this->platform?->value,
+            'name' => $this->name,
+            'domain' => $this->domain,
+            'email' => $this->email,
+            'sync_status' => $this->sync_status?->value,
+            'last_sync_at' => $this->last_sync_at?->toISOString(),
+            'created_at' => $this->created_at->toISOString(),
+        ];
+    }
+}
+
