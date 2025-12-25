@@ -33,7 +33,6 @@ class AdminController extends Controller
             ->whereMonth('external_created_at', now()->month)
             ->whereYear('external_created_at', now()->year)
             ->where('payment_status', 'paid')
-
             ->sum('total');
 
         // New clients this month
