@@ -22,7 +22,7 @@ class AdminController extends Controller
         $activeClients = User::where('role', UserRole::Client)->where('is_active', true)->count();
         $totalStores = Store::count();
         $totalCreditsUsed = User::where('role', UserRole::Client)->sum('ai_credits');
-        
+
         // Calculate MRR (mock calculation - in real app, this would come from subscription data)
         $mrr = $activeClients * 99.90;
 
@@ -33,6 +33,7 @@ class AdminController extends Controller
             ->whereMonth('external_created_at', now()->month)
             ->whereYear('external_created_at', now()->year)
             ->where('payment_status', 'paid')
+
             ->sum('total');
 
         // New clients this month
@@ -250,7 +251,7 @@ class AdminController extends Controller
     public function toggleClientStatus(int $id): JsonResponse
     {
         $client = User::where('role', UserRole::Client)->findOrFail($id);
-        
+
         $client->update(['is_active' => !$client->is_active]);
 
         $action = $client->is_active ? 'admin.client_activated' : 'admin.client_deactivated';
@@ -363,7 +364,7 @@ class AdminController extends Controller
                 $store->analyses()->delete();
                 $store->delete();
             }
-            
+
             // Delete chat conversations
             $client->chatConversations()->each(function ($conv) {
                 $conv->messages()->delete();
