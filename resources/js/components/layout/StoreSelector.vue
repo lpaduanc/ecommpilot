@@ -1,29 +1,70 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useNotificationStore } from '../../stores/notificationStore';
+import { useIntegrationStore } from '../../stores/integrationStore';
 import api from '../../services/api';
 import { ChevronDownIcon, BuildingStorefrontIcon, CheckIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
 
 const emit = defineEmits(['store-changed']);
 
 const notificationStore = useNotificationStore();
-const stores = ref([]);
-const activeStoreId = ref(null);
+const integrationStore = useIntegrationStore();
+
+const localStores = ref([]);
+const localActiveStoreId = ref(null);
 const isOpen = ref(false);
 const isLoading = ref(false);
 const isSyncing = ref(false);
 
 const activeStore = ref(null);
 
+// Use stores from integrationStore if available, otherwise use local
+const stores = computed(() => {
+    // If integrationStore has stores, use those (more up-to-date after connection)
+    if (integrationStore.stores.length > 0) {
+        return integrationStore.stores;
+    }
+    return localStores.value;
+});
+
+// Use activeStoreId from integrationStore if available
+const activeStoreId = computed(() => {
+    if (integrationStore.activeStoreId) {
+        return integrationStore.activeStoreId;
+    }
+    return localActiveStoreId.value;
+});
+
+// Watch for changes in integrationStore to update activeStore
+watch([() => integrationStore.stores, () => integrationStore.activeStoreId], ([newStores, newActiveId]) => {
+    if (newStores && newStores.length > 0) {
+        // Update activeStore based on activeStoreId
+        const current = newStores.find(s => s.id === (newActiveId || localActiveStoreId.value));
+        if (current) {
+            activeStore.value = current;
+        } else {
+            // If active store not found, select first one
+            activeStore.value = newStores[0];
+            localActiveStoreId.value = newStores[0].id;
+        }
+    }
+}, { deep: true, immediate: true });
+
 async function fetchStores() {
     isLoading.value = true;
     try {
         const response = await api.get('/integrations/my-stores');
-        stores.value = response.data.stores;
-        activeStoreId.value = response.data.active_store_id;
+        localStores.value = response.data.stores;
+        localActiveStoreId.value = response.data.active_store_id;
         activeStore.value = stores.value.find(s => s.id === activeStoreId.value) || stores.value[0];
+
+        // Also update integrationStore to keep them in sync
+        if (response.data.stores.length > 0) {
+            integrationStore.stores = response.data.stores;
+            integrationStore.activeStoreId = response.data.active_store_id;
+        }
     } catch {
-        stores.value = [];
+        localStores.value = [];
     } finally {
         isLoading.value = false;
     }
@@ -37,7 +78,8 @@ async function selectStore(store) {
 
     try {
         await api.post(`/integrations/select-store/${store.id}`);
-        activeStoreId.value = store.id;
+        localActiveStoreId.value = store.id;
+        integrationStore.activeStoreId = store.id;
         activeStore.value = store;
         isOpen.value = false;
         emit('store-changed', store);

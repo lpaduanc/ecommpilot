@@ -57,14 +57,14 @@ class AnalysisController extends Controller
         }
 
         // Check rate limit
-        if (!$this->analysisService->canRequestAnalysis($user)) {
-            $nextAvailableAt = $this->analysisService->getNextAvailableAt($user);
+        // if (!$this->analysisService->canRequestAnalysis($user)) {
+        //     $nextAvailableAt = $this->analysisService->getNextAvailableAt($user);
 
-            return response()->json([
-                'message' => 'Aguarde para solicitar uma nova análise.',
-                'next_available_at' => $nextAvailableAt?->toISOString(),
-            ], 429);
-        }
+        //     return response()->json([
+        //         'message' => 'Aguarde para solicitar uma nova análise.',
+        //         'next_available_at' => $nextAvailableAt?->toISOString(),
+        //     ], 429);
+        // }
 
         // Check credits
         if (!$user->hasCredits()) {

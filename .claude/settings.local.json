@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(mkdir:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(tree:*)",
+      "Bash(test:*)",
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(for file in resources/js/constants/*.ts)",
+      "Bash(do echo \"Verificando $file...\")",
+      "Bash(done)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build:*)",
+      "Bash(./vendor/bin/pint:*)",
+      "Bash(php artisan:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout /t 8 /nobreak)",
+      "Bash(grep:*)",
+      "Bash(php test-camelcase-fix.php:*)",
+      "Bash(php test-system-setting.php:*)",
+      "Bash(php test-api-settings.php:*)",
+      "Bash(php test-final-fix.php:*)",
+      "Bash(php:*)",
+      "Bash(del test-store-settings.php)",
+      "Bash(timeout /t 10)",
+      "Bash(npx eslint:*)"
+    ]
+  }
+}

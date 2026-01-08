@@ -318,7 +318,7 @@ onMounted(() => {
                                     </div>
                                     Alterar Senha
                                 </h2>
-                                
+
                                 <form @submit.prevent="updatePassword" class="space-y-5">
                                     <BaseInput
                                         v-model="passwordForm.current_password"

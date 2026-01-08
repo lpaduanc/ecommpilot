@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -29,6 +30,11 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => UserRole::Client,
+            'is_active' => true,
+            'ai_credits' => 10,
+            'must_change_password' => false,
+            'notification_settings' => [],
         ];
     }
 
@@ -39,6 +45,46 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is an admin.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => UserRole::Admin,
+        ]);
+    }
+
+    /**
+     * Indicate that the user has no credits.
+     */
+    public function withoutCredits(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'ai_credits' => 0,
+        ]);
+    }
+
+    /**
+     * Indicate that the user has specific number of credits.
+     */
+    public function withCredits(int $credits): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'ai_credits' => $credits,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is inactive.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
         ]);
     }
 }

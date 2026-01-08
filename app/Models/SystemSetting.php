@@ -23,6 +23,7 @@ class SystemSetting extends Model
     ];
 
     private const CACHE_PREFIX = 'system_setting:';
+
     private const CACHE_TTL = 3600; // 1 hour
 
     /**
@@ -30,12 +31,12 @@ class SystemSetting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $cacheKey = self::CACHE_PREFIX . $key;
+        $cacheKey = self::CACHE_PREFIX.$key;
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($key, $default) {
             $setting = self::where('key', $key)->first();
 
-            if (!$setting) {
+            if (! $setting) {
                 return $default;
             }
 
@@ -54,7 +55,7 @@ class SystemSetting extends Model
         );
 
         // Clear cache
-        Cache::forget(self::CACHE_PREFIX . $key);
+        Cache::forget(self::CACHE_PREFIX.$key);
 
         return $setting;
     }
@@ -98,8 +99,9 @@ class SystemSetting extends Model
         if ($this->is_sensitive && $this->value) {
             $decrypted = $this->decryptValue($this->value);
             if (strlen($decrypted) > 8) {
-                return substr($decrypted, 0, 4) . '****' . substr($decrypted, -4);
+                return substr($decrypted, 0, 4).'****'.substr($decrypted, -4);
             }
+
             return '********';
         }
 
@@ -147,8 +149,7 @@ class SystemSetting extends Model
     {
         $settings = self::all();
         foreach ($settings as $setting) {
-            Cache::forget(self::CACHE_PREFIX . $setting->key);
+            Cache::forget(self::CACHE_PREFIX.$setting->key);
         }
     }
 }
-

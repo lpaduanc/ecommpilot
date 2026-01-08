@@ -15,6 +15,7 @@ class StoreResource extends JsonResource
             'name' => $this->name,
             'domain' => $this->domain,
             'email' => $this->email,
+            'user_id' => $this->external_store_id,
             'sync_status' => $this->sync_status?->value,
             'last_sync_at' => $this->last_sync_at?->toISOString(),
             'created_at' => $this->created_at->toISOString(),

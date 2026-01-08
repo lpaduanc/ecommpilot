@@ -7,6 +7,7 @@ import BaseButton from '../components/common/BaseButton.vue';
 import BaseInput from '../components/common/BaseInput.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import ProductDetailPanel from '../components/dashboard/ProductDetailPanel.vue';
+import { useKeyboardNavigation } from '../composables/useKeyboard';
 import {
     CubeIcon,
     MagnifyingGlassIcon,
@@ -27,6 +28,13 @@ const totalPages = ref(1);
 const totalItems = ref(0);
 
 const showDetailPanel = computed(() => !!selectedProduct.value);
+
+// Navegação por teclado
+const { currentIndex } = useKeyboardNavigation(
+    products,
+    (product) => selectProduct(product),
+    { loop: true, disabled: isLoading }
+);
 
 async function fetchProducts() {
     isLoading.value = true;
@@ -126,20 +134,23 @@ onMounted(() => {
                     <!-- Search Bar -->
                     <div class="flex items-center gap-3">
                         <div class="relative flex-1 max-w-md">
-                            <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                             <input
                                 v-model="searchQuery"
                                 @keyup.enter="handleSearch"
-                                type="text"
+                                type="search"
                                 placeholder="Buscar produto por nome ou SKU..."
+                                aria-label="Buscar produtos por nome ou SKU"
                                 class="w-full pl-12 pr-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:bg-white/20 focus:border-white/30 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-all"
                             />
                         </div>
                         <button
                             @click="handleSearch"
-                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all"
+                            type="button"
+                            aria-label="Buscar produtos"
+                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
                         >
-                            <FunnelIcon class="w-5 h-5" />
+                            <FunnelIcon class="w-5 h-5" aria-hidden="true" />
                         </button>
                     </div>
                 </div>
@@ -187,10 +198,17 @@ onMounted(() => {
                                         <tr
                                             v-for="(product, index) in products"
                                             :key="product.id"
+                                            tabindex="0"
+                                            role="button"
+                                            :aria-label="`Ver detalhes do produto ${product.name}, preço ${formatCurrency(product.price)}, estoque ${product.stock_quantity} unidades`"
                                             @click="selectProduct(product)"
+                                            @keydown.enter="selectProduct(product)"
+                                            @keydown.space.prevent="selectProduct(product)"
                                             :class="[
                                                 'hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent cursor-pointer transition-all duration-200',
+                                                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset focus:bg-primary-50/30',
                                                 selectedProduct?.id === product.id ? 'bg-primary-50' : '',
+                                                currentIndex === index ? 'ring-2 ring-primary-400 ring-inset' : '',
                                                 'animate-slide-up'
                                             ]"
                                             :style="{ animationDelay: `${index * 30}ms` }"
@@ -258,30 +276,32 @@ onMounted(() => {
 
                             <!-- Pagination -->
                             <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                                <p class="text-sm text-gray-500">
-                                    Mostrando {{ (currentPage - 1) * 20 + 1 }} a {{ Math.min(currentPage * 20, totalItems) }} de {{ totalItems }}
+                                <p class="text-sm text-gray-500" role="status" aria-live="polite">
+                                    Mostrando {{ (currentPage - 1) * 20 + 1 }} a {{ Math.min(currentPage * 20, totalItems) }} de {{ totalItems }} produtos
                                 </p>
-                                <div class="flex items-center gap-2">
+                                <nav class="flex items-center gap-2" role="navigation" aria-label="Paginação de produtos">
                                     <BaseButton
                                         variant="ghost"
                                         size="sm"
                                         :disabled="currentPage === 1"
+                                        :aria-label="`Ir para página anterior`"
                                         @click="goToPage(currentPage - 1)"
                                     >
-                                        <ChevronLeftIcon class="w-4 h-4" />
+                                        <ChevronLeftIcon class="w-4 h-4" aria-hidden="true" />
                                     </BaseButton>
-                                    <span class="text-sm text-gray-600 px-3">
-                                        {{ currentPage }} / {{ totalPages }}
+                                    <span class="text-sm text-gray-600 px-3" aria-current="page">
+                                        Página {{ currentPage }} de {{ totalPages }}
                                     </span>
                                     <BaseButton
                                         variant="ghost"
                                         size="sm"
                                         :disabled="currentPage === totalPages"
+                                        :aria-label="`Ir para próxima página`"
                                         @click="goToPage(currentPage + 1)"
                                     >
-                                        <ChevronRightIcon class="w-4 h-4" />
+                                        <ChevronRightIcon class="w-4 h-4" aria-hidden="true" />
                                     </BaseButton>
-                                </div>
+                                </nav>
                             </div>
                         </BaseCard>
                     </div>

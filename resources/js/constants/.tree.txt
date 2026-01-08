@@ -1,0 +1,63 @@
+constants/
+├── index.ts                 # Ponto de exportação central (1.3 KB)
+│   └── Exporta todas as constantes de forma organizada
+│
+├── notifications.ts         # Sistema de notificações (953 bytes)
+│   ├── NotificationType enum (Success, Error, Warning, Info)
+│   ├── NOTIFICATION_DURATION (SHORT, MEDIUM, LONG, PERMANENT)
+│   └── Types helpers
+│
+├── stock.ts                 # Gerenciamento de estoque (1.7 KB)
+│   ├── StockStatus enum (OutOfStock, LowStock, InStock)
+│   ├── STOCK_THRESHOLDS (OUT_OF_STOCK: 0, LOW_STOCK: 10)
+│   ├── STOCK_STATUS_CONFIG (label, color, variant por status)
+│   ├── getStockStatus() helper function
+│   └── Types helpers
+│
+├── routes.ts                # Sistema de rotas (2.5 KB)
+│   ├── AUTH_ROUTES (login, register, forgot-password, reset-password)
+│   ├── APP_ROUTES (dashboard, products, orders, analysis, chat, etc.)
+│   ├── ADMIN_ROUTES (admin-dashboard, admin-users, admin-clients, etc.)
+│   ├── ROUTE_NAMES (todas as rotas combinadas)
+│   ├── ROUTE_PATHS (paths completos das rotas)
+│   ├── ROUTE_PERMISSIONS (permissões requeridas)
+│   └── Types helpers
+│
+├── api.ts                   # API endpoints e HTTP status (5.9 KB)
+│   ├── AUTH_ENDPOINTS (login, register, logout, etc.)
+│   ├── DASHBOARD_ENDPOINTS (stats, charts, low-stock, etc.)
+│   ├── PRODUCTS_ENDPOINTS (list, detail, performance)
+│   ├── ORDERS_ENDPOINTS (list, detail)
+│   ├── INTEGRATIONS_ENDPOINTS (nuvemshop, stores, sync, etc.)
+│   ├── ANALYSIS_ENDPOINTS (current, request, history, etc.)
+│   ├── CHAT_ENDPOINTS (conversation, message, clear)
+│   ├── ADMIN_ENDPOINTS (clients, settings, AI config, etc.)
+│   ├── SETTINGS_ENDPOINTS (notifications)
+│   ├── API_ENDPOINTS (todos agrupados)
+│   ├── HTTP_STATUS (códigos HTTP completos)
+│   ├── HTTP_STATUS_CATEGORY (helpers para verificar categorias)
+│   ├── buildEndpoint() helper function
+│   └── Types helpers
+│
+├── README.md                # Documentação completa (7.7 KB)
+│   ├── Estrutura do diretório
+│   ├── Exemplos de uso por categoria
+│   ├── Benefícios da abordagem
+│   ├── Convenções de código
+│   └── Guia de extensão
+│
+├── MIGRATION_GUIDE.md       # Guia de migração (9.5 KB)
+│   ├── Comparações antes/depois
+│   ├── Checklist de migração
+│   ├── Benefícios observados
+│   ├── Prioridade de migração
+│   └── Dicas práticas
+│
+└── EXAMPLES.md              # Exemplos práticos (17 KB)
+    ├── Exemplo 1: Lista de produtos com estoque
+    ├── Exemplo 2: Formulário de login com erros
+    ├── Exemplo 3: Dashboard com múltiplas APIs
+    ├── Exemplo 4: Guard de rota com permissões
+    └── Exemplo 5: Composable de produtos completo
+
+Total: 8 arquivos, ~46 KB de código e documentação

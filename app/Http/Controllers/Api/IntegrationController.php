@@ -7,10 +7,13 @@ use App\Http\Resources\StoreResource;
 use App\Jobs\SyncStoreDataJob;
 use App\Models\ActivityLog;
 use App\Models\Store;
+use App\Models\SystemSetting;
 use App\Services\Integration\NuvemshopService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class IntegrationController extends Controller
 {
@@ -28,35 +31,301 @@ class IntegrationController extends Controller
         return response()->json(StoreResource::collection($stores));
     }
 
-    public function connectNuvemshop(Request $request): RedirectResponse
+    public function connectNuvemshop(Request $request): JsonResponse|RedirectResponse
     {
+        $storeUrl = $request->input('store_url');
+
+        // Validate store_url if provided
+        if ($storeUrl) {
+            $storeUrl = $this->normalizeStoreUrl($storeUrl);
+
+            if (! $this->isValidNuvemshopUrl($storeUrl)) {
+                return response()->json([
+                    'message' => 'URL da loja inválida. Use o formato: minhaloja.lojavirtualnuvem.com.br',
+                ], 422);
+            }
+        }
+
         $authUrl = $this->nuvemshopService->getAuthorizationUrl(
-            $request->user()->id
+            $request->user()->id,
+            $storeUrl
         );
 
+        // Return JSON for API calls, redirect for direct access
+        if ($request->expectsJson()) {
+            return response()->json([
+                'redirect_url' => $authUrl,
+            ]);
+        }
+
         return redirect($authUrl);
+    }
+
+    /**
+     * Normalize the store URL to a consistent format.
+     */
+    private function normalizeStoreUrl(string $url): string
+    {
+        // Remove protocol if present
+        $url = preg_replace('#^https?://#', '', $url);
+
+        // Remove trailing slash
+        $url = rtrim($url, '/');
+
+        // Remove www. if present
+        $url = preg_replace('#^www\.#', '', $url);
+
+        return $url;
+    }
+
+    /**
+     * Validate if the URL is a valid Nuvemshop store URL.
+     */
+    private function isValidNuvemshopUrl(string $url): bool
+    {
+        $pattern = '/^[a-zA-Z0-9-]+\.(lojavirtualnuvem\.com\.br|nuvemshop\.com\.br|tiendanube\.com)$/';
+
+        return (bool) preg_match($pattern, $url);
     }
 
     public function callbackNuvemshop(Request $request): RedirectResponse
     {
         $code = $request->input('code');
-        $userId = $request->input('state');
+        $state = $request->input('state');
 
-        if (!$code || !$userId) {
+        if (! $code || ! $state) {
             return redirect('/integrations?error=invalid_callback');
         }
 
         try {
-            $store = $this->nuvemshopService->handleCallback($code, (int) $userId);
-            
+            // Decode state to get userId and storeUrl
+            $stateData = $this->nuvemshopService->decodeState($state);
+            $userId = $stateData['user_id'];
+            $storeUrl = $stateData['store_url'];
+
+            if (! $userId) {
+                return redirect('/integrations?error=invalid_state');
+            }
+
+            $store = $this->nuvemshopService->handleCallback($code, (int) $userId, $storeUrl);
+
             ActivityLog::log('store.connected', $store);
-            
+
             // Start initial sync
             SyncStoreDataJob::dispatch($store);
 
             return redirect('/integrations?success=connected');
         } catch (\Exception $e) {
-            return redirect('/integrations?error=' . urlencode($e->getMessage()));
+            Log::error('Nuvemshop callback error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect('/integrations?error='.urlencode($e->getMessage()));
+        }
+    }
+
+    /**
+     * Authorize Nuvemshop - Exchange OAuth code for access token.
+     * This is called by the frontend after receiving the code from Nuvemshop OAuth.
+     */
+    public function authorizeNuvemshop(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        $code = $request->input('code');
+
+        // Get client credentials from SystemSetting
+        $clientId = SystemSetting::get('nuvemshop.client_id');
+        $clientSecret = SystemSetting::get('nuvemshop.client_secret');
+
+        if (empty($clientId) || empty($clientSecret)) {
+            return response()->json([
+                'message' => 'Client ID e Client Secret não configurados. Entre em contato com o administrador.',
+            ], 400);
+        }
+
+        try {
+            // Log request data for debugging (not secrets)
+            Log::info('Attempting Nuvemshop token exchange', [
+                'client_id_set' => ! empty($clientId),
+                'client_secret_set' => ! empty($clientSecret),
+                'code_length' => strlen($code),
+            ]);
+
+            // Exchange code for access token
+            // Nuvemshop API expects form-urlencoded data, not JSON
+            // Using Brazilian URL (nuvemshop.com.br) - for Argentina use tiendanube.com
+            $response = Http::timeout(30)
+                ->asForm()
+                ->post('https://www.nuvemshop.com.br/apps/authorize/token', [
+                    'client_id' => $clientId,
+                    'client_secret' => $clientSecret,
+                    'grant_type' => 'authorization_code',
+                    'code' => $code,
+                ]);
+
+            if (! $response->successful()) {
+                Log::error('Nuvemshop token exchange failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                $errorMessage = 'Falha ao conectar com a Nuvemshop.';
+                $errorData = $response->json();
+
+                if (isset($errorData['error_description'])) {
+                    $errorMessage = $errorData['error_description'];
+                } elseif (isset($errorData['error'])) {
+                    $errorMessage = $errorData['error'];
+                }
+
+                return response()->json([
+                    'message' => $errorMessage,
+                ], 400);
+            }
+
+            $data = $response->json();
+
+            // Log response for debugging
+            Log::info('Nuvemshop token response', [
+                'status' => $response->status(),
+                'has_access_token' => isset($data['access_token']),
+                'keys' => array_keys($data ?? []),
+            ]);
+
+            // Validate that we received the expected access_token
+            if (! isset($data['access_token'])) {
+                Log::error('Nuvemshop response missing access_token', [
+                    'response_body' => $response->body(),
+                    'response_data' => $data,
+                ]);
+
+                $errorMessage = 'Resposta inválida da Nuvemshop. Token de acesso não recebido.';
+
+                if (isset($data['error_description'])) {
+                    $errorMessage = $data['error_description'];
+                } elseif (isset($data['error'])) {
+                    $errorMessage = $data['error'];
+                } elseif (isset($data['message'])) {
+                    $errorMessage = $data['message'];
+                }
+
+                return response()->json([
+                    'message' => $errorMessage,
+                    'debug' => config('app.debug') ? [
+                        'response_keys' => array_keys($data ?? []),
+                    ] : null,
+                ], 400);
+            }
+
+            // Save token data to SystemSettings
+            SystemSetting::set('nuvemshop.access_token', $data['access_token'], [
+                'type' => 'string',
+                'group' => 'nuvemshop',
+                'label' => 'Access Token',
+                'description' => 'Nuvemshop OAuth Access Token',
+                'is_sensitive' => true,
+            ]);
+
+            if (isset($data['token_type'])) {
+                SystemSetting::set('nuvemshop.token_type', $data['token_type'], [
+                    'type' => 'string',
+                    'group' => 'nuvemshop',
+                    'label' => 'Token Type',
+                ]);
+            }
+
+            if (isset($data['scope'])) {
+                SystemSetting::set('nuvemshop.scope', $data['scope'], [
+                    'type' => 'string',
+                    'group' => 'nuvemshop',
+                    'label' => 'Scope',
+                ]);
+            }
+
+            if (isset($data['user_id'])) {
+                SystemSetting::set('nuvemshop.user_id', (string) $data['user_id'], [
+                    'type' => 'string',
+                    'group' => 'nuvemshop',
+                    'label' => 'User ID',
+                ]);
+            }
+
+            // Also create/update a Store record for this user
+            $user = $request->user();
+            $store = Store::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'platform' => 'nuvemshop',
+                    'external_store_id' => (string) ($data['user_id'] ?? ''),
+                ],
+                [
+                    'name' => 'Loja Nuvemshop',
+                    'access_token' => $data['access_token'],
+                    'sync_status' => 'pending',
+                ]
+            );
+
+            // Try to get store details from Nuvemshop API
+            if (isset($data['user_id']) && isset($data['access_token'])) {
+                try {
+                    $storeResponse = Http::withHeaders([
+                        'Authentication' => 'bearer '.$data['access_token'],
+                        'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+                    ])->get("https://api.tiendanube.com/2025-03/{$data['user_id']}/store");
+
+                    if ($storeResponse->successful()) {
+                        $storeData = $storeResponse->json();
+                        $store->update([
+                            'name' => $storeData['name']['pt'] ?? $storeData['name']['es'] ?? $storeData['name']['en'] ?? 'Loja Nuvemshop',
+                            'domain' => $storeData['original_domain'] ?? $storeData['domains'][0] ?? null,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to fetch store details from Nuvemshop', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Set as active store if user doesn't have one
+            if (! $user->active_store_id) {
+                $user->update(['active_store_id' => $store->id]);
+            }
+
+            // Start initial sync
+            SyncStoreDataJob::dispatch($store);
+
+            ActivityLog::log('store.connected', $store);
+
+            Log::info('Nuvemshop OAuth completed successfully', [
+                'user_id' => $user->id,
+                'store_id' => $store->id,
+                'nuvemshop_user_id' => $data['user_id'] ?? null,
+            ]);
+
+            return response()->json([
+                'message' => 'Loja conectada com sucesso!',
+                'store' => new StoreResource($store),
+                'config' => [
+                    'userId' => $data['user_id'] ?? null,
+                    'scope' => $data['scope'] ?? null,
+                    'tokenType' => $data['token_type'] ?? null,
+                    'isConnected' => true,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Exception during Nuvemshop authorization', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao processar a autorização. Tente novamente.',
+            ], 500);
         }
     }
 
@@ -66,7 +335,7 @@ class IntegrationController extends Controller
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -77,7 +346,7 @@ class IntegrationController extends Controller
         }
 
         SyncStoreDataJob::dispatch($store);
-        
+
         ActivityLog::log('store.sync_started', $store);
 
         return response()->json([
@@ -92,13 +361,35 @@ class IntegrationController extends Controller
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
+        $storeName = $store->name;
+
         ActivityLog::log('store.disconnected', $store);
 
-        $store->delete();
+        // Delete related data first
+        $store->products()->delete();
+        $store->orders()->delete();
+        $store->customers()->delete();
+        $store->analyses()->delete();
+
+        // Permanently delete the store (not soft delete)
+        $store->forceDelete();
+
+        // Update user's active store if this was the active one
+        $user = $request->user();
+        if ($user->active_store_id === $storeId) {
+            $newActiveStore = $user->stores()->first();
+            $user->update(['active_store_id' => $newActiveStore?->id]);
+        }
+
+        Log::info('Store disconnected and deleted', [
+            'store_id' => $storeId,
+            'store_name' => $storeName,
+            'user_id' => $user->id,
+        ]);
 
         return response()->json([
             'message' => 'Loja desconectada com sucesso.',
@@ -116,7 +407,7 @@ class IntegrationController extends Controller
         $activeStoreId = $user->activeStore?->id;
 
         return response()->json([
-            'stores' => $stores->map(fn($s) => [
+            'stores' => $stores->map(fn ($s) => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'platform' => $s->platform,
@@ -132,12 +423,12 @@ class IntegrationController extends Controller
     public function selectStore(Request $request, int $storeId): JsonResponse
     {
         $user = $request->user();
-        
+
         $store = Store::where('id', $storeId)
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -152,4 +443,3 @@ class IntegrationController extends Controller
         ]);
     }
 }
-

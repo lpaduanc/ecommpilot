@@ -1,7 +1,6 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { useNotificationStore } from '../stores/notificationStore';
-import api from '../services/api';
+import { ref, computed } from 'vue';
+import { useIntegration } from '../composables/useIntegration';
 import BaseCard from '../components/common/BaseCard.vue';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
@@ -16,13 +15,28 @@ import {
     SparklesIcon,
 } from '@heroicons/vue/24/outline';
 
-const notificationStore = useNotificationStore();
+// Use integration composable - will auto-process OAuth callback
+const {
+    stores,
+    isLoading,
+    isSyncing,
+    isProcessingOAuth,
+    hasConnectedStore,
+    connectPlatform,
+    syncStore,
+    disconnectStore: disconnectStoreAction,
+    refreshStores,
+} = useIntegration({
+    autoFetch: true,
+    autoProcessOAuth: true,
+    redirectAfterOAuth: true,
+});
 
-const stores = ref([]);
-const isLoading = ref(false);
-const isSyncing = ref(false);
 const showDisconnectModal = ref(false);
+const showConnectModal = ref(false);
 const selectedStore = ref(null);
+const storeUrl = ref('');
+const storeUrlError = ref('');
 
 const platforms = [
     {
@@ -53,38 +67,54 @@ const platforms = [
     },
 ];
 
-const hasConnectedStore = computed(() => stores.value.length > 0);
-
-async function fetchStores() {
-    isLoading.value = true;
-    try {
-        const response = await api.get('/integrations/stores');
-        stores.value = response.data;
-    } catch {
-        stores.value = [];
-    } finally {
-        isLoading.value = false;
-    }
-}
-
-function connectPlatform(platform) {
+function handleConnectPlatform(platform) {
     if (!platform.available) return;
-    
-    // Redirect to OAuth flow
-    window.location.href = `/api/integrations/${platform.id}/connect`;
+
+    // Open modal for store URL input
+    showConnectModal.value = true;
+    storeUrl.value = '';
+    storeUrlError.value = '';
 }
 
-async function syncStore(store) {
-    isSyncing.value = true;
-    try {
-        await api.post(`/integrations/stores/${store.id}/sync`);
-        notificationStore.success('Sincronização iniciada! Você será notificado quando concluir.');
-        await fetchStores();
-    } catch {
-        notificationStore.error('Erro ao iniciar sincronização.');
-    } finally {
-        isSyncing.value = false;
+function closeConnectModal() {
+    showConnectModal.value = false;
+    storeUrl.value = '';
+    storeUrlError.value = '';
+}
+
+function validateStoreUrl() {
+    storeUrlError.value = '';
+
+    if (!storeUrl.value) {
+        storeUrlError.value = 'A URL da loja é obrigatória';
+        return false;
     }
+
+    // Validate URL format
+    const urlPattern = /^[a-zA-Z0-9-]+\.(lojavirtualnuvem\.com\.br|nuvemshop\.com\.br|tiendanube\.com)$/;
+    if (!urlPattern.test(storeUrl.value)) {
+        storeUrlError.value = 'URL inválida. Exemplo: minhaloja.lojavirtualnuvem.com.br';
+        return false;
+    }
+
+    return true;
+}
+
+async function handleConnect() {
+    if (!validateStoreUrl()) return;
+
+    // Call connectPlatform with store URL
+    const result = await connectPlatform('nuvemshop', storeUrl.value);
+
+    // Only show error in modal if there was a failure (success redirects away)
+    if (result && !result.success) {
+        storeUrlError.value = result.message;
+    }
+}
+
+async function handleSyncStore(store) {
+    await syncStore(store.id);
+    await refreshStores();
 }
 
 function confirmDisconnect(store) {
@@ -92,18 +122,12 @@ function confirmDisconnect(store) {
     showDisconnectModal.value = true;
 }
 
-async function disconnectStore() {
+async function handleDisconnectStore() {
     if (!selectedStore.value) return;
-    
-    try {
-        await api.delete(`/integrations/stores/${selectedStore.value.id}`);
-        notificationStore.success('Loja desconectada com sucesso.');
-        showDisconnectModal.value = false;
-        selectedStore.value = null;
-        await fetchStores();
-    } catch {
-        notificationStore.error('Erro ao desconectar loja.');
-    }
+
+    await disconnectStoreAction(selectedStore.value.id);
+    showDisconnectModal.value = false;
+    selectedStore.value = null;
 }
 
 function getSyncStatusLabel(status) {
@@ -130,10 +154,6 @@ function formatDate(date) {
     if (!date) return 'Nunca';
     return new Date(date).toLocaleString('pt-BR');
 }
-
-onMounted(() => {
-    fetchStores();
-});
 </script>
 
 <template>
@@ -168,8 +188,20 @@ onMounted(() => {
 
         <!-- Main Content -->
         <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+            <!-- Processing OAuth -->
+            <div v-if="isProcessingOAuth" class="flex items-center justify-center py-32">
+                <div class="text-center">
+                    <div class="relative mb-6">
+                        <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse"></div>
+                        <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
+                    </div>
+                    <p class="text-lg font-medium text-gray-900">Processando autorização...</p>
+                    <p class="text-sm text-gray-500 mt-2">Aguarde enquanto conectamos sua loja</p>
+                </div>
+            </div>
+
             <!-- Loading State -->
-            <div v-if="isLoading" class="flex items-center justify-center py-32">
+            <div v-else-if="isLoading" class="flex items-center justify-center py-32">
                 <div class="relative">
                     <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse"></div>
                     <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
@@ -201,6 +233,7 @@ onMounted(() => {
                                     <div>
                                         <h3 class="font-semibold text-gray-900">{{ store.name }}</h3>
                                         <p class="text-sm text-gray-500">{{ store.domain }}</p>
+                                        <p v-if="store.user_id" class="text-xs text-gray-400 mt-0.5">ID: {{ store.user_id }}</p>
                                     </div>
                                 </div>
                                 
@@ -237,7 +270,7 @@ onMounted(() => {
                                         <BaseButton
                                             variant="secondary"
                                             size="sm"
-                                            @click="syncStore(store)"
+                                            @click="handleSyncStore(store)"
                                             :disabled="isSyncing || store.sync_status === 'syncing'"
                                         >
                                             <ArrowPathIcon class="w-4 h-4" />
@@ -277,21 +310,21 @@ onMounted(() => {
                                     'animate-slide-up'
                                 ]"
                                 :style="{ animationDelay: `${index * 100}ms` }"
-                                @click="connectPlatform(platform)"
+                                @click="handleConnectPlatform(platform)"
                             >
                                 <!-- Background Gradient -->
                                 <div :class="['absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300', platform.gradient, 'to-transparent']"></div>
-                                
+
                                 <div class="relative p-6 text-center">
                                     <div :class="['w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg transition-transform duration-300 group-hover:scale-110', platform.gradient]">
                                         {{ platform.logo }}
                                     </div>
                                     <h3 class="font-semibold text-gray-900 mb-2">{{ platform.name }}</h3>
                                     <p class="text-sm text-gray-500 mb-4">{{ platform.description }}</p>
-                                    
+
                                     <BaseButton
                                         v-if="platform.available"
-                                        @click.stop="connectPlatform(platform)"
+                                        @click.stop="handleConnectPlatform(platform)"
                                         full-width
                                         class="group-hover:scale-105 transition-transform"
                                     >
@@ -311,6 +344,62 @@ onMounted(() => {
                 </div>
             </template>
         </div>
+
+        <!-- Connect Store Modal -->
+        <BaseModal
+            :show="showConnectModal"
+            @close="closeConnectModal"
+            title="Conectar Loja Nuvemshop"
+            size="md"
+        >
+            <div class="py-4">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-500/30 text-3xl">
+                    🛒
+                </div>
+
+                <p class="text-gray-600 mb-6 text-center">
+                    Digite a URL da sua loja Nuvemshop para conectá-la à plataforma
+                </p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                            URL da Loja
+                            <span class="text-danger-500">*</span>
+                        </label>
+                        <input
+                            v-model="storeUrl"
+                            type="text"
+                            placeholder="minhaloja.lojavirtualnuvem.com.br"
+                            class="w-full px-4 py-2.5 rounded-lg border bg-white text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2"
+                            :class="storeUrlError
+                                ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20'
+                                : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500/20'"
+                            @keyup.enter="handleConnect"
+                        />
+                        <p v-if="storeUrlError" class="text-sm text-danger-500 mt-1.5">{{ storeUrlError }}</p>
+                        <p v-else class="text-sm text-gray-500 mt-1.5">
+                            Exemplo: minhaloja.lojavirtualnuvem.com.br
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button
+                        @click="closeConnectModal"
+                        class="flex-1 px-6 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        @click="handleConnect"
+                        class="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all"
+                    >
+                        Conectar
+                    </button>
+                </div>
+            </div>
+        </BaseModal>
 
         <!-- Disconnect Confirmation Modal -->
         <BaseModal
@@ -336,7 +425,7 @@ onMounted(() => {
                         Cancelar
                     </button>
                     <button
-                        @click="disconnectStore"
+                        @click="handleDisconnectStore"
                         class="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-danger-500 to-danger-600 text-white font-semibold shadow-lg shadow-danger-500/30 hover:shadow-xl transition-all"
                     >
                         Desconectar

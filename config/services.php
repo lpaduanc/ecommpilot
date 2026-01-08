@@ -53,7 +53,7 @@ return [
 
     'ai' => [
         // Default AI provider: 'openai' or 'gemini'
-        'default' => env('AI_PROVIDER', 'openai'),
+        'default' => env('AI_PROVIDER', 'gemini'),
 
         // OpenAI Configuration
         'openai' => [

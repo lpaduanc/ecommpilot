@@ -2,119 +2,185 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/authStore';
 
 const routes = [
-    // Auth Routes
+    // Auth Routes - Guest only routes with prefetch for fast login flow
     {
         path: '/login',
         name: 'login',
-        component: () => import('../views/auth/LoginView.vue'),
+        component: () => import(
+            /* webpackChunkName: "auth-login" */
+            /* webpackPrefetch: true */
+            '../views/auth/LoginView.vue'
+        ),
         meta: { guest: true },
     },
     {
         path: '/register',
         name: 'register',
-        component: () => import('../views/auth/RegisterView.vue'),
+        component: () => import(
+            /* webpackChunkName: "auth-register" */
+            '../views/auth/RegisterView.vue'
+        ),
         meta: { guest: true },
     },
     {
         path: '/forgot-password',
         name: 'forgot-password',
-        component: () => import('../views/auth/ForgotPasswordView.vue'),
+        component: () => import(
+            /* webpackChunkName: "auth-forgot-password" */
+            '../views/auth/ForgotPasswordView.vue'
+        ),
         meta: { guest: true },
     },
     {
         path: '/reset-password/:token',
         name: 'reset-password',
-        component: () => import('../views/auth/ResetPasswordView.vue'),
+        component: () => import(
+            /* webpackChunkName: "auth-reset-password" */
+            '../views/auth/ResetPasswordView.vue'
+        ),
         meta: { guest: true },
     },
-    
-    // Main App Routes
+
+    // Main App Routes - High priority routes with prefetch
     {
         path: '/',
         name: 'dashboard',
-        component: () => import('../views/DashboardView.vue'),
+        component: () => import(
+            /* webpackChunkName: "dashboard" */
+            /* webpackPrefetch: true */
+            '../views/DashboardView.vue'
+        ),
         meta: { requiresAuth: true },
     },
     {
         path: '/products',
         name: 'products',
-        component: () => import('../views/ProductsView.vue'),
+        component: () => import(
+            /* webpackChunkName: "products" */
+            /* webpackPrefetch: true */
+            '../views/ProductsView.vue'
+        ),
         meta: { requiresAuth: true },
     },
     {
         path: '/orders',
         name: 'orders',
-        component: () => import('../views/OrdersView.vue'),
+        component: () => import(
+            /* webpackChunkName: "orders" */
+            /* webpackPrefetch: true */
+            '../views/OrdersView.vue'
+        ),
         meta: { requiresAuth: true },
     },
     {
         path: '/analysis',
         name: 'analysis',
-        component: () => import('../views/AnalysisView.vue'),
+        component: () => import(
+            /* webpackChunkName: "analysis" */
+            /* webpackPrefetch: true */
+            '../views/AnalysisView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'analytics.view' },
     },
     {
         path: '/chat',
         name: 'chat',
-        component: () => import('../views/ChatView.vue'),
+        component: () => import(
+            /* webpackChunkName: "chat" */
+            /* webpackPrefetch: true */
+            '../views/ChatView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'chat.use' },
     },
     {
         path: '/integrations',
         name: 'integrations',
-        component: () => import('../views/IntegrationsView.vue'),
+        component: () => import(
+            /* webpackChunkName: "integrations" */
+            '../views/IntegrationsView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'integrations.manage' },
     },
     {
         path: '/settings',
         name: 'settings',
-        component: () => import('../views/SettingsView.vue'),
+        component: () => import(
+            /* webpackChunkName: "settings" */
+            '../views/SettingsView.vue'
+        ),
         meta: { requiresAuth: true },
     },
-    
-    // Admin Routes
+
+    // Admin Routes - Lower priority, no preload for better initial performance
     {
         path: '/admin',
         name: 'admin-dashboard',
-        component: () => import('../views/admin/AdminDashboardView.vue'),
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/AdminDashboardView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'admin.access' },
     },
     {
         path: '/admin/users',
         name: 'admin-users',
-        component: () => import('../views/admin/UsersView.vue'),
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/UsersView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'users.view' },
     },
     {
         path: '/admin/users/:id',
         name: 'admin-user-detail',
-        component: () => import('../views/admin/UserDetailView.vue'),
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/UserDetailView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'users.view' },
     },
     {
         path: '/admin/clients',
         name: 'admin-clients',
-        component: () => import('../views/admin/ClientsView.vue'),
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/ClientsView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'admin.access' },
     },
     {
         path: '/admin/clients/:id',
         name: 'admin-client-detail',
-        component: () => import('../views/admin/ClientDetailView.vue'),
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/ClientDetailView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'admin.access' },
     },
     {
         path: '/admin/settings',
         name: 'admin-settings',
-        component: () => import('../views/admin/SettingsView.vue'),
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/SettingsView.vue'
+        ),
         meta: { requiresAuth: true, permission: 'admin.access' },
     },
-    
+
     // 404
     {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
-        component: () => import('../views/NotFoundView.vue'),
+        component: () => import(
+            /* webpackChunkName: "not-found" */
+            '../views/NotFoundView.vue'
+        ),
     },
 ];
 
