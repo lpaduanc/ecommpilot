@@ -34,7 +34,7 @@ class UserStoreSettingsController extends Controller
         $tokenType = SystemSetting::get('nuvemshop.token_type');
         $grantType = SystemSetting::get('nuvemshop.grant_type', 'authorization_code');
 
-        $isConnected = !empty(SystemSetting::get('nuvemshop.access_token'));
+        $isConnected = ! empty(SystemSetting::get('nuvemshop.access_token'));
 
         // For security, we don't expose client_id and client_secret to regular users
         return response()->json([
@@ -63,7 +63,7 @@ class UserStoreSettingsController extends Controller
         $scope = SystemSetting::get('nuvemshop.scope');
         $tokenType = SystemSetting::get('nuvemshop.token_type');
 
-        $isConnected = !empty(SystemSetting::get('nuvemshop.access_token'));
+        $isConnected = ! empty(SystemSetting::get('nuvemshop.access_token'));
 
         return response()->json([
             'is_connected' => $isConnected,

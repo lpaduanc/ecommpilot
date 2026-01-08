@@ -3,8 +3,6 @@
 namespace App\Http\Traits;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 trait ApiResponse
@@ -27,7 +25,7 @@ trait ApiResponse
             $response['data'] = $data;
         }
 
-        if (!empty($meta)) {
+        if (! empty($meta)) {
             $response['meta'] = $meta;
         }
 
@@ -52,7 +50,7 @@ trait ApiResponse
             $response['error_code'] = $errorCode;
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             $response['errors'] = $errors;
         }
 

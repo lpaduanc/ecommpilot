@@ -16,7 +16,9 @@ class ProcessAnalysisJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
+
     public int $backoff = 30;
+
     public int $timeout = 120;
 
     public function __construct(
@@ -39,11 +41,10 @@ class ProcessAnalysisJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         $this->analysis->markAsFailed();
-        
+
         // Refund credits
         $this->analysis->user->addCredits($this->analysis->credits_used);
-        
+
         Log::error("ProcessAnalysisJob failed for analysis {$this->analysis->id}: {$exception->getMessage()}");
     }
 }
-

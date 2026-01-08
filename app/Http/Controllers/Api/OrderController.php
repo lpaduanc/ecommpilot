@@ -14,7 +14,7 @@ class OrderController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([
                 'data' => [],
                 'total' => 0,
@@ -48,7 +48,7 @@ class OrderController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -56,11 +56,10 @@ class OrderController extends Controller
             ->where('id', $id)
             ->first();
 
-        if (!$order) {
+        if (! $order) {
             return response()->json(['message' => 'Pedido não encontrado.'], 404);
         }
 
         return response()->json(new OrderResource($order));
     }
 }
-

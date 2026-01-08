@@ -16,7 +16,6 @@ $app = require_once __DIR__.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Models\SystemSetting;
-use Illuminate\Support\Facades\DB;
 
 echo "=== CamelCase to Snake_Case Conversion Test ===\n\n";
 
@@ -99,7 +98,7 @@ if ($clientId === '24713') {
 }
 
 if ($clientSecret === 'c85726f31bf4f4b304488d6f802fe8f8a4a1df307f6ef258') {
-    echo "   ✓ client_secret: " . substr($clientSecret, 0, 20) . "...\n";
+    echo '   ✓ client_secret: '.substr($clientSecret, 0, 20)."...\n";
 } else {
     echo "   ✗ client_secret: Value mismatch\n";
     $success = false;

@@ -75,6 +75,7 @@ class SyncedProductFactory extends Factory
     {
         return $this->state(function (array $attributes) use ($discountPercent) {
             $price = $attributes['price'] ?? 100;
+
             return [
                 'compare_at_price' => round($price / (1 - $discountPercent / 100), 2),
             ];

@@ -25,6 +25,7 @@ return new class extends Migration
             $table->timestamp('external_created_at')->nullable();
             $table->timestamp('external_updated_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['store_id', 'external_id']);
             $table->index(['store_id', 'is_active']);
@@ -37,4 +38,3 @@ return new class extends Migration
         Schema::dropIfExists('synced_products');
     }
 };
-

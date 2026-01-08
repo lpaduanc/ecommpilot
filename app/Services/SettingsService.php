@@ -40,8 +40,8 @@ class SettingsService
         $settings['gemini']['api_key'] = $this->maskApiKey($settings['gemini']['api_key']);
 
         // Add configured status
-        $settings['openai']['is_configured'] = !empty(SystemSetting::get('ai.openai.api_key', config('openai.api_key')));
-        $settings['gemini']['is_configured'] = !empty(SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key')));
+        $settings['openai']['is_configured'] = ! empty(SystemSetting::get('ai.openai.api_key', config('openai.api_key')));
+        $settings['gemini']['is_configured'] = ! empty(SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key')));
 
         return $settings;
     }
@@ -80,7 +80,7 @@ class SettingsService
      */
     private function updateOpenAISettings(array $data): void
     {
-        if (isset($data['api_key']) && !$this->isMaskedValue($data['api_key'])) {
+        if (isset($data['api_key']) && ! $this->isMaskedValue($data['api_key'])) {
             SystemSetting::set('ai.openai.api_key', $data['api_key'], [
                 'type' => 'string',
                 'group' => 'ai',
@@ -119,7 +119,7 @@ class SettingsService
      */
     private function updateGeminiSettings(array $data): void
     {
-        if (isset($data['api_key']) && !$this->isMaskedValue($data['api_key'])) {
+        if (isset($data['api_key']) && ! $this->isMaskedValue($data['api_key'])) {
             SystemSetting::set('ai.gemini.api_key', $data['api_key'], [
                 'type' => 'string',
                 'group' => 'ai',
@@ -160,7 +160,7 @@ class SettingsService
     {
         try {
             $aiManager = app(\App\Services\AI\AIManager::class);
-            
+
             $response = $aiManager->chat([
                 ['role' => 'system', 'content' => 'You are a helpful assistant.'],
                 ['role' => 'user', 'content' => 'Say "Connection successful!" in Portuguese.'],
@@ -177,7 +177,7 @@ class SettingsService
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erro ao conectar: ' . $e->getMessage(),
+                'message' => 'Erro ao conectar: '.$e->getMessage(),
             ];
         }
     }
@@ -195,7 +195,7 @@ class SettingsService
             return '********';
         }
 
-        return substr($key, 0, 4) . str_repeat('*', strlen($key) - 8) . substr($key, -4);
+        return substr($key, 0, 4).str_repeat('*', strlen($key) - 8).substr($key, -4);
     }
 
     /**
@@ -210,4 +210,3 @@ class SettingsService
         return str_contains($value, '****') || $value === '********';
     }
 }
-

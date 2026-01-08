@@ -17,7 +17,7 @@ class StorePolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->policy = new StorePolicy();
+        $this->policy = new StorePolicy;
         $this->artisan('db:seed', ['--class' => 'Database\\Seeders\\PermissionSeeder']);
     }
 

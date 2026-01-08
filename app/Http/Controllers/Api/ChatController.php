@@ -26,7 +26,7 @@ class ChatController extends Controller
             }])
             ->first();
 
-        if (!$conversation) {
+        if (! $conversation) {
             return response()->json([
                 'conversation_id' => null,
                 'messages' => [],
@@ -120,4 +120,3 @@ class ChatController extends Controller
         ]);
     }
 }
-

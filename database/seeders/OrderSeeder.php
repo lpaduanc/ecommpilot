@@ -5,9 +5,7 @@ namespace Database\Seeders;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Store;
-use App\Models\SyncedCustomer;
 use App\Models\SyncedOrder;
-use App\Models\SyncedProduct;
 use Illuminate\Database\Seeder;
 
 class OrderSeeder extends Seeder
@@ -59,15 +57,15 @@ class OrderSeeder extends Seeder
     {
         $date = now()->subDays($daysAgo);
         $dayOfWeek = $date->dayOfWeek;
-        
+
         // Base orders (more recent = more orders)
         $baseOrders = max(1, 8 - ($daysAgo / 15));
-        
+
         // Weekend boost
         if ($dayOfWeek === 0 || $dayOfWeek === 6) {
             $baseOrders *= 1.3;
         }
-        
+
         // Random variation
         return rand((int) ($baseOrders * 0.5), (int) ($baseOrders * 1.5));
     }
@@ -76,11 +74,11 @@ class OrderSeeder extends Seeder
     {
         $customer = $customers->random();
         $orderDate = now()->subDays($daysAgo)->subHours(rand(0, 23))->subMinutes(rand(0, 59));
-        
+
         // Select 1-4 products for the order
         $numProducts = rand(1, 4);
         $orderProducts = $products->random(min($numProducts, $products->count()));
-        
+
         $items = [];
         $subtotal = 0;
 
@@ -118,8 +116,8 @@ class OrderSeeder extends Seeder
 
         SyncedOrder::create([
             'store_id' => $store->id,
-            'external_id' => 'ORD' . $store->id . '-' . uniqid() . '-' . rand(10000, 99999),
-            'order_number' => '#' . rand(10000, 99999),
+            'external_id' => 'ORD'.$store->id.'-'.uniqid().'-'.rand(10000, 99999),
+            'order_number' => '#'.rand(10000, 99999),
             'status' => $orderStatus,
             'payment_status' => $paymentStatus,
             'shipping_status' => $shippingStatus,
@@ -142,27 +140,50 @@ class OrderSeeder extends Seeder
         // Orders older than 14 days are mostly delivered
         if ($daysAgo > 14) {
             $rand = rand(1, 100);
-            if ($rand <= 85) return OrderStatus::Delivered;
-            if ($rand <= 95) return OrderStatus::Cancelled;
+            if ($rand <= 85) {
+                return OrderStatus::Delivered;
+            }
+            if ($rand <= 95) {
+                return OrderStatus::Cancelled;
+            }
+
             return OrderStatus::Shipped;
         }
 
         // Orders 7-14 days old
         if ($daysAgo > 7) {
             $rand = rand(1, 100);
-            if ($rand <= 50) return OrderStatus::Delivered;
-            if ($rand <= 80) return OrderStatus::Shipped;
-            if ($rand <= 90) return OrderStatus::Paid;
-            if ($rand <= 95) return OrderStatus::Cancelled;
+            if ($rand <= 50) {
+                return OrderStatus::Delivered;
+            }
+            if ($rand <= 80) {
+                return OrderStatus::Shipped;
+            }
+            if ($rand <= 90) {
+                return OrderStatus::Paid;
+            }
+            if ($rand <= 95) {
+                return OrderStatus::Cancelled;
+            }
+
             return OrderStatus::Pending;
         }
 
         // Orders less than 7 days old
         $rand = rand(1, 100);
-        if ($rand <= 20) return OrderStatus::Delivered;
-        if ($rand <= 50) return OrderStatus::Shipped;
-        if ($rand <= 75) return OrderStatus::Paid;
-        if ($rand <= 90) return OrderStatus::Pending;
+        if ($rand <= 20) {
+            return OrderStatus::Delivered;
+        }
+        if ($rand <= 50) {
+            return OrderStatus::Shipped;
+        }
+        if ($rand <= 75) {
+            return OrderStatus::Paid;
+        }
+        if ($rand <= 90) {
+            return OrderStatus::Pending;
+        }
+
         return OrderStatus::Cancelled;
     }
 
@@ -210,14 +231,14 @@ class OrderSeeder extends Seeder
         ];
 
         $cities = [
-            ['city' => 'São Paulo', 'state' => 'SP', 'zip' => '01310-' . rand(100, 999)],
-            ['city' => 'Rio de Janeiro', 'state' => 'RJ', 'zip' => '20040-' . rand(100, 999)],
-            ['city' => 'Belo Horizonte', 'state' => 'MG', 'zip' => '30130-' . rand(100, 999)],
-            ['city' => 'Curitiba', 'state' => 'PR', 'zip' => '80010-' . rand(100, 999)],
-            ['city' => 'Porto Alegre', 'state' => 'RS', 'zip' => '90010-' . rand(100, 999)],
-            ['city' => 'Brasília', 'state' => 'DF', 'zip' => '70040-' . rand(100, 999)],
-            ['city' => 'Salvador', 'state' => 'BA', 'zip' => '40010-' . rand(100, 999)],
-            ['city' => 'Recife', 'state' => 'PE', 'zip' => '50010-' . rand(100, 999)],
+            ['city' => 'São Paulo', 'state' => 'SP', 'zip' => '01310-'.rand(100, 999)],
+            ['city' => 'Rio de Janeiro', 'state' => 'RJ', 'zip' => '20040-'.rand(100, 999)],
+            ['city' => 'Belo Horizonte', 'state' => 'MG', 'zip' => '30130-'.rand(100, 999)],
+            ['city' => 'Curitiba', 'state' => 'PR', 'zip' => '80010-'.rand(100, 999)],
+            ['city' => 'Porto Alegre', 'state' => 'RS', 'zip' => '90010-'.rand(100, 999)],
+            ['city' => 'Brasília', 'state' => 'DF', 'zip' => '70040-'.rand(100, 999)],
+            ['city' => 'Salvador', 'state' => 'BA', 'zip' => '40010-'.rand(100, 999)],
+            ['city' => 'Recife', 'state' => 'PE', 'zip' => '50010-'.rand(100, 999)],
         ];
 
         $location = $cities[array_rand($cities)];
@@ -226,7 +247,7 @@ class OrderSeeder extends Seeder
             'name' => $customerName,
             'street' => $streets[array_rand($streets)],
             'number' => rand(1, 2000),
-            'complement' => rand(1, 100) <= 30 ? 'Apto ' . rand(1, 500) : null,
+            'complement' => rand(1, 100) <= 30 ? 'Apto '.rand(1, 500) : null,
             'neighborhood' => 'Centro',
             'city' => $location['city'],
             'state' => $location['state'],
@@ -235,4 +256,3 @@ class OrderSeeder extends Seeder
         ];
     }
 }
-

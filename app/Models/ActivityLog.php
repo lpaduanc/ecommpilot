@@ -65,4 +65,3 @@ class ActivityLog extends Model
         return $query->where('user_id', $userId);
     }
 }
-

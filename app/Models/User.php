@@ -65,6 +65,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($this->active_store_id) {
             return $this->getRelationValue('activeStore');
         }
+
         return $this->stores()->latest()->first();
     }
 
@@ -100,11 +101,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function deductCredits(int $amount = 1): bool
     {
-        if (!$this->hasCredits($amount)) {
+        if (! $this->hasCredits($amount)) {
             return false;
         }
 
         $this->decrement('ai_credits', $amount);
+
         return true;
     }
 

@@ -8,6 +8,7 @@ enum SyncStatus: string
     case Syncing = 'syncing';
     case Completed = 'completed';
     case Failed = 'failed';
+    case TokenExpired = 'token_expired';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum SyncStatus: string
             self::Syncing => 'Sincronizando',
             self::Completed => 'Sincronizado',
             self::Failed => 'Falhou',
+            self::TokenExpired => 'Token Expirado - Reconectar',
         };
     }
 
@@ -24,4 +26,3 @@ enum SyncStatus: string
         return array_column(self::cases(), 'value');
     }
 }
-

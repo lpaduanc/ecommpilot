@@ -28,7 +28,12 @@
       "Bash(php:*)",
       "Bash(del test-store-settings.php)",
       "Bash(timeout /t 10)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(C:\\\\projects\\\\ecommpilot\\\\vendor\\\\bin\\\\pint.bat:*)",
+      "WebSearch",
+      "WebFetch(domain:tiendanube.github.io)",
+      "WebFetch(domain:developers.nuvemshop.com.br)",
+      "Bash(Select -Last 50)"
     ]
   }
 }

@@ -11,7 +11,7 @@ class CustomerSeeder extends Seeder
     public function run(): void
     {
         $stores = Store::all();
-        
+
         $customerNames = [
             ['name' => 'Lucas Ferreira', 'email' => 'lucas.ferreira@gmail.com', 'phone' => '(11) 99111-1111'],
             ['name' => 'Fernanda Lima', 'email' => 'fernanda.lima@hotmail.com', 'phone' => '(11) 99222-2222'],
@@ -47,7 +47,7 @@ class CustomerSeeder extends Seeder
 
                 SyncedCustomer::create([
                     'store_id' => $store->id,
-                    'external_id' => 'CUST' . $store->id . str_pad($index + 1, 5, '0', STR_PAD_LEFT),
+                    'external_id' => 'CUST'.$store->id.str_pad($index + 1, 5, '0', STR_PAD_LEFT),
                     'name' => $customer['name'],
                     'email' => $customer['email'],
                     'phone' => $customer['phone'],
@@ -59,4 +59,3 @@ class CustomerSeeder extends Seeder
         }
     }
 }
-

@@ -22,4 +22,3 @@ enum Platform: string
         return array_column(self::cases(), 'value');
     }
 }
-

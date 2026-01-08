@@ -99,7 +99,7 @@ class StorePolicy
     public function requestAnalysis(User $user, Store $store): bool
     {
         // Precisa ser dono da loja e ter créditos
-        if (!$this->view($user, $store)) {
+        if (! $this->view($user, $store)) {
             return false;
         }
 

@@ -4,8 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Analysis;
 use App\Models\Store;
-use App\Models\SyncedOrder;
-use App\Models\SyncedProduct;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

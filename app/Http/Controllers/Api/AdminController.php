@@ -28,8 +28,8 @@ class AdminController extends Controller
 
         // Revenue from stores this month
         $monthlyRevenue = SyncedOrder::whereHas('store.user', function ($q) {
-                $q->where('role', UserRole::Client);
-            })
+            $q->where('role', UserRole::Client);
+        })
             ->whereMonth('external_created_at', now()->month)
             ->whereYear('external_created_at', now()->year)
             ->where('payment_status', 'paid')
@@ -64,8 +64,8 @@ class AdminController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -107,7 +107,7 @@ class AdminController extends Controller
                 'is_active' => $client->is_active,
                 'ai_credits' => $client->ai_credits,
                 'stores_count' => $client->stores->count(),
-                'stores' => $client->stores->map(fn($s) => [
+                'stores' => $client->stores->map(fn ($s) => [
                     'id' => $s->id,
                     'name' => $s->name,
                     'platform' => $s->platform,
@@ -134,10 +134,10 @@ class AdminController extends Controller
             ->get();
 
         // Calculate stats
-        $totalOrders = $client->stores->sum(fn($s) => $s->orders->count());
-        $totalRevenue = $client->stores->sum(fn($s) => $s->orders->where('payment_status', 'paid')->sum('total'));
-        $totalProducts = $client->stores->sum(fn($s) => $s->products->count());
-        $totalCustomers = $client->stores->sum(fn($s) => $s->customers->count());
+        $totalOrders = $client->stores->sum(fn ($s) => $s->orders->count());
+        $totalRevenue = $client->stores->sum(fn ($s) => $s->orders->where('payment_status', 'paid')->sum('total'));
+        $totalProducts = $client->stores->sum(fn ($s) => $s->products->count());
+        $totalCustomers = $client->stores->sum(fn ($s) => $s->customers->count());
 
         return response()->json([
             'id' => $client->id,
@@ -149,7 +149,7 @@ class AdminController extends Controller
             'email_verified_at' => $client->email_verified_at?->toISOString(),
             'last_login_at' => $client->last_login_at?->toISOString(),
             'created_at' => $client->created_at->toISOString(),
-            'stores' => $client->stores->map(fn($s) => [
+            'stores' => $client->stores->map(fn ($s) => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'domain' => $s->domain,
@@ -160,13 +160,13 @@ class AdminController extends Controller
                 'orders_count' => $s->orders->count(),
                 'customers_count' => $s->customers->count(),
             ]),
-            'analyses' => $client->analyses->map(fn($a) => [
+            'analyses' => $client->analyses->map(fn ($a) => [
                 'id' => $a->id,
                 'status' => $a->status,
                 'health_score' => $a->healthScore(),
                 'created_at' => $a->created_at->toISOString(),
             ]),
-            'activity_logs' => $activityLogs->map(fn($l) => [
+            'activity_logs' => $activityLogs->map(fn ($l) => [
                 'id' => $l->id,
                 'action' => $l->action,
                 'description' => $l->description,
@@ -251,7 +251,7 @@ class AdminController extends Controller
     {
         $client = User::where('role', UserRole::Client)->findOrFail($id);
 
-        $client->update(['is_active' => !$client->is_active]);
+        $client->update(['is_active' => ! $client->is_active]);
 
         $action = $client->is_active ? 'admin.client_activated' : 'admin.client_deactivated';
         ActivityLog::log($action, $client, request()->user());
@@ -282,7 +282,7 @@ class AdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => "Créditos adicionados com sucesso.",
+            'message' => 'Créditos adicionados com sucesso.',
             'ai_credits' => $client->ai_credits,
         ]);
     }
@@ -305,7 +305,7 @@ class AdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => "Créditos removidos com sucesso.",
+            'message' => 'Créditos removidos com sucesso.',
             'ai_credits' => $client->ai_credits,
         ]);
     }
@@ -388,4 +388,3 @@ class AdminController extends Controller
         ]);
     }
 }
-

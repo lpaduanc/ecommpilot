@@ -9,7 +9,9 @@ use OpenAI\Laravel\Facades\OpenAI;
 class OpenAIProvider implements AIProviderInterface
 {
     private string $defaultModel;
+
     private float $defaultTemperature;
+
     private int $defaultMaxTokens;
 
     public function __construct()
@@ -39,7 +41,6 @@ class OpenAIProvider implements AIProviderInterface
 
     public function isConfigured(): bool
     {
-        return !empty(config('openai.api_key'));
+        return ! empty(config('openai.api_key'));
     }
 }
-

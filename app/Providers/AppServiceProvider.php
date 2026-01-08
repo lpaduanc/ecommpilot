@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Contracts\AIProviderInterface;
 use App\Services\AI\AIManager;
 use Illuminate\Support\ServiceProvider;
 
@@ -15,7 +14,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register AIManager as a singleton
         $this->app->singleton(AIManager::class, function ($app) {
-            return new AIManager();
+            return new AIManager;
         });
     }
 

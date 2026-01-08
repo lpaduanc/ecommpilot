@@ -120,4 +120,3 @@ class AdminSettingsController extends Controller
         ];
     }
 }
-

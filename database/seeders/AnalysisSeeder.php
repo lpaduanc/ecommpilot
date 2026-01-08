@@ -20,12 +20,12 @@ class AnalysisSeeder extends Seeder
             for ($i = 0; $i < $numAnalyses; $i++) {
                 $daysAgo = $i * 7 + rand(0, 3); // Roughly weekly analyses
                 $analysisDate = now()->subDays($daysAgo);
-                
+
                 $periodEnd = $analysisDate->copy();
                 $periodStart = $periodEnd->copy()->subDays(30);
 
                 $healthScore = rand(60, 95);
-                
+
                 Analysis::create([
                     'user_id' => $store->user_id,
                     'store_id' => $store->id,
@@ -59,7 +59,7 @@ class AnalysisSeeder extends Seeder
                 $healthScore >= 40 => 'Regular',
                 default => 'Precisa de Atenção',
             },
-            'overview' => "A loja {$storeName} apresentou desempenho " . ($healthScore >= 70 ? 'positivo' : 'moderado') . " no período analisado.",
+            'overview' => "A loja {$storeName} apresentou desempenho ".($healthScore >= 70 ? 'positivo' : 'moderado').' no período analisado.',
             'revenue' => [
                 'total' => rand(15000, 150000),
                 'growth_percentage' => $revenueGrowth,
@@ -77,9 +77,9 @@ class AnalysisSeeder extends Seeder
             ],
             'conversion_rate' => rand(15, 45) / 10, // 1.5% - 4.5%
             'highlights' => [
-                'Aumento de ' . rand(10, 30) . '% nas vendas via PIX',
+                'Aumento de '.rand(10, 30).'% nas vendas via PIX',
                 'Ticket médio em alta nos finais de semana',
-                rand(3, 8) . ' produtos com estoque baixo',
+                rand(3, 8).' produtos com estoque baixo',
             ],
         ];
     }
@@ -175,6 +175,7 @@ class AnalysisSeeder extends Seeder
 
         // Return 3-5 random suggestions
         $shuffled = collect($allSuggestions)->shuffle();
+
         return $shuffled->take(rand(3, 5))->values()->toArray();
     }
 
@@ -225,6 +226,7 @@ class AnalysisSeeder extends Seeder
 
         // Return 1-3 random alerts
         $shuffled = collect($allAlerts)->shuffle();
+
         return $shuffled->take(rand(1, 3))->values()->toArray();
     }
 
@@ -283,7 +285,7 @@ class AnalysisSeeder extends Seeder
 
         // Return 2-3 random opportunities
         $shuffled = collect($allOpportunities)->shuffle();
+
         return $shuffled->take(rand(2, 3))->values()->toArray();
     }
 }
-

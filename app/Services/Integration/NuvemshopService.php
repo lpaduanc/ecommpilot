@@ -2,7 +2,9 @@
 
 namespace App\Services\Integration;
 
+use App\Contracts\ProductAdapterInterface;
 use App\Enums\Platform;
+use App\Enums\SyncStatus;
 use App\Models\Store;
 use App\Models\SyncedCustomer;
 use App\Models\SyncedOrder;
@@ -30,7 +32,12 @@ class NuvemshopService
      */
     private const RATE_LIMIT_PER_MINUTE = 60;
 
-    public function __construct()
+    /**
+     * Product adapter for transforming Nuvemshop data to SyncedProduct structure.
+     */
+    private ProductAdapterInterface $productAdapter;
+
+    public function __construct(?ProductAdapterInterface $productAdapter = null)
     {
         // Try SystemSetting first, fallback to config
         $this->clientId = SystemSetting::get('nuvemshop.client_id')
@@ -43,6 +50,9 @@ class NuvemshopService
 
         $this->redirectUri = config('services.nuvemshop.redirect_uri')
             ?? url('/api/integrations/nuvemshop/callback');
+
+        // Use provided adapter or default to NuvemshopProductAdapter
+        $this->productAdapter = $productAdapter ?? new NuvemshopProductAdapter;
     }
 
     public function getAuthorizationUrl(int $userId, ?string $storeUrl = null): string
@@ -149,6 +159,7 @@ class NuvemshopService
         ]);
 
         // Create or update store
+        // When reconnecting, clear token_requires_reconnection flag and reset sync_status
         return Store::updateOrCreate(
             [
                 'platform' => Platform::Nuvemshop,
@@ -161,6 +172,8 @@ class NuvemshopService
                 'email' => $storeInfo['email'] ?? null,
                 'access_token' => $data['access_token'],
                 'refresh_token' => $data['refresh_token'] ?? null,
+                'token_requires_reconnection' => false,
+                'sync_status' => SyncStatus::Pending,
                 'metadata' => $storeInfo,
             ]
         );
@@ -225,7 +238,11 @@ class NuvemshopService
 
     private function getStoreInfo(string $accessToken, string $storeId): array
     {
-        $response = Http::withToken($accessToken)
+        // Nuvemshop uses non-standard auth header: "Authentication: bearer {token}"
+        $response = Http::withHeaders([
+            'Authentication' => 'bearer '.$accessToken,
+            'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+        ])
             ->timeout(30)
             ->retry(3, 100, function ($exception) {
                 return $this->shouldRetry($exception);
@@ -236,7 +253,7 @@ class NuvemshopService
     }
 
     /**
-     * Faz uma requisição à API com retry, rate limiting e token refresh
+     * Faz uma requisição à API com retry, rate limiting e token refresh automático
      */
     private function makeRequest(Store $store, string $method, string $endpoint, array $params = []): array
     {
@@ -251,32 +268,73 @@ class NuvemshopService
 
         RateLimiter::hit($rateLimitKey, 60);
 
-        try {
-            $response = Http::withToken($store->access_token)
-                ->timeout(30)
-                ->retry(3, 100, function ($exception, $request) use ($store) {
-                    // Tenta refresh do token em caso de 401
-                    if ($exception instanceof RequestException && $exception->response->status() === 401) {
-                        return $this->tryRefreshToken($store, $request);
+        $maxAttempts = 2; // 1 tentativa inicial + 1 retry após refresh
+        $attempt = 0;
+
+        while ($attempt < $maxAttempts) {
+            $attempt++;
+
+            try {
+                // Refresh the store model to get the latest token
+                $store->refresh();
+
+                // Nuvemshop uses non-standard auth header: "Authentication: bearer {token}"
+                // NOT the standard "Authorization: Bearer {token}"
+                $response = Http::withHeaders([
+                    'Authentication' => 'bearer '.$store->access_token,
+                    'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+                ])
+                    ->timeout(30)
+                    ->retry(3, 100, function ($exception) {
+                        return $this->shouldRetry($exception);
+                    }, throw: false)
+                    ->{strtolower($method)}("{$this->apiBaseUrl}{$endpoint}", $params);
+
+                // Se recebeu 401 e ainda tem tentativas, tenta refresh do token
+                if ($response->status() === 401 && $attempt < $maxAttempts) {
+                    Log::info("Token expirado para loja {$store->id}, tentando renovar...");
+
+                    if ($this->refreshAccessToken($store)) {
+                        Log::info("Token renovado com sucesso para loja {$store->id}, retentando requisição...");
+
+                        continue; // Retry the request with new token
                     }
 
-                    return $this->shouldRetry($exception);
-                }, throw: false)
-                ->{strtolower($method)}("{$this->apiBaseUrl}{$endpoint}", $params);
+                    // Se falhou o refresh, não adianta tentar novamente
+                    Log::error("Falha ao renovar token para loja {$store->id}");
+                    break;
+                }
 
-            if (! $response->successful()) {
-                $this->handleApiError($response, $store, $endpoint);
+                // Para qualquer outro erro ou sucesso, processa normalmente
+                if (! $response->successful()) {
+                    $this->handleApiError($response, $store, $endpoint);
+                }
+
+                return $response->json() ?? [];
+            } catch (RequestException $e) {
+                // Se for o último attempt ou não for erro de autenticação, lança a exceção
+                if ($attempt >= $maxAttempts || $e->response->status() !== 401) {
+                    Log::error('Nuvemshop API request failed', [
+                        'store_id' => $store->id,
+                        'endpoint' => $endpoint,
+                        'attempt' => $attempt,
+                        'error' => $e->getMessage(),
+                    ]);
+                    throw $e;
+                }
+            } catch (\Exception $e) {
+                Log::error('Nuvemshop API request failed', [
+                    'store_id' => $store->id,
+                    'endpoint' => $endpoint,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+                throw $e;
             }
-
-            return $response->json() ?? [];
-        } catch (\Exception $e) {
-            Log::error('Nuvemshop API request failed', [
-                'store_id' => $store->id,
-                'endpoint' => $endpoint,
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
         }
+
+        // Se chegou aqui, esgotou as tentativas
+        throw new \RuntimeException("Falha ao executar requisição após {$maxAttempts} tentativas");
     }
 
     /**
@@ -295,44 +353,40 @@ class NuvemshopService
     }
 
     /**
-     * Tenta atualizar o token de acesso
+     * Handles token invalidation according to Nuvemshop's OAuth model.
+     *
+     * IMPORTANT: According to Nuvemshop's official documentation, access tokens
+     * DO NOT EXPIRE. They only become invalid when:
+     * 1. A new token is generated (invalidates the previous one)
+     * 2. The user uninstalls the app
+     *
+     * Since Nuvemshop does not support refresh_token grant type, when we receive
+     * a 401 error, it means the user needs to reconnect the app through the full
+     * OAuth flow. This method marks the store as requiring reconnection.
+     *
+     * @param  Store  $store  The store whose token has been invalidated
+     * @return bool Always returns false to indicate automatic refresh is not possible
      */
-    private function tryRefreshToken(Store $store, $request): bool
+    private function refreshAccessToken(Store $store): bool
     {
-        if (empty($store->refresh_token)) {
-            Log::warning("Token expirado e sem refresh_token para loja {$store->id}");
+        Log::warning('Token invalidado detectado para loja. Nuvemshop requer reconexão completa via OAuth.', [
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'platform' => $store->platform->value,
+        ]);
 
-            return false;
-        }
+        // Mark store as requiring reconnection
+        // This will trigger UI notification for the user to reconnect
+        $store->markAsTokenExpired();
 
-        try {
-            $response = Http::asForm()
-                ->timeout(30)
-                ->post("{$this->authUrl}/token", [
-                    'client_id' => $this->clientId,
-                    'client_secret' => $this->clientSecret,
-                    'refresh_token' => $store->refresh_token,
-                    'grant_type' => 'refresh_token',
-                ]);
+        Log::info('Loja marcada como token_expired. Usuário precisa reconectar.', [
+            'store_id' => $store->id,
+            'sync_status' => $store->sync_status->value,
+            'token_requires_reconnection' => $store->token_requires_reconnection,
+        ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $store->update([
-                    'access_token' => $data['access_token'],
-                    'refresh_token' => $data['refresh_token'] ?? $store->refresh_token,
-                ]);
-
-                // Atualiza o token no request para retry
-                $request->withToken($data['access_token']);
-
-                Log::info("Token atualizado com sucesso para loja {$store->id}");
-
-                return true;
-            }
-        } catch (\Exception $e) {
-            Log::error("Falha ao atualizar token para loja {$store->id}: {$e->getMessage()}");
-        }
-
+        // Return false to indicate that automatic token refresh is not possible
+        // The calling code should stop attempting the request
         return false;
     }
 
@@ -362,31 +416,34 @@ class NuvemshopService
         throw new \RuntimeException($message);
     }
 
+    /**
+     * Insert or update a product using the product adapter.
+     *
+     * This method uses the ProductAdapter to transform external Nuvemshop data
+     * into the normalized structure required by SyncedProduct model.
+     *
+     * @param  Store  $store  The store the product belongs to
+     * @param  array  $data  Raw product data from Nuvemshop API
+     */
     private function upsertProduct(Store $store, array $data): void
     {
-        $images = collect($data['images'] ?? [])->pluck('src')->toArray();
-        $categories = collect($data['categories'] ?? [])->pluck('name')->toArray();
+        // Transform external data using the adapter
+        $productData = $this->productAdapter->transform($data);
 
+        // Update or create the product
         SyncedProduct::updateOrCreate(
             [
                 'store_id' => $store->id,
-                'external_id' => $data['id'],
+                'external_id' => $productData['external_id'],
             ],
-            [
-                'name' => $data['name']['pt'] ?? $data['name']['en'] ?? 'Sem nome',
-                'description' => $data['description']['pt'] ?? $data['description']['en'] ?? null,
-                'price' => $data['variants'][0]['price'] ?? 0,
-                'compare_at_price' => $data['variants'][0]['compare_at_price'] ?? null,
-                'stock_quantity' => $data['variants'][0]['stock'] ?? 0,
-                'sku' => $data['variants'][0]['sku'] ?? null,
-                'images' => $images,
-                'categories' => $categories,
-                'variants' => $data['variants'] ?? [],
-                'is_active' => $data['published'] ?? true,
-                'external_created_at' => $data['created_at'] ?? null,
-                'external_updated_at' => $data['updated_at'] ?? null,
-            ]
+            array_merge(['store_id' => $store->id], $productData)
         );
+
+        Log::debug('Product synced successfully', [
+            'store_id' => $store->id,
+            'product_id' => $productData['external_id'],
+            'product_name' => $productData['name'],
+        ]);
     }
 
     private function upsertOrder(Store $store, array $data): void
@@ -397,6 +454,19 @@ class NuvemshopService
             'quantity' => $item['quantity'] ?? 1,
             'price' => $item['price'] ?? 0,
         ])->toArray();
+
+        // Sanitize numeric fields - Nuvemshop may return strings like "table_default"
+        $shipping = $data['shipping'] ?? 0;
+        $shipping = is_numeric($shipping) ? (float) $shipping : 0;
+
+        $subtotal = $data['subtotal'] ?? 0;
+        $subtotal = is_numeric($subtotal) ? (float) $subtotal : 0;
+
+        $discount = $data['discount'] ?? 0;
+        $discount = is_numeric($discount) ? (float) $discount : 0;
+
+        $total = $data['total'] ?? 0;
+        $total = is_numeric($total) ? (float) $total : 0;
 
         SyncedOrder::updateOrCreate(
             [
@@ -411,10 +481,10 @@ class NuvemshopService
                 'customer_name' => $data['customer']['name'] ?? 'Desconhecido',
                 'customer_email' => $data['customer']['email'] ?? null,
                 'customer_phone' => $data['customer']['phone'] ?? null,
-                'subtotal' => $data['subtotal'] ?? 0,
-                'discount' => $data['discount'] ?? 0,
-                'shipping' => $data['shipping'] ?? 0,
-                'total' => $data['total'] ?? 0,
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'total' => $total,
                 'payment_method' => $data['payment_details']['method'] ?? null,
                 'items' => $items,
                 'shipping_address' => $data['shipping_address'] ?? null,

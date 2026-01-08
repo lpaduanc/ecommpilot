@@ -95,8 +95,8 @@ class StoreSeeder extends Seeder
 
         foreach ($stores as $storeData) {
             $user = User::where('email', $storeData['email'])->first();
-            
-            if (!$user) {
+
+            if (! $user) {
                 continue;
             }
 
@@ -108,8 +108,8 @@ class StoreSeeder extends Seeder
                     'name' => $store['name'],
                     'domain' => $store['domain'],
                     'email' => $store['email'],
-                    'access_token' => 'demo_access_token_' . $store['external_store_id'],
-                    'refresh_token' => 'demo_refresh_token_' . $store['external_store_id'],
+                    'access_token' => 'demo_access_token_'.$store['external_store_id'],
+                    'refresh_token' => 'demo_refresh_token_'.$store['external_store_id'],
                     'sync_status' => $store['sync_status'],
                     'last_sync_at' => $store['last_sync_at'],
                     'metadata' => $store['metadata'],
@@ -118,4 +118,3 @@ class StoreSeeder extends Seeder
         }
     }
 }
-

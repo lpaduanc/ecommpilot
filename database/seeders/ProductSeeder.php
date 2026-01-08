@@ -14,11 +14,11 @@ class ProductSeeder extends Seeder
 
         foreach ($stores as $store) {
             $products = $this->getProductsForStore($store->name);
-            
+
             foreach ($products as $index => $product) {
                 SyncedProduct::create([
                     'store_id' => $store->id,
-                    'external_id' => 'PRD' . $store->id . str_pad($index + 1, 5, '0', STR_PAD_LEFT),
+                    'external_id' => 'PRD'.$store->id.str_pad($index + 1, 5, '0', STR_PAD_LEFT),
                     'name' => $product['name'],
                     'description' => $product['description'],
                     'price' => $product['price'],
@@ -464,4 +464,3 @@ class ProductSeeder extends Seeder
         ];
     }
 }
-

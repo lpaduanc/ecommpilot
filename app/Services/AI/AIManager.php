@@ -9,6 +9,7 @@ use InvalidArgumentException;
 class AIManager
 {
     private array $providers = [];
+
     private string $defaultProvider;
 
     public function __construct()
@@ -31,8 +32,8 @@ class AIManager
     private function registerProviders(): void
     {
         $this->providers = [
-            'openai' => new OpenAIProvider(),
-            'gemini' => new GeminiProvider(),
+            'openai' => new OpenAIProvider,
+            'gemini' => new GeminiProvider,
         ];
     }
 
@@ -43,13 +44,13 @@ class AIManager
     {
         $name = $name ?? $this->defaultProvider;
 
-        if (!isset($this->providers[$name])) {
+        if (! isset($this->providers[$name])) {
             throw new InvalidArgumentException("AI provider [{$name}] is not supported.");
         }
 
         $provider = $this->providers[$name];
 
-        if (!$provider->isConfigured()) {
+        if (! $provider->isConfigured()) {
             throw new InvalidArgumentException("AI provider [{$name}] is not properly configured.");
         }
 
@@ -94,4 +95,3 @@ class AIManager
         return $this->defaultProvider;
     }
 }
-

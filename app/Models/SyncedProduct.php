@@ -60,13 +60,13 @@ class SyncedProduct extends Model
 
     public function hasDiscount(): bool
     {
-        return $this->compare_at_price !== null 
+        return $this->compare_at_price !== null
             && $this->compare_at_price > $this->price;
     }
 
     public function discountPercentage(): ?float
     {
-        if (!$this->hasDiscount()) {
+        if (! $this->hasDiscount()) {
             return null;
         }
 
@@ -97,8 +97,7 @@ class SyncedProduct extends Model
 
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
-              ->orWhere('sku', 'like', "%{$search}%");
+                ->orWhere('sku', 'like', "%{$search}%");
         });
     }
 }
-

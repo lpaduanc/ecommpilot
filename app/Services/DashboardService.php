@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Store;
 use App\Models\SyncedOrder;
-use App\Models\SyncedProduct;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -56,7 +55,7 @@ class DashboardService
     public function getRevenueChart(Store $store, array $filters): array
     {
         $dateRange = $this->getDateRange($filters);
-        
+
         $data = SyncedOrder::where('store_id', $store->id)
             ->paid()
             ->whereBetween('external_created_at', [$dateRange['start'], $dateRange['end']])
@@ -102,30 +101,30 @@ class DashboardService
 
         // Aggregate product sales from order items
         $productSales = [];
-        
+
         foreach ($orders as $order) {
             $items = $order->items ?? [];
             foreach ($items as $item) {
                 $productName = $item['product_name'] ?? $item['name'] ?? 'Produto';
                 $quantity = $item['quantity'] ?? 1;
                 $total = $item['total'] ?? ($item['unit_price'] ?? 0) * $quantity;
-                
-                if (!isset($productSales[$productName])) {
+
+                if (! isset($productSales[$productName])) {
                     $productSales[$productName] = [
                         'name' => $productName,
                         'quantity_sold' => 0,
                         'revenue' => 0,
                     ];
                 }
-                
+
                 $productSales[$productName]['quantity_sold'] += $quantity;
                 $productSales[$productName]['revenue'] += $total;
             }
         }
 
         // Sort by quantity sold and return top 10
-        usort($productSales, fn($a, $b) => $b['quantity_sold'] <=> $a['quantity_sold']);
-        
+        usort($productSales, fn ($a, $b) => $b['quantity_sold'] <=> $a['quantity_sold']);
+
         return array_slice(array_values($productSales), 0, 10);
     }
 
@@ -248,4 +247,3 @@ class DashboardService
         return round((($current - $previous) / $previous) * 100, 2);
     }
 }
-

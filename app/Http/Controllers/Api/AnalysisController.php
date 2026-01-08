@@ -22,7 +22,7 @@ class AnalysisController extends Controller
         $user = $request->user();
         $store = $user->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([
                 'analysis' => null,
                 'next_available_at' => null,
@@ -50,7 +50,7 @@ class AnalysisController extends Controller
         $user = $request->user();
         $store = $user->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([
                 'message' => 'Nenhuma loja conectada.',
             ], 400);
@@ -67,7 +67,7 @@ class AnalysisController extends Controller
         // }
 
         // Check credits
-        if (!$user->hasCredits()) {
+        if (! $user->hasCredits()) {
             return response()->json([
                 'message' => 'Créditos insuficientes.',
                 'credits' => $user->ai_credits,
@@ -116,7 +116,7 @@ class AnalysisController extends Controller
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (!$analysis) {
+        if (! $analysis) {
             return response()->json(['message' => 'Análise não encontrada.'], 404);
         }
 
@@ -129,7 +129,7 @@ class AnalysisController extends Controller
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (!$analysis) {
+        if (! $analysis) {
             return response()->json(['message' => 'Análise não encontrada.'], 404);
         }
 
@@ -147,4 +147,3 @@ class AnalysisController extends Controller
         return response()->json(['message' => 'Sugestão marcada como concluída.']);
     }
 }
-

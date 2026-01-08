@@ -23,7 +23,7 @@ class AnalysisService
             ->latest()
             ->first();
 
-        if (!$lastAnalysis) {
+        if (! $lastAnalysis) {
             return true;
         }
 
@@ -36,7 +36,7 @@ class AnalysisService
             ->latest()
             ->first();
 
-        if (!$lastAnalysis) {
+        if (! $lastAnalysis) {
             return null;
         }
 
@@ -129,7 +129,7 @@ class AnalysisService
 
     private function getSystemPrompt(): string
     {
-        return <<<PROMPT
+        return <<<'PROMPT'
         Você é um consultor de e-commerce. Analise os dados e forneça recomendações.
 
         REGRAS IMPORTANTES:
@@ -154,13 +154,13 @@ class AnalysisService
     {
         // Check for truncated response (doesn't end with })
         $trimmedContent = trim($content);
-        if (!str_ends_with($trimmedContent, '}') && !str_ends_with($trimmedContent, '```')) {
+        if (! str_ends_with($trimmedContent, '}') && ! str_ends_with($trimmedContent, '```')) {
             Log::error('AI response appears truncated', [
                 'length' => strlen($content),
                 'last_100_chars' => substr($content, -100),
             ]);
             throw new \RuntimeException(
-                'AI response was truncated. The response did not complete. ' .
+                'AI response was truncated. The response did not complete. '.
                 'This usually means the output token limit was reached.'
             );
         }
@@ -197,11 +197,10 @@ class AnalysisService
         }
 
         // Validate structure
-        if (!isset($data['summary']) || !isset($data['suggestions'])) {
+        if (! isset($data['summary']) || ! isset($data['suggestions'])) {
             throw new \RuntimeException('AI response missing required fields (summary or suggestions)');
         }
 
         return $data;
     }
 }
-

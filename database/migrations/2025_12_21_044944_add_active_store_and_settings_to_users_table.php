@@ -14,7 +14,7 @@ return new class extends Migration
                 ->after('ai_credits')
                 ->constrained('stores')
                 ->nullOnDelete();
-            
+
             $table->json('notification_settings')->nullable()->after('active_store_id');
         });
     }

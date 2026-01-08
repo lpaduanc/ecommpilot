@@ -20,17 +20,17 @@ class PermissionSeeder extends Seeder
             ['name' => 'users.edit', 'label' => 'Editar Usuários'],
             ['name' => 'users.delete', 'label' => 'Excluir Usuários'],
             ['name' => 'users.view', 'label' => 'Visualizar Usuários'],
-            
+
             // Integrations
             ['name' => 'integrations.manage', 'label' => 'Gerenciar Integrações'],
-            
+
             // Analytics
             ['name' => 'analytics.view', 'label' => 'Visualizar Análises'],
             ['name' => 'analytics.request', 'label' => 'Solicitar Análise'],
-            
+
             // Chat
             ['name' => 'chat.use', 'label' => 'Usar Chat IA'],
-            
+
             // Admin
             ['name' => 'admin.access', 'label' => 'Acesso Administrativo'],
         ];
@@ -57,4 +57,3 @@ class PermissionSeeder extends Seeder
         ]);
     }
 }
-

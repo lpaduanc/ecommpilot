@@ -70,7 +70,7 @@ class SyncStoreDataJobTest extends TestCase
 
         $job = new SyncStoreDataJob($store);
 
-        $this->assertEquals('sync_store_' . $store->id, $job->uniqueId());
+        $this->assertEquals('sync_store_'.$store->id, $job->uniqueId());
     }
 
     public function test_job_successfully_syncs_store_data(): void

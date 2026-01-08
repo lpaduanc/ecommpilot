@@ -18,7 +18,7 @@ class DashboardController extends Controller
         $user = $request->user();
         $store = $user->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([
                 'has_store' => false,
                 'message' => 'Nenhuma loja conectada.',
@@ -35,7 +35,7 @@ class DashboardController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([]);
         }
 
@@ -49,7 +49,7 @@ class DashboardController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([]);
         }
 
@@ -63,7 +63,7 @@ class DashboardController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([]);
         }
 
@@ -77,7 +77,7 @@ class DashboardController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([]);
         }
 
@@ -91,7 +91,7 @@ class DashboardController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([]);
         }
 
@@ -105,7 +105,7 @@ class DashboardController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([]);
         }
 
@@ -125,4 +125,3 @@ class DashboardController extends Controller
         ];
     }
 }
-

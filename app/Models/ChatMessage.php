@@ -49,4 +49,3 @@ class ChatMessage extends Model
         return $query->where('role', 'assistant');
     }
 }
-

@@ -14,7 +14,7 @@ class ProductController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json([
                 'data' => [],
                 'total' => 0,
@@ -48,7 +48,7 @@ class ProductController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -56,7 +56,7 @@ class ProductController extends Controller
             ->where('id', $id)
             ->first();
 
-        if (!$product) {
+        if (! $product) {
             return response()->json(['message' => 'Produto não encontrado.'], 404);
         }
 
@@ -67,7 +67,7 @@ class ProductController extends Controller
     {
         $store = $request->user()->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -75,7 +75,7 @@ class ProductController extends Controller
             ->where('id', $id)
             ->first();
 
-        if (!$product) {
+        if (! $product) {
             return response()->json(['message' => 'Produto não encontrado.'], 404);
         }
 
@@ -93,7 +93,7 @@ class ProductController extends Controller
             foreach ($items as $item) {
                 $itemProductId = $item['product_id'] ?? null;
                 $itemSku = $item['sku'] ?? null;
-                
+
                 // Match by external_id or SKU
                 if ($itemProductId === $product->external_id || $itemSku === $product->sku) {
                     $quantitySold += $item['quantity'] ?? 1;
@@ -114,4 +114,3 @@ class ProductController extends Controller
         ]);
     }
 }
-

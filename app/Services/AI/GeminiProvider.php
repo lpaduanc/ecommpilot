@@ -9,9 +9,13 @@ use Illuminate\Support\Facades\Http;
 class GeminiProvider implements AIProviderInterface
 {
     private string $apiKey;
+
     private string $baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+
     private string $defaultModel;
+
     private float $defaultTemperature;
+
     private int $defaultMaxTokens;
 
     public function __construct()
@@ -57,7 +61,7 @@ class GeminiProvider implements AIProviderInterface
             'Content-Type' => 'application/json',
         ])->post("{$this->baseUrl}/models/{$model}:generateContent?key={$this->apiKey}", $payload);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             $error = $response->json('error.message', 'Unknown Gemini API error');
             throw new \RuntimeException("Gemini API error: {$error}");
         }
@@ -90,7 +94,7 @@ class GeminiProvider implements AIProviderInterface
 
     public function isConfigured(): bool
     {
-        return !empty($this->apiKey);
+        return ! empty($this->apiKey);
     }
 
     /**
@@ -137,4 +141,3 @@ class GeminiProvider implements AIProviderInterface
         return null;
     }
 }
-

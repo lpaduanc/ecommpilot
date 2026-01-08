@@ -24,7 +24,7 @@ class ChatbotService
         $chatHistory = $this->getChatHistory($conversation);
 
         $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis);
-        
+
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
         ];
@@ -54,7 +54,7 @@ class ChatbotService
     private function buildSystemPrompt(?object $store, ?Analysis $analysis): string
     {
         $storeName = $store?->name ?? 'sua loja';
-        
+
         $analysisContext = '';
         if ($analysis && $analysis->isCompleted()) {
             $analysisJson = json_encode([
@@ -62,7 +62,7 @@ class ChatbotService
                 'suggestions' => $analysis->suggestions,
                 'opportunities' => $analysis->opportunities,
             ], JSON_UNESCAPED_UNICODE);
-            
+
             $analysisContext = "\n\nÚLTIMA ANÁLISE:\n{$analysisJson}";
         }
 
@@ -117,4 +117,3 @@ class ChatbotService
             ->toArray();
     }
 }
-

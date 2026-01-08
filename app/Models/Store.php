@@ -23,6 +23,7 @@ class Store extends Model
         'email',
         'access_token',
         'refresh_token',
+        'token_requires_reconnection',
         'sync_status',
         'last_sync_at',
         'metadata',
@@ -92,5 +93,17 @@ class Store extends Model
     {
         $this->update(['sync_status' => SyncStatus::Failed]);
     }
-}
 
+    public function markAsTokenExpired(): void
+    {
+        $this->update([
+            'sync_status' => SyncStatus::TokenExpired,
+            'token_requires_reconnection' => true,
+        ]);
+    }
+
+    public function requiresReconnection(): bool
+    {
+        return $this->token_requires_reconnection === true || $this->sync_status === SyncStatus::TokenExpired;
+    }
+}

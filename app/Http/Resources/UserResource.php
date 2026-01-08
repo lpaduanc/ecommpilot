@@ -21,9 +21,8 @@ class UserResource extends JsonResource
             'email_verified_at' => $this->email_verified_at?->toISOString(),
             'last_login_at' => $this->last_login_at?->toISOString(),
             'permissions' => $this->getAllPermissions()->pluck('name'),
-            'store' => $this->whenLoaded('activeStore', fn() => new StoreResource($this->activeStore)),
+            'store' => $this->whenLoaded('activeStore', fn () => new StoreResource($this->activeStore)),
             'created_at' => $this->created_at->toISOString(),
         ];
     }
 }
-

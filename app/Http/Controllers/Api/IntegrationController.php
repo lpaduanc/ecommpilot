@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Platform;
+use App\Enums\SyncStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\StoreResource;
 use App\Jobs\SyncStoreDataJob;
@@ -255,17 +257,20 @@ class IntegrationController extends Controller
             }
 
             // Also create/update a Store record for this user
+            // Use platform + external_store_id as unique key (matches database constraint)
             $user = $request->user();
             $store = Store::updateOrCreate(
                 [
-                    'user_id' => $user->id,
-                    'platform' => 'nuvemshop',
+                    'platform' => Platform::Nuvemshop,
                     'external_store_id' => (string) ($data['user_id'] ?? ''),
                 ],
                 [
+                    'user_id' => $user->id,
                     'name' => 'Loja Nuvemshop',
                     'access_token' => $data['access_token'],
-                    'sync_status' => 'pending',
+                    'refresh_token' => $data['refresh_token'] ?? null,
+                    'sync_status' => SyncStatus::Pending,
+                    'token_requires_reconnection' => false,
                 ]
             );
 
@@ -337,6 +342,13 @@ class IntegrationController extends Controller
 
         if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
+        }
+
+        if ($store->requiresReconnection()) {
+            return response()->json([
+                'message' => 'O token de acesso da loja está inválido. Por favor, reconecte a loja.',
+                'requires_reconnection' => true,
+            ], 401);
         }
 
         if ($store->isSyncing()) {

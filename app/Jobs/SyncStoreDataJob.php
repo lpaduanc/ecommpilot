@@ -13,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
-class SyncStoreDataJob implements ShouldQueue, ShouldBeUnique
+class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -61,7 +61,7 @@ class SyncStoreDataJob implements ShouldQueue, ShouldBeUnique
      */
     public function uniqueId(): string
     {
-        return 'sync_store_' . $this->store->id;
+        return 'sync_store_'.$this->store->id;
     }
 
     /**
@@ -84,21 +84,21 @@ class SyncStoreDataJob implements ShouldQueue, ShouldBeUnique
             ]);
 
             // Sync products (se ainda não foi feito)
-            if (!in_array('products', $checkpoint)) {
+            if (! in_array('products', $checkpoint)) {
                 $nuvemshopService->syncProducts($this->store);
                 $this->saveCheckpoint('products');
                 Log::info("Products synced for store: {$this->store->name}");
             }
 
             // Sync orders (se ainda não foi feito)
-            if (!in_array('orders', $checkpoint)) {
+            if (! in_array('orders', $checkpoint)) {
                 $nuvemshopService->syncOrders($this->store);
                 $this->saveCheckpoint('orders');
                 Log::info("Orders synced for store: {$this->store->name}");
             }
 
             // Sync customers (se ainda não foi feito)
-            if (!in_array('customers', $checkpoint)) {
+            if (! in_array('customers', $checkpoint)) {
                 $nuvemshopService->syncCustomers($this->store);
                 $this->saveCheckpoint('customers');
                 Log::info("Customers synced for store: {$this->store->name}");
@@ -173,4 +173,3 @@ class SyncStoreDataJob implements ShouldQueue, ShouldBeUnique
         ]);
     }
 }
-
