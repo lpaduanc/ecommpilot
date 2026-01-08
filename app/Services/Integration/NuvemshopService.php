@@ -2,6 +2,7 @@
 
 namespace App\Services\Integration;
 
+use App\Contracts\OrderAdapterInterface;
 use App\Contracts\ProductAdapterInterface;
 use App\Enums\Platform;
 use App\Enums\SyncStatus;
@@ -37,8 +38,15 @@ class NuvemshopService
      */
     private ProductAdapterInterface $productAdapter;
 
-    public function __construct(?ProductAdapterInterface $productAdapter = null)
-    {
+    /**
+     * Order adapter for transforming Nuvemshop data to SyncedOrder structure.
+     */
+    private OrderAdapterInterface $orderAdapter;
+
+    public function __construct(
+        ?ProductAdapterInterface $productAdapter = null,
+        ?OrderAdapterInterface $orderAdapter = null
+    ) {
         // Try SystemSetting first, fallback to config
         $this->clientId = SystemSetting::get('nuvemshop.client_id')
             ?? config('services.nuvemshop.client_id')
@@ -51,8 +59,9 @@ class NuvemshopService
         $this->redirectUri = config('services.nuvemshop.redirect_uri')
             ?? url('/api/integrations/nuvemshop/callback');
 
-        // Use provided adapter or default to NuvemshopProductAdapter
+        // Use provided adapters or defaults
         $this->productAdapter = $productAdapter ?? new NuvemshopProductAdapter;
+        $this->orderAdapter = $orderAdapter ?? new NuvemshopOrderAdapter;
     }
 
     public function getAuthorizationUrl(int $userId, ?string $storeUrl = null): string
@@ -446,51 +455,34 @@ class NuvemshopService
         ]);
     }
 
+    /**
+     * Insert or update an order using the order adapter.
+     *
+     * This method uses the OrderAdapter to transform external Nuvemshop data
+     * into the normalized structure required by SyncedOrder model.
+     *
+     * @param  Store  $store  The store the order belongs to
+     * @param  array  $data  Raw order data from Nuvemshop API
+     */
     private function upsertOrder(Store $store, array $data): void
     {
-        $items = collect($data['products'] ?? [])->map(fn ($item) => [
-            'product_id' => $item['product_id'] ?? null,
-            'name' => $item['name'] ?? '',
-            'quantity' => $item['quantity'] ?? 1,
-            'price' => $item['price'] ?? 0,
-        ])->toArray();
+        // Transform external data using the adapter
+        $orderData = $this->orderAdapter->transform($data);
 
-        // Sanitize numeric fields - Nuvemshop may return strings like "table_default"
-        $shipping = $data['shipping'] ?? 0;
-        $shipping = is_numeric($shipping) ? (float) $shipping : 0;
-
-        $subtotal = $data['subtotal'] ?? 0;
-        $subtotal = is_numeric($subtotal) ? (float) $subtotal : 0;
-
-        $discount = $data['discount'] ?? 0;
-        $discount = is_numeric($discount) ? (float) $discount : 0;
-
-        $total = $data['total'] ?? 0;
-        $total = is_numeric($total) ? (float) $total : 0;
-
+        // Update or create the order
         SyncedOrder::updateOrCreate(
             [
                 'store_id' => $store->id,
-                'external_id' => $data['id'],
+                'external_id' => $orderData['external_id'],
             ],
-            [
-                'order_number' => $data['number'] ?? $data['id'],
-                'status' => $this->mapOrderStatus($data['status'] ?? 'open'),
-                'payment_status' => $this->mapPaymentStatus($data['payment_status'] ?? 'pending'),
-                'shipping_status' => $data['shipping_status'] ?? null,
-                'customer_name' => $data['customer']['name'] ?? 'Desconhecido',
-                'customer_email' => $data['customer']['email'] ?? null,
-                'customer_phone' => $data['customer']['phone'] ?? null,
-                'subtotal' => $subtotal,
-                'discount' => $discount,
-                'shipping' => $shipping,
-                'total' => $total,
-                'payment_method' => $data['payment_details']['method'] ?? null,
-                'items' => $items,
-                'shipping_address' => $data['shipping_address'] ?? null,
-                'external_created_at' => $data['created_at'] ?? null,
-            ]
+            array_merge(['store_id' => $store->id], $orderData)
         );
+
+        Log::debug('Order synced successfully', [
+            'store_id' => $store->id,
+            'order_id' => $orderData['external_id'],
+            'order_number' => $orderData['order_number'],
+        ]);
     }
 
     private function upsertCustomer(Store $store, array $data): void
@@ -509,27 +501,5 @@ class NuvemshopService
                 'external_created_at' => $data['created_at'] ?? null,
             ]
         );
-    }
-
-    private function mapOrderStatus(string $status): string
-    {
-        return match ($status) {
-            'open', 'pending' => 'pending',
-            'closed', 'paid' => 'paid',
-            'shipped' => 'shipped',
-            'delivered' => 'delivered',
-            'cancelled' => 'cancelled',
-            default => 'pending',
-        };
-    }
-
-    private function mapPaymentStatus(string $status): string
-    {
-        return match ($status) {
-            'pending', 'authorized' => 'pending',
-            'paid' => 'paid',
-            'refunded', 'voided' => 'refunded',
-            default => 'pending',
-        };
     }
 }

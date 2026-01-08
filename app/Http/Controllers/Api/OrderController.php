@@ -62,4 +62,48 @@ class OrderController extends Controller
 
         return response()->json(new OrderResource($order));
     }
+
+    public function stats(Request $request): JsonResponse
+    {
+        $store = $request->user()->activeStore;
+
+        if (! $store) {
+            return response()->json([
+                'total_orders' => 0,
+                'orders_by_status' => [],
+                'orders_by_payment_status' => [],
+                'total_value' => 0,
+                'paid_value' => 0,
+            ]);
+        }
+
+        $orders = SyncedOrder::where('store_id', $store->id)->get();
+
+        // Total de pedidos
+        $totalOrders = $orders->count();
+
+        // Pedidos por status
+        $ordersByStatus = $orders->groupBy(fn ($order) => $order->status?->value ?? 'unknown')
+            ->map(fn ($group) => $group->count())
+            ->toArray();
+
+        // Pedidos por status de pagamento
+        $ordersByPaymentStatus = $orders->groupBy(fn ($order) => $order->payment_status?->value ?? 'unknown')
+            ->map(fn ($group) => $group->count())
+            ->toArray();
+
+        // Valor total de todos os pedidos
+        $totalValue = $orders->sum('total');
+
+        // Valor total de pedidos pagos
+        $paidValue = $orders->filter(fn ($order) => $order->isPaid())->sum('total');
+
+        return response()->json([
+            'total_orders' => $totalOrders,
+            'orders_by_status' => $ordersByStatus,
+            'orders_by_payment_status' => $ordersByPaymentStatus,
+            'total_value' => (float) $totalValue,
+            'paid_value' => (float) $paidValue,
+        ]);
+    }
 }
