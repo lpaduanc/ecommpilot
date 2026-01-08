@@ -33,7 +33,9 @@
       "WebSearch",
       "WebFetch(domain:tiendanube.github.io)",
       "WebFetch(domain:developers.nuvemshop.com.br)",
-      "Bash(Select -Last 50)"
+      "Bash(Select -Last 50)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
