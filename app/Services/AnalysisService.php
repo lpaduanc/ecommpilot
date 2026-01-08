@@ -13,9 +13,13 @@ class AnalysisService
 {
     private const RATE_LIMIT_MINUTES = 60;
 
+    private EcommerceKnowledgeBase $knowledgeBase;
+
     public function __construct(
         private AIManager $aiManager
-    ) {}
+    ) {
+        $this->knowledgeBase = new EcommerceKnowledgeBase;
+    }
 
     public function canRequestAnalysis(User $user): bool
     {
@@ -53,7 +57,16 @@ class AnalysisService
             $store = $analysis->store;
             $storeData = $this->prepareStoreData($store, $analysis->period_start, $analysis->period_end);
 
-            $prompt = $this->buildAnalysisPrompt($storeData, $analysis->period_start, $analysis->period_end);
+            // RAG: Get relevant strategies from knowledge base
+            $relevantStrategies = $this->knowledgeBase->getRelevantStrategies($storeData);
+            $strategiesContext = $this->knowledgeBase->formatForPrompt($relevantStrategies);
+
+            Log::info('RAG strategies selected', [
+                'count' => count($relevantStrategies),
+                'categories' => array_column($relevantStrategies, 'category'),
+            ]);
+
+            $prompt = $this->buildAnalysisPrompt($storeData, $analysis->period_start, $analysis->period_end, $strategiesContext);
 
             $messages = [
                 ['role' => 'system', 'content' => $this->getSystemPrompt()],
@@ -397,7 +410,7 @@ class AnalysisService
         };
     }
 
-    private function buildAnalysisPrompt(array $storeData, Carbon $startDate, Carbon $endDate): string
+    private function buildAnalysisPrompt(array $storeData, Carbon $startDate, Carbon $endDate, string $strategiesContext = ''): string
     {
         $dataJson = json_encode($storeData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $periodDays = $startDate->diffInDays($endDate);
@@ -455,6 +468,8 @@ class AnalysisService
 - Produtos sem estoque: {$outOfStock}
 - Produtos com estoque baixo: {$lowStock}
 
+{$strategiesContext}
+
 ## DADOS COMPLETOS DA LOJA
 
 {$dataJson}
@@ -476,6 +491,7 @@ IMPORTANTE:
 - Mencione os NUMEROS EXATOS (receita, quantidade, porcentagens)
 - Calcule impactos baseado nos valores reais
 - Compare com o periodo anterior quando relevante
+- Se houver ESTRATEGIAS RECOMENDADAS acima, use-as como INSPIRACAO mas ADAPTE para os dados especificos desta loja
 
 Forneca sua analise no formato JSON especificado nas instrucoes do sistema.
 PROMPT;

@@ -1,0 +1,294 @@
+{
+  "retention": {
+    "description": "Estratégias para aumentar taxa de recompra e fidelização",
+    "triggers": ["repeat_purchase_rate < 15", "single_order_customers > 80%"],
+    "strategies": [
+      {
+        "title": "Programa de Pontos Simples",
+        "description": "Implemente um sistema onde cada R$1 gasto = 1 ponto. 100 pontos = R$5 de desconto na próxima compra.",
+        "expected_impact": "Aumento de 20-30% na taxa de recompra em 3 meses",
+        "action_steps": [
+          "Configure um sistema de pontos (apps como Smile.io ou LoyaltyLion)",
+          "Comunique o programa por email para base atual",
+          "Destaque os pontos no checkout e área do cliente"
+        ],
+        "benchmark": "Taxa de recompra média em e-commerce brasileiro: 25-30%"
+      },
+      {
+        "title": "Email de Recompra Automatizado",
+        "description": "Configure emails automáticos 15, 30 e 60 dias após a primeira compra oferecendo benefícios exclusivos.",
+        "expected_impact": "Recuperação de 10-15% dos clientes inativos",
+        "action_steps": [
+          "Segmente clientes por data da última compra",
+          "Crie sequência de 3 emails com ofertas crescentes",
+          "Inclua produtos relacionados à compra anterior"
+        ],
+        "benchmark": "Custo de retenção é 5-7x menor que aquisição de novo cliente"
+      },
+      {
+        "title": "Clube de Assinatura/Recorrência",
+        "description": "Para produtos consumíveis, ofereça opção de compra recorrente com 10-15% de desconto.",
+        "expected_impact": "Clientes recorrentes gastam em média 67% mais",
+        "action_steps": [
+          "Identifique produtos com ciclo de recompra natural",
+          "Configure opção de assinatura no checkout",
+          "Ofereça desconto progressivo por tempo de assinatura"
+        ]
+      }
+    ]
+  },
+  "inventory_critical": {
+    "description": "Estratégias para gestão de estoque crítico",
+    "triggers": ["out_of_stock > 5", "low_stock > 10", "top_seller sem estoque"],
+    "strategies": [
+      {
+        "title": "Pré-venda para Produtos Esgotados",
+        "description": "Em vez de perder a venda, ofereça pré-venda com desconto para produtos populares sem estoque.",
+        "expected_impact": "Recuperação de 40-60% das vendas perdidas por falta de estoque",
+        "action_steps": [
+          "Configure página de pré-venda para produtos esgotados",
+          "Ofereça 5-10% de desconto como incentivo",
+          "Comunique prazo realista de entrega"
+        ]
+      },
+      {
+        "title": "Alerta de Reposição Automático",
+        "description": "Configure alertas quando estoque atingir ponto de pedido baseado no histórico de vendas.",
+        "expected_impact": "Redução de 70% em rupturas de estoque",
+        "action_steps": [
+          "Calcule giro médio de cada produto",
+          "Defina estoque mínimo = giro semanal x lead time do fornecedor",
+          "Configure alertas automáticos no sistema"
+        ],
+        "benchmark": "Ruptura de estoque causa perda média de 4% do faturamento anual"
+      },
+      {
+        "title": "Lista de Espera com Captura de Email",
+        "description": "Capture emails de interessados em produtos esgotados para notificar quando voltar.",
+        "expected_impact": "Taxa de conversão de 20-35% quando produto volta ao estoque",
+        "action_steps": [
+          "Adicione formulário 'Avise-me' em produtos esgotados",
+          "Configure email automático de aviso",
+          "Ofereça prioridade de compra por 24h"
+        ]
+      }
+    ]
+  },
+  "revenue_decline": {
+    "description": "Estratégias para reverter queda nas vendas",
+    "triggers": ["revenue_trend = decline", "revenue_trend = strong_decline", "change_percent < -10"],
+    "strategies": [
+      {
+        "title": "Diagnóstico de Queda",
+        "description": "Antes de agir, identifique a causa: menos tráfego, menor conversão, ou ticket menor?",
+        "expected_impact": "Ações direcionadas são 3x mais efetivas que ações genéricas",
+        "action_steps": [
+          "Compare tráfego do período (Google Analytics)",
+          "Verifique taxa de conversão do checkout",
+          "Analise ticket médio vs período anterior",
+          "Verifique se há problema técnico no site"
+        ]
+      },
+      {
+        "title": "Campanha de Reativação Urgente",
+        "description": "Crie senso de urgência com promoção por tempo limitado para toda base de clientes.",
+        "expected_impact": "Pico de vendas de 30-50% durante a campanha",
+        "action_steps": [
+          "Defina desconto agressivo (15-25%) por 48-72 horas",
+          "Envie email para toda base com contador regressivo",
+          "Use remarketing para abandonadores de carrinho",
+          "Destaque escassez ('últimas unidades')"
+        ],
+        "benchmark": "Campanhas com prazo geram 3x mais conversão que promoções abertas"
+      },
+      {
+        "title": "Bundle/Kit de Produtos",
+        "description": "Crie combinações de produtos com desconto para aumentar ticket e girar estoque.",
+        "expected_impact": "Aumento de 15-25% no ticket médio",
+        "action_steps": [
+          "Identifique produtos frequentemente comprados juntos",
+          "Crie kits com 10-15% de desconto vs compra separada",
+          "Destaque economia na página do produto"
+        ]
+      }
+    ]
+  },
+  "high_cancellation": {
+    "description": "Estratégias para reduzir cancelamentos e reembolsos",
+    "triggers": ["cancellation_rate > 5", "refund_rate > 3"],
+    "strategies": [
+      {
+        "title": "Análise de Motivos de Cancelamento",
+        "description": "Implemente pesquisa obrigatória no cancelamento para entender as causas.",
+        "expected_impact": "Identificação de 80% dos problemas sistêmicos",
+        "action_steps": [
+          "Adicione campo obrigatório de motivo no cancelamento",
+          "Categorize: prazo, preço, arrependimento, problema produto, outro",
+          "Analise dados semanalmente e priorize correções"
+        ]
+      },
+      {
+        "title": "Comunicação Proativa de Status",
+        "description": "Envie atualizações automáticas de cada etapa do pedido para reduzir ansiedade.",
+        "expected_impact": "Redução de 30-40% em cancelamentos por 'demora'",
+        "action_steps": [
+          "Configure emails automáticos: confirmação, preparo, envio, entrega",
+          "Inclua link de rastreamento em todos os emails",
+          "Ofereça canal de WhatsApp para dúvidas urgentes"
+        ],
+        "benchmark": "60% dos cancelamentos são por falta de informação sobre status"
+      },
+      {
+        "title": "Oferta de Troca ao Invés de Reembolso",
+        "description": "Quando cliente pedir reembolso, ofereça troca com benefício adicional.",
+        "expected_impact": "Conversão de 25-35% dos reembolsos em trocas",
+        "action_steps": [
+          "Treine equipe para oferecer troca + cupom de 10%",
+          "Simplifique processo de troca (frete grátis)",
+          "Ofereça crédito na loja como alternativa"
+        ]
+      }
+    ]
+  },
+  "products_no_sales": {
+    "description": "Estratégias para produtos parados com estoque",
+    "triggers": ["no_sales_products > 5", "potential_revenue parado > 1000"],
+    "strategies": [
+      {
+        "title": "Liquidação Progressiva",
+        "description": "Crie urgência com descontos crescentes: semana 1 = 20%, semana 2 = 30%, semana 3 = 40%.",
+        "expected_impact": "Giro de 60-80% do estoque parado em 3-4 semanas",
+        "action_steps": [
+          "Separe produtos sem vendas há mais de 60 dias",
+          "Crie página de liquidação com contador",
+          "Divulgue progressão do desconto para criar urgência"
+        ],
+        "benchmark": "Capital parado em estoque custa 25-30% ao ano"
+      },
+      {
+        "title": "Bundle com Best Sellers",
+        "description": "Combine produtos parados com best sellers em kits promocionais.",
+        "expected_impact": "Conversão de 40-50% do estoque parado",
+        "action_steps": [
+          "Identifique produtos complementares entre parados e best sellers",
+          "Crie kits com desconto atrativo",
+          "Destaque na página do best seller"
+        ]
+      },
+      {
+        "title": "Brinde em Compras Acima de X",
+        "description": "Ofereça produto parado como brinde para pedidos acima de determinado valor.",
+        "expected_impact": "Aumento de 10-15% no ticket médio + giro de estoque",
+        "action_steps": [
+          "Defina valor mínimo (ex: R$ 150)",
+          "Selecione produtos de baixo custo parados",
+          "Comunique 'Brinde Especial' no site e emails"
+        ]
+      }
+    ]
+  },
+  "growth_acceleration": {
+    "description": "Estratégias para acelerar crescimento quando já está positivo",
+    "triggers": ["revenue_trend = growth", "revenue_trend = strong_growth"],
+    "strategies": [
+      {
+        "title": "Programa de Indicação",
+        "description": "Aproveite o momento positivo para criar programa 'Indique e Ganhe'.",
+        "expected_impact": "Clientes indicados têm LTV 16% maior e CAC 25% menor",
+        "action_steps": [
+          "Defina recompensa: cupom de R$20 para quem indica e quem é indicado",
+          "Crie link de indicação único por cliente",
+          "Lembre clientes satisfeitos por email pós-compra"
+        ],
+        "benchmark": "92% dos consumidores confiam em indicações de conhecidos"
+      },
+      {
+        "title": "Expansão de Catálogo",
+        "description": "Identifique categorias complementares aos best sellers para expandir.",
+        "expected_impact": "Aumento de 20-30% no ticket médio com cross-sell",
+        "action_steps": [
+          "Analise produtos frequentemente buscados que você não tem",
+          "Pesquise fornecedores para categorias complementares",
+          "Teste com lote pequeno antes de investir alto"
+        ]
+      },
+      {
+        "title": "Upsell no Checkout",
+        "description": "Adicione sugestões de upgrade ou produtos complementares no checkout.",
+        "expected_impact": "Aumento de 10-30% no valor do pedido",
+        "action_steps": [
+          "Identifique produtos frequentemente comprados juntos",
+          "Configure sugestões automáticas no carrinho",
+          "Ofereça frete grátis para pedidos acima de X"
+        ]
+      }
+    ]
+  },
+  "customer_segments": {
+    "description": "Estratégias específicas por segmento de cliente",
+    "triggers": ["segments.vip > 0", "segments.occasional > 50%"],
+    "strategies": [
+      {
+        "title": "Programa VIP Exclusivo",
+        "description": "Crie tratamento diferenciado para clientes que gastaram mais de R$1000.",
+        "expected_impact": "VIPs respondem por 40-60% do faturamento",
+        "action_steps": [
+          "Identifique clientes VIP automaticamente",
+          "Ofereça: frete grátis sempre, acesso antecipado a lançamentos, atendimento prioritário",
+          "Envie comunicação personalizada mensal"
+        ],
+        "benchmark": "Top 20% dos clientes geram 80% da receita (Pareto)"
+      },
+      {
+        "title": "Reativação de Ocasionais",
+        "description": "Clientes ocasionais (<R$200) precisam de incentivo para segunda compra.",
+        "expected_impact": "Conversão de 15-20% dos ocasionais em regulares",
+        "action_steps": [
+          "Segmente clientes com 1 compra < R$200",
+          "Envie cupom de 15% para segunda compra",
+          "Sugira produtos baseados na primeira compra"
+        ]
+      },
+      {
+        "title": "Upgrade de Regulares para VIP",
+        "description": "Incentive clientes regulares (R$200-1000) a atingir status VIP.",
+        "expected_impact": "Aumento de 25% no LTV deste segmento",
+        "action_steps": [
+          "Mostre quanto falta para atingir VIP",
+          "Ofereça benefício extra se atingir em 30 dias",
+          "Destaque vantagens exclusivas do programa VIP"
+        ]
+      }
+    ]
+  },
+  "benchmarks": {
+    "description": "Benchmarks de mercado para comparação",
+    "data": {
+      "taxa_conversao": {
+        "baixa": "< 1%",
+        "media": "1-3%",
+        "boa": "3-5%",
+        "excelente": "> 5%"
+      },
+      "taxa_recompra": {
+        "baixa": "< 15%",
+        "media": "15-25%",
+        "boa": "25-35%",
+        "excelente": "> 35%"
+      },
+      "ticket_medio_brasil": {
+        "moda": "R$ 150-250",
+        "eletronicos": "R$ 400-800",
+        "cosmeticos": "R$ 80-150",
+        "casa_decoracao": "R$ 200-400"
+      },
+      "taxa_cancelamento": {
+        "aceitavel": "< 3%",
+        "atencao": "3-5%",
+        "critico": "> 5%"
+      },
+      "custo_aquisicao_vs_retencao": "Adquirir novo cliente custa 5-7x mais que reter existente",
+      "abandono_carrinho_medio": "70-80% dos carrinhos são abandonados"
+    }
+  }
+}
