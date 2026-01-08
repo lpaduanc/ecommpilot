@@ -57,9 +57,10 @@ class GeminiProvider implements AIProviderInterface
             ];
         }
 
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-        ])->post("{$this->baseUrl}/models/{$model}:generateContent?key={$this->apiKey}", $payload);
+        $response = Http::timeout(120)
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/models/{$model}:generateContent?key={$this->apiKey}", $payload);
 
         if (! $response->successful()) {
             $error = $response->json('error.message', 'Unknown Gemini API error');

@@ -84,31 +84,317 @@ class AnalysisService
         $products = $store->products()->active()->get();
         $customers = $store->customers()->get();
 
-        $totalRevenue = $orders->where('payment_status', 'paid')->sum('total');
-        $averageTicket = $orders->count() > 0 ? $totalRevenue / $orders->count() : 0;
+        $paidOrders = $orders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+        $totalRevenue = $paidOrders->sum('total');
+        $averageTicket = $paidOrders->count() > 0 ? $totalRevenue / $paidOrders->count() : 0;
 
         return [
             'store' => [
                 'name' => $store->name,
-                'domain' => $store->domain,
+            ],
+            'period' => [
+                'start' => $startDate->format('Y-m-d'),
+                'end' => $endDate->format('Y-m-d'),
+                'days' => $startDate->diffInDays($endDate),
             ],
             'metrics' => [
-                'total_revenue' => $totalRevenue,
+                'total_revenue' => round($totalRevenue, 2),
                 'total_orders' => $orders->count(),
+                'paid_orders' => $paidOrders->count(),
                 'average_ticket' => round($averageTicket, 2),
                 'total_products' => $products->count(),
                 'total_customers' => $customers->count(),
             ],
-            'orders_by_status' => $orders->groupBy('status')->map->count(),
-            'orders_by_payment' => $orders->groupBy('payment_status')->map->count(),
-            'low_stock_products' => $products->filter(fn ($p) => $p->stock_quantity < 10)->count(),
-            'out_of_stock_products' => $products->filter(fn ($p) => $p->stock_quantity <= 0)->count(),
-            'top_products' => $products->sortByDesc('price')->take(10)->map(fn ($p) => [
-                'name' => $p->name,
-                'price' => $p->price,
-                'stock' => $p->stock_quantity,
-            ])->values(),
+            'trends' => $this->calculateTrends($store, $startDate, $endDate),
+            'product_performance' => $this->getProductPerformance($store, $orders),
+            'customer_insights' => $this->getCustomerInsights($customers),
+            'inventory_alerts' => $this->getInventoryAlerts($products),
+            'order_patterns' => $this->getOrderPatterns($orders),
         ];
+    }
+
+    /**
+     * Calculate trends comparing current period vs previous period
+     */
+    private function calculateTrends(Store $store, Carbon $startDate, Carbon $endDate): array
+    {
+        $periodDays = $startDate->diffInDays($endDate);
+        $prevStart = $startDate->copy()->subDays($periodDays + 1);
+        $prevEnd = $startDate->copy()->subDay();
+
+        // Current period orders
+        $currentOrders = $store->orders()
+            ->whereBetween('external_created_at', [$startDate, $endDate])
+            ->get();
+
+        // Previous period orders
+        $previousOrders = $store->orders()
+            ->whereBetween('external_created_at', [$prevStart, $prevEnd])
+            ->get();
+
+        $currentPaid = $currentOrders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+        $previousPaid = $previousOrders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+
+        $currentRevenue = $currentPaid->sum('total');
+        $previousRevenue = $previousPaid->sum('total');
+
+        $currentTicket = $currentPaid->count() > 0 ? $currentRevenue / $currentPaid->count() : 0;
+        $previousTicket = $previousPaid->count() > 0 ? $previousRevenue / $previousPaid->count() : 0;
+
+        return [
+            'revenue' => [
+                'current' => round($currentRevenue, 2),
+                'previous' => round($previousRevenue, 2),
+                'change_percent' => $this->calculateChangePercent($currentRevenue, $previousRevenue),
+                'trend' => $this->getTrendLabel($currentRevenue, $previousRevenue),
+            ],
+            'orders' => [
+                'current' => $currentOrders->count(),
+                'previous' => $previousOrders->count(),
+                'change_percent' => $this->calculateChangePercent($currentOrders->count(), $previousOrders->count()),
+            ],
+            'average_ticket' => [
+                'current' => round($currentTicket, 2),
+                'previous' => round($previousTicket, 2),
+                'change_percent' => $this->calculateChangePercent($currentTicket, $previousTicket),
+            ],
+            'comparison_period' => $prevStart->format('d/m/Y').' a '.$prevEnd->format('d/m/Y'),
+        ];
+    }
+
+    /**
+     * Get product performance based on actual sales
+     */
+    private function getProductPerformance(Store $store, $orders): array
+    {
+        $paidOrders = $orders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+
+        $productSales = [];
+
+        foreach ($paidOrders as $order) {
+            $items = $order->items ?? [];
+            foreach ($items as $item) {
+                $productName = $item['product_name'] ?? $item['name'] ?? 'Produto';
+                $quantity = $item['quantity'] ?? 1;
+                $price = $item['unit_price'] ?? $item['price'] ?? 0;
+                $total = $item['total'] ?? $price * $quantity;
+
+                if (! isset($productSales[$productName])) {
+                    $productSales[$productName] = [
+                        'name' => $productName,
+                        'units_sold' => 0,
+                        'revenue' => 0,
+                        'orders_count' => 0,
+                    ];
+                }
+
+                $productSales[$productName]['units_sold'] += $quantity;
+                $productSales[$productName]['revenue'] += $total;
+                $productSales[$productName]['orders_count']++;
+            }
+        }
+
+        // Sort by revenue descending
+        usort($productSales, fn ($a, $b) => $b['revenue'] <=> $a['revenue']);
+
+        $topSellers = array_slice($productSales, 0, 10);
+
+        // Format revenue
+        foreach ($topSellers as &$product) {
+            $product['revenue'] = round($product['revenue'], 2);
+        }
+
+        // Get products with stock but no sales in period
+        $soldProductNames = array_column($productSales, 'name');
+        $products = $store->products()->active()->get();
+
+        $noSalesProducts = $products->filter(function ($p) use ($soldProductNames) {
+            return ! in_array($p->name, $soldProductNames) && $p->stock_quantity > 0;
+        })->sortByDesc('price')->take(10)->map(fn ($p) => [
+            'name' => $p->name,
+            'price' => round($p->price, 2),
+            'stock' => $p->stock_quantity,
+            'potential_revenue' => round($p->price * $p->stock_quantity, 2),
+        ])->values()->toArray();
+
+        return [
+            'top_sellers' => $topSellers,
+            'no_sales_products' => $noSalesProducts,
+            'total_products_sold' => count($productSales),
+            'total_units_sold' => array_sum(array_column($productSales, 'units_sold')),
+        ];
+    }
+
+    /**
+     * Get customer behavior insights and segmentation
+     */
+    private function getCustomerInsights($customers): array
+    {
+        $totalCustomers = $customers->count();
+
+        if ($totalCustomers === 0) {
+            return [
+                'total_customers' => 0,
+                'repeat_purchase_rate' => 0,
+                'single_order_customers' => 0,
+                'segments' => ['vip' => 0, 'regular' => 0, 'occasional' => 0],
+                'average_customer_value' => 0,
+                'top_customers' => [],
+            ];
+        }
+
+        $customersWithMultipleOrders = $customers->filter(fn ($c) => $c->total_orders > 1)->count();
+        $repeatRate = round(($customersWithMultipleOrders / $totalCustomers) * 100, 1);
+
+        // Customer segmentation by total spent
+        $segments = [
+            'vip' => $customers->filter(fn ($c) => $c->total_spent >= 1000)->count(),
+            'regular' => $customers->filter(fn ($c) => $c->total_spent >= 200 && $c->total_spent < 1000)->count(),
+            'occasional' => $customers->filter(fn ($c) => $c->total_spent < 200)->count(),
+        ];
+
+        // Top customers by value
+        $topCustomers = $customers->sortByDesc('total_spent')
+            ->take(5)
+            ->map(fn ($c) => [
+                'orders' => $c->total_orders,
+                'total_spent' => round($c->total_spent, 2),
+                'average_order' => $c->total_orders > 0 ? round($c->total_spent / $c->total_orders, 2) : 0,
+            ])->values()->toArray();
+
+        return [
+            'total_customers' => $totalCustomers,
+            'repeat_purchase_rate' => $repeatRate,
+            'single_order_customers' => $totalCustomers - $customersWithMultipleOrders,
+            'segments' => $segments,
+            'average_customer_value' => round($customers->avg('total_spent'), 2),
+            'top_customers' => $topCustomers,
+        ];
+    }
+
+    /**
+     * Get detailed inventory alerts with product names
+     */
+    private function getInventoryAlerts($products): array
+    {
+        $totalProducts = $products->count();
+
+        $outOfStockProducts = $products->filter(fn ($p) => $p->stock_quantity <= 0)
+            ->sortByDesc('price')
+            ->take(10)
+            ->map(fn ($p) => [
+                'name' => $p->name,
+                'price' => round($p->price, 2),
+            ])->values()->toArray();
+
+        $lowStockProducts = $products->filter(fn ($p) => $p->stock_quantity > 0 && $p->stock_quantity < 10)
+            ->sortBy('stock_quantity')
+            ->take(10)
+            ->map(fn ($p) => [
+                'name' => $p->name,
+                'stock' => $p->stock_quantity,
+                'price' => round($p->price, 2),
+            ])->values()->toArray();
+
+        $outOfStockCount = $products->filter(fn ($p) => $p->stock_quantity <= 0)->count();
+        $lowStockCount = $products->filter(fn ($p) => $p->stock_quantity > 0 && $p->stock_quantity < 10)->count();
+        $healthyStockCount = $products->filter(fn ($p) => $p->stock_quantity >= 10)->count();
+
+        return [
+            'out_of_stock' => [
+                'count' => $outOfStockCount,
+                'products' => $outOfStockProducts,
+            ],
+            'low_stock' => [
+                'count' => $lowStockCount,
+                'products' => $lowStockProducts,
+            ],
+            'healthy_stock_count' => $healthyStockCount,
+            'health_rate' => $totalProducts > 0 ? round(($healthyStockCount / $totalProducts) * 100, 1) : 0,
+        ];
+    }
+
+    /**
+     * Analyze order patterns and behaviors
+     */
+    private function getOrderPatterns($orders): array
+    {
+        $totalOrders = $orders->count();
+
+        if ($totalOrders === 0) {
+            return [
+                'total_orders' => 0,
+                'by_status' => [],
+                'by_payment_status' => [],
+                'cancellation_rate' => 0,
+                'refund_rate' => 0,
+                'average_shipping' => 0,
+                'discount_usage_rate' => 0,
+                'peak_day' => null,
+            ];
+        }
+
+        // Orders by day of week
+        $ordersByDay = $orders->groupBy(fn ($o) => $o->external_created_at?->dayOfWeek ?? 0)
+            ->map->count()
+            ->toArray();
+
+        $peakDay = ! empty($ordersByDay) ? array_search(max($ordersByDay), $ordersByDay) : null;
+        $dayNames = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
+
+        // Status distribution
+        $byStatus = $orders->groupBy(fn ($o) => $o->status?->value ?? $o->status ?? 'unknown')
+            ->map->count()
+            ->toArray();
+
+        $byPaymentStatus = $orders->groupBy(fn ($o) => $o->payment_status?->value ?? $o->payment_status ?? 'unknown')
+            ->map->count()
+            ->toArray();
+
+        // Calculate rates
+        $cancelledCount = $orders->filter(fn ($o) => ($o->status?->value ?? $o->status) === 'cancelled')->count();
+        $refundedCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'refunded')->count();
+        $ordersWithDiscount = $orders->filter(fn ($o) => ($o->discount ?? 0) > 0)->count();
+
+        return [
+            'total_orders' => $totalOrders,
+            'by_status' => $byStatus,
+            'by_payment_status' => $byPaymentStatus,
+            'cancellation_rate' => round(($cancelledCount / $totalOrders) * 100, 1),
+            'refund_rate' => round(($refundedCount / $totalOrders) * 100, 1),
+            'average_shipping' => round($orders->avg('shipping') ?? 0, 2),
+            'discount_usage_rate' => round(($ordersWithDiscount / $totalOrders) * 100, 1),
+            'peak_day' => $peakDay !== null ? $dayNames[$peakDay] : null,
+            'orders_by_day' => $ordersByDay,
+        ];
+    }
+
+    /**
+     * Calculate percentage change between two values
+     */
+    private function calculateChangePercent(float $current, float $previous): float
+    {
+        if ($previous == 0) {
+            return $current > 0 ? 100 : 0;
+        }
+
+        return round((($current - $previous) / $previous) * 100, 1);
+    }
+
+    /**
+     * Get trend label based on change percentage
+     */
+    private function getTrendLabel(float $current, float $previous): string
+    {
+        $change = $this->calculateChangePercent($current, $previous);
+
+        return match (true) {
+            $change > 20 => 'strong_growth',
+            $change > 5 => 'growth',
+            $change > -5 => 'stable',
+            $change > -20 => 'decline',
+            default => 'strong_decline',
+        };
     }
 
     private function buildAnalysisPrompt(array $storeData, Carbon $startDate, Carbon $endDate): string
@@ -116,10 +402,13 @@ class AnalysisService
         $dataJson = json_encode($storeData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $periodDays = $startDate->diffInDays($endDate);
 
-        // Calcular contexto da loja
+        // Extrair dados para contexto resumido
         $revenue = $storeData['metrics']['total_revenue'] ?? 0;
         $products = $storeData['metrics']['total_products'] ?? 0;
         $orders = $storeData['metrics']['total_orders'] ?? 0;
+        $trends = $storeData['trends'] ?? [];
+        $customerInsights = $storeData['customer_insights'] ?? [];
+        $inventoryAlerts = $storeData['inventory_alerts'] ?? [];
 
         $storeSize = match (true) {
             $revenue > 50000 => 'grande (alto faturamento)',
@@ -127,15 +416,44 @@ class AnalysisService
             default => 'pequeno/iniciante',
         };
 
+        // Resumo de tendencias
+        $revenueTrend = $trends['revenue']['trend'] ?? 'stable';
+        $revenueChange = $trends['revenue']['change_percent'] ?? 0;
+        $trendDescription = match ($revenueTrend) {
+            'strong_growth' => "CRESCIMENTO FORTE (+{$revenueChange}%)",
+            'growth' => "crescimento (+{$revenueChange}%)",
+            'stable' => 'estavel',
+            'decline' => "queda ({$revenueChange}%)",
+            'strong_decline' => "QUEDA FORTE ({$revenueChange}%)",
+            default => 'sem dados anteriores',
+        };
+
+        // Resumo de clientes
+        $repeatRate = $customerInsights['repeat_purchase_rate'] ?? 0;
+        $vipCount = $customerInsights['segments']['vip'] ?? 0;
+
+        // Resumo de estoque
+        $outOfStock = $inventoryAlerts['out_of_stock']['count'] ?? 0;
+        $lowStock = $inventoryAlerts['low_stock']['count'] ?? 0;
+
         return <<<PROMPT
 ## CONTEXTO DA ANALISE
 
-- Loja: {$storeData['store']['name']}
-- Porte estimado: {$storeSize}
-- Periodo analisado: {$startDate->format('d/m/Y')} a {$endDate->format('d/m/Y')} ({$periodDays} dias)
-- Total de produtos ativos: {$products}
-- Total de pedidos no periodo: {$orders}
-- Faturamento no periodo: R$ {$revenue}
+**Loja:** {$storeData['store']['name']}
+**Porte:** {$storeSize}
+**Periodo:** {$startDate->format('d/m/Y')} a {$endDate->format('d/m/Y')} ({$periodDays} dias)
+
+### METRICAS PRINCIPAIS
+- Faturamento: R$ {$revenue} ({$trendDescription} vs periodo anterior)
+- Pedidos: {$orders}
+- Produtos ativos: {$products}
+
+### SITUACAO ATUAL
+- Tendencia de receita: {$trendDescription}
+- Taxa de recompra: {$repeatRate}% (clientes que voltam a comprar)
+- Clientes VIP (>R$1000): {$vipCount}
+- Produtos sem estoque: {$outOfStock}
+- Produtos com estoque baixo: {$lowStock}
 
 ## DADOS COMPLETOS DA LOJA
 
@@ -145,12 +463,19 @@ class AnalysisService
 
 Analise os dados acima e forneca recomendacoes ESPECIFICAS para esta loja.
 
+FOQUE ESPECIALMENTE EM:
+1. **Tendencias**: Se houver queda, identifique possiveis causas. Se houver crescimento, como acelerar.
+2. **Top Sellers**: Use os dados de "product_performance.top_sellers" para sugestoes de estoque e marketing
+3. **Produtos parados**: "product_performance.no_sales_products" mostra produtos com estoque mas sem vendas - sugira acoes
+4. **Retencao**: Se "repeat_purchase_rate" for baixo (<20%), sugira estrategias de fidelizacao
+5. **Estoque critico**: Use "inventory_alerts" para alertar sobre produtos que precisam reposicao
+6. **Padroes de pedidos**: Use "order_patterns" para identificar problemas (cancelamentos, reembolsos)
+
 IMPORTANTE:
-- Use os NOMES DOS PRODUTOS que aparecem em "top_products"
-- Mencione os NUMEROS EXATOS dos dados (receita, quantidade de pedidos, estoque)
-- Calcule impactos baseado nos valores reais (ex: produto X custa R$50 com 10 em estoque = R$500 potencial)
-- Se houver produtos com estoque zerado ou baixo, mencione-os pelo nome
-- Analise a distribuicao de status dos pedidos para identificar problemas
+- Use os NOMES DOS PRODUTOS que aparecem nos dados
+- Mencione os NUMEROS EXATOS (receita, quantidade, porcentagens)
+- Calcule impactos baseado nos valores reais
+- Compare com o periodo anterior quando relevante
 
 Forneca sua analise no formato JSON especificado nas instrucoes do sistema.
 PROMPT;
@@ -164,20 +489,25 @@ Voce e um consultor senior de e-commerce com 15 anos de experiencia analisando l
 ## PROCESSO DE ANALISE (siga estas etapas mentalmente)
 
 1. DIAGNOSTICO: Analise os dados e identifique padroes
-   - Verifique se ha produtos sem estoque ou com estoque baixo
-   - Identifique os produtos mais caros e se estao vendendo
-   - Avalie a distribuicao de pedidos por status
-   - Calcule metricas como ticket medio
+   - Verifique as TENDENCIAS em "trends" - a receita esta crescendo ou caindo?
+   - Analise "product_performance.top_sellers" - quais produtos realmente vendem
+   - Verifique "product_performance.no_sales_products" - produtos parados com estoque
+   - Analise "customer_insights" - taxa de recompra e segmentacao
+   - Verifique "inventory_alerts" - produtos sem estoque ou com estoque critico
+   - Analise "order_patterns" - taxas de cancelamento, reembolso, dia de pico
 
 2. PRIORIZACAO: Determine o que e mais urgente
-   - Problemas que estao custando dinheiro AGORA (prioridade alta)
-   - Oportunidades de crescimento rapido (prioridade media)
-   - Otimizacoes de longo prazo (prioridade baixa)
+   - Se tendencia de queda forte: PRIORIDADE MAXIMA - identificar causa
+   - Produtos sem estoque que sao top sellers: PRIORIDADE ALTA
+   - Taxa de recompra baixa (<15%): PRIORIDADE ALTA - problema de retencao
+   - Alto indice de cancelamentos (>5%): PRIORIDADE ALTA
+   - Produtos parados com estoque: PRIORIDADE MEDIA - capital parado
 
 3. RECOMENDACOES: Crie sugestoes ESPECIFICAS e ACIONAVEIS
    - SEMPRE mencione produtos, numeros ou metricas ESPECIFICOS dos dados fornecidos
    - NAO de conselhos genericos - cada sugestao deve ser unica para ESTA loja
-   - Cada sugestao deve poder ser executada em menos de 1 semana
+   - Use os dados de tendencia para justificar urgencia
+   - Calcule impactos usando os valores reais dos dados
 
 ## EXEMPLOS DE SUGESTOES
 
