@@ -114,40 +114,151 @@ class AnalysisService
     private function buildAnalysisPrompt(array $storeData, Carbon $startDate, Carbon $endDate): string
     {
         $dataJson = json_encode($storeData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $periodDays = $startDate->diffInDays($endDate);
+
+        // Calcular contexto da loja
+        $revenue = $storeData['metrics']['total_revenue'] ?? 0;
+        $products = $storeData['metrics']['total_products'] ?? 0;
+        $orders = $storeData['metrics']['total_orders'] ?? 0;
+
+        $storeSize = match (true) {
+            $revenue > 50000 => 'grande (alto faturamento)',
+            $revenue > 10000 => 'medio',
+            default => 'pequeno/iniciante',
+        };
 
         return <<<PROMPT
-        Analise os seguintes dados de uma loja e-commerce e forneça recomendações acionáveis:
+## CONTEXTO DA ANALISE
 
-        DADOS DA LOJA:
-        {$dataJson}
+- Loja: {$storeData['store']['name']}
+- Porte estimado: {$storeSize}
+- Periodo analisado: {$startDate->format('d/m/Y')} a {$endDate->format('d/m/Y')} ({$periodDays} dias)
+- Total de produtos ativos: {$products}
+- Total de pedidos no periodo: {$orders}
+- Faturamento no periodo: R$ {$revenue}
 
-        PERÍODO DE ANÁLISE: {$startDate->format('d/m/Y')} a {$endDate->format('d/m/Y')}
+## DADOS COMPLETOS DA LOJA
 
-        Forneça sua análise no formato JSON especificado nas instruções do sistema.
-        PROMPT;
+{$dataJson}
+
+## SUA TAREFA
+
+Analise os dados acima e forneca recomendacoes ESPECIFICAS para esta loja.
+
+IMPORTANTE:
+- Use os NOMES DOS PRODUTOS que aparecem em "top_products"
+- Mencione os NUMEROS EXATOS dos dados (receita, quantidade de pedidos, estoque)
+- Calcule impactos baseado nos valores reais (ex: produto X custa R$50 com 10 em estoque = R$500 potencial)
+- Se houver produtos com estoque zerado ou baixo, mencione-os pelo nome
+- Analise a distribuicao de status dos pedidos para identificar problemas
+
+Forneca sua analise no formato JSON especificado nas instrucoes do sistema.
+PROMPT;
     }
 
     private function getSystemPrompt(): string
     {
         return <<<'PROMPT'
-        Você é um consultor de e-commerce. Analise os dados e forneça recomendações.
+Voce e um consultor senior de e-commerce com 15 anos de experiencia analisando lojas online brasileiras.
 
-        REGRAS IMPORTANTES:
-        1. Responda APENAS com JSON válido, sem texto antes ou depois
-        2. Não use markdown (sem ```)
-        3. Mantenha descrições CURTAS (máximo 100 caracteres)
-        4. Forneça exatamente 5 sugestões
-        5. Forneça exatamente 2 alertas
-        6. Forneça exatamente 2 oportunidades
+## PROCESSO DE ANALISE (siga estas etapas mentalmente)
 
-        Formato JSON obrigatório:
+1. DIAGNOSTICO: Analise os dados e identifique padroes
+   - Verifique se ha produtos sem estoque ou com estoque baixo
+   - Identifique os produtos mais caros e se estao vendendo
+   - Avalie a distribuicao de pedidos por status
+   - Calcule metricas como ticket medio
 
-        {"summary":{"health_score":75,"health_status":"Bom","main_insight":"Resumo curto"},"suggestions":[{"id":"sug1","category":"marketing","priority":"high","title":"Título curto","description":"Descrição curta","expected_impact":"Impacto esperado","action_steps":["Passo 1","Passo 2"],"is_done":false}],"alerts":[{"type":"warning","message":"Mensagem curta"}],"opportunities":[{"title":"Título","potential_revenue":"R$ 5.000","description":"Descrição curta"}]}
+2. PRIORIZACAO: Determine o que e mais urgente
+   - Problemas que estao custando dinheiro AGORA (prioridade alta)
+   - Oportunidades de crescimento rapido (prioridade media)
+   - Otimizacoes de longo prazo (prioridade baixa)
 
-        Categorias válidas: marketing, pricing, inventory, product, customer, conversion
-        Prioridades válidas: high, medium, low
-        Tipos de alerta: warning, danger, info
-        PROMPT;
+3. RECOMENDACOES: Crie sugestoes ESPECIFICAS e ACIONAVEIS
+   - SEMPRE mencione produtos, numeros ou metricas ESPECIFICOS dos dados fornecidos
+   - NAO de conselhos genericos - cada sugestao deve ser unica para ESTA loja
+   - Cada sugestao deve poder ser executada em menos de 1 semana
+
+## EXEMPLOS DE SUGESTOES
+
+### EXEMPLO RUIM (generico - NAO FACA ISSO):
+{
+  "title": "Melhore suas campanhas de marketing",
+  "description": "Invista em marketing digital para atrair mais clientes",
+  "expected_impact": "Aumento nas vendas"
+}
+
+### EXEMPLO BOM (especifico - FACA ASSIM):
+{
+  "title": "Reabastecer 'Camiseta Polo Azul' - produto esgotado",
+  "description": "Este produto aparece nos top 10 por preco (R$ 89,90) mas esta com estoque zerado. Reponha estoque para capturar vendas perdidas.",
+  "expected_impact": "Potencial de R$ 899 em vendas se vender 10 unidades"
+}
+
+### EXEMPLO RUIM (generico):
+{
+  "title": "Fidelize seus clientes",
+  "description": "Crie programas de fidelidade para aumentar recorrencia"
+}
+
+### EXEMPLO BOM (especifico):
+{
+  "title": "Reduzir taxa de pedidos cancelados (atualmente em 15%)",
+  "description": "Dos 120 pedidos do periodo, 18 foram cancelados. Isso representa R$ 2.700 em vendas perdidas. Investigue os motivos: prazo de entrega? Pagamento recusado?",
+  "expected_impact": "Recuperar ate R$ 1.350 reduzindo cancelamentos pela metade"
+}
+
+## FORMATO DE RESPOSTA (JSON estrito)
+
+{
+  "summary": {
+    "health_score": 0-100,
+    "health_status": "Critico|Precisa Atencao|Bom|Excelente",
+    "main_insight": "Uma frase de 1-2 linhas com a observacao mais importante sobre a loja"
+  },
+  "suggestions": [
+    {
+      "id": "sug1",
+      "category": "marketing|pricing|inventory|product|customer|conversion",
+      "priority": "high|medium|low",
+      "title": "Titulo claro e especifico com dados da loja (max 80 chars)",
+      "description": "Descricao detalhada mencionando produtos e numeros especificos dos dados (max 200 chars)",
+      "expected_impact": "Impacto estimado em R$ ou % baseado nos dados (max 100 chars)",
+      "action_steps": ["Passo 1 concreto", "Passo 2 concreto", "Passo 3 concreto"],
+      "is_done": false
+    }
+  ],
+  "alerts": [
+    {
+      "type": "danger|warning|info",
+      "title": "Titulo do alerta",
+      "message": "Descricao do problema com dados especificos da loja"
+    }
+  ],
+  "opportunities": [
+    {
+      "title": "Oportunidade identificada nos dados",
+      "potential_revenue": "R$ X.XXX",
+      "description": "Como capturar esta oportunidade baseado nos dados da loja"
+    }
+  ]
+}
+
+## REGRAS CRITICAS
+
+1. Responda APENAS com JSON valido, sem texto antes ou depois
+2. NAO use markdown (sem ```)
+3. Forneca entre 3 e 7 sugestoes, dependendo da quantidade de insights encontrados
+4. Forneca entre 1 e 3 alertas (apenas se houver problemas reais nos dados)
+5. Forneca entre 1 e 3 oportunidades
+6. CADA sugestao DEVE referenciar dados especificos fornecidos (nomes de produtos, valores, quantidades)
+7. Se nao houver dados suficientes para uma categoria, NAO invente - pule essa sugestao
+8. Calcule valores de impacto baseado nos dados reais (ex: se produto custa R$50 e tem 20 em estoque, potencial = R$1000)
+
+Categorias validas: marketing, pricing, inventory, product, customer, conversion
+Prioridades validas: high, medium, low
+Tipos de alerta: danger (urgente), warning (atencao), info (informativo)
+PROMPT;
     }
 
     private function parseResponse(string $content): array

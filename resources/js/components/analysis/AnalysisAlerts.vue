@@ -84,7 +84,10 @@ function isVisible(index) {
 
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
-                    <p :class="['font-medium leading-relaxed', getConfig(alert.type).text]">
+                    <p v-if="alert.title" :class="['font-semibold', getConfig(alert.type).text]">
+                        {{ alert.title }}
+                    </p>
+                    <p :class="['leading-relaxed', alert.title ? getConfig(alert.type).subtext : 'font-medium ' + getConfig(alert.type).text]">
                         {{ alert.message }}
                     </p>
                 </div>
