@@ -70,6 +70,19 @@ php artisan cache:clear && php artisan config:clear && php artisan route:clear &
 
 Laravel 12 + Vue 3 SPA for e-commerce analytics with AI-powered insights. Integrates with Nuvemshop to sync store data and uses OpenAI/Gemini for analysis.
 
+### Laravel 12 Specifics
+
+**Release Notes:**
+- Laravel 12 focuses on minimal breaking changes - most apps upgrade without code changes
+- New starter kits for React, Vue, and Livewire with Inertia 2, TypeScript, shadcn/ui
+- Optional WorkOS AuthKit for social auth, passkeys, and SSO
+- Follows Semantic Versioning - major releases yearly (~Q1)
+
+**Upgrade Notes:**
+- This project uses Laravel 12's built-in Sanctum for SPA authentication
+- No WorkOS integration - uses standard Laravel auth system
+- Tailwind CSS for styling (not Flux UI)
+
 ### Backend Structure
 
 **Services Layer** (`app/Services/`)
@@ -90,6 +103,39 @@ Laravel 12 + Vue 3 SPA for e-commerce analytics with AI-powered insights. Integr
 - `SyncStoreDataJob` - Syncs products, orders, customers from Nuvemshop (retries 3x with 60s backoff)
 - `ProcessAnalysisJob` - Runs AI analysis asynchronously
 
+**Laravel 12 Job Patterns:**
+```php
+// Rate limiting middleware for jobs (Laravel 12)
+use Illuminate\Queue\Middleware\RateLimited;
+
+public function middleware(): array
+{
+    return [new RateLimited('api-sync')];
+}
+
+// Exception throttling - stops retrying after N exceptions in X seconds
+use Illuminate\Queue\Middleware\ThrottlesExceptions;
+
+public function middleware(): array
+{
+    return [new ThrottlesExceptions(10, 5 * 60)]; // 10 exceptions, 5 min delay
+}
+
+// Define rate limiters in AppServiceProvider
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
+
+RateLimiter::for('api-sync', function ($job) {
+    return Limit::perMinute(60)->by($job->store->id);
+});
+```
+
+**Queue Worker Commands:**
+```bash
+php artisan queue:work --tries=3 --backoff=60    # 3 retries, 60s between
+php artisan queue:work redis --timeout=300       # 5 min timeout per job
+```
+
 **Key Models** (`app/Models/`)
 - `User` - Supports multi-store with `active_store_id`, has `ai_credits` for rate limiting AI features
 - `Store` - Connected e-commerce stores with `sync_status` tracking (Pending/Syncing/Completed/Failed/TokenExpired)
@@ -108,6 +154,33 @@ Laravel 12 + Vue 3 SPA for e-commerce analytics with AI-powered insights. Integr
 **API Resources** (`app/Http/Resources/`)
 - `OrderResource` - Formats order data for API responses (includes items, shipping_address as JSON)
 - `ProductResource` - Formats product data for API responses
+
+**Laravel 12 Resource Patterns:**
+```php
+// Paginated collections - auto-includes meta & links
+return new UserCollection(User::paginate());
+// Or use convenience method:
+return User::paginate()->toResourceCollection();
+
+// Response structure for paginated resources:
+{
+    "data": [...],
+    "links": { "first", "last", "prev", "next" },
+    "meta": { "current_page", "from", "last_page", "per_page", "to", "total" }
+}
+
+// Custom collection with metadata
+class OrderCollection extends ResourceCollection
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'data' => $this->collection,
+            'stats' => ['total_revenue' => $this->collection->sum('total')],
+        ];
+    }
+}
+```
 
 ### Frontend Structure
 

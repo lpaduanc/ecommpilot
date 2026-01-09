@@ -12,7 +12,6 @@ use App\Models\SyncedCoupon;
 use App\Models\SyncedCustomer;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
-use App\Models\SystemSetting;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +25,7 @@ class NuvemshopService
 
     private string $redirectUri;
 
-    private string $apiBaseUrl = 'https://api.nuvemshop.com.br/v1';
+    private string $apiBaseUrl = 'https://api.nuvemshop.com.br/2025-03';
 
     private string $authUrl = 'https://www.nuvemshop.com.br/apps/authorize';
 
@@ -214,7 +213,7 @@ class NuvemshopService
     public function syncOrders(Store $store): void
     {
         $page = 1;
-        $perPage = 200;
+        $perPage = 50; // Using smaller batch for stability with large stores
 
         do {
             $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/orders", [
@@ -227,6 +226,11 @@ class NuvemshopService
             }
 
             $page++;
+
+            // Log progress for large syncs
+            if ($page % 10 === 0) {
+                Log::info("Orders sync progress for store {$store->id}: page {$page}");
+            }
         } while (count($response) === $perPage);
     }
 

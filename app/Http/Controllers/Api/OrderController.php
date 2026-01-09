@@ -7,6 +7,7 @@ use App\Http\Resources\OrderResource;
 use App\Models\SyncedOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
 {
@@ -26,12 +27,28 @@ class OrderController extends Controller
             ->search($request->input('search'))
             ->orderBy('external_created_at', 'desc');
 
-        if ($request->has('status') && $request->input('status')) {
+        if ($request->filled('status')) {
             $query->byStatus($request->input('status'));
         }
 
-        if ($request->has('payment_status') && $request->input('payment_status')) {
+        if ($request->filled('payment_status')) {
             $query->byPaymentStatus($request->input('payment_status'));
+        }
+
+        if ($request->filled('coupon')) {
+            $query->byCoupon($request->input('coupon'));
+        }
+
+        if ($request->filled('country')) {
+            $query->byCountry($request->input('country'));
+        }
+
+        if ($request->filled('state')) {
+            $query->byState($request->input('state'));
+        }
+
+        if ($request->filled('city')) {
+            $query->byCity($request->input('city'));
         }
 
         $orders = $query->paginate($request->input('per_page', 20));
@@ -42,6 +59,163 @@ class OrderController extends Controller
             'last_page' => $orders->lastPage(),
             'current_page' => $orders->currentPage(),
         ]);
+    }
+
+    public function filters(Request $request): JsonResponse
+    {
+        $store = $request->user()->activeStore;
+
+        if (! $store) {
+            return response()->json([
+                'statuses' => [],
+                'coupons' => [],
+                'countries' => [],
+                'states' => [],
+                'cities' => [],
+            ]);
+        }
+
+        $orders = SyncedOrder::where('store_id', $store->id)->get();
+
+        $statuses = $orders
+            ->pluck('status')
+            ->filter()
+            ->map(fn ($status) => $status->value)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $coupons = $orders
+            ->pluck('coupon')
+            ->filter()
+            ->map(fn ($coupon) => $coupon['code'] ?? null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $countries = $orders
+            ->pluck('shipping_address')
+            ->filter()
+            ->map(fn ($address) => $address['country'] ?? null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $states = $orders
+            ->pluck('shipping_address')
+            ->filter()
+            ->map(fn ($address) => $address['province'] ?? null)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        $cities = $orders
+            ->pluck('shipping_address')
+            ->filter()
+            ->map(fn ($address) => $address['city'] ?? null)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        return response()->json([
+            'statuses' => $statuses,
+            'coupons' => $coupons,
+            'countries' => $countries,
+            'states' => $states,
+            'cities' => $cities,
+        ]);
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $store = $request->user()->activeStore;
+
+        $query = SyncedOrder::where('store_id', $store?->id ?? 0)
+            ->search($request->input('search'))
+            ->orderBy('external_created_at', 'desc');
+
+        if ($request->filled('status')) {
+            $query->byStatus($request->input('status'));
+        }
+
+        if ($request->filled('payment_status')) {
+            $query->byPaymentStatus($request->input('payment_status'));
+        }
+
+        if ($request->filled('coupon')) {
+            $query->byCoupon($request->input('coupon'));
+        }
+
+        if ($request->filled('country')) {
+            $query->byCountry($request->input('country'));
+        }
+
+        if ($request->filled('state')) {
+            $query->byState($request->input('state'));
+        }
+
+        if ($request->filled('city')) {
+            $query->byCity($request->input('city'));
+        }
+
+        $orders = $query->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="pedidos_'.date('Y-m-d_His').'.csv"',
+        ];
+
+        return response()->stream(function () use ($orders) {
+            $handle = fopen('php://output', 'w');
+
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($handle, [
+                'Pedido',
+                'Data',
+                'Status',
+                'Cliente',
+                'Email',
+                'Telefone',
+                'Total Vendido',
+                'Itens',
+                'Custo',
+                'Lucro Bruto',
+                'Margem %',
+                'Cupom',
+                'País',
+                'Estado',
+                'Cidade',
+            ], ';');
+
+            foreach ($orders as $order) {
+                fputcsv($handle, [
+                    $order->order_number,
+                    $order->external_created_at?->format('d/m/Y'),
+                    $order->status?->value ?? '-',
+                    $order->customer_name,
+                    $order->customer_email,
+                    $order->customer_phone ?? '-',
+                    number_format((float) $order->total, 2, ',', '.'),
+                    $order->items_count,
+                    number_format($order->calculateCost(), 2, ',', '.'),
+                    number_format($order->calculateGrossProfit(), 2, ',', '.'),
+                    $order->calculateMargin() !== null ? number_format($order->calculateMargin(), 1, ',', '.').'%' : '-',
+                    $order->coupon['code'] ?? '-',
+                    $order->shipping_address['country'] ?? '-',
+                    $order->shipping_address['province'] ?? '-',
+                    $order->shipping_address['city'] ?? '-',
+                ], ';');
+            }
+
+            fclose($handle);
+        }, 200, $headers);
     }
 
     public function show(Request $request, int $id): JsonResponse

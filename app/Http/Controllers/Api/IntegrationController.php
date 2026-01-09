@@ -43,7 +43,7 @@ class IntegrationController extends Controller
 
             if (! $this->isValidNuvemshopUrl($storeUrl)) {
                 return response()->json([
-                    'message' => 'URL da loja inválida. Use o formato: minhaloja.lojavirtualnuvem.com.br',
+                    'message' => 'URL da loja inválida.',
                 ], 422);
             }
         }
@@ -81,13 +81,13 @@ class IntegrationController extends Controller
     }
 
     /**
-     * Validate if the URL is a valid Nuvemshop store URL.
+     * Validate if the URL is a valid store URL format.
+     * Accepts any valid domain - Nuvemshop will validate if it's a real store.
      */
     private function isValidNuvemshopUrl(string $url): bool
     {
-        $pattern = '/^[a-zA-Z0-9-]+\.(lojavirtualnuvem\.com\.br|nuvemshop\.com\.br|tiendanube\.com)$/';
-
-        return (bool) preg_match($pattern, $url);
+        // Accept any non-empty URL - Nuvemshop will validate if it's a real store
+        return ! empty($url) && strlen($url) >= 3;
     }
 
     public function callbackNuvemshop(Request $request): RedirectResponse

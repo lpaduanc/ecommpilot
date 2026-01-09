@@ -88,15 +88,8 @@ function closeConnectModal() {
 function validateStoreUrl() {
     storeUrlError.value = '';
 
-    if (!storeUrl.value) {
+    if (!storeUrl.value || !storeUrl.value.trim()) {
         storeUrlError.value = 'A URL da loja é obrigatória';
-        return false;
-    }
-
-    // Validate URL format
-    const urlPattern = /^[a-zA-Z0-9-]+\.(lojavirtualnuvem\.com\.br|nuvemshop\.com\.br|tiendanube\.com)$/;
-    if (!urlPattern.test(storeUrl.value)) {
-        storeUrlError.value = 'URL inválida. Exemplo: minhaloja.lojavirtualnuvem.com.br';
         return false;
     }
 

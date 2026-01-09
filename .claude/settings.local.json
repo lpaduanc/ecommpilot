@@ -40,5 +40,9 @@
       "Bash(echo:*)",
       "Bash(chmod:*)"
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "$input = $input | ConvertFrom-Json; $dir = Split-Path -Leaf $input.workspace.current_dir; $model = $input.model.display_name -replace 'Claude ', ''; $style = $input.output_style.name; $vim = if ($input.vim) { \"[$($input.vim.mode)]\" } else { '' }; Write-Host \"$dir | $model | $style $vim\" -NoNewline"
   }
 }

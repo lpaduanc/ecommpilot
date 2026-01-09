@@ -58,8 +58,8 @@ const menuItems = computed(() => [
         permission: 'products.view',
     },
     {
-        name: 'Vendas',
-        label: 'Vendas',
+        name: 'Pedidos',
+        label: 'Pedidos',
         icon: CurrencyDollarIcon,
         route: 'orders',
         permission: 'orders.view',

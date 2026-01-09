@@ -73,6 +73,8 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::prefix('orders')->middleware('can:orders.view')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
+        Route::get('/filters', [OrderController::class, 'filters']);
+        Route::get('/export', [OrderController::class, 'export']);
         Route::get('/stats', [OrderController::class, 'stats']);
         Route::get('/{id}', [OrderController::class, 'show']);
     });

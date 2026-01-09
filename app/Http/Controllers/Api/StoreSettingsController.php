@@ -45,7 +45,7 @@ class StoreSettingsController extends Controller
             return str_repeat('*', strlen($value));
         }
 
-        return substr($value, 0, 4) . str_repeat('*', strlen($value) - 8) . substr($value, -4);
+        return substr($value, 0, 4).str_repeat('*', strlen($value) - 8).substr($value, -4);
     }
 
     /**
