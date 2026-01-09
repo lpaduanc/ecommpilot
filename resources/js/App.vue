@@ -6,9 +6,11 @@ import TheHeader from './components/layout/TheHeader.vue';
 import NotificationToast from './components/common/NotificationToast.vue';
 import ErrorBoundary from './components/shared/ErrorBoundary.vue';
 import { useAuthStore } from './stores/authStore';
+import { useSidebarStore } from './stores/sidebarStore';
 
 const route = useRoute();
 const authStore = useAuthStore();
+const sidebarStore = useSidebarStore();
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
 const isAuthPage = computed(() => {
@@ -58,7 +60,7 @@ provide('mobileSidebar', {
             <TheSidebar id="sidebar-nav" :is-mobile-open="isMobileSidebarOpen" @close="isMobileSidebarOpen = false" />
 
             <!-- Main Content - responsive margin -->
-            <div class="flex-1 lg:ml-72 min-h-screen">
+            <div :class="['flex-1 min-h-screen transition-all duration-300', sidebarStore.contentMargin]">
                 <TheHeader @toggle-mobile-sidebar="isMobileSidebarOpen = !isMobileSidebarOpen" />
                 <main id="main-content" class="p-4 sm:p-6 lg:p-8">
                     <!-- ErrorBoundary envolve o router-view para capturar erros em rotas -->

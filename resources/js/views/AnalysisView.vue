@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useAnalysisStore } from '../stores/analysisStore';
+import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
@@ -21,6 +22,7 @@ import {
 } from '@heroicons/vue/24/outline';
 
 const analysisStore = useAnalysisStore();
+const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
 
 const showCreditWarning = ref(false);
@@ -105,10 +107,10 @@ onUnmounted(() => {
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
         <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
-            <!-- Animated Background Elements -->
+            <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl animate-pulse-soft"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl animate-pulse-soft" style="animation-delay: 1s;"></div>
+                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
@@ -156,6 +158,7 @@ onUnmounted(() => {
                             {{ showChat ? 'Ver Análises' : 'Chat IA' }}
                         </button>
                         <button
+                            v-if="authStore.hasPermission('analysis.request')"
                             @click="handleRequestAnalysis"
                             :disabled="isRequesting"
                             class="group relative px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -177,7 +180,7 @@ onUnmounted(() => {
             <!-- Loading State -->
             <div v-if="isLoading && !currentAnalysis" class="flex flex-col items-center justify-center py-32">
                 <div class="relative">
-                    <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse"></div>
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
                     <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
                 </div>
                 <p class="text-gray-500 mt-6 font-medium">Carregando análises...</p>
@@ -190,15 +193,15 @@ onUnmounted(() => {
                         <!-- Left Column - Analysis (hidden on mobile when chat is open) -->
                         <div :class="['lg:col-span-2 space-y-6', showChat ? 'hidden lg:block' : '']">
                             <!-- Health Score -->
-                            <HealthScore v-if="summary" :summary="summary" class="animate-fade-in" />
+                            <HealthScore v-if="summary" :summary="summary" />
 
                             <!-- Alerts -->
-                            <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" class="animate-fade-in animate-delay-100" />
+                            <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" />
 
                             <!-- Suggestions by Priority -->
                             <div v-if="suggestions.length > 0" class="space-y-8">
                                 <!-- High Priority -->
-                                <div v-if="groupedSuggestions.high.length > 0" class="animate-fade-in animate-delay-200">
+                                <div v-if="groupedSuggestions.high.length > 0">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-danger-500 to-danger-600 flex items-center justify-center shadow-lg shadow-danger-500/30">
                                             <BoltIcon class="w-5 h-5 text-white" />
@@ -214,14 +217,12 @@ onUnmounted(() => {
                                             :key="suggestion.id"
                                             :suggestion="suggestion"
                                             @view-detail="viewSuggestionDetail"
-                                            :style="{ animationDelay: `${index * 50}ms` }"
-                                            class="animate-slide-up"
                                         />
                                     </div>
                                 </div>
 
                                 <!-- Medium Priority -->
-                                <div v-if="groupedSuggestions.medium.length > 0" class="animate-fade-in animate-delay-300">
+                                <div v-if="groupedSuggestions.medium.length > 0">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shadow-lg shadow-accent-500/30">
                                             <ChartBarIcon class="w-5 h-5 text-white" />
@@ -237,14 +238,12 @@ onUnmounted(() => {
                                             :key="suggestion.id"
                                             :suggestion="suggestion"
                                             @view-detail="viewSuggestionDetail"
-                                            :style="{ animationDelay: `${index * 50}ms` }"
-                                            class="animate-slide-up"
                                         />
                                     </div>
                                 </div>
 
                                 <!-- Low Priority -->
-                                <div v-if="groupedSuggestions.low.length > 0" class="animate-fade-in animate-delay-400">
+                                <div v-if="groupedSuggestions.low.length > 0">
                                     <div class="flex items-center gap-3 mb-5">
                                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center shadow-lg shadow-success-500/30">
                                             <RocketLaunchIcon class="w-5 h-5 text-white" />
@@ -260,15 +259,13 @@ onUnmounted(() => {
                                             :key="suggestion.id"
                                             :suggestion="suggestion"
                                             @view-detail="viewSuggestionDetail"
-                                            :style="{ animationDelay: `${index * 50}ms` }"
-                                            class="animate-slide-up"
                                         />
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Empty State -->
-                            <div v-else class="text-center py-20 animate-fade-in">
+                            <div v-else class="text-center py-20">
                                 <div class="relative inline-block mb-6">
                                     <div class="w-32 h-32 rounded-3xl bg-gradient-to-br from-primary-100 to-secondary-100 flex items-center justify-center">
                                         <SparklesIcon class="w-16 h-16 text-primary-400" />
@@ -284,22 +281,26 @@ onUnmounted(() => {
                                     Solicite sua primeira análise e receba sugestões personalizadas baseadas em inteligência artificial para impulsionar suas vendas.
                                 </p>
                                 <button
+                                    v-if="authStore.hasPermission('analysis.request')"
                                     @click="handleRequestAnalysis"
                                     class="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 hover:scale-[1.02] transition-all duration-200"
                                 >
                                     <SparklesIcon class="w-5 h-5" />
                                     Solicitar Primeira Análise
                                 </button>
+                                <p v-else class="text-sm text-gray-500">
+                                    Você não possui permissão para solicitar análises.
+                                </p>
                             </div>
                         </div>
 
                         <!-- Right Column - Chat & Opportunities -->
                         <div :class="['space-y-6', !showChat ? 'hidden lg:block' : '']">
                             <!-- Opportunities -->
-                            <OpportunitiesPanel v-if="opportunities.length > 0" :opportunities="opportunities" class="animate-fade-in animate-delay-200" />
+                            <OpportunitiesPanel v-if="opportunities.length > 0" :opportunities="opportunities" />
 
                             <!-- Chat -->
-                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-[500px] lg:h-[600px] animate-fade-in animate-delay-300">
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-[500px] lg:h-[600px]">
                                 <ChatContainer compact />
                             </div>
                         </div>

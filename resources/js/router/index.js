@@ -50,7 +50,7 @@ const routes = [
             /* webpackPrefetch: true */
             '../views/DashboardView.vue'
         ),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, permission: 'dashboard.view' },
     },
     {
         path: '/products',
@@ -60,7 +60,7 @@ const routes = [
             /* webpackPrefetch: true */
             '../views/ProductsView.vue'
         ),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, permission: 'products.view' },
     },
     {
         path: '/orders',
@@ -70,7 +70,16 @@ const routes = [
             /* webpackPrefetch: true */
             '../views/OrdersView.vue'
         ),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, permission: 'orders.view' },
+    },
+    {
+        path: '/marketing/descontos',
+        name: 'discounts',
+        component: () => import(
+            /* webpackChunkName: "discounts" */
+            '../views/DiscountsView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'marketing.access' },
     },
     {
         path: '/analysis',
@@ -80,7 +89,7 @@ const routes = [
             /* webpackPrefetch: true */
             '../views/AnalysisView.vue'
         ),
-        meta: { requiresAuth: true, permission: 'analytics.view' },
+        meta: { requiresAuth: true, permission: 'analysis.view' },
     },
     {
         path: '/chat',
@@ -108,7 +117,25 @@ const routes = [
             /* webpackChunkName: "settings" */
             '../views/SettingsView.vue'
         ),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, permission: 'settings.view' },
+    },
+    {
+        path: '/settings/users',
+        name: 'users-management',
+        component: () => import(
+            /* webpackChunkName: "users-management" */
+            '../views/UsersManagementView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'users.view' },
+        beforeEnter: (to, from, next) => {
+            const authStore = useAuthStore();
+            // Admins não devem acessar essa área (eles usam /admin/clients)
+            if (authStore.isAdmin) {
+                next({ name: 'admin-clients' });
+            } else {
+                next();
+            }
+        },
     },
 
     // Admin Routes - Lower priority, no preload for better initial performance

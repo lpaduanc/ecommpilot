@@ -137,10 +137,10 @@ onMounted(() => {
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
         <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
-            <!-- Animated Background Elements -->
+            <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl animate-pulse-soft"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl animate-pulse-soft" style="animation-delay: 1s;"></div>
+                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
@@ -201,11 +201,11 @@ onMounted(() => {
         <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto">
                 <!-- Orders Table -->
-                <BaseCard padding="none" class="overflow-hidden animate-fade-in">
+                <BaseCard padding="none" class="overflow-hidden">
                     <!-- Loading -->
                     <div v-if="isLoading" class="flex items-center justify-center py-20">
                         <div class="relative">
-                            <div class="w-16 h-16 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse"></div>
+                            <div class="w-16 h-16 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
                             <LoadingSpinner size="lg" class="absolute inset-0 m-auto text-white" />
                         </div>
                     </div>
@@ -242,11 +242,7 @@ onMounted(() => {
                                 <tr
                                     v-for="(order, index) in orders"
                                     :key="order.id"
-                                    :class="[
-                                        'hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent transition-all duration-200',
-                                        'animate-slide-up'
-                                    ]"
-                                    :style="{ animationDelay: `${index * 30}ms` }"
+                                    class="hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent transition-all duration-200"
                                 >
                                     <td class="px-6 py-4">
                                         <span class="font-medium text-gray-900">{{ order.order_number }}</span>
@@ -284,7 +280,7 @@ onMounted(() => {
                     </div>
 
                     <!-- Empty State -->
-                    <div v-else class="text-center py-20 animate-fade-in">
+                    <div v-else class="text-center py-20">
                         <div class="relative inline-block mb-6">
                             <div class="w-32 h-32 rounded-3xl bg-gradient-to-br from-primary-100 to-secondary-100 flex items-center justify-center">
                                 <CurrencyDollarIcon class="w-16 h-16 text-primary-400" />
@@ -346,7 +342,7 @@ onMounted(() => {
                     ></div>
 
                     <!-- Modal -->
-                    <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl animate-scale-in">
+                    <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl">
                         <!-- Header with Gradient -->
                         <div class="relative px-8 py-6 bg-gradient-to-r from-primary-500 to-secondary-500 overflow-hidden">
                             <!-- Background Pattern -->
@@ -506,16 +502,11 @@ onMounted(() => {
 <style scoped>
 .modal-enter-active,
 .modal-leave-active {
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease;
 }
 
 .modal-enter-from,
 .modal-leave-to {
     opacity: 0;
-}
-
-.modal-enter-from .animate-scale-in,
-.modal-leave-to .animate-scale-in {
-    transform: scale(0.95) translateY(20px);
 }
 </style>

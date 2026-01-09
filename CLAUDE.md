@@ -2,6 +2,37 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## REGRAS CRÍTICAS - LEIA PRIMEIRO
+
+### Prevenção de Regressões de Código
+
+**NUNCA substitua código funcional por versões antigas ou incompletas.** Siga estas regras obrigatórias:
+
+1. **Sempre leia o arquivo ATUAL antes de editar** - Use a ferramenta Read para obter o estado mais recente do arquivo. Nunca assuma que você sabe o conteúdo atual baseado em leituras anteriores na conversa.
+
+2. **Use Edit em vez de Write para modificações** - A ferramenta Edit faz substituições precisas. A ferramenta Write sobrescreve o arquivo inteiro e pode causar perda de código.
+
+3. **Edições cirúrgicas, não substituições completas** - Ao modificar um arquivo, altere apenas o trecho necessário. Nunca reescreva funções, métodos ou seções inteiras que não precisam ser alteradas.
+
+4. **Preserve código existente que funciona** - Se uma função/componente já está funcionando, não a modifique a menos que seja explicitamente solicitado.
+
+5. **Verifique antes de remover** - Antes de remover qualquer código, confirme que ele realmente não é mais necessário.
+
+6. **Após edições significativas, valide** - Execute `npm run build` para frontend ou `./vendor/bin/pint` para backend para garantir que não há erros de sintaxe.
+
+### Fluxo Obrigatório para Edições
+
+```
+1. Read arquivo atual → 2. Identificar trecho específico → 3. Edit apenas o necessário → 4. Validar build/lint
+```
+
+### O que NUNCA fazer
+
+- Nunca usar Write para "atualizar" um arquivo existente sem ler primeiro
+- Nunca copiar código de mensagens anteriores da conversa como "versão atual"
+- Nunca remover imports, funções ou variáveis sem verificar se são usados
+- Nunca simplificar ou "limpar" código que não foi solicitado alterar
+
 ## Build and Development Commands
 
 ```bash

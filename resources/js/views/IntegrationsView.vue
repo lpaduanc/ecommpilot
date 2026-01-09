@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useIntegration } from '../composables/useIntegration';
+import { useAuthStore } from '../stores/authStore';
 import BaseCard from '../components/common/BaseCard.vue';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
@@ -14,6 +15,8 @@ import {
     PlusIcon,
     SparklesIcon,
 } from '@heroicons/vue/24/outline';
+
+const authStore = useAuthStore();
 
 // Use integration composable - will auto-process OAuth callback
 const {
@@ -160,10 +163,10 @@ function formatDate(date) {
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
         <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
-            <!-- Animated Background Elements -->
+            <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl animate-pulse-soft"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl animate-pulse-soft" style="animation-delay: 1s;"></div>
+                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
@@ -192,7 +195,7 @@ function formatDate(date) {
             <div v-if="isProcessingOAuth" class="flex items-center justify-center py-32">
                 <div class="text-center">
                     <div class="relative mb-6">
-                        <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse"></div>
+                        <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
                         <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
                     </div>
                     <p class="text-lg font-medium text-gray-900">Processando autorização...</p>
@@ -203,7 +206,7 @@ function formatDate(date) {
             <!-- Loading State -->
             <div v-else-if="isLoading" class="flex items-center justify-center py-32">
                 <div class="relative">
-                    <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 animate-pulse"></div>
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
                     <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
                 </div>
             </div>
@@ -211,7 +214,7 @@ function formatDate(date) {
             <template v-else>
                 <div class="max-w-7xl mx-auto space-y-8">
                     <!-- Connected Stores -->
-                    <div v-if="hasConnectedStore" class="space-y-4 animate-fade-in">
+                    <div v-if="hasConnectedStore" class="space-y-4">
                         <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center">
                                 <CheckCircleIcon class="w-4 h-4 text-white" />
@@ -223,7 +226,6 @@ function formatDate(date) {
                             v-for="(store, index) in stores"
                             :key="store.id"
                             padding="normal"
-                            :class="['animate-slide-up', `animate-delay-${index * 100}`]"
                         >
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-4">
@@ -266,7 +268,7 @@ function formatDate(date) {
                                     </div>
 
                                     <!-- Actions -->
-                                    <div class="flex items-center gap-2">
+                                    <div v-if="authStore.hasPermission('integrations.manage')" class="flex items-center gap-2">
                                         <BaseButton
                                             variant="secondary"
                                             size="sm"
@@ -290,7 +292,7 @@ function formatDate(date) {
                     </div>
 
                     <!-- Available Platforms -->
-                    <div class="space-y-4 animate-fade-in animate-delay-200">
+                    <div class="space-y-4">
                         <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
                                 <PlusIcon class="w-4 h-4 text-white" />
@@ -304,12 +306,10 @@ function formatDate(date) {
                                 :key="platform.id"
                                 :class="[
                                     'group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 transition-all duration-300',
-                                    platform.available 
-                                        ? 'hover:shadow-xl hover:-translate-y-1 cursor-pointer' 
-                                        : 'opacity-60',
-                                    'animate-slide-up'
+                                    platform.available
+                                        ? 'hover:shadow-xl hover:-translate-y-1 cursor-pointer'
+                                        : 'opacity-60'
                                 ]"
-                                :style="{ animationDelay: `${index * 100}ms` }"
                                 @click="handleConnectPlatform(platform)"
                             >
                                 <!-- Background Gradient -->
@@ -323,7 +323,7 @@ function formatDate(date) {
                                     <p class="text-sm text-gray-500 mb-4">{{ platform.description }}</p>
 
                                     <BaseButton
-                                        v-if="platform.available"
+                                        v-if="platform.available && authStore.hasPermission('integrations.manage')"
                                         @click.stop="handleConnectPlatform(platform)"
                                         full-width
                                         class="group-hover:scale-105 transition-transform"
@@ -331,6 +331,12 @@ function formatDate(date) {
                                         <PlusIcon class="w-4 h-4" />
                                         Conectar Loja
                                     </BaseButton>
+                                    <span
+                                        v-else-if="platform.available && !authStore.hasPermission('integrations.manage')"
+                                        class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500"
+                                    >
+                                        Sem Permissão
+                                    </span>
                                     <span
                                         v-else-if="platform.comingSoon"
                                         class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500"

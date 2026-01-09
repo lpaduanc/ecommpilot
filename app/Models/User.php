@@ -28,6 +28,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'ai_credits',
         'active_store_id',
         'notification_settings',
+        'parent_user_id',
     ];
 
     protected $hidden = [
@@ -82,6 +83,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'parent_user_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(User::class, 'parent_user_id');
     }
 
     public function isAdmin(): bool

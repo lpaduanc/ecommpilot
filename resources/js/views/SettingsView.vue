@@ -1,5 +1,6 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import api from '../services/api';
@@ -11,8 +12,10 @@ import {
     UserCircleIcon,
     LockClosedIcon,
     BellIcon,
+    UsersIcon,
 } from '@heroicons/vue/24/outline';
 
+const router = useRouter();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
 
@@ -57,7 +60,25 @@ const tabs = [
     { id: 'profile', name: 'Perfil', icon: UserCircleIcon, gradient: 'from-blue-500 to-indigo-600' },
     { id: 'password', name: 'Senha', icon: LockClosedIcon, gradient: 'from-purple-500 to-pink-600' },
     { id: 'notifications', name: 'Notificações', icon: BellIcon, gradient: 'from-amber-500 to-orange-600' },
-];
+]
+
+const visibleTabs = computed(() => {
+    const baseTabs = [...tabs]
+
+    // Adiciona a aba de Usuários APENAS para Clientes (não Admin) com permissão
+    // Admins gerenciam clientes via /admin/clients
+    if (!authStore.isAdmin && authStore.hasPermission('users.view')) {
+        baseTabs.push({
+            id: 'users',
+            name: 'Usuários',
+            icon: UsersIcon,
+            gradient: 'from-green-500 to-emerald-600',
+            route: 'users-management'
+        })
+    }
+
+    return baseTabs
+})
 
 function loadUserData() {
     profileForm.name = authStore.user?.name || '';
@@ -199,6 +220,16 @@ function resetPasswordForm() {
     passwordForm.password_confirmation = '';
 }
 
+function handleTabClick(tab) {
+    if (tab.route) {
+        // Se a aba tem rota, navega para ela
+        router.push({ name: tab.route });
+    } else {
+        // Se não, apenas muda a aba ativa
+        activeTab.value = tab.id;
+    }
+}
+
 onMounted(() => {
     loadUserData();
     loadNotificationSettings();
@@ -209,10 +240,10 @@ onMounted(() => {
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
         <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
-            <!-- Animated Background Elements -->
+            <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl animate-pulse-soft"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl animate-pulse-soft" style="animation-delay: 1s;"></div>
+                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
@@ -241,12 +272,12 @@ onMounted(() => {
                 <div class="flex flex-col lg:flex-row gap-8">
                     <!-- Tabs Navigation -->
                     <div class="w-full lg:w-64 flex-shrink-0">
-                        <BaseCard padding="sm" class="animate-fade-in">
+                        <BaseCard padding="sm">
                             <nav class="space-y-1">
                                 <button
-                                    v-for="tab in tabs"
+                                    v-for="tab in visibleTabs"
                                     :key="tab.id"
-                                    @click="activeTab = tab.id"
+                                    @click="handleTabClick(tab)"
                                     :class="[
                                         'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
                                         activeTab === tab.id
@@ -265,7 +296,7 @@ onMounted(() => {
                     <!-- Tab Content -->
                     <div class="flex-1">
                         <!-- Profile Tab -->
-                        <BaseCard v-if="activeTab === 'profile'" padding="lg" class="animate-fade-in animate-delay-100">
+                        <BaseCard v-if="activeTab === 'profile'" padding="lg">
                             <div class="max-w-xl">
                                 <h2 class="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
@@ -281,6 +312,7 @@ onMounted(() => {
                                         label="Nome"
                                         placeholder="Seu nome completo"
                                         :error="profileErrors.name"
+                                        :disabled="!authStore.hasPermission('settings.edit')"
                                     />
 
                                     <BaseInput
@@ -289,6 +321,7 @@ onMounted(() => {
                                         label="E-mail"
                                         placeholder="seu@email.com"
                                         :error="profileErrors.email"
+                                        :disabled="!authStore.hasPermission('settings.edit')"
                                     />
 
                                     <BaseInput
@@ -297,20 +330,25 @@ onMounted(() => {
                                         label="Telefone"
                                         placeholder="(00) 00000-0000"
                                         :error="profileErrors.phone"
+                                        :disabled="!authStore.hasPermission('settings.edit')"
                                     />
 
                                     <BaseButton
+                                        v-if="authStore.hasPermission('settings.edit')"
                                         type="submit"
                                         :loading="isLoadingProfile"
                                     >
                                         Salvar Alterações
                                     </BaseButton>
+                                    <p v-else class="text-sm text-gray-500 italic">
+                                        Você não possui permissão para editar as configurações.
+                                    </p>
                                 </form>
                             </div>
                         </BaseCard>
 
                         <!-- Password Tab -->
-                        <BaseCard v-if="activeTab === 'password'" padding="lg" class="animate-fade-in animate-delay-100">
+                        <BaseCard v-if="activeTab === 'password'" padding="lg">
                             <div class="max-w-xl">
                                 <h2 class="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
@@ -326,6 +364,7 @@ onMounted(() => {
                                         label="Senha Atual"
                                         placeholder="••••••••"
                                         :error="passwordErrors.current_password"
+                                        :disabled="!authStore.hasPermission('settings.edit')"
                                     />
 
                                     <BaseInput
@@ -335,6 +374,7 @@ onMounted(() => {
                                         placeholder="••••••••"
                                         hint="Mínimo de 8 caracteres"
                                         :error="passwordErrors.password"
+                                        :disabled="!authStore.hasPermission('settings.edit')"
                                     />
 
                                     <BaseInput
@@ -343,20 +383,25 @@ onMounted(() => {
                                         label="Confirmar Nova Senha"
                                         placeholder="••••••••"
                                         :error="passwordErrors.password_confirmation"
+                                        :disabled="!authStore.hasPermission('settings.edit')"
                                     />
 
                                     <BaseButton
+                                        v-if="authStore.hasPermission('settings.edit')"
                                         type="submit"
                                         :loading="isLoadingPassword"
                                     >
                                         Alterar Senha
                                     </BaseButton>
+                                    <p v-else class="text-sm text-gray-500 italic">
+                                        Você não possui permissão para editar as configurações.
+                                    </p>
                                 </form>
                             </div>
                         </BaseCard>
 
                         <!-- Notifications Tab -->
-                        <BaseCard v-if="activeTab === 'notifications'" padding="lg" class="animate-fade-in animate-delay-100">
+                        <BaseCard v-if="activeTab === 'notifications'" padding="lg">
                             <div class="max-w-xl">
                                 <h2 class="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
@@ -366,7 +411,10 @@ onMounted(() => {
                                 </h2>
                                 
                                 <div class="space-y-4">
-                                    <label class="flex items-center justify-between p-4 rounded-xl border border-gray-200 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent transition-all">
+                                    <label :class="[
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                    ]">
                                         <div>
                                             <p class="font-medium text-gray-900">E-mail de Análises</p>
                                             <p class="text-sm text-gray-500">Receber resumo semanal das análises</p>
@@ -374,11 +422,15 @@ onMounted(() => {
                                         <input
                                             type="checkbox"
                                             v-model="notificationSettings.email_analysis"
-                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                            :disabled="!authStore.hasPermission('settings.edit')"
+                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
                                         />
                                     </label>
 
-                                    <label class="flex items-center justify-between p-4 rounded-xl border border-gray-200 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent transition-all">
+                                    <label :class="[
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                    ]">
                                         <div>
                                             <p class="font-medium text-gray-900">Alertas de Estoque</p>
                                             <p class="text-sm text-gray-500">Notificar quando produtos estiverem com estoque baixo</p>
@@ -386,11 +438,15 @@ onMounted(() => {
                                         <input
                                             type="checkbox"
                                             v-model="notificationSettings.stock_alerts"
-                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                            :disabled="!authStore.hasPermission('settings.edit')"
+                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
                                         />
                                     </label>
 
-                                    <label class="flex items-center justify-between p-4 rounded-xl border border-gray-200 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent transition-all">
+                                    <label :class="[
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                    ]">
                                         <div>
                                             <p class="font-medium text-gray-900">Novos Pedidos</p>
                                             <p class="text-sm text-gray-500">Receber notificação a cada novo pedido</p>
@@ -398,11 +454,15 @@ onMounted(() => {
                                         <input
                                             type="checkbox"
                                             v-model="notificationSettings.new_orders"
-                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                            :disabled="!authStore.hasPermission('settings.edit')"
+                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
                                         />
                                     </label>
 
-                                    <label class="flex items-center justify-between p-4 rounded-xl border border-gray-200 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent transition-all">
+                                    <label :class="[
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                    ]">
                                         <div>
                                             <p class="font-medium text-gray-900">Atualizações do Sistema</p>
                                             <p class="text-sm text-gray-500">Novidades e melhorias da plataforma</p>
@@ -410,14 +470,23 @@ onMounted(() => {
                                         <input
                                             type="checkbox"
                                             v-model="notificationSettings.system_updates"
-                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                            :disabled="!authStore.hasPermission('settings.edit')"
+                                            class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
                                         />
                                     </label>
                                 </div>
 
-                                <BaseButton class="mt-6" @click="saveNotificationSettings" :loading="isSavingNotifications">
+                                <BaseButton
+                                    v-if="authStore.hasPermission('settings.edit')"
+                                    class="mt-6"
+                                    @click="saveNotificationSettings"
+                                    :loading="isSavingNotifications"
+                                >
                                     Salvar Preferências
                                 </BaseButton>
+                                <p v-else class="text-sm text-gray-500 italic mt-6">
+                                    Você não possui permissão para editar as configurações.
+                                </p>
                             </div>
                         </BaseCard>
                     </div>

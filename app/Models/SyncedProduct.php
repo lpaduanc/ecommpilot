@@ -17,6 +17,7 @@ class SyncedProduct extends Model
         'name',
         'description',
         'price',
+        'cost',
         'compare_at_price',
         'stock_quantity',
         'sku',
@@ -32,6 +33,7 @@ class SyncedProduct extends Model
     {
         return [
             'price' => 'decimal:2',
+            'cost' => 'decimal:2',
             'compare_at_price' => 'decimal:2',
             'stock_quantity' => 'integer',
             'images' => 'array',

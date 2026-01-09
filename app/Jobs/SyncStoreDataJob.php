@@ -104,6 +104,13 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                 Log::info("Customers synced for store: {$this->store->name}");
             }
 
+            // Sync coupons (se ainda não foi feito)
+            if (! in_array('coupons', $checkpoint)) {
+                $nuvemshopService->syncCoupons($this->store);
+                $this->saveCheckpoint('coupons');
+                Log::info("Coupons synced for store: {$this->store->name}");
+            }
+
             $this->store->markAsSynced();
             $this->clearCheckpoint();
 

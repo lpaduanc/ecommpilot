@@ -15,6 +15,15 @@ class PermissionSeeder extends Seeder
 
         // Create permissions
         $permissions = [
+            // Dashboard
+            ['name' => 'dashboard.view', 'label' => 'Visualizar Dashboard'],
+
+            // Products
+            ['name' => 'products.view', 'label' => 'Visualizar Produtos'],
+
+            // Orders
+            ['name' => 'orders.view', 'label' => 'Visualizar Pedidos'],
+
             // Users
             ['name' => 'users.create', 'label' => 'Criar Usuários'],
             ['name' => 'users.edit', 'label' => 'Editar Usuários'],
@@ -25,11 +34,18 @@ class PermissionSeeder extends Seeder
             ['name' => 'integrations.manage', 'label' => 'Gerenciar Integrações'],
 
             // Analytics
-            ['name' => 'analytics.view', 'label' => 'Visualizar Análises'],
-            ['name' => 'analytics.request', 'label' => 'Solicitar Análise'],
+            ['name' => 'analysis.view', 'label' => 'Visualizar Análises'],
+            ['name' => 'analysis.request', 'label' => 'Solicitar Análise'],
 
             // Chat
             ['name' => 'chat.use', 'label' => 'Usar Chat IA'],
+
+            // Marketing
+            ['name' => 'marketing.access', 'label' => 'Acessar Marketing e Descontos'],
+
+            // Settings
+            ['name' => 'settings.view', 'label' => 'Visualizar Configurações'],
+            ['name' => 'settings.edit', 'label' => 'Editar Configurações'],
 
             // Admin
             ['name' => 'admin.access', 'label' => 'Acesso Administrativo'],
@@ -50,10 +66,16 @@ class PermissionSeeder extends Seeder
 
         // Assign limited permissions to client
         $clientRole->syncPermissions([
+            'dashboard.view',
+            'products.view',
+            'orders.view',
             'integrations.manage',
-            'analytics.view',
-            'analytics.request',
+            'analysis.view',
+            'analysis.request',
             'chat.use',
+            'marketing.access',
+            'settings.view',
+            'settings.edit',
         ]);
     }
 }

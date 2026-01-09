@@ -2,11 +2,13 @@
 
 namespace App\Services\Integration;
 
+use App\Contracts\CouponAdapterInterface;
 use App\Contracts\OrderAdapterInterface;
 use App\Contracts\ProductAdapterInterface;
 use App\Enums\Platform;
 use App\Enums\SyncStatus;
 use App\Models\Store;
+use App\Models\SyncedCoupon;
 use App\Models\SyncedCustomer;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
@@ -43,18 +45,19 @@ class NuvemshopService
      */
     private OrderAdapterInterface $orderAdapter;
 
+    /**
+     * Coupon adapter for transforming Nuvemshop data to SyncedCoupon structure.
+     */
+    private CouponAdapterInterface $couponAdapter;
+
     public function __construct(
         ?ProductAdapterInterface $productAdapter = null,
-        ?OrderAdapterInterface $orderAdapter = null
+        ?OrderAdapterInterface $orderAdapter = null,
+        ?CouponAdapterInterface $couponAdapter = null
     ) {
-        // Try SystemSetting first, fallback to config
-        $this->clientId = SystemSetting::get('nuvemshop.client_id')
-            ?? config('services.nuvemshop.client_id')
-            ?? '';
-
-        $this->clientSecret = SystemSetting::get('nuvemshop.client_secret')
-            ?? config('services.nuvemshop.client_secret')
-            ?? '';
+        // Always use .env for client credentials
+        $this->clientId = env('NUVEMSHOP_CLIENT_ID', '');
+        $this->clientSecret = env('NUVEMSHOP_CLIENT_SECRET', '');
 
         $this->redirectUri = config('services.nuvemshop.redirect_uri')
             ?? url('/api/integrations/nuvemshop/callback');
@@ -62,6 +65,7 @@ class NuvemshopService
         // Use provided adapters or defaults
         $this->productAdapter = $productAdapter ?? new NuvemshopProductAdapter;
         $this->orderAdapter = $orderAdapter ?? new NuvemshopOrderAdapter;
+        $this->couponAdapter = $couponAdapter ?? new NuvemshopCouponAdapter;
     }
 
     public function getAuthorizationUrl(int $userId, ?string $storeUrl = null): string
@@ -75,7 +79,7 @@ class NuvemshopService
 
         $params = http_build_query([
             'response_type' => 'code',
-            'scope' => 'read_products write_products read_orders read_customers',
+            'scope' => 'read_products write_products read_orders read_customers read_coupons',
             'redirect_uri' => $this->redirectUri,
             'state' => $state,
         ]);
@@ -239,6 +243,25 @@ class NuvemshopService
 
             foreach ($response as $customer) {
                 $this->upsertCustomer($store, $customer);
+            }
+
+            $page++;
+        } while (count($response) === $perPage);
+    }
+
+    public function syncCoupons(Store $store): void
+    {
+        $page = 1;
+        $perPage = 200;
+
+        do {
+            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/coupons", [
+                'page' => $page,
+                'per_page' => $perPage,
+            ]);
+
+            foreach ($response as $coupon) {
+                $this->upsertCoupon($store, $coupon);
             }
 
             $page++;
@@ -501,5 +524,35 @@ class NuvemshopService
                 'external_created_at' => $data['created_at'] ?? null,
             ]
         );
+    }
+
+    /**
+     * Insert or update a coupon using the coupon adapter.
+     *
+     * This method uses the CouponAdapter to transform external Nuvemshop data
+     * into the normalized structure required by SyncedCoupon model.
+     *
+     * @param  Store  $store  The store the coupon belongs to
+     * @param  array  $data  Raw coupon data from Nuvemshop API
+     */
+    private function upsertCoupon(Store $store, array $data): void
+    {
+        // Transform external data using the adapter
+        $couponData = $this->couponAdapter->transform($data);
+
+        // Update or create the coupon
+        SyncedCoupon::updateOrCreate(
+            [
+                'store_id' => $store->id,
+                'external_id' => $couponData['external_id'],
+            ],
+            array_merge(['store_id' => $store->id], $couponData)
+        );
+
+        Log::debug('Coupon synced successfully', [
+            'store_id' => $store->id,
+            'coupon_id' => $couponData['external_id'],
+            'coupon_code' => $couponData['code'],
+        ]);
     }
 }

@@ -65,6 +65,7 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
         $customerInfo = $this->extractCustomerInfo($externalData);
         $items = $this->extractItems($externalData);
         $shippingAddress = $this->extractShippingAddress($externalData);
+        $coupon = $this->extractCoupon($externalData);
 
         return [
             'external_id' => (string) $externalData['id'],
@@ -80,6 +81,7 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
             'shipping' => $this->sanitizeNumericValue($externalData['shipping'] ?? 0),
             'total' => $this->sanitizeNumericValue($externalData['total'] ?? 0),
             'payment_method' => $this->extractPaymentMethod($externalData),
+            'coupon' => $coupon,
             'items' => $items,
             'shipping_address' => $shippingAddress,
             'external_created_at' => $externalData['created_at'] ?? null,
@@ -122,12 +124,18 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
         }
 
         return collect($products)->map(function ($item) {
+            $quantity = max(1, (int) ($item['quantity'] ?? 1));
+            $unitPrice = $this->sanitizeNumericValue($item['price'] ?? 0);
+            $sku = $item['sku'] ?? null;
+
             return [
                 'product_id' => $item['product_id'] ?? null,
                 'variant_id' => $item['variant_id'] ?? null,
-                'name' => $item['name'] ?? 'Produto sem nome',
-                'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
-                'price' => $this->sanitizeNumericValue($item['price'] ?? 0),
+                'product_name' => $item['name'] ?? 'Produto sem nome',
+                'sku' => $sku,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+                'total' => $quantity * $unitPrice,
             ];
         })->toArray();
     }
@@ -240,5 +248,30 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
         }
 
         return $paymentDetails['method'] ?? null;
+    }
+
+    /**
+     * Extract coupon information from Nuvemshop order data.
+     *
+     * Nuvemshop may include coupon data in the order when a coupon is applied.
+     *
+     * @param  array  $externalData  Raw order data
+     * @return array|null Coupon data or null if no coupon applied
+     */
+    private function extractCoupon(array $externalData): ?array
+    {
+        $coupon = $externalData['coupon'] ?? null;
+
+        if (empty($coupon) || ! is_array($coupon)) {
+            return null;
+        }
+
+        // Return normalized coupon data
+        return array_filter([
+            'id' => $coupon['id'] ?? null,
+            'code' => $coupon['code'] ?? null,
+            'type' => $coupon['type'] ?? null,
+            'value' => isset($coupon['value']) ? $this->sanitizeNumericValue($coupon['value']) : null,
+        ], fn ($value) => $value !== null);
     }
 }

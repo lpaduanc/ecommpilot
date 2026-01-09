@@ -35,7 +35,10 @@
       "WebFetch(domain:developers.nuvemshop.com.br)",
       "Bash(Select -Last 50)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(echo $env:USERPROFILE)",
+      "Bash(echo:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

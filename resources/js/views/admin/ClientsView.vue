@@ -39,6 +39,7 @@ const totalItems = ref(0);
 
 // Modals
 const showCreateModal = ref(false);
+const showEditModal = ref(false);
 const showAddCreditsModal = ref(false);
 const showResetPasswordModal = ref(false);
 const showDeleteModal = ref(false);
@@ -54,8 +55,29 @@ const createForm = ref({
     ai_credits: 10,
     is_active: true,
 });
+const editForm = ref({
+    name: '',
+    email: '',
+    phone: '',
+    is_active: true,
+    permissions: [],
+});
 const creditsForm = ref({ amount: 10, reason: '' });
 const passwordForm = ref({ password: '' });
+const availablePermissions = ref([]);
+
+// Definição das categorias de permissões (para agrupar no modal)
+const permissionCategories = {
+    'Usuários': ['users.view', 'users.create', 'users.edit', 'users.delete'],
+    'Dashboard': ['dashboard.view'],
+    'Produtos': ['products.view'],
+    'Pedidos': ['orders.view'],
+    'Análises IA': ['analysis.view', 'analysis.request'],
+    'Chat IA': ['chat.use'],
+    'Configurações': ['settings.view', 'settings.edit'],
+    'Integrações': ['integrations.manage'],
+    'Marketing': ['marketing.access'],
+};
 
 const statusOptions = [
     { value: '', label: 'Todos os Status' },
@@ -232,8 +254,107 @@ async function impersonateClient(client) {
     }
 }
 
+// Buscar permissões disponíveis
+async function fetchPermissions() {
+    try {
+        const response = await api.get('/admin/clients/permissions');
+        availablePermissions.value = response.data.permissions;
+    } catch (error) {
+        console.error('Erro ao buscar permissões:', error);
+    }
+}
+
+// Abrir modal de edição
+async function openEditModal(client) {
+    selectedClient.value = client;
+
+    // Buscar detalhes do cliente (incluindo permissões)
+    try {
+        const response = await api.get(`/admin/clients/${client.id}`);
+        editForm.value = {
+            name: response.data.name,
+            email: response.data.email,
+            phone: response.data.phone || '',
+            is_active: response.data.is_active,
+            permissions: response.data.permissions || [],
+        };
+        showEditModal.value = true;
+    } catch (error) {
+        notificationStore.error('Erro ao carregar dados do cliente');
+    }
+}
+
+// Submeter edição
+async function submitEditClient() {
+    isSubmitting.value = true;
+    try {
+        await api.put(`/admin/clients/${selectedClient.value.id}`, editForm.value);
+        notificationStore.success('Cliente atualizado com sucesso!');
+        showEditModal.value = false;
+        fetchClients();
+    } catch (error) {
+        notificationStore.error(error.response?.data?.message || 'Erro ao atualizar cliente');
+    } finally {
+        isSubmitting.value = false;
+    }
+}
+
+// Selecionar todas as permissões de uma categoria
+function toggleCategoryPermissions(category) {
+    const categoryPerms = permissionCategories[category];
+    const allSelected = categoryPerms.every(p => editForm.value.permissions.includes(p));
+
+    if (allSelected) {
+        // Remover todas da categoria
+        editForm.value.permissions = editForm.value.permissions.filter(p => !categoryPerms.includes(p));
+    } else {
+        // Adicionar todas da categoria
+        categoryPerms.forEach(p => {
+            if (!editForm.value.permissions.includes(p)) {
+                editForm.value.permissions.push(p);
+            }
+        });
+    }
+}
+
+// Verificar se todas as permissões de uma categoria estão selecionadas
+function isCategorySelected(category) {
+    return permissionCategories[category].every(p => editForm.value.permissions.includes(p));
+}
+
+// Selecionar/desselecionar todas as permissões
+function toggleAllPermissions() {
+    if (editForm.value.permissions.length === availablePermissions.value.length) {
+        editForm.value.permissions = [];
+    } else {
+        editForm.value.permissions = [...availablePermissions.value];
+    }
+}
+
+// Formatar label de permissão
+function formatPermissionLabel(permission) {
+    const labels = {
+        'users.view': 'Visualizar usuários',
+        'users.create': 'Criar usuários',
+        'users.edit': 'Editar usuários',
+        'users.delete': 'Excluir usuários',
+        'dashboard.view': 'Ver dashboard',
+        'products.view': 'Ver produtos',
+        'orders.view': 'Ver pedidos',
+        'analysis.view': 'Ver análises',
+        'analysis.request': 'Solicitar análises',
+        'chat.use': 'Usar chat IA',
+        'settings.view': 'Ver configurações',
+        'settings.edit': 'Editar configurações',
+        'integrations.manage': 'Gerenciar integrações',
+        'marketing.access': 'Acessar marketing',
+    };
+    return labels[permission] || permission;
+}
+
 onMounted(() => {
     fetchClients();
+    fetchPermissions();
 });
 </script>
 
@@ -376,6 +497,9 @@ onMounted(() => {
                                     <BaseButton variant="ghost" size="sm" @click="viewClient(client)" title="Ver detalhes">
                                         <EyeIcon class="w-4 h-4" />
                                     </BaseButton>
+                                    <BaseButton variant="ghost" size="sm" @click="openEditModal(client)" title="Editar">
+                                        <PencilIcon class="w-4 h-4 text-primary-500" />
+                                    </BaseButton>
                                     <BaseButton variant="ghost" size="sm" @click="openAddCreditsModal(client)" title="Adicionar créditos">
                                         <CurrencyDollarIcon class="w-4 h-4 text-success-500" />
                                     </BaseButton>
@@ -474,6 +598,102 @@ onMounted(() => {
                     <BaseButton @click="submitResetPassword" :loading="isSubmitting">Redefinir</BaseButton>
                 </div>
             </template>
+        </BaseModal>
+
+        <!-- Edit Client Modal -->
+        <BaseModal :show="showEditModal" @close="showEditModal = false" title="Editar Cliente" size="lg">
+            <form @submit.prevent="submitEditClient" class="space-y-6">
+                <!-- Dados Básicos -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Dados do Cliente</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <BaseInput
+                            v-model="editForm.name"
+                            label="Nome"
+                            placeholder="Nome do cliente"
+                            required
+                        />
+                        <BaseInput
+                            v-model="editForm.email"
+                            label="E-mail"
+                            type="email"
+                            placeholder="email@exemplo.com"
+                            required
+                        />
+                        <BaseInput
+                            v-model="editForm.phone"
+                            label="Telefone"
+                            placeholder="(00) 00000-0000"
+                        />
+                        <div class="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="edit-is-active"
+                                v-model="editForm.is_active"
+                                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            />
+                            <label for="edit-is-active" class="text-sm text-gray-700">Cliente ativo</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permissões -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Permissões</h3>
+                        <button
+                            type="button"
+                            @click="toggleAllPermissions"
+                            class="text-sm text-primary-600 hover:text-primary-700"
+                        >
+                            {{ editForm.permissions.length === availablePermissions.length ? 'Desmarcar todas' : 'Selecionar todas' }}
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div
+                            v-for="(perms, category) in permissionCategories"
+                            :key="category"
+                            class="border border-gray-200 rounded-lg p-3"
+                        >
+                            <div class="flex items-center gap-2 mb-2">
+                                <input
+                                    type="checkbox"
+                                    :checked="isCategorySelected(category)"
+                                    @change="toggleCategoryPermissions(category)"
+                                    class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                />
+                                <span class="text-sm font-medium text-gray-700">{{ category }}</span>
+                            </div>
+                            <div class="space-y-1 ml-6">
+                                <label
+                                    v-for="perm in perms"
+                                    :key="perm"
+                                    class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :value="perm"
+                                        v-model="editForm.permissions"
+                                        class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                    />
+                                    {{ formatPermissionLabel(perm) }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    <BaseButton type="button" variant="secondary" @click="showEditModal = false">
+                        Cancelar
+                    </BaseButton>
+                    <BaseButton type="submit" :loading="isSubmitting">
+                        Salvar Alterações
+                    </BaseButton>
+                </div>
+            </form>
         </BaseModal>
 
         <!-- Delete Confirmation Modal -->

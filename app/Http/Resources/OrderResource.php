@@ -24,6 +24,7 @@ class OrderResource extends JsonResource
             'shipping' => (float) $this->shipping,
             'total' => (float) $this->total,
             'payment_method' => $this->payment_method,
+            'coupon' => $this->coupon,
             'items' => $this->items ?? [],
             'shipping_address' => $this->shipping_address,
             'external_created_at' => $this->external_created_at?->toISOString(),

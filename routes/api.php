@@ -6,10 +6,12 @@ use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StoreSettingsController;
+use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -43,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     | Dashboard
     |--------------------------------------------------------------------------
     */
-    Route::prefix('dashboard')->group(function () {
+    Route::prefix('dashboard')->middleware('can:dashboard.view')->group(function () {
         Route::get('stats', [DashboardController::class, 'stats']);
         Route::get('charts/revenue', [DashboardController::class, 'revenueChart']);
         Route::get('charts/orders-status', [DashboardController::class, 'ordersStatusChart']);
@@ -58,18 +60,32 @@ Route::middleware('auth:sanctum')->group(function () {
     | Products
     |--------------------------------------------------------------------------
     */
-    Route::get('products', [ProductController::class, 'index']);
-    Route::get('products/{id}', [ProductController::class, 'show']);
-    Route::get('products/{id}/performance', [ProductController::class, 'performance']);
+    Route::prefix('products')->middleware('can:products.view')->group(function () {
+        Route::get('/', [ProductController::class, 'index']);
+        Route::get('/{id}', [ProductController::class, 'show']);
+        Route::get('/{id}/performance', [ProductController::class, 'performance']);
+    });
 
     /*
     |--------------------------------------------------------------------------
     | Orders
     |--------------------------------------------------------------------------
     */
-    Route::get('orders', [OrderController::class, 'index']);
-    Route::get('orders/stats', [OrderController::class, 'stats']);
-    Route::get('orders/{id}', [OrderController::class, 'show']);
+    Route::prefix('orders')->middleware('can:orders.view')->group(function () {
+        Route::get('/', [OrderController::class, 'index']);
+        Route::get('/stats', [OrderController::class, 'stats']);
+        Route::get('/{id}', [OrderController::class, 'show']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Discounts / Coupons
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('discounts')->middleware('can:marketing.access')->group(function () {
+        Route::get('/', [DiscountController::class, 'index']);
+        Route::get('/stats', [DiscountController::class, 'stats']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -77,13 +93,18 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('integrations')->group(function () {
+        // Visualização de lojas - qualquer usuário autenticado
         Route::get('stores', [IntegrationController::class, 'stores']);
         Route::get('my-stores', [IntegrationController::class, 'myStores']);
         Route::post('select-store/{storeId}', [IntegrationController::class, 'selectStore']);
-        Route::get('nuvemshop/connect', [IntegrationController::class, 'connectNuvemshop']);
-        Route::post('nuvemshop/authorize', [IntegrationController::class, 'authorizeNuvemshop']);
-        Route::post('stores/{storeId}/sync', [IntegrationController::class, 'sync']);
-        Route::delete('stores/{storeId}', [IntegrationController::class, 'disconnect']);
+
+        // Gerenciamento de integrações - requer permissão
+        Route::middleware('can:integrations.manage')->group(function () {
+            Route::get('nuvemshop/connect', [IntegrationController::class, 'connectNuvemshop']);
+            Route::post('nuvemshop/authorize', [IntegrationController::class, 'authorizeNuvemshop']);
+            Route::post('stores/{storeId}/sync', [IntegrationController::class, 'sync']);
+            Route::delete('stores/{storeId}', [IntegrationController::class, 'disconnect']);
+        });
     });
 
     /*
@@ -92,12 +113,19 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('analysis')->group(function () {
-        Route::get('current', [AnalysisController::class, 'current']);
-        // Rate limit: 1 análise por hora por usuário
-        Route::post('request', [AnalysisController::class, 'request']);
-        Route::get('history', [AnalysisController::class, 'history']);
-        Route::get('{id}', [AnalysisController::class, 'show']);
-        Route::post('{analysisId}/suggestions/{suggestionId}/done', [AnalysisController::class, 'markSuggestionDone']);
+        // Visualização de análises - requer permissão
+        Route::middleware('can:analysis.view')->group(function () {
+            Route::get('current', [AnalysisController::class, 'current']);
+            Route::get('history', [AnalysisController::class, 'history']);
+            Route::get('{id}', [AnalysisController::class, 'show']);
+        });
+
+        // Solicitar nova análise - requer permissão específica
+        Route::post('request', [AnalysisController::class, 'request'])->middleware('can:analysis.request');
+
+        // Marcar sugestão como feita - requer permissão de visualização
+        Route::post('{analysisId}/suggestions/{suggestionId}/done', [AnalysisController::class, 'markSuggestionDone'])
+            ->middleware('can:analysis.view');
     });
 
     /*
@@ -105,11 +133,25 @@ Route::middleware('auth:sanctum')->group(function () {
     | Chat (AI)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('chat')->group(function () {
+    Route::prefix('chat')->middleware('can:chat.use')->group(function () {
         Route::get('conversation', [ChatController::class, 'conversation']);
         // Rate limit: 20 mensagens por minuto por usuário
         Route::post('message', [ChatController::class, 'sendMessage'])->middleware('throttle:20,1');
         Route::delete('conversation', [ChatController::class, 'clearConversation']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | User Management
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('users')->middleware('can:users.view')->group(function () {
+        Route::get('/', [UserManagementController::class, 'index']);
+        Route::get('/permissions', [UserManagementController::class, 'permissions']);
+        Route::post('/', [UserManagementController::class, 'store'])->middleware('can:users.create');
+        Route::get('/{id}', [UserManagementController::class, 'show']);
+        Route::put('/{id}', [UserManagementController::class, 'update'])->middleware('can:users.edit');
+        Route::delete('/{id}', [UserManagementController::class, 'destroy'])->middleware('can:users.delete');
     });
 
     /*
@@ -121,6 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('stats', [AdminController::class, 'dashboardStats']);
         Route::get('clients', [AdminController::class, 'clients']);
         Route::post('clients', [AdminController::class, 'createClient']);
+        Route::get('clients/permissions', [AdminController::class, 'clientPermissions']);
         Route::get('clients/{id}', [AdminController::class, 'clientDetail']);
         Route::put('clients/{id}', [AdminController::class, 'updateClient']);
         Route::delete('clients/{id}', [AdminController::class, 'deleteClient']);
@@ -154,17 +197,28 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('settings')->group(function () {
-        Route::get('notifications', [AuthController::class, 'getNotificationSettings']);
-        Route::put('notifications', [AuthController::class, 'updateNotificationSettings']);
+        // Visualização de configurações - requer permissão
+        Route::middleware('can:settings.view')->group(function () {
+            Route::get('notifications', [AuthController::class, 'getNotificationSettings']);
+        });
 
-        // Store/Nuvemshop Settings (accessible to all authenticated users)
+        // Edição de configurações - requer permissão
+        Route::middleware('can:settings.edit')->group(function () {
+            Route::put('notifications', [AuthController::class, 'updateNotificationSettings']);
+        });
+
+        // Store/Nuvemshop Settings - requer permissão de integrações
         Route::prefix('store')->group(function () {
             Route::get('/', [StoreSettingsController::class, 'getUserStoreSettings']);
-            Route::put('/', [StoreSettingsController::class, 'updateUserStoreSettings']);
             Route::get('connection', [StoreSettingsController::class, 'getConnectionStatus']);
-            Route::post('exchange-token', [StoreSettingsController::class, 'exchangeToken']);
-            Route::post('test-connection', [StoreSettingsController::class, 'testConnection']);
-            Route::post('disconnect', [StoreSettingsController::class, 'disconnect']);
+
+            // Ações que modificam configurações da loja
+            Route::middleware('can:integrations.manage')->group(function () {
+                Route::put('/', [StoreSettingsController::class, 'updateUserStoreSettings']);
+                Route::post('exchange-token', [StoreSettingsController::class, 'exchangeToken']);
+                Route::post('test-connection', [StoreSettingsController::class, 'testConnection']);
+                Route::post('disconnect', [StoreSettingsController::class, 'disconnect']);
+            });
         });
     });
 

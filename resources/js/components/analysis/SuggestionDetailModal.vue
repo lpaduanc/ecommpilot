@@ -68,7 +68,7 @@ const actionSteps = computed(() => {
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl animate-scale-in">
+                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl">
                     <!-- Header with Gradient -->
                     <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="category.color">
                         <!-- Background Pattern -->
@@ -221,16 +221,11 @@ const actionSteps = computed(() => {
 <style scoped>
 .modal-enter-active,
 .modal-leave-active {
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease;
 }
 
 .modal-enter-from,
 .modal-leave-to {
     opacity: 0;
-}
-
-.modal-enter-from .animate-scale-in,
-.modal-leave-to .animate-scale-in {
-    transform: scale(0.95) translateY(20px);
 }
 </style>

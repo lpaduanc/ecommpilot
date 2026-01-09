@@ -124,7 +124,7 @@ class AdminController extends Controller
     public function clientDetail(int $id): JsonResponse
     {
         $client = User::where('role', UserRole::Client)
-            ->with(['stores.products', 'stores.orders', 'stores.customers', 'analyses'])
+            ->with(['stores.products', 'stores.orders', 'stores.customers', 'analyses', 'permissions'])
             ->findOrFail($id);
 
         // Get activity logs
@@ -146,6 +146,7 @@ class AdminController extends Controller
             'phone' => $client->phone,
             'is_active' => $client->is_active,
             'ai_credits' => $client->ai_credits,
+            'permissions' => $client->permissions->pluck('name'),
             'email_verified_at' => $client->email_verified_at?->toISOString(),
             'last_login_at' => $client->last_login_at?->toISOString(),
             'created_at' => $client->created_at->toISOString(),
@@ -183,6 +184,31 @@ class AdminController extends Controller
         ]);
     }
 
+    public function clientPermissions(): JsonResponse
+    {
+        $permissions = \Spatie\Permission\Models\Permission::whereIn('name', [
+            'users.view',
+            'users.create',
+            'users.edit',
+            'users.delete',
+            'dashboard.view',
+            'products.view',
+            'products.edit',
+            'orders.view',
+            'orders.edit',
+            'analysis.view',
+            'analysis.request',
+            'chat.use',
+            'settings.view',
+            'settings.edit',
+            'integrations.manage',
+        ])->pluck('name');
+
+        return response()->json([
+            'permissions' => $permissions,
+        ]);
+    }
+
     public function createClient(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -214,7 +240,21 @@ class AdminController extends Controller
 
         $client->assignRole('client');
 
-        ActivityLog::log('admin.client_created', $client, request()->user());
+        // Give all client permissions to the newly created client
+        $clientPermissions = \Spatie\Permission\Models\Permission::whereIn('name', [
+            'users.view',
+            'users.create',
+            'users.edit',
+            'users.delete',
+            'integrations.manage',
+            'analytics.view',
+            'analytics.request',
+            'chat.use',
+        ])->pluck('name')->toArray();
+
+        $client->syncPermissions($clientPermissions);
+
+        ActivityLog::log('admin.client_created', $client);
 
         return response()->json([
             'message' => 'Cliente criado com sucesso.',
@@ -231,19 +271,33 @@ class AdminController extends Controller
             'email' => ['sometimes', 'email', Rule::unique('users')->ignore($client->id)],
             'phone' => ['nullable', 'string', 'max:20'],
             'is_active' => ['sometimes', 'boolean'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,name'],
         ], [
             'name.required' => 'O nome é obrigatório.',
             'email.email' => 'Digite um e-mail válido.',
             'email.unique' => 'Este e-mail já está em uso.',
+            'permissions.array' => 'As permissões devem ser um array.',
+            'permissions.*.exists' => 'Permissão inválida.',
         ]);
 
+        // Separar permissões dos outros dados
+        $permissions = $validated['permissions'] ?? null;
+        unset($validated['permissions']);
+
+        // Atualizar dados básicos
         $client->update($validated);
 
-        ActivityLog::log('admin.client_updated', $client, request()->user());
+        // Sincronizar permissões se foram enviadas
+        if ($permissions !== null) {
+            $client->syncPermissions($permissions);
+        }
+
+        ActivityLog::log('admin.client_updated', $client);
 
         return response()->json([
             'message' => 'Cliente atualizado com sucesso.',
-            'client' => $client,
+            'client' => $client->load('permissions'),
         ]);
     }
 
@@ -254,7 +308,7 @@ class AdminController extends Controller
         $client->update(['is_active' => ! $client->is_active]);
 
         $action = $client->is_active ? 'admin.client_activated' : 'admin.client_deactivated';
-        ActivityLog::log($action, $client, request()->user());
+        ActivityLog::log($action, $client);
 
         return response()->json([
             'message' => $client->is_active ? 'Cliente ativado.' : 'Cliente desativado.',
@@ -326,7 +380,7 @@ class AdminController extends Controller
             'must_change_password' => true,
         ]);
 
-        ActivityLog::log('admin.password_reset', $client, request()->user());
+        ActivityLog::log('admin.password_reset', $client);
 
         return response()->json([
             'message' => 'Senha redefinida com sucesso.',
@@ -340,7 +394,7 @@ class AdminController extends Controller
         // Create a temporary token for the client
         $token = $client->createToken('impersonation-token', ['*'], now()->addHour())->plainTextToken;
 
-        ActivityLog::log('admin.impersonated', $client, request()->user());
+        ActivityLog::log('admin.impersonated', $client);
 
         return response()->json([
             'message' => 'Sessão de impersonação iniciada.',

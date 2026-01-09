@@ -28,6 +28,7 @@ class SyncedOrder extends Model
         'shipping',
         'total',
         'payment_method',
+        'coupon',
         'items',
         'shipping_address',
         'external_created_at',
@@ -43,6 +44,7 @@ class SyncedOrder extends Model
             'shipping' => 'decimal:2',
             'total' => 'decimal:2',
             'items' => 'array',
+            'coupon' => 'array',
             'shipping_address' => 'array',
             'external_created_at' => 'datetime',
         ];

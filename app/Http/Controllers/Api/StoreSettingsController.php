@@ -19,21 +19,33 @@ class StoreSettingsController extends Controller
 
     /**
      * Get store settings (client_id, client_secret, grant_type).
-     * Sensitive values are partially masked.
+     * Client credentials come from .env file.
      */
     public function getStoreSettings(): JsonResponse
     {
-        $clientId = SystemSetting::where('key', 'nuvemshop.client_id')->first();
-        $clientSecret = SystemSetting::where('key', 'nuvemshop.client_secret')->first();
+        $clientId = env('NUVEMSHOP_CLIENT_ID', '');
+        $clientSecret = env('NUVEMSHOP_CLIENT_SECRET', '');
         $grantType = SystemSetting::get('nuvemshop.grant_type', 'authorization_code');
 
         return response()->json([
-            'client_id' => $clientId?->getDisplayValue(),
-            'client_secret' => $clientSecret?->getDisplayValue(),
+            'client_id' => ! empty($clientId) ? $this->maskValue($clientId) : null,
+            'client_secret' => ! empty($clientSecret) ? $this->maskValue($clientSecret) : null,
             'grant_type' => $grantType,
-            'has_client_id' => ! empty(SystemSetting::get('nuvemshop.client_id')),
-            'has_client_secret' => ! empty(SystemSetting::get('nuvemshop.client_secret')),
+            'has_client_id' => ! empty($clientId),
+            'has_client_secret' => ! empty($clientSecret),
         ]);
+    }
+
+    /**
+     * Mask a sensitive value for display.
+     */
+    private function maskValue(string $value): string
+    {
+        if (strlen($value) <= 8) {
+            return str_repeat('*', strlen($value));
+        }
+
+        return substr($value, 0, 4) . str_repeat('*', strlen($value) - 8) . substr($value, -4);
     }
 
     /**
@@ -118,12 +130,12 @@ class StoreSettingsController extends Controller
     {
         $validated = $request->validated();
 
-        $clientId = SystemSetting::get('nuvemshop.client_id');
-        $clientSecret = SystemSetting::get('nuvemshop.client_secret');
+        $clientId = env('NUVEMSHOP_CLIENT_ID', '');
+        $clientSecret = env('NUVEMSHOP_CLIENT_SECRET', '');
 
         if (empty($clientId) || empty($clientSecret)) {
             return response()->json([
-                'message' => 'Client ID e Client Secret não configurados. Configure nas configurações da loja primeiro.',
+                'message' => 'NUVEMSHOP_CLIENT_ID e NUVEMSHOP_CLIENT_SECRET não configurados no .env',
             ], 400);
         }
 

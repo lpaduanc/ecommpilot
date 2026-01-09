@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\SyncedProduct;
+use App\Services\ProductAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        private ProductAnalyticsService $analyticsService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $store = $request->user()->activeStore;
@@ -19,6 +24,8 @@ class ProductController extends Controller
                 'data' => [],
                 'total' => 0,
                 'last_page' => 1,
+                'totals' => [],
+                'abc_analysis' => [],
             ]);
         }
 
@@ -34,13 +41,55 @@ class ProductController extends Controller
             }
         }
 
-        $products = $query->paginate($request->input('per_page', 20));
+        // Get all products for analytics calculation (before pagination)
+        $allProducts = $query->get();
+
+        // Calculate analytics for all products
+        $analyticsData = $this->analyticsService->calculateProductAnalytics($store, $allProducts);
+
+        // Attach analytics data to products
+        foreach ($allProducts as $product) {
+            if (isset($analyticsData['products'][$product->id])) {
+                $product->analytics = $analyticsData['products'][$product->id];
+            }
+        }
+
+        // Apply ABC category filter (after analytics calculation)
+        $abcCategory = $request->input('abc_category');
+        if ($abcCategory) {
+            $allProducts = $allProducts->filter(function ($product) use ($abcCategory) {
+                return isset($product->analytics['abc_category'])
+                    && strtoupper($product->analytics['abc_category']) === strtoupper($abcCategory);
+            });
+        }
+
+        // Apply stock health filter (after analytics calculation)
+        $stockHealth = $request->input('stock_health');
+        if ($stockHealth) {
+            $allProducts = $allProducts->filter(function ($product) use ($stockHealth) {
+                $productHealth = $product->analytics['stock_health'] ?? null;
+
+                return $productHealth === $stockHealth;
+            });
+        }
+
+        // Apply pagination manually
+        $perPage = $request->input('per_page', 20);
+        $page = $request->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+
+        // Get paginated subset
+        $paginatedProducts = $allProducts->slice($offset, $perPage)->values();
+        $total = $allProducts->count();
+        $lastPage = (int) ceil($total / $perPage) ?: 1;
 
         return response()->json([
-            'data' => ProductResource::collection($products),
-            'total' => $products->total(),
-            'last_page' => $products->lastPage(),
-            'current_page' => $products->currentPage(),
+            'data' => ProductResource::collection($paginatedProducts),
+            'total' => $total,
+            'last_page' => $lastPage,
+            'current_page' => $page,
+            'totals' => $analyticsData['totals'],
+            'abc_analysis' => $analyticsData['abc_analysis'],
         ]);
     }
 
@@ -88,16 +137,32 @@ class ProductController extends Controller
         $quantitySold = 0;
         $revenueGenerated = 0;
 
+        // Convert product external_id to string for comparison
+        $productExternalId = (string) $product->external_id;
+
         foreach ($orders as $order) {
             $items = $order->items ?? [];
             foreach ($items as $item) {
-                $itemProductId = $item['product_id'] ?? null;
-                $itemSku = $item['sku'] ?? null;
+                // Convert item product_id to string for comparison
+                $itemProductId = isset($item['product_id']) ? (string) $item['product_id'] : null;
+                $itemName = $item['product_name'] ?? $item['name'] ?? null;
 
-                // Match by external_id or SKU
-                if ($itemProductId === $product->external_id || $itemSku === $product->sku) {
-                    $quantitySold += $item['quantity'] ?? 1;
-                    $revenueGenerated += $item['total'] ?? 0;
+                // Match by external_id or name (case-insensitive)
+                $matchesId = $itemProductId !== null && $itemProductId === $productExternalId;
+                $matchesName = $itemName !== null && strcasecmp($itemName, $product->name) === 0;
+
+                if ($matchesId || $matchesName) {
+                    $quantity = $item['quantity'] ?? 1;
+                    // Use 'total' if available, otherwise calculate from unit_price * quantity
+                    if (isset($item['total'])) {
+                        $itemTotal = (float) $item['total'];
+                    } else {
+                        $price = $item['unit_price'] ?? $item['price'] ?? 0;
+                        $itemTotal = $quantity * $price;
+                    }
+
+                    $quantitySold += $quantity;
+                    $revenueGenerated += $itemTotal;
                 }
             }
         }
@@ -109,7 +174,7 @@ class ProductController extends Controller
             'product_id' => $product->id,
             'period_days' => $daysInPeriod,
             'quantity_sold' => $quantitySold,
-            'revenue_generated' => $revenueGenerated,
+            'revenue_generated' => round($revenueGenerated, 2),
             'average_per_day' => $averagePerDay,
         ]);
     }
