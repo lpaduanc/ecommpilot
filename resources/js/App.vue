@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, provide } from 'vue';
+import { computed, ref, provide, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import TheSidebar from './components/layout/TheSidebar.vue';
 import TheHeader from './components/layout/TheHeader.vue';
@@ -7,10 +7,17 @@ import NotificationToast from './components/common/NotificationToast.vue';
 import ErrorBoundary from './components/shared/ErrorBoundary.vue';
 import { useAuthStore } from './stores/authStore';
 import { useSidebarStore } from './stores/sidebarStore';
+import { useThemeStore } from './stores/themeStore';
 
 const route = useRoute();
 const authStore = useAuthStore();
 const sidebarStore = useSidebarStore();
+const themeStore = useThemeStore();
+
+// Initialize theme on app mount
+onMounted(() => {
+    themeStore.initTheme();
+});
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
 const isAuthPage = computed(() => {
@@ -30,7 +37,7 @@ provide('mobileSidebar', {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
         <!-- Skip Links (acessibilidade) - visível apenas no :focus -->
         <nav aria-label="Atalhos de teclado" class="sr-only focus-within:not-sr-only">
             <a
@@ -52,7 +59,7 @@ provide('mobileSidebar', {
             <Transition name="fade">
                 <div
                     v-if="isMobileSidebarOpen"
-                    class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden"
+                    class="fixed inset-0 bg-gray-900/50 dark:bg-black/60 backdrop-blur-sm z-40 lg:hidden"
                     @click="isMobileSidebarOpen = false"
                 ></div>
             </Transition>

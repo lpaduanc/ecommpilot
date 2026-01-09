@@ -164,9 +164,9 @@ function getAbcCategoryBadge(category) {
 }
 
 function getMarginColor(margin) {
-    if (margin >= 30) return 'text-success-600';
-    if (margin >= 15) return 'text-warning-600';
-    return 'text-danger-600';
+    if (margin >= 30) return 'text-success-600 dark:text-success-400';
+    if (margin >= 15) return 'text-warning-600 dark:text-warning-400';
+    return 'text-danger-600 dark:text-danger-400';
 }
 
 function applyAbcFilter(category) {
@@ -211,12 +211,12 @@ onMounted(() => {
 <template>
     <div class="min-h-screen">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12 -mx-8 -mt-8">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12 -mx-8 -mt-8">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 dark:bg-primary-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 dark:bg-secondary-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 dark:bg-accent-500/5 rounded-full blur-3xl"></div>
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
             </div>
@@ -229,10 +229,10 @@ onMounted(() => {
                                 <CubeIcon class="w-7 h-7 text-white" />
                             </div>
                             <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
+                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
                                     Produtos
                                 </h1>
-                                <p class="text-primary-200/80 text-sm lg:text-base">
+                                <p class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base">
                                     {{ totalItems }} produtos sincronizados
                                 </p>
                             </div>
@@ -266,7 +266,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="py-8 px-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="py-8 px-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="w-full">
                 <div class="flex gap-6">
                     <!-- Products Table -->
@@ -279,8 +279,8 @@ onMounted(() => {
                                         <CubeIcon class="w-5 h-5 text-primary-600" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 mb-1">Total de Produtos</p>
-                                        <p class="text-lg font-bold text-gray-900">{{ formatNumber(totals.total_products) }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total de Produtos</p>
+                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatNumber(totals.total_products) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
@@ -291,8 +291,8 @@ onMounted(() => {
                                         <ChartBarIcon class="w-5 h-5 text-primary-600" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 mb-1">Unidades Vendidas</p>
-                                        <p class="text-lg font-bold text-gray-900">{{ formatNumber(totals.units_sold) }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Unidades Vendidas</p>
+                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatNumber(totals.units_sold) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
@@ -303,8 +303,8 @@ onMounted(() => {
                                         <ChartBarIcon class="w-5 h-5 text-success-600" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 mb-1">Receita Total</p>
-                                        <p class="text-lg font-bold text-gray-900">{{ formatCurrency(totals.total_revenue) }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Receita Total</p>
+                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatCurrency(totals.total_revenue) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
@@ -315,7 +315,7 @@ onMounted(() => {
                                         <ChartBarIcon class="w-5 h-5 text-success-600" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 mb-1">Lucro Total</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Lucro Total</p>
                                         <p class="text-lg font-bold text-success-600">{{ formatCurrency(totals.total_profit) }}</p>
                                     </div>
                                 </div>
@@ -327,8 +327,8 @@ onMounted(() => {
                                         <ChartBarIcon class="w-5 h-5 text-warning-600" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 mb-1">Margem Média</p>
-                                        <p class="text-lg font-bold text-gray-900">{{ formatPercentage(totals.average_margin) }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Margem Média</p>
+                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatPercentage(totals.average_margin) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
@@ -343,8 +343,8 @@ onMounted(() => {
                                 <div class="flex-1">
                                     <div class="flex items-center justify-between mb-4">
                                         <div>
-                                            <h3 class="text-lg font-semibold text-gray-900 mb-1">Análise ABC</h3>
-                                            <p class="text-sm text-gray-500">Distribuição dos produtos por categoria de faturamento</p>
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Análise ABC</h3>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Distribuição dos produtos por categoria de faturamento</p>
                                         </div>
                                         <BaseButton
                                             v-if="hasActiveFilters"
@@ -406,13 +406,13 @@ onMounted(() => {
                                             @click="applyAbcFilter('A')"
                                             :class="[
                                                 'flex items-center gap-3 p-3 rounded-lg border-2 transition-all',
-                                                selectedAbcCategory === 'A' ? 'border-success-500 bg-success-50' : 'border-transparent hover:border-success-200 hover:bg-success-50/50'
+                                                selectedAbcCategory === 'A' ? 'border-success-500 bg-success-50 dark:bg-success-900/30' : 'border-transparent hover:border-success-200 dark:hover:border-success-700 hover:bg-success-50/50 dark:hover:bg-success-900/20'
                                             ]"
                                         >
                                             <div class="w-4 h-4 rounded bg-gradient-to-br from-success-500 to-success-600 flex-shrink-0"></div>
                                             <div class="text-left">
-                                                <p class="text-xs text-gray-500">Categoria A</p>
-                                                <p class="text-sm font-semibold text-gray-900">{{ abcAnalysis.countA }} produtos ({{ abcAnalysis.a.toFixed(1) }}%)</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Categoria A</p>
+                                                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ abcAnalysis.countA }} produtos ({{ abcAnalysis.a.toFixed(1) }}%)</p>
                                             </div>
                                         </button>
                                         <button
@@ -420,13 +420,13 @@ onMounted(() => {
                                             @click="applyAbcFilter('B')"
                                             :class="[
                                                 'flex items-center gap-3 p-3 rounded-lg border-2 transition-all',
-                                                selectedAbcCategory === 'B' ? 'border-warning-500 bg-warning-50' : 'border-transparent hover:border-warning-200 hover:bg-warning-50/50'
+                                                selectedAbcCategory === 'B' ? 'border-warning-500 bg-warning-50 dark:bg-warning-900/30' : 'border-transparent hover:border-warning-200 dark:hover:border-warning-700 hover:bg-warning-50/50 dark:hover:bg-warning-900/20'
                                             ]"
                                         >
                                             <div class="w-4 h-4 rounded bg-gradient-to-br from-warning-400 to-warning-500 flex-shrink-0"></div>
                                             <div class="text-left">
-                                                <p class="text-xs text-gray-500">Categoria B</p>
-                                                <p class="text-sm font-semibold text-gray-900">{{ abcAnalysis.countB }} produtos ({{ abcAnalysis.b.toFixed(1) }}%)</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Categoria B</p>
+                                                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ abcAnalysis.countB }} produtos ({{ abcAnalysis.b.toFixed(1) }}%)</p>
                                             </div>
                                         </button>
                                         <button
@@ -434,20 +434,20 @@ onMounted(() => {
                                             @click="applyAbcFilter('C')"
                                             :class="[
                                                 'flex items-center gap-3 p-3 rounded-lg border-2 transition-all',
-                                                selectedAbcCategory === 'C' ? 'border-danger-500 bg-danger-50' : 'border-transparent hover:border-danger-200 hover:bg-danger-50/50'
+                                                selectedAbcCategory === 'C' ? 'border-danger-500 bg-danger-50 dark:bg-danger-900/30' : 'border-transparent hover:border-danger-200 dark:hover:border-danger-700 hover:bg-danger-50/50 dark:hover:bg-danger-900/20'
                                             ]"
                                         >
                                             <div class="w-4 h-4 rounded bg-gradient-to-br from-danger-400 to-danger-500 flex-shrink-0"></div>
                                             <div class="text-left">
-                                                <p class="text-xs text-gray-500">Categoria C</p>
-                                                <p class="text-sm font-semibold text-gray-900">{{ abcAnalysis.countC }} produtos ({{ abcAnalysis.c.toFixed(1) }}%)</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Categoria C</p>
+                                                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ abcAnalysis.countC }} produtos ({{ abcAnalysis.c.toFixed(1) }}%)</p>
                                             </div>
                                         </button>
                                     </div>
 
                                     <!-- Filtro de Saúde do Estoque -->
-                                    <div class="pt-4 border-t border-gray-200">
-                                        <p class="text-sm font-medium text-gray-700 mb-3">Filtrar por Saúde do Estoque</p>
+                                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Filtrar por Saúde do Estoque</p>
                                         <div class="flex flex-wrap gap-2">
                                             <button
                                                 type="button"
@@ -493,11 +493,11 @@ onMounted(() => {
                                     </div>
 
                                     <!-- Botão Limpar Filtros -->
-                                    <div v-if="hasActiveFilters" class="pt-4 border-t border-gray-200">
+                                    <div v-if="hasActiveFilters" class="pt-4 border-t border-gray-200 dark:border-gray-700">
                                         <button
                                             type="button"
                                             @click="clearFilters"
-                                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-all"
+                                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-all"
                                         >
                                             <XMarkIcon class="w-4 h-4" />
                                             Limpar Todos os Filtros
@@ -534,50 +534,50 @@ onMounted(() => {
                                         <col style="width: 100px"><!-- Margem -->
                                         <col style="width: 100px"><!-- Estoque -->
                                     </colgroup>
-                                    <thead class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 sticky top-0 z-10">
+                                    <thead class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
                                         <tr>
-                                            <th class="text-left px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-left px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Produto
                                             </th>
-                                            <th class="text-center px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-center px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Curva ABC
                                             </th>
-                                            <th class="text-center px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-center px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Saúde Estoque
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Unid. Vendidas
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Taxa Conv.
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 % Vendas
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Total Vendido
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Lucro Total
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Preço
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Preço Médio
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Custo
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Margem
                                             </th>
-                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                 Estoque
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-100">
+                                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                         <tr
                                             v-for="(product, index) in products"
                                             :key="product.id"
@@ -588,9 +588,9 @@ onMounted(() => {
                                             @keydown.enter="selectProduct(product)"
                                             @keydown.space.prevent="selectProduct(product)"
                                             :class="[
-                                                'hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent cursor-pointer transition-all duration-200',
-                                                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset focus:bg-primary-50/30',
-                                                selectedProduct?.id === product.id ? 'bg-primary-50' : '',
+                                                'hover:bg-gradient-to-r hover:from-primary-50/50 dark:hover:from-primary-900/30 hover:to-transparent cursor-pointer transition-all duration-200',
+                                                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset focus:bg-primary-50/30 dark:focus:bg-primary-900/30',
+                                                selectedProduct?.id === product.id ? 'bg-primary-50 dark:bg-primary-900/30' : '',
                                                 currentIndex === index ? 'ring-2 ring-primary-400 ring-inset' : ''
                                             ]"
                                         >
@@ -607,8 +607,8 @@ onMounted(() => {
                                                         <CubeIcon v-else class="w-5 h-5 text-gray-400" />
                                                     </div>
                                                     <div class="min-w-0 flex-1">
-                                                        <p class="font-medium text-gray-900 truncate text-sm">{{ product.name }}</p>
-                                                        <p class="text-xs text-gray-500 truncate">{{ product.sku || '-' }}</p>
+                                                        <p class="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">{{ product.name }}</p>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ product.sku || '-' }}</p>
                                                     </div>
                                                 </div>
                                             </td>
@@ -642,22 +642,22 @@ onMounted(() => {
                                             </td>
 
                                             <!-- Unidades Vendidas -->
-                                            <td class="px-4 py-4 text-right text-sm font-medium text-gray-900">
+                                            <td class="px-4 py-4 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
                                                 {{ formatNumber(product.analytics?.units_sold || 0) }}
                                             </td>
 
                                             <!-- Taxa de Conversão -->
-                                            <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                            <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                                 {{ product.analytics?.conversion_rate ? formatPercentage(product.analytics.conversion_rate) : '-' }}
                                             </td>
 
                                             <!-- Porcentagem de Vendas -->
-                                            <td class="px-4 py-4 text-right text-sm text-gray-600">
+                                            <td class="px-4 py-4 text-right text-sm text-gray-600 dark:text-gray-300">
                                                 {{ product.analytics?.sales_percentage ? formatPercentage(product.analytics.sales_percentage) : '-' }}
                                             </td>
 
                                             <!-- Total Vendido (Receita) -->
-                                            <td class="px-4 py-4 text-right text-sm font-semibold text-gray-900">
+                                            <td class="px-4 py-4 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                 {{ formatCurrency(product.analytics?.total_sold || 0) }}
                                             </td>
 
@@ -667,17 +667,17 @@ onMounted(() => {
                                             </td>
 
                                             <!-- Preço -->
-                                            <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                            <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                                 {{ formatCurrency(product.price || 0) }}
                                             </td>
 
                                             <!-- Preço Médio -->
-                                            <td class="px-4 py-4 text-right text-sm text-gray-700">
+                                            <td class="px-4 py-4 text-right text-sm text-gray-700 dark:text-gray-300">
                                                 {{ product.analytics?.average_price ? formatCurrency(product.analytics.average_price) : '-' }}
                                             </td>
 
                                             <!-- Custo -->
-                                            <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                            <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                                 {{ formatCurrency(product.cost || 0) }}
                                             </td>
 
@@ -693,7 +693,7 @@ onMounted(() => {
                                             </td>
 
                                             <!-- Estoque -->
-                                            <td class="px-4 py-4 text-right text-sm font-medium text-gray-900">
+                                            <td class="px-4 py-4 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
                                                 {{ formatNumber(product.stock || 0) }}
                                             </td>
                                         </tr>
@@ -711,7 +711,7 @@ onMounted(() => {
                                         <SparklesIcon class="w-4 h-4 text-white" />
                                     </div>
                                 </div>
-                                <h3 class="text-2xl font-display font-bold text-gray-900 mb-3">
+                                <h3 class="text-2xl font-display font-bold text-gray-900 dark:text-gray-100 mb-3">
                                     Nenhum produto encontrado
                                 </h3>
                                 <p class="text-gray-500 mb-4">
@@ -737,8 +737,8 @@ onMounted(() => {
                             </div>
 
                             <!-- Pagination -->
-                            <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                                <p class="text-sm text-gray-500" role="status" aria-live="polite">
+                            <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                                <p class="text-sm text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
                                     Mostrando {{ (currentPage - 1) * 20 + 1 }} a {{ Math.min(currentPage * 20, totalItems) }} de {{ totalItems }} produtos
                                 </p>
                                 <nav class="flex items-center gap-2" role="navigation" aria-label="Paginação de produtos">
@@ -751,7 +751,7 @@ onMounted(() => {
                                     >
                                         <ChevronLeftIcon class="w-4 h-4" aria-hidden="true" />
                                     </BaseButton>
-                                    <span class="text-sm text-gray-600 px-3" aria-current="page">
+                                    <span class="text-sm text-gray-600 dark:text-gray-300 px-3" aria-current="page">
                                         Página {{ currentPage }} de {{ totalPages }}
                                     </span>
                                     <BaseButton

@@ -50,7 +50,7 @@ const permissionLabel = computed(() => {
             'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200',
             modelValue
                 ? 'border-primary-300 bg-primary-50'
-                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50',
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 hover:bg-gray-50',
             disabled ? 'opacity-50 cursor-not-allowed' : ''
         ]"
     >
@@ -69,7 +69,7 @@ const permissionLabel = computed(() => {
             >
                 {{ label || permissionLabel }}
             </p>
-            <p class="text-xs text-gray-500 mt-0.5">{{ permission }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ permission }}</p>
         </div>
     </label>
 </template>

@@ -35,10 +35,10 @@ const emit = defineEmits(['click']);
 
 const variantClasses = {
     primary: 'bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:from-primary-700 hover:to-primary-600 focus:ring-primary-500 shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30',
-    secondary: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 focus:ring-gray-500',
+    secondary: 'bg-white dark:bg-gray-800 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-600 hover:border-gray-300 dark:hover:border-gray-500 focus:ring-gray-500',
     danger: 'bg-gradient-to-r from-danger-600 to-danger-500 text-white hover:from-danger-700 hover:to-danger-600 focus:ring-danger-500 shadow-lg shadow-danger-500/25',
     success: 'bg-gradient-to-r from-success-600 to-success-500 text-white hover:from-success-700 hover:to-success-600 focus:ring-success-500 shadow-lg shadow-success-500/25',
-    ghost: 'text-gray-600 hover:bg-gray-100 focus:ring-gray-500',
+    ghost: 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 focus:ring-gray-500',
 };
 
 const sizeClasses = {
@@ -48,7 +48,7 @@ const sizeClasses = {
 };
 
 const buttonClasses = computed(() => [
-    'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
+    'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800',
     variantClasses[props.variant],
     sizeClasses[props.size],
     props.fullWidth ? 'w-full' : '',

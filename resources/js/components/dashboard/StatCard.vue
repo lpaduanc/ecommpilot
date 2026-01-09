@@ -56,7 +56,7 @@ const hasChange = computed(() => props.change !== null && props.change !== undef
 </script>
 
 <template>
-    <div class="relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+    <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
         <!-- Background Gradient -->
         <div :class="['absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300', config.gradient]"></div>
         
@@ -78,7 +78,7 @@ const hasChange = computed(() => props.change !== null && props.change !== undef
                             ? 'bg-success-100 text-success-700' 
                             : isNegative 
                                 ? 'bg-danger-100 text-danger-700' 
-                                : 'bg-gray-100 text-gray-600'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600'
                     ]"
                 >
                     <ArrowUpIcon v-if="isPositive" class="w-3.5 h-3.5" />
@@ -88,8 +88,8 @@ const hasChange = computed(() => props.change !== null && props.change !== undef
             </div>
             
             <div>
-                <p class="text-sm font-medium text-gray-500 mb-2">{{ title }}</p>
-                <p class="text-3xl font-display font-bold text-gray-900">{{ value }}</p>
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">{{ title }}</p>
+                <p class="text-3xl font-display font-bold text-gray-900 dark:text-gray-100">{{ value }}</p>
             </div>
         </div>
     </div>

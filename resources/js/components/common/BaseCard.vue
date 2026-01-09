@@ -21,10 +21,10 @@ const paddingClasses = {
 };
 
 const cardClasses = computed(() => [
-    'bg-white rounded-2xl border border-gray-100 overflow-hidden',
+    'bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden',
     paddingClasses[props.padding],
-    props.hoverable 
-        ? 'shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/50 hover:-translate-y-0.5' 
+    props.hoverable
+        ? 'shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-900/50 hover:-translate-y-0.5'
         : 'shadow-sm',
 ]);
 </script>

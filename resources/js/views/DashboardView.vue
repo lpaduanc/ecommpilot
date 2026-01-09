@@ -95,12 +95,12 @@ onMounted(() => {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 dark:bg-primary-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 dark:bg-secondary-500/10 rounded-full blur-3xl"></div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 dark:bg-accent-500/5 rounded-full blur-3xl"></div>
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
             </div>
@@ -113,10 +113,10 @@ onMounted(() => {
                                 <ChartBarIcon class="w-7 h-7 text-white" />
                             </div>
                             <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
+                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
                                     Dashboard
                                 </h1>
-                                <p class="text-primary-200/80 text-sm lg:text-base">
+                                <p class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base">
                                     Visão geral completa da sua loja
                                 </p>
                             </div>
@@ -131,14 +131,14 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <!-- Loading State -->
             <div v-if="isLoading && !stats" class="flex flex-col items-center justify-center py-32">
                 <div class="relative">
                     <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
                     <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
                 </div>
-                <p class="text-gray-500 mt-6 font-medium">Carregando dados...</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-6 font-medium">Carregando dados...</p>
             </div>
 
             <!-- Empty State - No Store Connected -->
@@ -163,7 +163,7 @@ onMounted(() => {
                     <!-- Charts Row 1 -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <BaseCard padding="normal">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
                                     <ArrowTrendingUpIcon class="w-4 h-4 text-white" />
                                 </div>
@@ -173,7 +173,7 @@ onMounted(() => {
                         </BaseCard>
 
                         <BaseCard padding="normal">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center">
                                     <ShoppingCartIcon class="w-4 h-4 text-white" />
                                 </div>
@@ -186,7 +186,7 @@ onMounted(() => {
                     <!-- Charts Row 2 -->
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <BaseCard padding="normal" class="lg:col-span-2">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center">
                                     <CubeIcon class="w-4 h-4 text-white" />
                                 </div>
@@ -196,7 +196,7 @@ onMounted(() => {
                         </BaseCard>
 
                         <BaseCard padding="normal">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-danger-500 to-danger-600 flex items-center justify-center">
                                     <SparklesIcon class="w-4 h-4 text-white" />
                                 </div>

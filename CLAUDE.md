@@ -33,6 +33,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Nunca remover imports, funções ou variáveis sem verificar se são usados
 - Nunca simplificar ou "limpar" código que não foi solicitado alterar
 
+### Consistência da Stack Tecnológica
+
+**Utilize APENAS as tecnologias da stack do projeto.** Não introduza linguagens ou ferramentas externas para resolver problemas que podem ser resolvidos com a stack existente.
+
+**Stack do Projeto:**
+- **Backend:** PHP/Laravel 12
+- **Frontend:** Vue 3, JavaScript/TypeScript, Tailwind CSS v4
+- **Build:** Vite, npm
+
+**O que NUNCA fazer:**
+- Nunca criar scripts Python, Ruby, ou outras linguagens para automação que pode ser feita com JavaScript/PHP
+- Nunca adicionar dependências de linguagens fora da stack sem aprovação explícita
+- Nunca usar ferramentas CLI externas quando existe equivalente na stack (ex: usar Vite/npm em vez de scripts shell complexos)
+
+**Exemplo:** Para aplicar mudanças em arquivos Vue, use JavaScript/Node.js ou ferramentas do ecossistema Vue/Vite, não scripts Python.
+
 ## Build and Development Commands
 
 ```bash

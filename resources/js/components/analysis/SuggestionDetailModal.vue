@@ -68,7 +68,7 @@ const actionSteps = computed(() => {
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl">
+                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl">
                     <!-- Header with Gradient -->
                     <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="category.color">
                         <!-- Background Pattern -->
@@ -106,11 +106,11 @@ const actionSteps = computed(() => {
                     <div class="px-8 py-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-6">
                         <!-- Description -->
                         <div>
-                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 mb-3">
+                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-3">
                                 <SparklesIcon class="w-5 h-5 text-primary-500" />
                                 Descrição
                             </h3>
-                            <p class="text-gray-600 leading-relaxed">{{ suggestion.description }}</p>
+                            <p class="text-gray-600 dark:text-gray-400 leading-relaxed">{{ suggestion.description }}</p>
                         </div>
 
                         <!-- Expected Impact -->
@@ -124,7 +124,7 @@ const actionSteps = computed(() => {
 
                         <!-- Implementation Steps -->
                         <div v-if="actionSteps.length > 0">
-                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 mb-4">
+                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-4">
                                 <BoltIcon class="w-5 h-5 text-primary-500" />
                                 Passos para Implementação
                             </h3>
@@ -132,7 +132,7 @@ const actionSteps = computed(() => {
                                 <div
                                     v-for="(step, index) in actionSteps"
                                     :key="index"
-                                    class="flex items-start gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                                    class="flex items-start gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
                                 >
                                     <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-primary-500/30">
                                         {{ index + 1 }}
@@ -144,7 +144,7 @@ const actionSteps = computed(() => {
 
                         <!-- Metrics to Track -->
                         <div v-if="suggestion.metrics_to_track?.length > 0">
-                            <h3 class="font-semibold text-gray-900 mb-3">📊 Métricas para Acompanhar</h3>
+                            <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-3">📊 Métricas para Acompanhar</h3>
                             <div class="flex flex-wrap gap-2">
                                 <span
                                     v-for="metric in suggestion.metrics_to_track"
@@ -163,7 +163,7 @@ const actionSteps = computed(() => {
                                     <BoltIcon class="w-5 h-5 text-amber-600" />
                                 </div>
                                 <div>
-                                    <span class="text-xs text-gray-500 block">Esforço</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Esforço</span>
                                     <span class="font-semibold text-gray-900">{{ effortLabels[suggestion.estimated_effort] }}</span>
                                 </div>
                             </div>
@@ -172,7 +172,7 @@ const actionSteps = computed(() => {
                                     <ClockIcon class="w-5 h-5 text-blue-600" />
                                 </div>
                                 <div>
-                                    <span class="text-xs text-gray-500 block">Tempo Estimado</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Tempo Estimado</span>
                                     <span class="font-semibold text-gray-900">{{ suggestion.estimated_time }}</span>
                                 </div>
                             </div>
@@ -180,12 +180,12 @@ const actionSteps = computed(() => {
                     </div>
 
                     <!-- Footer -->
-                    <div class="px-8 py-5 bg-gray-50 border-t border-gray-100">
+                    <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100">
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                             <button
                                 v-if="!suggestion.is_done"
                                 @click="emit('mark-done', suggestion)"
-                                class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 font-medium hover:border-success-500 hover:text-success-600 hover:bg-success-50 transition-all"
+                                class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 dark:text-gray-400 font-medium hover:border-success-500 hover:text-success-600 hover:bg-success-50 transition-all"
                             >
                                 <CheckCircleIcon class="w-5 h-5" />
                                 Marcar como Implementado
@@ -198,7 +198,7 @@ const actionSteps = computed(() => {
                             <div class="flex items-center gap-3">
                                 <button
                                     @click="emit('close')"
-                                    class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                                    class="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
                                 >
                                     Fechar
                                 </button>

@@ -15,7 +15,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -43,7 +43,7 @@ onMounted(() => {
         </div>
 
         <!-- Chat Container -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto">
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-[calc(100vh-300px)]">
                     <ChatContainer />

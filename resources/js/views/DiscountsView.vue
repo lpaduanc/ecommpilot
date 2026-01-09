@@ -116,7 +116,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -171,7 +171,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Stats Cards -->
                 <div v-if="stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -203,7 +203,7 @@ onMounted(() => {
                 <BaseCard padding="none" class="overflow-hidden">
                     <!-- Table Header with Export Button -->
                     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900">Cupons de Desconto</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Cupons de Desconto</h3>
                         <BaseButton
                             variant="secondary"
                             size="sm"
@@ -320,21 +320,21 @@ onMounted(() => {
 
                                     <!-- Cupom -->
                                     <td class="px-4 py-4">
-                                        <span class="font-medium text-gray-900">{{ coupon.coupon_code || '-' }}</span>
+                                        <span class="font-medium text-gray-900 dark:text-gray-100">{{ coupon.coupon_code || '-' }}</span>
                                     </td>
 
                                     <!-- Receita de Produtos -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(coupon.product_revenue || 0) }}
                                     </td>
 
                                     <!-- Receita de Frete -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(coupon.shipping_revenue || 0) }}
                                     </td>
 
                                     <!-- Total Vendido -->
-                                    <td class="px-4 py-4 text-right text-sm font-semibold text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(coupon.total_sold || 0) }}
                                     </td>
 
@@ -344,63 +344,63 @@ onMounted(() => {
                                     </td>
 
                                     <!-- Número de Pedidos -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatNumber(coupon.order_count || 0) }}
                                     </td>
 
                                     <!-- Percentual de Desconto -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ coupon.discount_percentage ? formatPercentage(coupon.discount_percentage) : '-' }}
                                     </td>
 
                                     <!-- Desconto Médio por Pedido -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(coupon.avg_discount_per_order || 0) }}
                                     </td>
 
                                     <!-- Ticket Médio -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(coupon.avg_ticket || 0) }}
                                     </td>
 
                                     <!-- Novos Clientes -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatNumber(coupon.new_customers || 0) }}
                                     </td>
 
                                     <!-- % Recompra -->
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ coupon.repurchase_rate ? formatPercentage(coupon.repurchase_rate) : '-' }}
                                     </td>
                                 </tr>
 
                                 <!-- Linha de Totais -->
                                 <tr v-if="totals" class="bg-gradient-to-r from-gray-100 to-gray-50 font-semibold border-t-2 border-gray-300">
-                                    <td class="px-4 py-4 text-sm text-gray-900" colspan="2">
+                                    <td class="px-4 py-4 text-sm text-gray-900 dark:text-gray-100" colspan="2">
                                         TOTAL
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(totals.product_revenue) }}
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(totals.shipping_revenue) }}
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatCurrency(totals.total_sold) }}
                                     </td>
                                     <td class="px-4 py-4 text-right text-sm text-warning-600">
                                         {{ formatCurrency(totals.total_discounts) }}
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatNumber(totals.order_count) }}
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900" colspan="4">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100" colspan="4">
                                         -
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         {{ formatNumber(totals.new_customers) }}
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-900">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                                         -
                                     </td>
                                 </tr>
@@ -421,14 +421,14 @@ onMounted(() => {
                         <h3 class="text-2xl font-display font-bold text-gray-900 mb-3">
                             Nenhum cupom encontrado
                         </h3>
-                        <p class="text-gray-500">
+                        <p class="text-gray-500 dark:text-gray-400">
                             {{ searchQuery ? 'Tente uma busca diferente' : 'Nenhum cupom de desconto foi utilizado ainda' }}
                         </p>
                     </div>
 
                     <!-- Pagination -->
                     <div v-if="discountStore.totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                        <p class="text-sm text-gray-500" role="status" aria-live="polite">
+                        <p class="text-sm text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
                             Mostrando {{ (discountStore.currentPage - 1) * discountStore.perPage + 1 }} a {{ Math.min(discountStore.currentPage * discountStore.perPage, discountStore.totalItems) }} de {{ discountStore.totalItems }} cupons
                         </p>
                         <nav class="flex items-center gap-2" role="navigation" aria-label="Paginação de cupons">

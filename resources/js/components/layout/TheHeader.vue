@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/authStore';
 import StoreSelector from './StoreSelector.vue';
+import ThemeToggle from '../common/ThemeToggle.vue';
 import {
     BellIcon,
     MagnifyingGlassIcon,
@@ -114,14 +115,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-100">
+    <header class="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-700">
         <div class="flex items-center justify-between h-16 lg:h-20 px-4 lg:px-8">
             <!-- Left Section: Mobile Menu + Search -->
             <div class="flex items-center gap-3">
                 <!-- Mobile Menu Button -->
                 <button
                     @click="emit('toggle-mobile-sidebar')"
-                    class="lg:hidden p-2 -ml-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
+                    class="lg:hidden p-2 -ml-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
                 >
                     <Bars3Icon class="w-6 h-6" />
                 </button>
@@ -135,7 +136,7 @@ onUnmounted(() => {
                             @keyup.enter="handleSearch"
                             type="text"
                             placeholder="Buscar produtos, pedidos..."
-                            class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-100 text-gray-900 placeholder-gray-400 focus:bg-white focus:border-primary-200 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
+                            class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
                         />
                     </div>
                 </div>
@@ -143,7 +144,7 @@ onUnmounted(() => {
                 <!-- Mobile Search Button -->
                 <button
                     @click="showMobileSearch = !showMobileSearch"
-                    class="md:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
+                    class="md:hidden p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
                 >
                     <MagnifyingGlassIcon class="w-6 h-6" />
                 </button>
@@ -154,11 +155,14 @@ onUnmounted(() => {
                 <!-- Store Selector -->
                 <StoreSelector v-if="!authStore.isAdmin" class="hidden sm:block" />
 
+                <!-- Theme Toggle -->
+                <ThemeToggle />
+
                 <!-- Notifications -->
                 <div id="notifications-menu" class="relative">
                     <button
                         @click.stop="toggleNotifications"
-                        class="relative p-2 lg:p-3 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors"
+                        class="relative p-2 lg:p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors"
                     >
                         <BellIcon class="w-5 h-5 lg:w-6 lg:h-6" />
                         <span
@@ -178,13 +182,13 @@ onUnmounted(() => {
                     >
                         <div
                             v-if="showNotifications"
-                            class="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden"
+                            class="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-gray-700 overflow-hidden"
                         >
-                            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                                <span class="font-semibold text-gray-900">Notificações</span>
+                            <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                <span class="font-semibold text-gray-900 dark:text-gray-100 dark:text-white">Notificações</span>
                                 <button
                                     @click="markAllAsRead"
-                                    class="text-sm text-primary-600 hover:text-primary-700"
+                                    class="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
                                 >
                                     Marcar como lidas
                                 </button>
@@ -194,8 +198,8 @@ onUnmounted(() => {
                                     v-for="notification in notifications"
                                     :key="notification.id"
                                     :class="[
-                                        'px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer',
-                                        !notification.read ? 'bg-primary-50/50' : ''
+                                        'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors cursor-pointer',
+                                        !notification.read ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
                                     ]"
                                 >
                                     <div class="flex items-start gap-3">
@@ -206,9 +210,9 @@ onUnmounted(() => {
                                             ]"
                                         ></div>
                                         <div>
-                                            <p class="font-medium text-gray-900 text-sm">{{ notification.title }}</p>
-                                            <p class="text-gray-500 text-sm mt-0.5">{{ notification.message }}</p>
-                                            <p class="text-gray-400 text-xs mt-1">{{ notification.time }}</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100 dark:text-white text-sm">{{ notification.title }}</p>
+                                            <p class="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{{ notification.message }}</p>
+                                            <p class="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-xs mt-1">{{ notification.time }}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -221,14 +225,14 @@ onUnmounted(() => {
                 <div id="user-menu" class="relative">
                     <button
                         @click.stop="toggleUserMenu"
-                        class="flex items-center gap-2 lg:gap-3 p-1.5 lg:p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                        class="flex items-center gap-2 lg:gap-3 p-1.5 lg:p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors"
                     >
                         <div class="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold text-sm lg:text-base shadow-lg shadow-primary-500/30">
                             {{ userInitials }}
                         </div>
                         <div class="hidden lg:block text-left">
-                            <p class="font-medium text-gray-900 text-sm">{{ userName }}</p>
-                            <p class="text-gray-500 text-xs">{{ userEmail }}</p>
+                            <p class="font-medium text-gray-900 dark:text-gray-100 dark:text-white text-sm">{{ userName }}</p>
+                            <p class="text-gray-500 dark:text-gray-400 text-xs">{{ userEmail }}</p>
                         </div>
                     </button>
 
@@ -243,33 +247,33 @@ onUnmounted(() => {
                     >
                         <div
                             v-if="showUserMenu"
-                            class="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden"
+                            class="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-gray-700 overflow-hidden"
                         >
                             <!-- Mobile only: User info -->
-                            <div class="lg:hidden px-4 py-3 border-b border-gray-100">
-                                <p class="font-medium text-gray-900 text-sm">{{ userName }}</p>
-                                <p class="text-gray-500 text-xs">{{ userEmail }}</p>
+                            <div class="lg:hidden px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                                <p class="font-medium text-gray-900 dark:text-gray-100 dark:text-white text-sm">{{ userName }}</p>
+                                <p class="text-gray-500 dark:text-gray-400 text-xs">{{ userEmail }}</p>
                             </div>
                             <div class="p-2">
                                 <button
                                     @click="goToSettings"
-                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors text-sm"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors text-sm"
                                 >
                                     <UserCircleIcon class="w-5 h-5 text-gray-400" />
                                     <span>Meu Perfil</span>
                                 </button>
                                 <button
                                     @click="goToSettings"
-                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors text-sm"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors text-sm"
                                 >
                                     <Cog6ToothIcon class="w-5 h-5 text-gray-400" />
                                     <span>Configurações</span>
                                 </button>
                             </div>
-                            <div class="border-t border-gray-100 p-2">
+                            <div class="border-t border-gray-100 dark:border-gray-700 p-2">
                                 <button
                                     @click="handleLogout"
-                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-danger-600 hover:bg-danger-50 transition-colors text-sm"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors text-sm"
                                 >
                                     <ArrowLeftOnRectangleIcon class="w-5 h-5" />
                                     <span>Sair</span>
@@ -298,7 +302,7 @@ onUnmounted(() => {
                         @keyup.enter="handleSearch"
                         type="text"
                         placeholder="Buscar produtos, pedidos..."
-                        class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-100 text-gray-900 placeholder-gray-400 focus:bg-white focus:border-primary-200 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
+                        class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
                         autofocus
                     />
                 </div>

@@ -102,7 +102,7 @@ onUnmounted(() => {
         >
             <div
                 v-if="show"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 dark:bg-black/60 backdrop-blur-sm"
                 @click="handleBackdropClick"
                 aria-hidden="false"
             >
@@ -121,18 +121,18 @@ onUnmounted(() => {
                         aria-modal="true"
                         :aria-labelledby="titleId"
                         :aria-describedby="descriptionId"
-                        :class="['w-full bg-white rounded-2xl shadow-2xl overflow-hidden', sizeClasses[size]]"
+                        :class="['w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden', sizeClasses[size]]"
                     >
                         <!-- Header -->
-                        <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                            <h3 v-if="title" :id="titleId" class="text-lg font-semibold text-gray-900">{{ title }}</h3>
+                        <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                            <h3 v-if="title" :id="titleId" class="text-lg font-semibold text-gray-900 dark:text-gray-100 dark:text-white">{{ title }}</h3>
                             <button
                                 v-if="closable"
                                 ref="closeButtonRef"
                                 type="button"
                                 aria-label="Fechar modal"
                                 @click="close"
-                                class="p-2 -mr-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                                class="p-2 -mr-2 rounded-lg text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                             >
                                 <XMarkIcon class="w-5 h-5" aria-hidden="true" />
                             </button>
@@ -144,7 +144,7 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Footer -->
-                        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                             <slot name="footer" />
                         </div>
                     </div>

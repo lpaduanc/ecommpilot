@@ -12,7 +12,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <!-- Header -->
         <div class="relative px-6 py-5 bg-gradient-to-r from-emerald-500 to-teal-500 overflow-hidden">
             <!-- Background Pattern -->
@@ -45,7 +45,7 @@ const props = defineProps({
                     <!-- Content -->
                     <div class="flex-1 min-w-0">
                         <div class="flex items-start justify-between gap-3 mb-2">
-                            <h4 class="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                            <h4 class="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-emerald-700 transition-colors">
                                 {{ opportunity.title }}
                             </h4>
                             <div class="flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm flex-shrink-0">
@@ -53,7 +53,7 @@ const props = defineProps({
                                 {{ opportunity.potential_revenue }}
                             </div>
                         </div>
-                        <p class="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                        <p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
                             {{ opportunity.description }}
                         </p>
                         

@@ -244,7 +244,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12 -mx-8 -mt-8">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12 -mx-8 -mt-8">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -262,10 +262,10 @@ onMounted(() => {
                                 <CurrencyDollarIcon class="w-7 h-7 text-white" />
                             </div>
                             <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
+                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
                                     Pedidos
                                 </h1>
-                                <p class="text-primary-200/80 text-sm lg:text-base">
+                                <p class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base">
                                     {{ totalItems }} pedidos sincronizados
                                 </p>
                             </div>
@@ -281,18 +281,18 @@ onMounted(() => {
                                 @keyup.enter="handleSearch"
                                 type="search"
                                 placeholder="Buscar por pedido, cliente ou email..."
-                                class="w-full pl-12 pr-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:bg-white/20 focus:border-white/30 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-all"
+                                class="w-full pl-12 pr-4 py-3 rounded-xl bg-white dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:bg-white dark:bg-gray-800/20 focus:border-white/30 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-all"
                             />
                         </div>
                         <button
                             @click="handleSearch"
-                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all"
+                            class="px-6 py-3 rounded-xl bg-white dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white dark:bg-gray-800/20 transition-all"
                         >
                             <FunnelIcon class="w-5 h-5" />
                         </button>
                         <button
                             @click="exportOrders"
-                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all flex items-center gap-2"
+                            class="px-6 py-3 rounded-xl bg-white dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white dark:bg-gray-800/20 transition-all flex items-center gap-2"
                         >
                             <ArrowDownTrayIcon class="w-5 h-5" />
                             <span class="hidden lg:inline">Baixar</span>
@@ -303,7 +303,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="py-8 px-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="py-8 px-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="w-full">
                 <!-- Filters Section -->
                 <BaseCard v-if="!isLoading" class="mb-6">
@@ -314,8 +314,8 @@ onMounted(() => {
                         <div class="flex-1">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Filtros</h3>
-                                    <p class="text-sm text-gray-500">Filtre os pedidos por status, localização ou cupom</p>
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Filtros</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Filtre os pedidos por status, localização ou cupom</p>
                                 </div>
                                 <BaseButton
                                     v-if="hasActiveFilters"
@@ -334,7 +334,7 @@ onMounted(() => {
                                 <select
                                     v-model="statusFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">Todos os Status</option>
                                     <option v-for="status in filterOptions.statuses" :key="status" :value="status">
@@ -346,7 +346,7 @@ onMounted(() => {
                                 <select
                                     v-model="couponFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">Cupom de Desconto</option>
                                     <option v-for="coupon in filterOptions.coupons" :key="coupon" :value="coupon">
@@ -358,7 +358,7 @@ onMounted(() => {
                                 <select
                                     v-model="countryFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">País</option>
                                     <option v-for="country in filterOptions.countries" :key="country" :value="country">
@@ -370,7 +370,7 @@ onMounted(() => {
                                 <select
                                     v-model="stateFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">Estados</option>
                                     <option v-for="state in filterOptions.states" :key="state" :value="state">
@@ -382,7 +382,7 @@ onMounted(() => {
                                 <select
                                     v-model="cityFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">Cidades</option>
                                     <option v-for="city in filterOptions.cities" :key="city" :value="city">
@@ -392,11 +392,11 @@ onMounted(() => {
 
                                 <!-- Per Page Selector -->
                                 <div class="flex items-center gap-2 ml-auto">
-                                    <span class="text-sm text-gray-500">Exibir:</span>
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">Exibir:</span>
                                     <select
                                         :value="perPage"
                                         @change="changePerPage(Number($event.target.value))"
-                                        class="px-3 py-2.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        class="px-3 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                     >
                                         <option v-for="option in perPageOptions" :key="option" :value="option">
                                             {{ option }} por página
@@ -434,39 +434,39 @@ onMounted(() => {
                                 <col style="width: 120px;">  <!-- Lucro Bruto -->
                                 <col style="width: 90px;">   <!-- Margem -->
                             </colgroup>
-                            <thead class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 sticky top-0 z-10">
+                            <thead class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
                                 <tr>
-                                    <th class="text-left px-5 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-left px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Pedido
                                     </th>
-                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Data
                                     </th>
-                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Status
                                     </th>
-                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Cliente
                                     </th>
-                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Email
                                     </th>
-                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-left px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Telefone
                                     </th>
-                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Total Vendido
                                     </th>
-                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Itens
                                     </th>
-                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Custo
                                     </th>
-                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Lucro Bruto
                                     </th>
-                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th class="text-right px-4 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Margem
                                     </th>
                                 </tr>
@@ -479,9 +479,9 @@ onMounted(() => {
                                     class="hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent cursor-pointer transition-all duration-200"
                                 >
                                     <td class="px-5 py-4">
-                                        <span class="font-medium text-gray-900">{{ order.order_number }}</span>
+                                        <span class="font-medium text-gray-900 dark:text-gray-100">{{ order.order_number }}</span>
                                     </td>
-                                    <td class="px-4 py-4 text-sm text-gray-600">
+                                    <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
                                         {{ formatDate(order.external_created_at) }}
                                     </td>
                                     <td class="px-4 py-4">
@@ -490,10 +490,10 @@ onMounted(() => {
                                         </span>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <span class="text-sm text-gray-900 truncate block">{{ order.customer_name }}</span>
+                                        <span class="text-sm text-gray-900 dark:text-gray-100 truncate block">{{ order.customer_name }}</span>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <span class="text-sm text-gray-600 truncate block">{{ order.customer_email }}</span>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400 truncate block">{{ order.customer_email }}</span>
                                     </td>
                                     <td class="px-4 py-4">
                                         <a
@@ -508,13 +508,13 @@ onMounted(() => {
                                         <span v-else class="text-sm text-gray-400">-</span>
                                     </td>
                                     <td class="px-4 py-4 text-right">
-                                        <span class="text-sm font-semibold text-gray-900">{{ formatCurrency(order.total) }}</span>
+                                        <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ formatCurrency(order.total) }}</span>
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-600">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-600 dark:text-gray-400">
                                         {{ order.items_count }}
                                     </td>
                                     <td class="px-4 py-4 text-right">
-                                        <span v-if="order.cost > 0" class="text-sm text-gray-600">{{ formatCurrency(order.cost) }}</span>
+                                        <span v-if="order.cost > 0" class="text-sm text-gray-600 dark:text-gray-400">{{ formatCurrency(order.cost) }}</span>
                                         <span v-else class="text-sm text-gray-400">-</span>
                                     </td>
                                     <td class="px-4 py-4 text-right">
@@ -546,10 +546,10 @@ onMounted(() => {
                                 <SparklesIcon class="w-4 h-4 text-white" />
                             </div>
                         </div>
-                        <h3 class="text-2xl font-display font-bold text-gray-900 mb-3">
+                        <h3 class="text-2xl font-display font-bold text-gray-900 dark:text-gray-100 mb-3">
                             Nenhum pedido encontrado
                         </h3>
-                        <p class="text-gray-500 mb-4">
+                        <p class="text-gray-500 dark:text-gray-400 mb-4">
                             <template v-if="hasActiveFilters">
                                 Nenhum pedido corresponde aos filtros selecionados
                             </template>
@@ -572,8 +572,8 @@ onMounted(() => {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                        <p class="text-sm text-gray-500">
+                    <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
                             Mostrando {{ (currentPage - 1) * perPage + 1 }} a {{ Math.min(currentPage * perPage, totalItems) }} de {{ totalItems }} pedidos
                         </p>
                         <div class="flex items-center gap-2">
@@ -594,7 +594,7 @@ onMounted(() => {
                                         'w-8 h-8 flex items-center justify-center rounded text-sm font-medium transition-colors',
                                         page === currentPage
                                             ? 'bg-primary-600 text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100'
                                     ]"
                                 >
                                     {{ page }}
@@ -628,7 +628,7 @@ onMounted(() => {
                     ></div>
 
                     <!-- Modal -->
-                    <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl">
+                    <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl">
                         <!-- Header with Gradient -->
                         <div class="relative px-8 py-6 bg-gradient-to-r from-primary-500 to-secondary-500 overflow-hidden">
                             <!-- Background Pattern -->
@@ -637,7 +637,7 @@ onMounted(() => {
                             <!-- Close Button -->
                             <button
                                 @click="showDetailModal = false"
-                                class="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                                class="absolute top-4 right-4 p-2 rounded-full bg-white dark:bg-gray-800/20 hover:bg-white dark:bg-gray-800/30 transition-colors"
                             >
                                 <XMarkIcon class="w-5 h-5 text-white" />
                             </button>
@@ -647,7 +647,7 @@ onMounted(() => {
                                     <p class="text-white/80 text-sm mb-1">Pedido</p>
                                     <p class="text-2xl font-display font-bold text-white">{{ selectedOrder.order_number }}</p>
                                 </div>
-                                <span :class="['badge bg-white/20 text-white border-white/30', `badge-${getStatusConfig(selectedOrder.status).color}`]">
+                                <span :class="['badge bg-white dark:bg-gray-800/20 text-white border-white/30', `badge-${getStatusConfig(selectedOrder.status).color}`]">
                                     {{ getStatusConfig(selectedOrder.status).label }}
                                 </span>
                             </div>
@@ -657,7 +657,7 @@ onMounted(() => {
                         <div class="px-8 py-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-6">
                             <!-- Customer Info -->
                             <div class="space-y-3">
-                                <h4 class="font-semibold text-gray-900 flex items-center gap-2">
+                                <h4 class="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
                                         <UserIcon class="w-4 h-4 text-primary-600" />
                                     </div>
@@ -666,19 +666,19 @@ onMounted(() => {
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-xl">
                                         <div>
-                                            <p class="text-xs text-gray-500">Nome</p>
-                                            <p class="font-medium text-gray-900">{{ selectedOrder.customer_name }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">Nome</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100">{{ selectedOrder.customer_name }}</p>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-xl">
                                         <div>
-                                            <p class="text-xs text-gray-500">E-mail</p>
-                                            <p class="font-medium text-gray-900">{{ selectedOrder.customer_email }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">E-mail</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100">{{ selectedOrder.customer_email }}</p>
                                         </div>
                                     </div>
                                     <div v-if="selectedOrder.customer_phone" class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-xl">
                                         <div>
-                                            <p class="text-xs text-gray-500">Telefone</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">Telefone</p>
                                             <a
                                                 :href="getWhatsAppLink(selectedOrder.customer_phone)"
                                                 target="_blank"
@@ -693,48 +693,48 @@ onMounted(() => {
 
                             <!-- Shipping Address -->
                             <div v-if="selectedOrder.shipping_address" class="space-y-3">
-                                <h4 class="font-semibold text-gray-900 flex items-center gap-2">
+                                <h4 class="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-success-100 flex items-center justify-center">
                                         <MapPinIcon class="w-4 h-4 text-success-600" />
                                     </div>
                                     Endereço de Entrega
                                 </h4>
-                                <div class="p-4 bg-gradient-to-r from-gray-50 to-transparent rounded-xl border border-gray-200">
-                                    <p class="text-gray-900">
+                                <div class="p-4 bg-gradient-to-r from-gray-50 to-transparent rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <p class="text-gray-900 dark:text-gray-100">
                                         {{ selectedOrder.shipping_address.street }}, {{ selectedOrder.shipping_address.number }}
                                         <span v-if="selectedOrder.shipping_address.complement"> - {{ selectedOrder.shipping_address.complement }}</span>
                                     </p>
-                                    <p class="text-gray-600">
+                                    <p class="text-gray-600 dark:text-gray-400">
                                         {{ selectedOrder.shipping_address.neighborhood }} - {{ selectedOrder.shipping_address.city }}/{{ selectedOrder.shipping_address.province || selectedOrder.shipping_address.state }}
                                     </p>
-                                    <p class="text-gray-500">CEP: {{ selectedOrder.shipping_address.zip_code || selectedOrder.shipping_address.zipcode }}</p>
+                                    <p class="text-gray-500 dark:text-gray-400">CEP: {{ selectedOrder.shipping_address.zip_code || selectedOrder.shipping_address.zipcode }}</p>
                                 </div>
                             </div>
 
                             <!-- Order Items -->
                             <div class="space-y-3">
-                                <h4 class="font-semibold text-gray-900 flex items-center gap-2">
+                                <h4 class="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-accent-100 flex items-center justify-center">
                                         <DocumentTextIcon class="w-4 h-4 text-accent-600" />
                                     </div>
                                     Itens do Pedido
                                 </h4>
-                                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                                <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                                     <table class="w-full text-sm">
                                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                                             <tr>
-                                                <th class="text-left px-4 py-2 text-gray-500 font-medium">Produto</th>
-                                                <th class="text-center px-4 py-2 text-gray-500 font-medium">Qtd</th>
-                                                <th class="text-right px-4 py-2 text-gray-500 font-medium">Preço</th>
-                                                <th class="text-right px-4 py-2 text-gray-500 font-medium">Total</th>
+                                                <th class="text-left px-4 py-2 text-gray-500 dark:text-gray-400 font-medium">Produto</th>
+                                                <th class="text-center px-4 py-2 text-gray-500 dark:text-gray-400 font-medium">Qtd</th>
+                                                <th class="text-right px-4 py-2 text-gray-500 dark:text-gray-400 font-medium">Preço</th>
+                                                <th class="text-right px-4 py-2 text-gray-500 dark:text-gray-400 font-medium">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-100">
-                                            <tr v-for="(item, index) in selectedOrder.items" :key="index" class="hover:bg-gray-50">
-                                                <td class="px-4 py-3 text-gray-900">{{ item.product_name || item.name }}</td>
-                                                <td class="px-4 py-3 text-center text-gray-600">{{ item.quantity }}</td>
-                                                <td class="px-4 py-3 text-right text-gray-600">{{ formatCurrency(item.unit_price || item.price) }}</td>
-                                                <td class="px-4 py-3 text-right font-medium text-gray-900">{{ formatCurrency(item.total || (item.quantity * (item.unit_price || item.price))) }}</td>
+                                            <tr v-for="(item, index) in selectedOrder.items" :key="index" class="hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900">
+                                                <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ item.product_name || item.name }}</td>
+                                                <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{{ item.quantity }}</td>
+                                                <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{{ formatCurrency(item.unit_price || item.price) }}</td>
+                                                <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-gray-100">{{ formatCurrency(item.total || (item.quantity * (item.unit_price || item.price))) }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -744,36 +744,36 @@ onMounted(() => {
                             <!-- Order Summary -->
                             <div class="space-y-2 p-4 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-xl border border-primary-100">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Subtotal</span>
-                                    <span class="text-gray-900 font-medium">{{ formatCurrency(selectedOrder.subtotal) }}</span>
+                                    <span class="text-gray-500 dark:text-gray-400">Subtotal</span>
+                                    <span class="text-gray-900 dark:text-gray-100 font-medium">{{ formatCurrency(selectedOrder.subtotal) }}</span>
                                 </div>
                                 <div v-if="selectedOrder.discount > 0" class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Desconto</span>
+                                    <span class="text-gray-500 dark:text-gray-400">Desconto</span>
                                     <span class="text-success-600 font-medium">-{{ formatCurrency(selectedOrder.discount) }}</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Frete</span>
-                                    <span class="text-gray-900 font-medium">{{ selectedOrder.shipping > 0 ? formatCurrency(selectedOrder.shipping) : 'Grátis' }}</span>
+                                    <span class="text-gray-500 dark:text-gray-400">Frete</span>
+                                    <span class="text-gray-900 dark:text-gray-100 font-medium">{{ selectedOrder.shipping > 0 ? formatCurrency(selectedOrder.shipping) : 'Grátis' }}</span>
                                 </div>
                                 <div v-if="selectedOrder.cost > 0" class="flex justify-between text-sm">
-                                    <span class="text-gray-500">Custo dos Produtos</span>
-                                    <span class="text-gray-900 font-medium">{{ formatCurrency(selectedOrder.cost) }}</span>
+                                    <span class="text-gray-500 dark:text-gray-400">Custo dos Produtos</span>
+                                    <span class="text-gray-900 dark:text-gray-100 font-medium">{{ formatCurrency(selectedOrder.cost) }}</span>
                                 </div>
-                                <div class="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
-                                    <span class="text-gray-900">Total</span>
-                                    <span class="text-gray-900">{{ formatCurrency(selectedOrder.total) }}</span>
+                                <div class="flex justify-between text-lg font-bold pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <span class="text-gray-900 dark:text-gray-100">Total</span>
+                                    <span class="text-gray-900 dark:text-gray-100">{{ formatCurrency(selectedOrder.total) }}</span>
                                 </div>
                                 <div v-if="selectedOrder.cost > 0" class="flex justify-between text-sm pt-2">
-                                    <span class="text-gray-500">Lucro Bruto</span>
+                                    <span class="text-gray-500 dark:text-gray-400">Lucro Bruto</span>
                                     <span class="font-medium text-success-600">{{ formatCurrency(selectedOrder.gross_profit) }} ({{ selectedOrder.margin?.toFixed(1) }}%)</span>
                                 </div>
                             </div>
 
                             <!-- Payment Info -->
-                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-transparent rounded-xl border border-gray-200">
+                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-transparent rounded-xl border border-gray-200 dark:border-gray-700">
                                 <div>
-                                    <p class="text-sm text-gray-500">Método de Pagamento</p>
-                                    <p class="font-medium text-gray-900">{{ getPaymentMethodLabel(selectedOrder.payment_method) }}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Método de Pagamento</p>
+                                    <p class="font-medium text-gray-900 dark:text-gray-100">{{ getPaymentMethodLabel(selectedOrder.payment_method) }}</p>
                                 </div>
                                 <span :class="['badge', `badge-${getPaymentStatusConfig(selectedOrder.payment_status).color}`]">
                                     {{ getPaymentStatusConfig(selectedOrder.payment_status).label }}
@@ -782,7 +782,7 @@ onMounted(() => {
                         </div>
 
                         <!-- Footer -->
-                        <div class="px-8 py-5 bg-gray-50 border-t border-gray-100">
+                        <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                             <div class="flex justify-end">
                                 <BaseButton variant="secondary" @click="showDetailModal = false">
                                     Fechar

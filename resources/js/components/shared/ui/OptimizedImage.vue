@@ -186,7 +186,7 @@ onMounted(() => {
         <!-- Error State (when both main and fallback fail) -->
         <div
             v-if="hasError && imageSrc === fallback"
-            class="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center text-center p-4"
+            class="absolute inset-0 bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center text-center p-4"
         >
             <PhotoIcon class="w-16 h-16 text-gray-400 mb-2" />
             <span class="text-sm text-gray-500">Imagem não disponível</span>

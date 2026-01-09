@@ -89,7 +89,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
+    <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 lg:p-8">
         <!-- Background Gradient -->
         <div :class="['absolute inset-0 bg-gradient-to-br opacity-30', config.bg]"></div>
         
@@ -152,15 +152,15 @@ onMounted(() => {
                     </span>
                 </div>
                 
-                <p class="text-gray-600 leading-relaxed mb-4">{{ insight }}</p>
+                <p class="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">{{ insight }}</p>
                 
                 <!-- Quick Actions -->
                 <div class="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 text-sm text-gray-600">
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-900 text-sm text-gray-600">
                         <SparklesIcon class="w-4 h-4 text-primary-500" />
                         <span>Análise atualizada</span>
                     </div>
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 text-sm text-gray-600">
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-900 text-sm text-gray-600">
                         <ArrowTrendingUpIcon class="w-4 h-4 text-success-500" />
                         <span>Baseado em dados reais</span>
                     </div>

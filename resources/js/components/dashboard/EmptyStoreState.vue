@@ -18,10 +18,10 @@ function goToIntegrations() {
         </div>
 
         <!-- Title -->
-        <h2 class="text-3xl font-display font-bold text-gray-900 mb-4">
+        <h2 class="text-3xl font-display font-bold text-gray-900 dark:text-gray-100 mb-4">
             Conecte sua loja para começar
         </h2>
-        <p class="text-lg text-gray-500 mb-8">
+        <p class="text-lg text-gray-500 dark:text-gray-400 mb-8">
             Para visualizar seu dashboard e receber análises inteligentes, 
             primeiro conecte sua loja de e-commerce.
         </p>
@@ -38,7 +38,7 @@ function goToIntegrations() {
                 <div class="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-4">
                     <ChartBarIcon class="w-7 h-7 text-primary-600" />
                 </div>
-                <h3 class="font-semibold text-gray-900 mb-2">Dashboard Completo</h3>
+                <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Dashboard Completo</h3>
                 <p class="text-sm text-gray-500">
                     Visualize receita, pedidos, produtos e muito mais em tempo real
                 </p>
@@ -48,7 +48,7 @@ function goToIntegrations() {
                 <div class="w-14 h-14 rounded-2xl bg-secondary-100 flex items-center justify-center mx-auto mb-4">
                     <SparklesIcon class="w-7 h-7 text-secondary-600" />
                 </div>
-                <h3 class="font-semibold text-gray-900 mb-2">Análises com IA</h3>
+                <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Análises com IA</h3>
                 <p class="text-sm text-gray-500">
                     Receba sugestões personalizadas para aumentar suas vendas
                 </p>
@@ -58,7 +58,7 @@ function goToIntegrations() {
                 <div class="w-14 h-14 rounded-2xl bg-accent-100 flex items-center justify-center mx-auto mb-4">
                     <ChatBubbleLeftRightIcon class="w-7 h-7 text-accent-600" />
                 </div>
-                <h3 class="font-semibold text-gray-900 mb-2">Chat Inteligente</h3>
+                <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Chat Inteligente</h3>
                 <p class="text-sm text-gray-500">
                     Tire dúvidas e explore estratégias com nosso assistente IA
                 </p>

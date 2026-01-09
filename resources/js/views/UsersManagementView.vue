@@ -115,7 +115,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -155,7 +155,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto">
                 <!-- Search and Filters -->
                 <BaseCard padding="sm" class="mb-6">
@@ -199,7 +199,7 @@ onMounted(() => {
                     <!-- Users Table -->
                     <div v-else class="overflow-x-auto">
                         <table class="w-full">
-                            <thead class="bg-gray-50 border-b border-gray-200">
+                            <thead class="bg-gray-50 border-b border-gray-200 dark:border-gray-700">
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                         Usuário
@@ -230,29 +230,29 @@ onMounted(() => {
                                                 {{ user.name.charAt(0).toUpperCase() }}
                                             </div>
                                             <div>
-                                                <p class="font-medium text-gray-900">{{ user.name }}</p>
-                                                <p v-if="user.role" class="text-xs text-gray-500">
+                                                <p class="font-medium text-gray-900 dark:text-gray-100">{{ user.name }}</p>
+                                                <p v-if="user.role" class="text-xs text-gray-500 dark:text-gray-400">
                                                     {{ user.role === 'admin' ? 'Administrador' : 'Cliente' }}
                                                 </p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <p class="text-sm text-gray-900">{{ user.email }}</p>
+                                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ user.email }}</p>
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-2">
                                             <ShieldCheckIcon class="w-4 h-4 text-primary-600" />
-                                            <span class="text-sm font-medium text-gray-900">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                                 {{ getPermissionsCount(user) }}
                                             </span>
-                                            <span class="text-xs text-gray-500">
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">
                                                 {{ getPermissionsCount(user) === 1 ? 'permissão' : 'permissões' }}
                                             </span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <p class="text-sm text-gray-900">{{ formatDate(user.created_at) }}</p>
+                                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ formatDate(user.created_at) }}</p>
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center justify-end gap-2">
@@ -280,9 +280,9 @@ onMounted(() => {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="hasUsers && userStore.totalPages > 1" class="px-6 py-4 border-t border-gray-200">
+                    <div v-if="hasUsers && userStore.totalPages > 1" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                         <div class="flex items-center justify-between">
-                            <p class="text-sm text-gray-600">
+                            <p class="text-sm text-gray-600 dark:text-gray-400">
                                 Mostrando {{ filteredUsers.length }} de {{ userStore.total }} usuários
                             </p>
                             <div class="flex items-center gap-2">
@@ -343,7 +343,7 @@ onMounted(() => {
                             <div class="w-12 h-12 rounded-full bg-danger-100 flex items-center justify-center">
                                 <TrashIcon class="w-6 h-6 text-danger-600" />
                             </div>
-                            <h3 class="text-lg font-semibold text-gray-900">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                                 Confirmar Exclusão
                             </h3>
                         </div>

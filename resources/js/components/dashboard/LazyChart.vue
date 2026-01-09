@@ -116,7 +116,7 @@ const handleLegendClick = (chartContext: any, seriesIndex: number, config: any) 
         >
             <div class="text-center">
                 <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-3"></div>
-                <p class="text-gray-600 text-sm">{{ loadingMessage }}</p>
+                <p class="text-gray-600 dark:text-gray-400 text-sm">{{ loadingMessage }}</p>
             </div>
         </div>
 
@@ -139,8 +139,8 @@ const handleLegendClick = (chartContext: any, seriesIndex: number, config: any) 
                     d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
             </svg>
-            <p class="text-gray-600 font-medium">{{ emptyMessage }}</p>
-            <p class="text-gray-500 text-sm mt-1">
+            <p class="text-gray-600 dark:text-gray-400 font-medium">{{ emptyMessage }}</p>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">
                 Os dados do gráfico aparecerão aqui quando disponíveis.
             </p>
         </div>
@@ -168,7 +168,7 @@ const handleLegendClick = (chartContext: any, seriesIndex: number, config: any) 
                 >
                     <div class="text-center">
                         <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mb-2"></div>
-                        <p class="text-gray-500 text-xs">Inicializando gráfico...</p>
+                        <p class="text-gray-500 dark:text-gray-400 text-xs">Inicializando gráfico...</p>
                     </div>
                 </div>
             </template>

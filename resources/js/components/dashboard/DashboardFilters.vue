@@ -77,7 +77,7 @@ function toggleFilters() {
         >
             <div
                 v-if="showFilters"
-                class="absolute right-0 mt-2 w-80 rounded-2xl bg-white shadow-xl ring-1 ring-black/5 z-50 p-4"
+                class="absolute right-0 mt-2 w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 z-50 p-4"
             >
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold text-gray-900">Filtros</h3>
@@ -98,7 +98,7 @@ function toggleFilters() {
                                 'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                                 selectedPeriod === option.value
                                     ? 'bg-primary-100 text-primary-700'
-                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
                             ]"
                         >
                             {{ option.label }}

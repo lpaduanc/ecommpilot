@@ -239,7 +239,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -267,7 +267,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto">
                 <div class="flex flex-col lg:flex-row gap-8">
                     <!-- Tabs Navigation -->
@@ -416,8 +416,8 @@ onMounted(() => {
                                         authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
-                                            <p class="font-medium text-gray-900">E-mail de Análises</p>
-                                            <p class="text-sm text-gray-500">Receber resumo semanal das análises</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100">E-mail de Análises</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Receber resumo semanal das análises</p>
                                         </div>
                                         <input
                                             type="checkbox"
@@ -432,8 +432,8 @@ onMounted(() => {
                                         authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
-                                            <p class="font-medium text-gray-900">Alertas de Estoque</p>
-                                            <p class="text-sm text-gray-500">Notificar quando produtos estiverem com estoque baixo</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100">Alertas de Estoque</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Notificar quando produtos estiverem com estoque baixo</p>
                                         </div>
                                         <input
                                             type="checkbox"
@@ -448,8 +448,8 @@ onMounted(() => {
                                         authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
-                                            <p class="font-medium text-gray-900">Novos Pedidos</p>
-                                            <p class="text-sm text-gray-500">Receber notificação a cada novo pedido</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100">Novos Pedidos</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Receber notificação a cada novo pedido</p>
                                         </div>
                                         <input
                                             type="checkbox"
@@ -464,8 +464,8 @@ onMounted(() => {
                                         authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
-                                            <p class="font-medium text-gray-900">Atualizações do Sistema</p>
-                                            <p class="text-sm text-gray-500">Novidades e melhorias da plataforma</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100">Atualizações do Sistema</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Novidades e melhorias da plataforma</p>
                                         </div>
                                         <input
                                             type="checkbox"

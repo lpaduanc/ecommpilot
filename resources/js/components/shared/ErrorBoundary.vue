@@ -94,7 +94,7 @@ const reset = (): void => {
     role="alert"
     aria-live="assertive"
   >
-    <div class="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center border border-gray-100">
+    <div class="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center border border-gray-100">
       <!-- Ícone de Erro -->
       <div
         class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4"
@@ -104,19 +104,19 @@ const reset = (): void => {
       </div>
 
       <!-- Título -->
-      <h3 class="text-xl font-bold text-gray-900 mb-2">
+      <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
         Ops! Algo deu errado
       </h3>
 
       <!-- Descrição -->
-      <p class="text-gray-600 mb-6">
+      <p class="text-gray-600 dark:text-gray-400 mb-6">
         Ocorreu um erro inesperado. Por favor, tente novamente.
       </p>
 
       <!-- Detalhes Técnicos (colapsável) -->
-      <details class="text-left mb-6 bg-gray-50 rounded-lg overflow-hidden">
+      <details class="text-left mb-6 bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
         <summary
-          class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 px-4 py-2 font-medium transition-colors"
+          class="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 px-4 py-2 font-medium transition-colors"
           role="button"
           aria-expanded="false"
         >
@@ -125,11 +125,11 @@ const reset = (): void => {
         <div class="px-4 pb-4 pt-2">
           <div class="mb-3">
             <p class="text-xs font-semibold text-gray-700 mb-1">Mensagem:</p>
-            <pre class="p-3 bg-white rounded border border-gray-200 text-xs text-red-600 overflow-auto">{{ error.message }}</pre>
+            <pre class="p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-xs text-red-600 overflow-auto">{{ error.message }}</pre>
           </div>
           <div v-if="errorInfo">
             <p class="text-xs font-semibold text-gray-700 mb-1">Origem:</p>
-            <p class="text-xs text-gray-600 bg-white p-2 rounded border border-gray-200">{{ errorInfo }}</p>
+            <p class="text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-2 rounded border border-gray-200">{{ errorInfo }}</p>
           </div>
         </div>
       </details>

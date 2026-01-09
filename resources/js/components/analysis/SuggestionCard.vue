@@ -35,10 +35,10 @@ const isDone = computed(() => props.suggestion.is_done);
 <template>
     <div 
         :class="[
-            'group relative bg-white rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden',
+            'group relative bg-white dark:bg-gray-800 rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden',
             isDone 
                 ? 'border-success-200 bg-success-50/30' 
-                : 'border-gray-100 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1'
+                : 'border-gray-100 dark:border-gray-700 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1'
         ]"
         @click="emit('view-detail', suggestion)"
     >
@@ -71,7 +71,7 @@ const isDone = computed(() => props.suggestion.is_done);
                         {{ category.label }}
                     </span>
                     <h4 :class="[
-                        'font-semibold text-gray-900 mt-1 line-clamp-2 transition-colors duration-200',
+                        'font-semibold text-gray-900 dark:text-gray-100 mt-1 line-clamp-2 transition-colors duration-200',
                         !isDone && 'group-hover:text-primary-600'
                     ]">
                         {{ suggestion.title }}
@@ -80,14 +80,14 @@ const isDone = computed(() => props.suggestion.is_done);
             </div>
 
             <!-- Description -->
-            <p class="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2 leading-relaxed">
                 {{ suggestion.description }}
             </p>
 
             <!-- Expected Impact -->
             <div v-if="suggestion.expected_impact" class="flex items-start gap-2 mb-4 p-3 rounded-xl bg-gradient-to-r from-gray-50 to-transparent">
                 <span class="text-lg">💡</span>
-                <p class="text-sm text-gray-600 line-clamp-2">{{ suggestion.expected_impact }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{{ suggestion.expected_impact }}</p>
             </div>
 
             <!-- Footer -->

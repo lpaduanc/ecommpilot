@@ -155,7 +155,7 @@ function formatDate(date) {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -183,7 +183,7 @@ function formatDate(date) {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <!-- Processing OAuth -->
             <div v-if="isProcessingOAuth" class="flex items-center justify-center py-32">
                 <div class="text-center">
@@ -191,7 +191,7 @@ function formatDate(date) {
                         <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
                         <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
                     </div>
-                    <p class="text-lg font-medium text-gray-900">Processando autorização...</p>
+                    <p class="text-lg font-medium text-gray-900 dark:text-gray-100">Processando autorização...</p>
                     <p class="text-sm text-gray-500 mt-2">Aguarde enquanto conectamos sua loja</p>
                 </div>
             </div>
@@ -226,8 +226,8 @@ function formatDate(date) {
                                         🛒
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900">{{ store.name }}</h3>
-                                        <p class="text-sm text-gray-500">{{ store.domain }}</p>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ store.name }}</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ store.domain }}</p>
                                         <p v-if="store.user_id" class="text-xs text-gray-400 mt-0.5">ID: {{ store.user_id }}</p>
                                     </div>
                                 </div>
@@ -326,13 +326,13 @@ function formatDate(date) {
                                     </BaseButton>
                                     <span
                                         v-else-if="platform.available && !authStore.hasPermission('integrations.manage')"
-                                        class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500"
+                                        class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:text-gray-400"
                                     >
                                         Sem Permissão
                                     </span>
                                     <span
                                         v-else-if="platform.comingSoon"
-                                        class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500"
+                                        class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:text-gray-400"
                                     >
                                         Em Breve
                                     </span>

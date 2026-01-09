@@ -106,7 +106,7 @@ onUnmounted(() => {
 <template>
     <div class="min-h-screen -m-8 -mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -176,7 +176,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 min-h-[calc(100vh-200px)]">
+        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <!-- Loading State -->
             <div v-if="isLoading && !currentAnalysis" class="flex flex-col items-center justify-center py-32">
                 <div class="relative">
@@ -207,8 +207,8 @@ onUnmounted(() => {
                                             <BoltIcon class="w-5 h-5 text-white" />
                                         </div>
                                         <div>
-                                            <h3 class="text-lg font-bold text-gray-900">Alta Prioridade</h3>
-                                            <p class="text-sm text-gray-500">Ações com maior impacto imediato</p>
+                                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -228,8 +228,8 @@ onUnmounted(() => {
                                             <ChartBarIcon class="w-5 h-5 text-white" />
                                         </div>
                                         <div>
-                                            <h3 class="text-lg font-bold text-gray-900">Média Prioridade</h3>
-                                            <p class="text-sm text-gray-500">Melhorias estratégicas recomendadas</p>
+                                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -249,8 +249,8 @@ onUnmounted(() => {
                                             <RocketLaunchIcon class="w-5 h-5 text-white" />
                                         </div>
                                         <div>
-                                            <h3 class="text-lg font-bold text-gray-900">Baixa Prioridade</h3>
-                                            <p class="text-sm text-gray-500">Otimizações complementares</p>
+                                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Otimizações complementares</p>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -288,7 +288,7 @@ onUnmounted(() => {
                                     <SparklesIcon class="w-5 h-5" />
                                     Solicitar Primeira Análise
                                 </button>
-                                <p v-else class="text-sm text-gray-500">
+                                <p v-else class="text-sm text-gray-500 dark:text-gray-400">
                                     Você não possui permissão para solicitar análises.
                                 </p>
                             </div>
@@ -324,12 +324,12 @@ onUnmounted(() => {
                 </p>
                 <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 mb-6 space-y-3">
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Você possui:</span>
-                        <span class="font-bold text-lg text-gray-900">{{ credits }} créditos</span>
+                        <span class="text-gray-600 dark:text-gray-400">Você possui:</span>
+                        <span class="font-bold text-lg text-gray-900 dark:text-gray-100">{{ credits }} créditos</span>
                     </div>
                     <div class="h-px bg-gray-200"></div>
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-600">Custo desta análise:</span>
+                        <span class="text-gray-600 dark:text-gray-400">Custo desta análise:</span>
                         <span class="font-bold text-lg text-primary-600">1 crédito</span>
                     </div>
                 </div>

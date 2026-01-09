@@ -18,13 +18,13 @@ const props = withDefaults(defineProps<Props>(), {
   <!-- Fullscreen Loading -->
   <div
     v-if="variant === 'fullscreen'"
-    class="fixed inset-0 z-50 bg-white flex items-center justify-center"
+    class="fixed inset-0 z-50 bg-white dark:bg-gray-800 flex items-center justify-center"
     role="status"
     aria-live="polite"
   >
     <div class="text-center">
       <LoadingSpinner size="xl" class="text-primary-500 mx-auto mb-4" />
-      <p class="text-gray-600 font-medium">{{ message }}</p>
+      <p class="text-gray-600 dark:text-gray-400 font-medium">{{ message }}</p>
     </div>
   </div>
 
@@ -37,7 +37,7 @@ const props = withDefaults(defineProps<Props>(), {
   >
     <div class="text-center">
       <LoadingSpinner size="lg" class="text-primary-500 mx-auto mb-2" />
-      <p v-if="message" class="text-gray-600 text-sm">{{ message }}</p>
+      <p v-if="message" class="text-gray-600 dark:text-gray-400 text-sm">{{ message }}</p>
     </div>
   </div>
 

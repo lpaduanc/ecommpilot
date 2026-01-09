@@ -325,7 +325,7 @@ onMounted(async () => {
         <form @submit.prevent="handleSubmit" class="space-y-6">
             <!-- Informações Básicas -->
             <div class="space-y-4">
-                <h4 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                     Informações Básicas
                 </h4>
 
@@ -374,7 +374,7 @@ onMounted(async () => {
             <!-- Permissões -->
             <div class="space-y-4">
                 <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
                         Permissões
                     </h4>
                     <label class="flex items-center gap-2 text-sm font-medium text-primary-600 cursor-pointer">
@@ -392,7 +392,7 @@ onMounted(async () => {
                     <div
                         v-for="category in permissionCategories"
                         :key="category.key"
-                        class="bg-gray-50 rounded-xl p-4"
+                        class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4"
                     >
                         <div class="flex items-center justify-between mb-3">
                             <h5 class="text-sm font-semibold text-gray-900">{{ category.name }}</h5>

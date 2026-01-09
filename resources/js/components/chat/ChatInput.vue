@@ -34,7 +34,7 @@ function handleKeydown(event) {
                 :disabled="disabled"
                 placeholder="Digite sua mensagem..."
                 rows="1"
-                class="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 text-gray-900 placeholder-gray-400 resize-none focus:bg-white focus:border-primary-200 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none focus:bg-white dark:bg-gray-800 focus:border-primary-200 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style="min-height: 48px; max-height: 120px;"
             ></textarea>
         </div>

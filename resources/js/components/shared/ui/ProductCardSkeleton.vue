@@ -5,7 +5,7 @@
 
 <template>
   <div
-    class="bg-white rounded-xl p-4 border border-gray-100 animate-pulse"
+    class="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 animate-pulse"
     role="status"
     aria-live="polite"
     aria-label="Carregando produto"
