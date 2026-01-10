@@ -434,7 +434,7 @@ onMounted(() => {
                                 <col style="width: 120px;">  <!-- Lucro Bruto -->
                                 <col style="width: 90px;">   <!-- Margem -->
                             </colgroup>
-                            <thead class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+                            <thead class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
                                 <tr>
                                     <th class="text-left px-5 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Pedido
@@ -471,17 +471,17 @@ onMounted(() => {
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100">
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                 <tr
                                     v-for="order in orders"
                                     :key="order.id"
                                     @click="viewOrderDetail(order)"
-                                    class="hover:bg-gradient-to-r hover:from-primary-50/50 hover:to-transparent cursor-pointer transition-all duration-200"
+                                    class="hover:bg-gradient-to-r hover:from-primary-50/50 dark:hover:from-primary-900/30 hover:to-transparent cursor-pointer transition-all duration-200"
                                 >
                                     <td class="px-5 py-4">
                                         <span class="font-medium text-gray-900 dark:text-gray-100">{{ order.order_number }}</span>
                                     </td>
-                                    <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
                                         {{ formatDate(order.external_created_at) }}
                                     </td>
                                     <td class="px-4 py-4">
@@ -493,7 +493,7 @@ onMounted(() => {
                                         <span class="text-sm text-gray-900 dark:text-gray-100 truncate block">{{ order.customer_name }}</span>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <span class="text-sm text-gray-600 dark:text-gray-400 truncate block">{{ order.customer_email }}</span>
+                                        <span class="text-sm text-gray-600 dark:text-gray-300 truncate block">{{ order.customer_email }}</span>
                                     </td>
                                     <td class="px-4 py-4">
                                         <a
@@ -510,11 +510,11 @@ onMounted(() => {
                                     <td class="px-4 py-4 text-right">
                                         <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ formatCurrency(order.total) }}</span>
                                     </td>
-                                    <td class="px-4 py-4 text-right text-sm text-gray-600 dark:text-gray-400">
+                                    <td class="px-4 py-4 text-right text-sm text-gray-600 dark:text-gray-300">
                                         {{ order.items_count }}
                                     </td>
                                     <td class="px-4 py-4 text-right">
-                                        <span v-if="order.cost > 0" class="text-sm text-gray-600 dark:text-gray-400">{{ formatCurrency(order.cost) }}</span>
+                                        <span v-if="order.cost > 0" class="text-sm text-gray-600 dark:text-gray-300">{{ formatCurrency(order.cost) }}</span>
                                         <span v-else class="text-sm text-gray-400">-</span>
                                     </td>
                                     <td class="px-4 py-4 text-right">
@@ -572,7 +572,7 @@ onMounted(() => {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                    <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                             Mostrando {{ (currentPage - 1) * perPage + 1 }} a {{ Math.min(currentPage * perPage, totalItems) }} de {{ totalItems }} pedidos
                         </p>
@@ -594,7 +594,7 @@ onMounted(() => {
                                         'w-8 h-8 flex items-center justify-center rounded text-sm font-medium transition-colors',
                                         page === currentPage
                                             ? 'bg-primary-600 text-white'
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                     ]"
                                 >
                                     {{ page }}

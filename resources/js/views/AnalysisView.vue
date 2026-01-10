@@ -300,7 +300,7 @@ onUnmounted(() => {
                             <OpportunitiesPanel v-if="opportunities.length > 0" :opportunities="opportunities" />
 
                             <!-- Chat -->
-                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-[500px] lg:h-[600px]">
+                            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-[500px] lg:h-[600px]">
                                 <ChatContainer compact />
                             </div>
                         </div>

@@ -17,29 +17,29 @@ const alertConfig = {
     warning: {
         icon: ExclamationTriangleIcon,
         gradient: 'from-amber-500 to-orange-500',
-        bg: 'bg-gradient-to-r from-amber-50 to-orange-50',
-        border: 'border-amber-200/50',
+        bg: 'bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30',
+        border: 'border-amber-200/50 dark:border-amber-700/50',
         iconBg: 'bg-gradient-to-br from-amber-400 to-orange-500',
-        text: 'text-amber-900',
-        subtext: 'text-amber-700',
+        text: 'text-amber-900 dark:text-amber-200',
+        subtext: 'text-amber-700 dark:text-amber-300',
     },
     danger: {
         icon: ExclamationCircleIcon,
         gradient: 'from-rose-500 to-red-500',
-        bg: 'bg-gradient-to-r from-rose-50 to-red-50',
-        border: 'border-rose-200/50',
+        bg: 'bg-gradient-to-r from-rose-50 to-red-50 dark:from-rose-900/30 dark:to-red-900/30',
+        border: 'border-rose-200/50 dark:border-rose-700/50',
         iconBg: 'bg-gradient-to-br from-rose-400 to-red-500',
-        text: 'text-rose-900',
-        subtext: 'text-rose-700',
+        text: 'text-rose-900 dark:text-rose-200',
+        subtext: 'text-rose-700 dark:text-rose-300',
     },
     info: {
         icon: InformationCircleIcon,
         gradient: 'from-blue-500 to-indigo-500',
-        bg: 'bg-gradient-to-r from-blue-50 to-indigo-50',
-        border: 'border-blue-200/50',
+        bg: 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30',
+        border: 'border-blue-200/50 dark:border-blue-700/50',
         iconBg: 'bg-gradient-to-br from-blue-400 to-indigo-500',
-        text: 'text-blue-900',
-        subtext: 'text-blue-700',
+        text: 'text-blue-900 dark:text-blue-200',
+        subtext: 'text-blue-700 dark:text-blue-300',
     },
 };
 
@@ -96,7 +96,7 @@ function isVisible(index) {
                 <button
                     @click.stop="dismissAlert(index)"
                     :class="[
-                        'flex-shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white/50',
+                        'flex-shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white/50 dark:hover:bg-gray-700/50',
                         getConfig(alert.type).subtext
                     ]"
                 >

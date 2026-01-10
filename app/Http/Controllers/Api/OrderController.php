@@ -218,7 +218,7 @@ class OrderController extends Controller
         }, 200, $headers);
     }
 
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
         $store = $request->user()->activeStore;
 

@@ -52,14 +52,14 @@ onMounted(() => {
 <template>
     <div :class="['flex flex-col h-full', compact ? '' : 'p-4']">
         <!-- Header -->
-        <div :class="['flex items-center justify-between border-b border-gray-100', compact ? 'px-4 py-3' : 'pb-4']">
+        <div :class="['flex items-center justify-between border-b border-gray-100 dark:border-gray-700', compact ? 'px-4 py-3' : 'pb-4']">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center">
                     <SparklesIcon class="w-5 h-5 text-white" />
                 </div>
                 <div>
-                    <h3 class="font-semibold text-gray-900">Assistente IA</h3>
-                    <p class="text-xs text-gray-500">Online</p>
+                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Assistente IA</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Online</p>
                 </div>
             </div>
             <BaseButton
@@ -93,11 +93,11 @@ onMounted(() => {
                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center flex-shrink-0">
                         <SparklesIcon class="w-4 h-4 text-white" />
                     </div>
-                    <div class="px-4 py-3 rounded-2xl rounded-tl-md bg-gray-100">
+                    <div class="px-4 py-3 rounded-2xl rounded-tl-md bg-gray-100 dark:bg-gray-700">
                         <div class="flex items-center gap-1">
-                            <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms"></span>
-                            <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms"></span>
-                            <span class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 300ms"></span>
+                            <span class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" style="animation-delay: 0ms"></span>
+                            <span class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" style="animation-delay: 150ms"></span>
+                            <span class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" style="animation-delay: 300ms"></span>
                         </div>
                     </div>
                 </div>
@@ -105,7 +105,7 @@ onMounted(() => {
         </div>
 
         <!-- Input -->
-        <div :class="['border-t border-gray-100', compact ? 'px-4 py-3' : 'pt-4']">
+        <div :class="['border-t border-gray-100 dark:border-gray-700', compact ? 'px-4 py-3' : 'pt-4']">
             <ChatInput
                 @send="handleSendMessage"
                 :disabled="isSending"

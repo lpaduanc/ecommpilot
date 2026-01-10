@@ -45,7 +45,7 @@ onMounted(() => {
         <!-- Chat Container -->
         <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto">
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-[calc(100vh-300px)]">
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-[calc(100vh-300px)]">
                     <ChatContainer />
                 </div>
             </div>

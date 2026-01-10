@@ -208,7 +208,7 @@ function formatDate(date) {
                 <div class="max-w-7xl mx-auto space-y-8">
                     <!-- Connected Stores -->
                     <div v-if="hasConnectedStore" class="space-y-4">
-                        <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center">
                                 <CheckCircleIcon class="w-4 h-4 text-white" />
                             </div>
@@ -286,19 +286,19 @@ function formatDate(date) {
 
                     <!-- Available Platforms -->
                     <div class="space-y-4">
-                        <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
                                 <PlusIcon class="w-4 h-4 text-white" />
                             </div>
                             Plataformas Disponíveis
                         </h2>
-                        
+
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div
                                 v-for="(platform, index) in platforms"
                                 :key="platform.id"
                                 :class="[
-                                    'group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 transition-all duration-300',
+                                    'group relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-all duration-300',
                                     platform.available
                                         ? 'hover:shadow-xl hover:-translate-y-1 cursor-pointer'
                                         : 'opacity-60'
@@ -312,8 +312,8 @@ function formatDate(date) {
                                     <div :class="['w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg transition-transform duration-300 group-hover:scale-110', platform.gradient]">
                                         {{ platform.logo }}
                                     </div>
-                                    <h3 class="font-semibold text-gray-900 mb-2">{{ platform.name }}</h3>
-                                    <p class="text-sm text-gray-500 mb-4">{{ platform.description }}</p>
+                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">{{ platform.name }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ platform.description }}</p>
 
                                     <BaseButton
                                         v-if="platform.available && authStore.hasPermission('integrations.manage')"

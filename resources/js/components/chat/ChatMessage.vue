@@ -23,10 +23,10 @@ const formattedTime = computed(() => {
         <div
             :class="[
                 'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
-                isUser ? 'bg-gray-200' : 'bg-gradient-to-br from-primary-500 to-secondary-600'
+                isUser ? 'bg-gray-200 dark:bg-gray-700' : 'bg-gradient-to-br from-primary-500 to-secondary-600'
             ]"
         >
-            <UserIcon v-if="isUser" class="w-4 h-4 text-gray-600" />
+            <UserIcon v-if="isUser" class="w-4 h-4 text-gray-600 dark:text-gray-300" />
             <SparklesIcon v-else class="w-4 h-4 text-white" />
         </div>
 
@@ -37,7 +37,7 @@ const formattedTime = computed(() => {
                     'px-4 py-3 rounded-2xl',
                     isUser
                         ? 'bg-primary-500 text-white rounded-tr-md'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-tl-md'
                 ]"
             >
                 <p class="whitespace-pre-wrap text-sm">{{ message.content }}</p>

@@ -282,7 +282,7 @@ onMounted(() => {
                                         'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
                                         activeTab === tab.id
                                             ? 'bg-gradient-to-r text-white shadow-lg'
-                                            : 'text-gray-600 hover:bg-gray-50',
+                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700',
                                         activeTab === tab.id ? tab.gradient : ''
                                     ]"
                                 >
@@ -298,7 +298,7 @@ onMounted(() => {
                         <!-- Profile Tab -->
                         <BaseCard v-if="activeTab === 'profile'" padding="lg">
                             <div class="max-w-xl">
-                                <h2 class="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
                                         <UserCircleIcon class="w-4 h-4 text-white" />
                                     </div>
@@ -340,7 +340,7 @@ onMounted(() => {
                                     >
                                         Salvar Alterações
                                     </BaseButton>
-                                    <p v-else class="text-sm text-gray-500 italic">
+                                    <p v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
                                         Você não possui permissão para editar as configurações.
                                     </p>
                                 </form>
@@ -350,7 +350,7 @@ onMounted(() => {
                         <!-- Password Tab -->
                         <BaseCard v-if="activeTab === 'password'" padding="lg">
                             <div class="max-w-xl">
-                                <h2 class="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
                                         <LockClosedIcon class="w-4 h-4 text-white" />
                                     </div>
@@ -393,7 +393,7 @@ onMounted(() => {
                                     >
                                         Alterar Senha
                                     </BaseButton>
-                                    <p v-else class="text-sm text-gray-500 italic">
+                                    <p v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
                                         Você não possui permissão para editar as configurações.
                                     </p>
                                 </form>
@@ -403,7 +403,7 @@ onMounted(() => {
                         <!-- Notifications Tab -->
                         <BaseCard v-if="activeTab === 'notifications'" padding="lg">
                             <div class="max-w-xl">
-                                <h2 class="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
                                         <BellIcon class="w-4 h-4 text-white" />
                                     </div>
@@ -412,8 +412,8 @@ onMounted(() => {
                                 
                                 <div class="space-y-4">
                                     <label :class="[
-                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
-                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 dark:hover:from-gray-700 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
                                             <p class="font-medium text-gray-900 dark:text-gray-100">E-mail de Análises</p>
@@ -428,8 +428,8 @@ onMounted(() => {
                                     </label>
 
                                     <label :class="[
-                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
-                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 dark:hover:from-gray-700 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
                                             <p class="font-medium text-gray-900 dark:text-gray-100">Alertas de Estoque</p>
@@ -444,8 +444,8 @@ onMounted(() => {
                                     </label>
 
                                     <label :class="[
-                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
-                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 dark:hover:from-gray-700 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
                                             <p class="font-medium text-gray-900 dark:text-gray-100">Novos Pedidos</p>
@@ -460,8 +460,8 @@ onMounted(() => {
                                     </label>
 
                                     <label :class="[
-                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 transition-all',
-                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
+                                        'flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-700 transition-all',
+                                        authStore.hasPermission('settings.edit') ? 'cursor-pointer hover:bg-gradient-to-r hover:from-gray-50 dark:hover:from-gray-700 hover:to-transparent' : 'opacity-60 cursor-not-allowed'
                                     ]">
                                         <div>
                                             <p class="font-medium text-gray-900 dark:text-gray-100">Atualizações do Sistema</p>
@@ -484,7 +484,7 @@ onMounted(() => {
                                 >
                                     Salvar Preferências
                                 </BaseButton>
-                                <p v-else class="text-sm text-gray-500 italic mt-6">
+                                <p v-else class="text-sm text-gray-500 dark:text-gray-400 italic mt-6">
                                     Você não possui permissão para editar as configurações.
                                 </p>
                             </div>
