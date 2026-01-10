@@ -14,6 +14,7 @@ export const useIntegrationStore = defineStore('integration', () => {
     const isSyncing = ref(false);
     const isProcessingOAuth = ref(false);
     const oauthError = ref(null);
+    const syncStatusPollingInterval = ref(null);
 
     // Nuvemshop configuration
     const nuvemshopConfig = ref({
@@ -44,6 +45,24 @@ export const useIntegrationStore = defineStore('integration', () => {
 
     // Active store ID
     const activeStoreId = ref(null);
+
+    // Active store computed
+    const activeStore = computed(() => {
+        if (!activeStoreId.value || stores.value.length === 0) return null;
+        return stores.value.find(s => s.id === activeStoreId.value);
+    });
+
+    const isActiveStoreSyncing = computed(() =>
+        ['syncing', 'pending'].includes(activeStore.value?.sync_status)
+    );
+
+    const isActiveStoreFailed = computed(() =>
+        activeStore.value?.sync_status === 'failed'
+    );
+
+    const isActiveStoreTokenExpired = computed(() =>
+        activeStore.value?.sync_status === 'token_expired'
+    );
 
     // Actions
 
@@ -157,7 +176,7 @@ export const useIntegrationStore = defineStore('integration', () => {
         try {
             const response = await api.post(`/integrations/stores/${storeId}/sync`);
 
-            // Update the store in the list
+            // Update the store in the list immediately
             const storeIndex = stores.value.findIndex(s => s.id === storeId);
             if (storeIndex !== -1) {
                 stores.value[storeIndex] = {
@@ -165,6 +184,9 @@ export const useIntegrationStore = defineStore('integration', () => {
                     sync_status: 'syncing',
                 };
             }
+
+            // Start polling to track sync progress
+            startSyncStatusPolling(5000);
 
             return {
                 success: true,
@@ -272,6 +294,55 @@ export const useIntegrationStore = defineStore('integration', () => {
     }
 
     /**
+     * Fetch sync status for active store (lightweight endpoint for polling)
+     */
+    async function fetchSyncStatus() {
+        try {
+            const response = await api.get('/integrations/sync-status');
+            if (response.data.has_store && response.data.store_id) {
+                const idx = stores.value.findIndex(s => s.id === response.data.store_id);
+                if (idx !== -1) {
+                    stores.value[idx] = {
+                        ...stores.value[idx],
+                        sync_status: response.data.sync_status,
+                        last_sync_at: response.data.last_sync_at,
+                    };
+                }
+            }
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Erro ao verificar status' };
+        }
+    }
+
+    /**
+     * Start polling for sync status updates
+     */
+    function startSyncStatusPolling(intervalMs = 5000) {
+        stopSyncStatusPolling(); // Clear any existing interval
+        syncStatusPollingInterval.value = setInterval(async () => {
+            const result = await fetchSyncStatus();
+            // Stop polling if sync is no longer in progress
+            if (result.success && result.data.sync_status) {
+                const status = result.data.sync_status;
+                if (!['syncing', 'pending'].includes(status)) {
+                    stopSyncStatusPolling();
+                }
+            }
+        }, intervalMs);
+    }
+
+    /**
+     * Stop polling for sync status
+     */
+    function stopSyncStatusPolling() {
+        if (syncStatusPollingInterval.value) {
+            clearInterval(syncStatusPollingInterval.value);
+            syncStatusPollingInterval.value = null;
+        }
+    }
+
+    /**
      * Reset store state
      */
     function $reset() {
@@ -309,6 +380,10 @@ export const useIntegrationStore = defineStore('integration', () => {
         connectedStores,
         pendingStores,
         failedStores,
+        activeStore,
+        isActiveStoreSyncing,
+        isActiveStoreFailed,
+        isActiveStoreTokenExpired,
 
         // Actions
         fetchStores,
@@ -320,6 +395,9 @@ export const useIntegrationStore = defineStore('integration', () => {
         updateNuvemshopConfig,
         setCurrentStore,
         clearOAuthError,
+        fetchSyncStatus,
+        startSyncStatusPolling,
+        stopSyncStatusPolling,
         $reset,
     };
 });

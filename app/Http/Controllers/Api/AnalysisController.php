@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AnalysisStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AnalysisResource;
 use App\Jobs\ProcessAnalysisJob;
@@ -25,6 +26,7 @@ class AnalysisController extends Controller
         if (! $store) {
             return response()->json([
                 'analysis' => null,
+                'pending_analysis' => null,
                 'next_available_at' => null,
                 'credits' => $user->ai_credits,
             ]);
@@ -36,10 +38,16 @@ class AnalysisController extends Controller
             ->latest()
             ->first();
 
-        $nextAvailableAt = $this->analysisService->getNextAvailableAt($user);
+        $pendingAnalysis = $this->analysisService->getPendingAnalysis($user, $store);
+        $nextAvailableAt = $this->analysisService->getNextAvailableAt($user, $store);
 
         return response()->json([
             'analysis' => $analysis ? new AnalysisResource($analysis) : null,
+            'pending_analysis' => $pendingAnalysis ? [
+                'id' => $pendingAnalysis->id,
+                'status' => $pendingAnalysis->status->value,
+                'created_at' => $pendingAnalysis->created_at->toISOString(),
+            ] : null,
             'next_available_at' => $nextAvailableAt?->toISOString(),
             'credits' => $user->ai_credits,
         ]);
@@ -56,15 +64,28 @@ class AnalysisController extends Controller
             ], 400);
         }
 
-        // Check rate limit
-        // if (!$this->analysisService->canRequestAnalysis($user)) {
-        //     $nextAvailableAt = $this->analysisService->getNextAvailableAt($user);
+        // Check if there's already a pending analysis for this store
+        $pendingAnalysis = $this->analysisService->getPendingAnalysis($user, $store);
+        if ($pendingAnalysis) {
+            return response()->json([
+                'message' => 'Já existe uma análise em andamento para esta loja.',
+                'pending_analysis' => [
+                    'id' => $pendingAnalysis->id,
+                    'status' => $pendingAnalysis->status->value,
+                    'created_at' => $pendingAnalysis->created_at->toISOString(),
+                ],
+            ], 409);
+        }
 
-        //     return response()->json([
-        //         'message' => 'Aguarde para solicitar uma nova análise.',
-        //         'next_available_at' => $nextAvailableAt?->toISOString(),
-        //     ], 429);
-        // }
+        // Check rate limit (per store)
+        if (! $this->analysisService->canRequestAnalysis($user, $store)) {
+            $nextAvailableAt = $this->analysisService->getNextAvailableAt($user, $store);
+
+            return response()->json([
+                'message' => 'Aguarde para solicitar uma nova análise para esta loja.',
+                'next_available_at' => $nextAvailableAt?->toISOString(),
+            ], 429);
+        }
 
         // Check credits
         if (! $user->hasCredits()) {
@@ -81,6 +102,7 @@ class AnalysisController extends Controller
         $analysis = Analysis::create([
             'user_id' => $user->id,
             'store_id' => $store->id,
+            'status' => AnalysisStatus::Pending,
             'period_start' => now()->subDays(30),
             'period_end' => now(),
         ]);
@@ -93,6 +115,11 @@ class AnalysisController extends Controller
         return response()->json([
             'message' => 'Análise solicitada com sucesso.',
             'analysis' => new AnalysisResource($analysis),
+            'pending_analysis' => [
+                'id' => $analysis->id,
+                'status' => $analysis->status->value,
+                'created_at' => $analysis->created_at->toISOString(),
+            ],
             'credits' => $user->fresh()->ai_credits,
         ]);
     }

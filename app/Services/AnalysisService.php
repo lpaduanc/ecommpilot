@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AnalysisStatus;
 use App\Models\Analysis;
 use App\Models\Store;
 use App\Models\User;
@@ -21,9 +22,16 @@ class AnalysisService
         $this->knowledgeBase = new EcommerceKnowledgeBase;
     }
 
-    public function canRequestAnalysis(User $user): bool
+    public function canRequestAnalysis(User $user, ?Store $store = null): bool
     {
+        $storeId = $store?->id ?? $user->active_store_id;
+
+        if (! $storeId) {
+            return false;
+        }
+
         $lastAnalysis = Analysis::where('user_id', $user->id)
+            ->where('store_id', $storeId)
             ->latest()
             ->first();
 
@@ -34,9 +42,16 @@ class AnalysisService
         return $lastAnalysis->created_at->addMinutes(self::RATE_LIMIT_MINUTES)->isPast();
     }
 
-    public function getNextAvailableAt(User $user): ?Carbon
+    public function getNextAvailableAt(User $user, ?Store $store = null): ?Carbon
     {
+        $storeId = $store?->id ?? $user->active_store_id;
+
+        if (! $storeId) {
+            return null;
+        }
+
         $lastAnalysis = Analysis::where('user_id', $user->id)
+            ->where('store_id', $storeId)
             ->latest()
             ->first();
 
@@ -47,6 +62,21 @@ class AnalysisService
         $nextAvailable = $lastAnalysis->created_at->addMinutes(self::RATE_LIMIT_MINUTES);
 
         return $nextAvailable->isFuture() ? $nextAvailable : null;
+    }
+
+    public function getPendingAnalysis(User $user, ?Store $store = null): ?Analysis
+    {
+        $storeId = $store?->id ?? $user->active_store_id;
+
+        if (! $storeId) {
+            return null;
+        }
+
+        return Analysis::where('user_id', $user->id)
+            ->where('store_id', $storeId)
+            ->whereIn('status', [AnalysisStatus::Pending, AnalysisStatus::Processing])
+            ->latest()
+            ->first();
     }
 
     public function processAnalysis(Analysis $analysis): void

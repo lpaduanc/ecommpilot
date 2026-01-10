@@ -56,13 +56,13 @@ const hasChange = computed(() => props.change !== null && props.change !== undef
 </script>
 
 <template>
-    <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+    <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-[transform,box-shadow] duration-300 hover:shadow-xl hover:-translate-y-1 group">
         <!-- Background Gradient -->
-        <div :class="['absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300', config.gradient]"></div>
-        
+        <div :class="['absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100', config.gradient]"></div>
+
         <!-- Decorative Element -->
-        <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20 transition-opacity" :class="config.iconBg"></div>
-        
+        <div class="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20" :class="config.iconBg"></div>
+
         <div class="relative">
             <div class="flex items-start justify-between mb-4">
                 <div :class="['p-3 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-110', config.iconBg]">

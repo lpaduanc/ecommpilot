@@ -78,7 +78,7 @@ function removeNotification(id) {
                 :aria-label="`${notification.type}: ${notification.message}`"
                 :class="[
                     'flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm',
-                    'transform transition-all hover:scale-105',
+                    'transform transition-transform hover:scale-105',
                     getColors(notification.type).bg,
                     getColors(notification.type).border
                 ]"

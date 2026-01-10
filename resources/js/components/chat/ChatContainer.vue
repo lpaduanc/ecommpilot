@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useChatStore } from '../../stores/chatStore';
+import { useIntegrationStore } from '../../stores/integrationStore';
 import ChatMessage from './ChatMessage.vue';
 import ChatInput from './ChatInput.vue';
 import LoadingSpinner from '../common/LoadingSpinner.vue';
@@ -12,11 +13,14 @@ const props = defineProps({
 });
 
 const chatStore = useChatStore();
+const integrationStore = useIntegrationStore();
 const messagesContainer = ref(null);
 
 const messages = computed(() => chatStore.messages);
 const isLoading = computed(() => chatStore.isLoading);
 const isSending = computed(() => chatStore.isSending);
+const isStoreSyncing = computed(() => integrationStore.isActiveStoreSyncing);
+const isChatDisabled = computed(() => isSending.value || isStoreSyncing.value);
 
 async function handleSendMessage(content) {
     await chatStore.sendMessage(content);
@@ -108,8 +112,11 @@ onMounted(() => {
         <div :class="['border-t border-gray-100 dark:border-gray-700', compact ? 'px-4 py-3' : 'pt-4']">
             <ChatInput
                 @send="handleSendMessage"
-                :disabled="isSending"
+                :disabled="isChatDisabled"
             />
+            <p v-if="isStoreSyncing" class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                Chat desabilitado durante a sincronização da loja
+            </p>
         </div>
     </div>
 </template>

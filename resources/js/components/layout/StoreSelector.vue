@@ -142,7 +142,7 @@ onMounted(() => {
     <div v-if="stores.length > 0" class="store-selector relative">
         <button
             @click="isOpen = !isOpen"
-            class="flex items-center gap-3 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 transition-colors"
+            class="flex items-center gap-3 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900"
         >
             <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
                 <BuildingStorefrontIcon class="w-4 h-4 text-primary-600" />
@@ -172,7 +172,7 @@ onMounted(() => {
                     v-for="store in stores"
                     :key="store.id"
                     @click="selectStore(store)"
-                    class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 transition-colors text-left"
+                    class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 text-left"
                 >
                     <div class="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg">
                         🛒
@@ -200,7 +200,7 @@ onMounted(() => {
                 <button
                     @click="syncStore"
                     :disabled="isSyncing || activeStore?.sync_status === 'syncing'"
-                    class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <ArrowPathIcon :class="['w-4 h-4', { 'animate-spin': isSyncing || activeStore?.sync_status === 'syncing' }]" />
                     {{ isSyncing || activeStore?.sync_status === 'syncing' ? 'Sincronizando...' : 'Sincronizar Agora' }}

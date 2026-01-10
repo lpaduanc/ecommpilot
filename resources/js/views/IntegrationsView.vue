@@ -109,8 +109,11 @@ async function handleConnect() {
 }
 
 async function handleSyncStore(store) {
+    // Não chamar refreshStores() aqui pois:
+    // 1. syncStore já atualiza o estado local para 'syncing'
+    // 2. syncStore já inicia o polling que vai atualizar quando terminar
+    // 3. Chamar refreshStores imediatamente busca dados antigos do servidor
     await syncStore(store.id);
-    await refreshStores();
 }
 
 function confirmDisconnect(store) {
@@ -138,12 +141,12 @@ function getSyncStatusLabel(status) {
 
 function getSyncStatusColor(status) {
     const colors = {
-        pending: 'text-gray-500 bg-gray-100',
-        syncing: 'text-primary-500 bg-primary-100',
-        completed: 'text-success-500 bg-success-100',
-        failed: 'text-danger-500 bg-danger-100',
+        pending: 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-700',
+        syncing: 'text-primary-600 bg-primary-100 dark:text-primary-400 dark:bg-primary-900/50',
+        completed: 'text-success-600 bg-success-100 dark:text-success-400 dark:bg-success-900/50',
+        failed: 'text-danger-600 bg-danger-100 dark:text-danger-400 dark:bg-danger-900/50',
     };
-    return colors[status] || 'text-gray-500 bg-gray-100';
+    return colors[status] || 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-700';
 }
 
 function formatDate(date) {
@@ -265,11 +268,11 @@ function formatDate(date) {
                                         <BaseButton
                                             variant="secondary"
                                             size="sm"
-                                            @click="handleSyncStore(store)"
+                                            @click.stop.prevent="handleSyncStore(store)"
                                             :disabled="isSyncing || store.sync_status === 'syncing'"
                                         >
-                                            <ArrowPathIcon class="w-4 h-4" />
-                                            Sincronizar
+                                            <ArrowPathIcon :class="['w-4 h-4', store.sync_status === 'syncing' ? 'animate-spin' : '']" />
+                                            {{ store.sync_status === 'syncing' ? 'Sincronizando...' : 'Sincronizar' }}
                                         </BaseButton>
                                         <BaseButton
                                             variant="ghost"

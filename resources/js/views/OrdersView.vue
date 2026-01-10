@@ -46,6 +46,10 @@ const filterOptions = ref({
     cities: [],
 });
 
+// Loading states for dynamic selects
+const isLoadingStates = ref(false);
+const isLoadingCities = ref(false);
+
 // Order detail modal
 const showDetailModal = ref(false);
 const selectedOrder = ref(null);
@@ -96,6 +100,35 @@ async function fetchFilterOptions() {
     }
 }
 
+async function fetchStates() {
+    isLoadingStates.value = true;
+    try {
+        const response = await api.get('/locations/states');
+        filterOptions.value.states = response.data.data || response.data || [];
+    } catch {
+        filterOptions.value.states = [];
+    } finally {
+        isLoadingStates.value = false;
+    }
+}
+
+async function fetchCities(uf) {
+    if (!uf) {
+        filterOptions.value.cities = [];
+        return;
+    }
+
+    isLoadingCities.value = true;
+    try {
+        const response = await api.get(`/locations/cities/${uf}`);
+        filterOptions.value.cities = response.data.data || response.data || [];
+    } catch {
+        filterOptions.value.cities = [];
+    } finally {
+        isLoadingCities.value = false;
+    }
+}
+
 function handleSearch() {
     currentPage.value = 1;
     fetchOrders();
@@ -106,6 +139,21 @@ function handleFilterChange() {
     fetchOrders();
 }
 
+async function handleStateChange() {
+    // Limpar cidade selecionada ao trocar de estado
+    cityFilter.value = '';
+
+    // Carregar cidades do novo estado
+    if (stateFilter.value) {
+        await fetchCities(stateFilter.value);
+    } else {
+        filterOptions.value.cities = [];
+    }
+
+    // Aplicar filtros
+    handleFilterChange();
+}
+
 function clearFilters() {
     statusFilter.value = '';
     couponFilter.value = '';
@@ -113,6 +161,7 @@ function clearFilters() {
     stateFilter.value = '';
     cityFilter.value = '';
     searchQuery.value = '';
+    filterOptions.value.cities = [];
     currentPage.value = 1;
     fetchOrders();
 }
@@ -238,6 +287,7 @@ const hasActiveFilters = computed(() => {
 onMounted(() => {
     fetchOrders();
     fetchFilterOptions();
+    fetchStates();
 });
 </script>
 
@@ -281,18 +331,20 @@ onMounted(() => {
                                 @keyup.enter="handleSearch"
                                 type="search"
                                 placeholder="Buscar por pedido, cliente ou email..."
-                                class="w-full pl-12 pr-4 py-3 rounded-xl bg-white dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:bg-white dark:bg-gray-800/20 focus:border-white/30 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-all"
+                                class="w-full pl-12 pr-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:bg-white/20 focus:border-white/30 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-all"
                             />
                         </div>
                         <button
                             @click="handleSearch"
-                            class="px-6 py-3 rounded-xl bg-white dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white dark:bg-gray-800/20 transition-all"
+                            type="button"
+                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
                         >
                             <FunnelIcon class="w-5 h-5" />
                         </button>
                         <button
                             @click="exportOrders"
-                            class="px-6 py-3 rounded-xl bg-white dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white dark:bg-gray-800/20 transition-all flex items-center gap-2"
+                            type="button"
+                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 flex items-center gap-2"
                         >
                             <ArrowDownTrayIcon class="w-5 h-5" />
                             <span class="hidden lg:inline">Baixar</span>
@@ -334,7 +386,8 @@ onMounted(() => {
                                 <select
                                     v-model="statusFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none bg-no-repeat bg-right cursor-pointer"
+                                    style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
                                     <option value="">Todos os Status</option>
                                     <option v-for="status in filterOptions.statuses" :key="status" :value="status">
@@ -346,7 +399,8 @@ onMounted(() => {
                                 <select
                                     v-model="couponFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none bg-no-repeat bg-right cursor-pointer"
+                                    style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
                                     <option value="">Cupom de Desconto</option>
                                     <option v-for="coupon in filterOptions.coupons" :key="coupon" :value="coupon">
@@ -358,7 +412,8 @@ onMounted(() => {
                                 <select
                                     v-model="countryFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    class="px-4 py-2.5 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none bg-no-repeat bg-right cursor-pointer"
+                                    style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
                                     <option value="">País</option>
                                     <option v-for="country in filterOptions.countries" :key="country" :value="country">
@@ -369,12 +424,14 @@ onMounted(() => {
                                 <!-- State Filter -->
                                 <select
                                     v-model="stateFilter"
-                                    @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    @change="handleStateChange"
+                                    :disabled="isLoadingStates"
+                                    class="px-4 py-2.5 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none bg-no-repeat bg-right cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
-                                    <option value="">Estados</option>
-                                    <option v-for="state in filterOptions.states" :key="state" :value="state">
-                                        {{ state }}
+                                    <option value="">{{ isLoadingStates ? 'Carregando estados...' : 'Estados' }}</option>
+                                    <option v-for="state in filterOptions.states" :key="state.id" :value="state.sigla">
+                                        {{ state.nome }}
                                     </option>
                                 </select>
 
@@ -382,11 +439,17 @@ onMounted(() => {
                                 <select
                                     v-model="cityFilter"
                                     @change="handleFilterChange"
-                                    class="px-4 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    :disabled="!stateFilter || isLoadingCities"
+                                    class="px-4 py-2.5 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none bg-no-repeat bg-right cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
-                                    <option value="">Cidades</option>
-                                    <option v-for="city in filterOptions.cities" :key="city" :value="city">
-                                        {{ city }}
+                                    <option value="">
+                                        <template v-if="!stateFilter">Selecione um estado</template>
+                                        <template v-else-if="isLoadingCities">Carregando cidades...</template>
+                                        <template v-else>Cidades</template>
+                                    </option>
+                                    <option v-for="city in filterOptions.cities" :key="city.id" :value="city.nome">
+                                        {{ city.nome }}
                                     </option>
                                 </select>
 
@@ -396,7 +459,8 @@ onMounted(() => {
                                     <select
                                         :value="perPage"
                                         @change="changePerPage(Number($event.target.value))"
-                                        class="px-3 py-2.5 text-sm border border-gray-300 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        class="px-3 py-2.5 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 appearance-none bg-no-repeat bg-right cursor-pointer"
+                                        style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                     >
                                         <option v-for="option in perPageOptions" :key="option" :value="option">
                                             {{ option }} por página

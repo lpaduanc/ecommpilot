@@ -14,6 +14,8 @@ import {
     BeakerIcon,
     EyeIcon,
     EyeSlashIcon,
+    MapPinIcon,
+    ArrowPathIcon,
 } from '@heroicons/vue/24/outline';
 
 const notificationStore = useNotificationStore();
@@ -49,6 +51,15 @@ const availableModels = ref({});
 const testResults = reactive({
     openai: null,
     gemini: null,
+});
+
+// Brazil Locations Sync
+const isSyncingLocations = ref(false);
+const locationsStatus = reactive({
+    last_sync: null,
+    states_count: 0,
+    cities_count: 0,
+    needs_sync: true,
 });
 
 const selectedProviderConfig = computed(() => {
@@ -113,8 +124,49 @@ function getProviderIcon(providerId) {
     return providerId === 'openai' ? '🤖' : '✨';
 }
 
+async function fetchLocationsStatus() {
+    try {
+        const response = await api.get('/admin/locations/sync-status');
+        Object.assign(locationsStatus, response.data);
+    } catch (error) {
+        console.error('Erro ao buscar status de localidades:', error);
+    }
+}
+
+async function syncLocations() {
+    isSyncingLocations.value = true;
+    try {
+        await api.post('/admin/locations/sync');
+        notificationStore.success('Sincronização de localidades iniciada! Isso pode levar alguns segundos.');
+        // Poll for completion
+        setTimeout(async () => {
+            await fetchLocationsStatus();
+            if (!locationsStatus.needs_sync) {
+                notificationStore.success('Sincronização concluída com sucesso!');
+            }
+            isSyncingLocations.value = false;
+        }, 15000);
+    } catch (error) {
+        notificationStore.error('Erro ao iniciar sincronização de localidades');
+        isSyncingLocations.value = false;
+    }
+}
+
+function formatSyncDate(dateString) {
+    if (!dateString) return 'Nunca sincronizado';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
 onMounted(() => {
     fetchSettings();
+    fetchLocationsStatus();
 });
 </script>
 
@@ -484,6 +536,75 @@ onMounted(() => {
                         Salvar Configurações
                     </BaseButton>
                 </div>
+            </div>
+
+            <!-- Brazil Locations Sync - Full Width -->
+            <div class="lg:col-span-3">
+                <BaseCard>
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <MapPinIcon class="w-6 h-6 text-primary-500" />
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Localidades do Brasil</h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Sincronização de estados e cidades via API do IBGE</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span
+                                v-if="!locationsStatus.needs_sync"
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400"
+                            >
+                                Sincronizado
+                            </span>
+                            <span
+                                v-else
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400"
+                            >
+                                Precisa sincronizar
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <!-- Stats -->
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Última sincronização</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                                {{ formatSyncDate(locationsStatus.last_sync) }}
+                            </p>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Estados</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                                {{ locationsStatus.states_count || 0 }}
+                            </p>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Cidades</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                                {{ locationsStatus.cities_count || 0 }}
+                            </p>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <BaseButton
+                                variant="secondary"
+                                @click="syncLocations"
+                                :loading="isSyncingLocations"
+                                :disabled="isSyncingLocations"
+                            >
+                                <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isSyncingLocations }" />
+                                {{ isSyncingLocations ? 'Sincronizando...' : 'Sincronizar Agora' }}
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                        <p class="text-sm text-blue-700 dark:text-blue-300">
+                            <strong>Sincronização automática:</strong> Os dados são atualizados automaticamente todo domingo às 3h da manhã.
+                            Use o botão acima para forçar uma atualização manual quando necessário.
+                        </p>
+                    </div>
+                </BaseCard>
             </div>
         </div>
     </div>

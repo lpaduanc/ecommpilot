@@ -3,6 +3,7 @@ import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useAnalysisStore } from '../stores/analysisStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useIntegrationStore } from '../stores/integrationStore';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
@@ -24,6 +25,9 @@ import {
 const analysisStore = useAnalysisStore();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
+const integrationStore = useIntegrationStore();
+
+const isStoreSyncing = computed(() => integrationStore.isActiveStoreSyncing);
 
 const showCreditWarning = ref(false);
 const showRateLimitWarning = ref(false);
@@ -35,6 +39,8 @@ const showChat = ref(false);
 const isLoading = computed(() => analysisStore.isLoading);
 const isRequesting = computed(() => analysisStore.isRequesting);
 const currentAnalysis = computed(() => analysisStore.currentAnalysis);
+const hasAnalysisInProgress = computed(() => analysisStore.hasAnalysisInProgress);
+const pendingAnalysis = computed(() => analysisStore.pendingAnalysis);
 const suggestions = computed(() => analysisStore.suggestions);
 const summary = computed(() => analysisStore.summary);
 const alerts = computed(() => analysisStore.alerts);
@@ -42,6 +48,16 @@ const opportunities = computed(() => analysisStore.opportunities);
 const canRequestAnalysis = computed(() => analysisStore.canRequestAnalysis);
 const timeUntilNext = computed(() => analysisStore.timeUntilNextAnalysis);
 const credits = computed(() => analysisStore.credits);
+
+const pendingAnalysisElapsed = computed(() => {
+    if (!pendingAnalysis.value?.created_at) return null;
+    const start = new Date(pendingAnalysis.value.created_at);
+    const now = new Date();
+    const diff = Math.floor((now - start) / 1000);
+    const minutes = Math.floor(diff / 60);
+    const seconds = diff % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+});
 
 const groupedSuggestions = computed(() => {
     return {
@@ -57,6 +73,14 @@ const completedSuggestions = computed(() =>
 );
 
 function handleRequestAnalysis() {
+    if (isStoreSyncing.value) {
+        notificationStore.warning('Aguarde a sincronização da loja ser concluída antes de solicitar uma nova análise.');
+        return;
+    }
+    if (hasAnalysisInProgress.value) {
+        notificationStore.warning('Já existe uma análise em andamento para esta loja.');
+        return;
+    }
     if (!canRequestAnalysis.value) {
         showRateLimitWarning.value = true;
         return;
@@ -66,11 +90,11 @@ function handleRequestAnalysis() {
 
 async function confirmAnalysis() {
     showCreditWarning.value = false;
-    
+
     const result = await analysisStore.requestNewAnalysis();
-    
+
     if (result.success) {
-        notificationStore.success('Análise concluída! Confira as sugestões.');
+        notificationStore.success('Análise iniciada! Você será notificado quando ela for concluída.');
     } else {
         notificationStore.error(result.message);
     }
@@ -100,214 +124,236 @@ onUnmounted(() => {
     if (countdownInterval.value) {
         clearInterval(countdownInterval.value);
     }
+    analysisStore.stopPolling();
 });
 </script>
 
 <template>
-    <div class="min-h-screen -m-8 -mt-8">
-        <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
-            <!-- Background Elements -->
-            <div class="absolute inset-0 overflow-hidden">
-                <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
-                <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-500/20 rounded-full blur-3xl"></div>
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl"></div>
-                <!-- Grid Pattern -->
-                <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px;"></div>
-            </div>
-            
-            <div class="relative z-10 max-w-7xl mx-auto">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                                <SparklesIcon class="w-7 h-7 text-white" />
-                            </div>
-                            <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
-                                    Análises IA
-                                </h1>
-                                <p class="text-primary-200/80 text-sm lg:text-base">
-                                    Insights inteligentes para potencializar suas vendas
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <!-- Quick Stats -->
-                        <div class="flex flex-wrap items-center gap-4 lg:gap-6 text-sm">
-                            <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
-                                <BoltIcon class="w-4 h-4 text-accent-400" />
-                                <span class="text-white/90">{{ totalSuggestions }} sugestões</span>
-                            </div>
-                            <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
-                                <ChartBarIcon class="w-4 h-4 text-success-400" />
-                                <span class="text-white/90">{{ completedSuggestions }} implementadas</span>
-                            </div>
-                            <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
-                                <RocketLaunchIcon class="w-4 h-4 text-secondary-400" />
-                                <span class="text-white/90">{{ credits }} créditos</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                        <button
-                            @click="showChat = !showChat"
-                            class="lg:hidden px-4 py-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all"
-                        >
-                            {{ showChat ? 'Ver Análises' : 'Chat IA' }}
-                        </button>
-                        <button
-                            v-if="authStore.hasPermission('analysis.request')"
-                            @click="handleRequestAnalysis"
-                            :disabled="isRequesting"
-                            class="group relative px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                        >
-                            <span class="flex items-center gap-2">
-                                <SparklesIcon v-if="!isRequesting" class="w-5 h-5" />
-                                <LoadingSpinner v-else size="sm" class="text-white" />
-                                Nova Análise
-                            </span>
-                            <div class="absolute inset-0 rounded-xl bg-gradient-to-r from-primary-400 to-secondary-400 opacity-0 group-hover:opacity-100 transition-opacity -z-10 blur-xl"></div>
-                        </button>
+    <div class="space-y-6">
+        <!-- Compact Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/20">
+                    <SparklesIcon class="w-5 h-5 text-white" />
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Análises IA</h1>
+                    <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                        <span class="flex items-center gap-1">
+                            <BoltIcon class="w-3.5 h-3.5" />
+                            {{ totalSuggestions }} sugestões
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <ChartBarIcon class="w-3.5 h-3.5" />
+                            {{ completedSuggestions }} implementadas
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <RocketLaunchIcon class="w-3.5 h-3.5" />
+                            {{ credits }} créditos
+                        </span>
                     </div>
                 </div>
             </div>
+            <div class="flex items-center gap-2">
+                <button
+                    @click="showChat = !showChat"
+                    class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                    :class="showChat
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'"
+                >
+                    {{ showChat ? 'Ocultar Chat' : 'Chat IA' }}
+                </button>
+                <button
+                    v-if="authStore.hasPermission('analysis.request')"
+                    @click="handleRequestAnalysis"
+                    :disabled="isRequesting || isStoreSyncing || hasAnalysisInProgress"
+                    class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-primary-500 to-secondary-500 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <SparklesIcon v-if="!isRequesting" class="w-4 h-4" />
+                    <LoadingSpinner v-else size="sm" class="text-white" />
+                    Nova Análise
+                </button>
+            </div>
+        </div>
+
+        <!-- Analysis In Progress Banner -->
+        <div v-if="hasAnalysisInProgress" class="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary-500/10 via-secondary-500/10 to-accent-500/10 dark:from-primary-500/20 dark:via-secondary-500/20 dark:to-accent-500/20 border border-primary-200 dark:border-primary-800">
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="relative">
+                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
+                                <SparklesIcon class="w-5 h-5 text-white animate-pulse" />
+                            </div>
+                            <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent-400 border-2 border-white dark:border-gray-800 animate-ping"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Analisando sua loja...</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Nossa IA está processando os dados</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="px-3 py-1.5 rounded-lg bg-white/50 dark:bg-gray-800/50 text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {{ pendingAnalysis?.status === 'processing' ? 'Processando' : 'Na fila' }}
+                        </div>
+                        <div class="flex items-center gap-1 text-xs text-gray-500">
+                            <ClockIcon class="w-3.5 h-3.5" />
+                            <span class="tabular-nums">{{ pendingAnalysisElapsed }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 h-1 bg-gray-200/50 dark:bg-gray-700/50 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 rounded-full animate-progress-indeterminate"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="isLoading && !currentAnalysis" class="flex flex-col items-center justify-center py-20">
+            <LoadingSpinner size="lg" class="text-primary-500" />
+            <p class="text-gray-500 mt-4 text-sm">Carregando análises...</p>
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
-            <!-- Loading State -->
-            <div v-if="isLoading && !currentAnalysis" class="flex flex-col items-center justify-center py-32">
-                <div class="relative">
-                    <div class="w-20 h-20 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500"></div>
-                    <LoadingSpinner size="xl" class="absolute inset-0 m-auto text-white" />
-                </div>
-                <p class="text-gray-500 mt-6 font-medium">Carregando análises...</p>
-            </div>
+        <template v-else>
+            <div class="flex gap-6">
+                <!-- Main Column -->
+                <div class="flex-1 min-w-0 space-y-6">
+                    <!-- Health Score + Alerts Row -->
+                    <div v-if="summary || alerts.length > 0" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <HealthScore v-if="summary" :summary="summary" />
+                        <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" />
+                    </div>
 
-            <!-- Content -->
-            <template v-else>
-                <div class="max-w-7xl mx-auto">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <!-- Left Column - Analysis (hidden on mobile when chat is open) -->
-                        <div :class="['lg:col-span-2 space-y-6', showChat ? 'hidden lg:block' : '']">
-                            <!-- Health Score -->
-                            <HealthScore v-if="summary" :summary="summary" />
+                    <!-- Opportunities Row -->
+                    <OpportunitiesPanel v-if="opportunities.length > 0 && !showChat" :opportunities="opportunities" />
 
-                            <!-- Alerts -->
-                            <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" />
-
-                            <!-- Suggestions by Priority -->
-                            <div v-if="suggestions.length > 0" class="space-y-8">
-                                <!-- High Priority -->
-                                <div v-if="groupedSuggestions.high.length > 0">
-                                    <div class="flex items-center gap-3 mb-5">
-                                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-danger-500 to-danger-600 flex items-center justify-center shadow-lg shadow-danger-500/30">
-                                            <BoltIcon class="w-5 h-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <SuggestionCard
-                                            v-for="(suggestion, index) in groupedSuggestions.high"
-                                            :key="suggestion.id"
-                                            :suggestion="suggestion"
-                                            @view-detail="viewSuggestionDetail"
-                                        />
-                                    </div>
+                    <!-- Suggestions -->
+                    <div v-if="suggestions.length > 0" class="space-y-6">
+                        <!-- High Priority -->
+                        <div v-if="groupedSuggestions.high.length > 0">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="w-8 h-8 rounded-lg bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center">
+                                    <BoltIcon class="w-4 h-4 text-danger-600 dark:text-danger-400" />
                                 </div>
-
-                                <!-- Medium Priority -->
-                                <div v-if="groupedSuggestions.medium.length > 0">
-                                    <div class="flex items-center gap-3 mb-5">
-                                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shadow-lg shadow-accent-500/30">
-                                            <ChartBarIcon class="w-5 h-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <SuggestionCard
-                                            v-for="(suggestion, index) in groupedSuggestions.medium"
-                                            :key="suggestion.id"
-                                            :suggestion="suggestion"
-                                            @view-detail="viewSuggestionDetail"
-                                        />
-                                    </div>
-                                </div>
-
-                                <!-- Low Priority -->
-                                <div v-if="groupedSuggestions.low.length > 0">
-                                    <div class="flex items-center gap-3 mb-5">
-                                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center shadow-lg shadow-success-500/30">
-                                            <RocketLaunchIcon class="w-5 h-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">Otimizações complementares</p>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <SuggestionCard
-                                            v-for="(suggestion, index) in groupedSuggestions.low"
-                                            :key="suggestion.id"
-                                            :suggestion="suggestion"
-                                            @view-detail="viewSuggestionDetail"
-                                        />
-                                    </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
                                 </div>
                             </div>
-
-                            <!-- Empty State -->
-                            <div v-else class="text-center py-20">
-                                <div class="relative inline-block mb-6">
-                                    <div class="w-32 h-32 rounded-3xl bg-gradient-to-br from-primary-100 to-secondary-100 flex items-center justify-center">
-                                        <SparklesIcon class="w-16 h-16 text-primary-400" />
-                                    </div>
-                                    <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-accent-400 flex items-center justify-center">
-                                        <BoltIcon class="w-4 h-4 text-white" />
-                                    </div>
-                                </div>
-                                <h3 class="text-2xl font-display font-bold text-gray-900 mb-3">
-                                    Nenhuma análise disponível
-                                </h3>
-                                <p class="text-gray-500 mb-8 max-w-md mx-auto">
-                                    Solicite sua primeira análise e receba sugestões personalizadas baseadas em inteligência artificial para impulsionar suas vendas.
-                                </p>
-                                <button
-                                    v-if="authStore.hasPermission('analysis.request')"
-                                    @click="handleRequestAnalysis"
-                                    class="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 hover:scale-[1.02] transition-all duration-200"
-                                >
-                                    <SparklesIcon class="w-5 h-5" />
-                                    Solicitar Primeira Análise
-                                </button>
-                                <p v-else class="text-sm text-gray-500 dark:text-gray-400">
-                                    Você não possui permissão para solicitar análises.
-                                </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                <SuggestionCard
+                                    v-for="suggestion in groupedSuggestions.high"
+                                    :key="suggestion.id"
+                                    :suggestion="suggestion"
+                                    @view-detail="viewSuggestionDetail"
+                                />
                             </div>
                         </div>
 
-                        <!-- Right Column - Chat & Opportunities -->
-                        <div :class="['space-y-6', !showChat ? 'hidden lg:block' : '']">
-                            <!-- Opportunities -->
-                            <OpportunitiesPanel v-if="opportunities.length > 0" :opportunities="opportunities" />
+                        <!-- Medium Priority -->
+                        <div v-if="groupedSuggestions.medium.length > 0">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+                                    <ChartBarIcon class="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                <SuggestionCard
+                                    v-for="suggestion in groupedSuggestions.medium"
+                                    :key="suggestion.id"
+                                    :suggestion="suggestion"
+                                    @view-detail="viewSuggestionDetail"
+                                />
+                            </div>
+                        </div>
 
-                            <!-- Chat -->
-                            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden h-[500px] lg:h-[600px]">
-                                <ChatContainer compact />
+                        <!-- Low Priority -->
+                        <div v-if="groupedSuggestions.low.length > 0">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
+                                    <RocketLaunchIcon class="w-4 h-4 text-success-600 dark:text-success-400" />
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Otimizações complementares</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                <SuggestionCard
+                                    v-for="suggestion in groupedSuggestions.low"
+                                    :key="suggestion.id"
+                                    :suggestion="suggestion"
+                                    @view-detail="viewSuggestionDetail"
+                                />
                             </div>
                         </div>
                     </div>
+
+                    <!-- Empty State -->
+                    <div v-else class="text-center py-16">
+                        <div class="relative inline-block mb-4">
+                            <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 flex items-center justify-center">
+                                <SparklesIcon class="w-10 h-10 text-primary-500" />
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Nenhuma análise disponível</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
+                            Solicite sua primeira análise e receba sugestões personalizadas baseadas em IA.
+                        </p>
+                        <button
+                            v-if="authStore.hasPermission('analysis.request')"
+                            @click="handleRequestAnalysis"
+                            :disabled="isStoreSyncing || hasAnalysisInProgress"
+                            class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <SparklesIcon class="w-5 h-5" />
+                            Solicitar Primeira Análise
+                        </button>
+                    </div>
                 </div>
-            </template>
-        </div>
+
+                <!-- Chat Sidebar -->
+                <div
+                    v-if="showChat"
+                    class="w-80 xl:w-96 flex-shrink-0 hidden lg:block"
+                >
+                    <div class="sticky top-6">
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[calc(100vh-180px)]">
+                            <ChatContainer compact />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Chat (fullscreen overlay) -->
+            <div
+                v-if="showChat"
+                class="lg:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900"
+            >
+                <div class="flex flex-col h-full">
+                    <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                        <h2 class="font-semibold text-gray-900 dark:text-gray-100">Chat IA</h2>
+                        <button
+                            @click="showChat = false"
+                            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <ChatContainer />
+                    </div>
+                </div>
+            </div>
+        </template>
 
         <!-- Credit Warning Modal -->
         <BaseModal
@@ -394,3 +440,23 @@ onUnmounted(() => {
         />
     </div>
 </template>
+
+<style scoped>
+@keyframes progress-indeterminate {
+    0% {
+        transform: translateX(-100%);
+        width: 30%;
+    }
+    50% {
+        width: 50%;
+    }
+    100% {
+        transform: translateX(400%);
+        width: 30%;
+    }
+}
+
+.animate-progress-indeterminate {
+    animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+</style>

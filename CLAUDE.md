@@ -2,52 +2,71 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## REGRAS CRÍTICAS - LEIA PRIMEIRO
+## CRITICAL RULES - READ FIRST
 
-### Prevenção de Regressões de Código
+### Preventing Code Regressions
 
-**NUNCA substitua código funcional por versões antigas ou incompletas.** Siga estas regras obrigatórias:
+**NEVER replace working code with old or incomplete versions.** Follow these mandatory rules:
 
-1. **Sempre leia o arquivo ATUAL antes de editar** - Use a ferramenta Read para obter o estado mais recente do arquivo. Nunca assuma que você sabe o conteúdo atual baseado em leituras anteriores na conversa.
+1. **Always read the CURRENT file before editing** - Use the Read tool to get the latest state of the file. Never assume you know the current content based on earlier reads in the conversation.
 
-2. **Use Edit em vez de Write para modificações** - A ferramenta Edit faz substituições precisas. A ferramenta Write sobrescreve o arquivo inteiro e pode causar perda de código.
+2. **Use Edit instead of Write for modifications** - The Edit tool makes precise replacements. The Write tool overwrites the entire file and can cause code loss.
 
-3. **Edições cirúrgicas, não substituições completas** - Ao modificar um arquivo, altere apenas o trecho necessário. Nunca reescreva funções, métodos ou seções inteiras que não precisam ser alteradas.
+3. **Surgical edits, not complete replacements** - When modifying a file, change only the necessary section. Never rewrite functions, methods, or entire sections that don't need to be changed.
 
-4. **Preserve código existente que funciona** - Se uma função/componente já está funcionando, não a modifique a menos que seja explicitamente solicitado.
+4. **Preserve existing working code** - If a function/component is already working, don't modify it unless explicitly requested.
 
-5. **Verifique antes de remover** - Antes de remover qualquer código, confirme que ele realmente não é mais necessário.
+5. **Verify before removing** - Before removing any code, confirm it is truly no longer needed.
 
-6. **Após edições significativas, valide** - Execute `npm run build` para frontend ou `./vendor/bin/pint` para backend para garantir que não há erros de sintaxe.
+6. **After significant edits, validate** - Run `npm run build` for frontend or `./vendor/bin/pint` for backend to ensure there are no syntax errors.
 
-### Fluxo Obrigatório para Edições
+### Mandatory Flow for Edits
 
 ```
-1. Read arquivo atual → 2. Identificar trecho específico → 3. Edit apenas o necessário → 4. Validar build/lint
+1. Read current file → 2. Identify specific section → 3. Edit only what's necessary → 4. Validate build/lint
 ```
 
-### O que NUNCA fazer
+### What to NEVER Do
 
-- Nunca usar Write para "atualizar" um arquivo existente sem ler primeiro
-- Nunca copiar código de mensagens anteriores da conversa como "versão atual"
-- Nunca remover imports, funções ou variáveis sem verificar se são usados
-- Nunca simplificar ou "limpar" código que não foi solicitado alterar
+- Never use Write to "update" an existing file without reading it first
+- Never copy code from earlier messages in the conversation as the "current version"
+- Never remove imports, functions, or variables without verifying they are unused
+- Never simplify or "clean up" code that wasn't requested to be changed
 
-### Consistência da Stack Tecnológica
+### Technology Stack Consistency
 
-**Utilize APENAS as tecnologias da stack do projeto.** Não introduza linguagens ou ferramentas externas para resolver problemas que podem ser resolvidos com a stack existente.
+**Use ONLY the project's stack technologies.** Don't introduce external languages or tools to solve problems that can be solved with the existing stack.
 
-**Stack do Projeto:**
+**Project Stack:**
 - **Backend:** PHP/Laravel 12
 - **Frontend:** Vue 3, JavaScript/TypeScript, Tailwind CSS v4
 - **Build:** Vite, npm
 
-**O que NUNCA fazer:**
-- Nunca criar scripts Python, Ruby, ou outras linguagens para automação que pode ser feita com JavaScript/PHP
-- Nunca adicionar dependências de linguagens fora da stack sem aprovação explícita
-- Nunca usar ferramentas CLI externas quando existe equivalente na stack (ex: usar Vite/npm em vez de scripts shell complexos)
+**What to NEVER do:**
+- Never create Python, Ruby, or other language scripts for automation that can be done with JavaScript/PHP
+- Never add dependencies from languages outside the stack without explicit approval
+- Never use external CLI tools when an equivalent exists in the stack (e.g., use Vite/npm instead of complex shell scripts)
 
-**Exemplo:** Para aplicar mudanças em arquivos Vue, use JavaScript/Node.js ou ferramentas do ecossistema Vue/Vite, não scripts Python.
+**Example:** To apply changes to Vue files, use JavaScript/Node.js or Vue/Vite ecosystem tools, not Python scripts.
+
+### Definitive Solutions, Not Workarounds
+
+**NEVER implement workarounds or hacks.** All solutions must be definitive and solve the problem at its root.
+
+**What is considered a workaround:**
+- Adding temporary CSS classes that are removed via JavaScript after a delay
+- Using `setTimeout` or `requestAnimationFrame` to "work around" visual issues
+- Creating flags or control variables to mask unwanted behaviors
+- Temporarily disabling functionality instead of fixing the cause
+- Adding code that "hides" the problem instead of solving it
+
+**What to do instead:**
+- Identify the root cause of the problem
+- Remove or modify the code that is causing the unwanted behavior
+- Implement the correct solution, even if it requires more changes
+- If the correct solution is complex, ask the user before proceeding
+
+**Example:** If a CSS transition is causing an unwanted effect on theme change, the correct solution is to remove or adjust the transition on the affected elements, NOT to add a class that temporarily disables transitions.
 
 ## Build and Development Commands
 
@@ -276,20 +295,106 @@ All routes in `routes/api.php`. Protected routes require Sanctum auth.
 - No refresh_token support - user must reconnect via OAuth when token invalid (401)
 - Store marked as `TokenExpired` on 401 - requires reconnection
 
-**AI Analysis Flow:**
-1. `POST /api/analysis/request` -> creates Analysis record, dispatches `ProcessAnalysisJob`
-2. Job prepares store data -> sends to AI provider -> parses JSON response -> updates Analysis
-3. Response contains: health_score, suggestions (5), alerts (2), opportunities (2)
+## Módulo de Análise IA para Lojas de E-commerce
 
-### AI Integration
+### Objetivo
+Sistema inteligente de análise que gera sugestões acionáveis para aumentar vendas das lojas conectadas, com aprendizado contínuo e personalização por loja/nicho.
 
-`AIManager` uses provider interface pattern. Default provider configurable via `SystemSetting::get('ai.provider')`.
+### Arquitetura
+Pipeline de agentes especializados com RAG e memória persistente:
 
-Providers:
-- `OpenAIProvider` - Uses openai-php/laravel package
-- `GeminiProvider` - Google Gemini API via HTTP
+```
+Dados da Loja → Agente Coletor → Agente Analista → Agente Estrategista → Agente Crítico → Sugestões
+                     ↓                                                            ↓
+              [RAG: Knowledge Base]                                    [Memória: Histórico]
+                     ↓                                                            ↓
+              Benchmarks, boas práticas,                              Sugestões anteriores,
+              cases por nicho                                         feedback, resultados
+```
 
-Analysis prompts expect structured JSON. The `AnalysisService::parseResponse()` handles markdown removal and validation.
+### Stack Técnica
+- **Backend:** Laravel (PHP 8.x)
+- **Frontend:** Vue.js
+- **Banco:** PostgreSQL + pgvector (embeddings)
+- **LLM:** Claude API (Anthropic)
+- **Embeddings:** OpenAI text-embedding-3-small ou Voyage AI
+
+### Componentes Principais
+
+1. **RAG (Retrieval Augmented Generation)**
+   - Base de conhecimento vetorial com boas práticas de e-commerce
+   - Benchmarks por nicho (moda, eletrônicos, etc.)
+   - Estratégias de cupons, precificação, sazonalidade
+   - Tabela: `knowledge_embeddings`
+
+2. **Sistema de Memória por Loja**
+   - Histórico de análises e sugestões
+   - Status de cada sugestão (pendente/feita/ignorada)
+   - Resultados após implementação (feedback loop)
+   - Tabelas: `analises`, `sugestoes`, `resultados`
+
+3. **Pipeline de Agentes**
+   - `AgenteColetorService`: contexto + histórico + benchmarks via RAG
+   - `AgenteAnalistaService`: métricas, padrões, anomalias
+   - `AgenteEstrategistaService`: gera sugestões novas e personalizadas
+   - `AgenteCriticoService`: filtra genéricas, valida, prioriza
+
+4. **Feedback Loop**
+   - Compara métricas antes/depois de sugestão implementada
+   - Alimenta base de conhecimento com o que funcionou
+   - Melhora sugestões futuras
+
+### Estrutura de Diretórios
+```
+app/
+├── Services/
+│   └── IA/
+│       ├── AnaliseLojaService.php      # Orquestrador principal
+│       ├── Agentes/
+│       │   ├── AgenteColetorService.php
+│       │   ├── AgenteAnalistaService.php
+│       │   ├── AgenteEstrategistaService.php
+│       │   └── AgenteCriticoService.php
+│       ├── RAG/
+│       │   ├── EmbeddingService.php
+│       │   └── KnowledgeBaseService.php
+│       └── Memoria/
+│           ├── HistoricoService.php
+│           └── FeedbackLoopService.php
+├── Models/
+│   ├── Analise.php
+│   ├── Sugestao.php
+│   ├── Resultado.php
+│   └── KnowledgeEmbedding.php
+```
+
+### Fluxo Principal
+```php
+// AnaliseLojaService@executar($lojaId)
+1. Coletar contexto (histórico, sugestões anteriores, benchmarks RAG)
+2. Analisar dados atuais (pedidos, produtos, estoque, cupons)
+3. Calcular métricas e detectar anomalias
+4. Gerar sugestões via Agente Estrategista
+5. Filtrar e validar via Agente Crítico
+6. Verificar similaridade (evitar repetições via embedding)
+7. Salvar e retornar sugestões priorizadas
+```
+
+### Regras de Negócio
+- Sugestões não devem repetir (similaridade > 0.85 = descarta)
+- Cada sugestão tem impacto esperado (alto/médio/baixo)
+- Sugestões marcadas como "feitas" disparam comparação de métricas
+- Nicho da loja é identificado automaticamente pelos produtos
+- Benchmarks são específicos por nicho
+
+### Dependências
+```bash
+composer require anthropic-ai/anthropic-php  # Claude API
+composer require pgvector/pgvector           # PostgreSQL vectors
+```
+
+### Documentação Detalhada
+Ver: `docs/arquitetura-ia-ecommerce.md`
 
 ### Authentication & Authorization
 

@@ -38,7 +38,8 @@
       "Bash(git commit:*)",
       "Bash(echo $env:USERPROFILE)",
       "Bash(echo:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(curl:*)"
     ]
   },
   "statusLine": {

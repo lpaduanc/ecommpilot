@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\IntegrationController;
+use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StoreSettingsController;
@@ -81,6 +82,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Locations (Brazil States and Cities)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('locations')->group(function () {
+        Route::get('states', [LocationController::class, 'states']);
+        Route::get('cities/{uf}', [LocationController::class, 'cities']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | Discounts / Coupons
     |--------------------------------------------------------------------------
     */
@@ -98,6 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Visualização de lojas - qualquer usuário autenticado
         Route::get('stores', [IntegrationController::class, 'stores']);
         Route::get('my-stores', [IntegrationController::class, 'myStores']);
+        Route::get('sync-status', [IntegrationController::class, 'syncStatus']);
         Route::post('select-store/{storeId}', [IntegrationController::class, 'selectStore']);
 
         // Gerenciamento de integrações - requer permissão
@@ -190,6 +202,12 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('test-connection', [StoreSettingsController::class, 'testConnection']);
                 Route::post('disconnect', [StoreSettingsController::class, 'disconnect']);
             });
+        });
+
+        // Brazil Locations Sync
+        Route::prefix('locations')->group(function () {
+            Route::post('sync', [LocationController::class, 'sync']);
+            Route::get('sync-status', [LocationController::class, 'syncStatus']);
         });
     });
 

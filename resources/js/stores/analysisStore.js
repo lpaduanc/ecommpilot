@@ -4,14 +4,22 @@ import api from '../services/api';
 
 export const useAnalysisStore = defineStore('analysis', () => {
     const currentAnalysis = ref(null);
+    const pendingAnalysis = ref(null);
     const analysisHistory = ref([]);
     const isLoading = ref(false);
     const isRequesting = ref(false);
     const error = ref(null);
     const nextAvailableAt = ref(null);
     const credits = ref(0);
+    const pollingInterval = ref(null);
     
+    const hasAnalysisInProgress = computed(() => {
+        return pendingAnalysis.value !== null;
+    });
+
     const canRequestAnalysis = computed(() => {
+        // Can't request if there's already one in progress
+        if (hasAnalysisInProgress.value) return false;
         if (!nextAvailableAt.value) return true;
         return new Date() >= new Date(nextAvailableAt.value);
     });
@@ -49,16 +57,55 @@ export const useAnalysisStore = defineStore('analysis', () => {
     async function fetchCurrentAnalysis() {
         isLoading.value = true;
         error.value = null;
-        
+
         try {
             const response = await api.get('/analysis/current');
             currentAnalysis.value = response.data.analysis;
+            pendingAnalysis.value = response.data.pending_analysis;
             nextAvailableAt.value = response.data.next_available_at;
             credits.value = response.data.credits;
+
+            // Start polling if there's a pending analysis
+            if (pendingAnalysis.value) {
+                startPolling();
+            } else {
+                stopPolling();
+            }
         } catch (err) {
             error.value = err.response?.data?.message || 'Erro ao carregar análise';
         } finally {
             isLoading.value = false;
+        }
+    }
+
+    function startPolling() {
+        if (pollingInterval.value) return;
+
+        pollingInterval.value = setInterval(async () => {
+            try {
+                const response = await api.get('/analysis/current');
+
+                // Check if analysis completed
+                if (!response.data.pending_analysis && pendingAnalysis.value) {
+                    // Analysis completed!
+                    currentAnalysis.value = response.data.analysis;
+                    pendingAnalysis.value = null;
+                    nextAvailableAt.value = response.data.next_available_at;
+                    credits.value = response.data.credits;
+                    stopPolling();
+                } else {
+                    pendingAnalysis.value = response.data.pending_analysis;
+                }
+            } catch {
+                // Silently ignore polling errors
+            }
+        }, 5000); // Poll every 5 seconds
+    }
+
+    function stopPolling() {
+        if (pollingInterval.value) {
+            clearInterval(pollingInterval.value);
+            pollingInterval.value = null;
         }
     }
     
@@ -74,22 +121,30 @@ export const useAnalysisStore = defineStore('analysis', () => {
     async function requestNewAnalysis() {
         isRequesting.value = true;
         error.value = null;
-        
+
         try {
             const response = await api.post('/analysis/request');
-            currentAnalysis.value = response.data.analysis;
-            nextAvailableAt.value = response.data.next_available_at;
+            pendingAnalysis.value = response.data.pending_analysis;
             credits.value = response.data.credits;
-            
-            return { success: true };
+
+            // Start polling to check when analysis completes
+            startPolling();
+
+            return { success: true, pending: true };
         } catch (err) {
             const message = err.response?.data?.message || 'Erro ao solicitar análise';
             error.value = message;
-            
+
             if (err.response?.status === 429) {
                 nextAvailableAt.value = err.response.data.next_available_at;
             }
-            
+
+            if (err.response?.status === 409) {
+                // Already has a pending analysis
+                pendingAnalysis.value = err.response.data.pending_analysis;
+                startPolling();
+            }
+
             return { success: false, message };
         } finally {
             isRequesting.value = false;
@@ -135,6 +190,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     
     return {
         currentAnalysis,
+        pendingAnalysis,
+        hasAnalysisInProgress,
         analysisHistory,
         isLoading,
         isRequesting,
@@ -156,6 +213,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
         getAnalysisById,
         markSuggestionAsDone,
         getSuggestionsByCategory,
+        startPolling,
+        stopPolling,
     };
 });
 

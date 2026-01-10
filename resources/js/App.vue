@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import TheSidebar from './components/layout/TheSidebar.vue';
 import TheHeader from './components/layout/TheHeader.vue';
 import NotificationToast from './components/common/NotificationToast.vue';
+import SyncStatusBanner from './components/common/SyncStatusBanner.vue';
 import ErrorBoundary from './components/shared/ErrorBoundary.vue';
 import { useAuthStore } from './stores/authStore';
 import { useSidebarStore } from './stores/sidebarStore';
@@ -37,7 +38,7 @@ provide('mobileSidebar', {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
         <!-- Skip Links (acessibilidade) - visível apenas no :focus -->
         <nav aria-label="Atalhos de teclado" class="sr-only focus-within:not-sr-only">
             <a
@@ -67,8 +68,9 @@ provide('mobileSidebar', {
             <TheSidebar id="sidebar-nav" :is-mobile-open="isMobileSidebarOpen" @close="isMobileSidebarOpen = false" />
 
             <!-- Main Content - responsive margin -->
-            <div :class="['flex-1 min-h-screen transition-all duration-300', sidebarStore.contentMargin]">
+            <div :class="['flex-1 min-h-screen transition-[margin] duration-300', sidebarStore.contentMargin]">
                 <TheHeader @toggle-mobile-sidebar="isMobileSidebarOpen = !isMobileSidebarOpen" />
+                <SyncStatusBanner />
                 <main id="main-content" class="p-4 sm:p-6 lg:p-8">
                     <!-- ErrorBoundary envolve o router-view para capturar erros em rotas -->
                     <ErrorBoundary>

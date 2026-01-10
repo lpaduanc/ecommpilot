@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\SyncedOrder;
+use App\Services\BrazilLocationsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        private BrazilLocationsService $locationsService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $store = $request->user()->activeStore;
@@ -68,6 +73,7 @@ class OrderController extends Controller
         if (! $store) {
             return response()->json([
                 'statuses' => [],
+                'payment_statuses' => [],
                 'coupons' => [],
                 'countries' => [],
                 'states' => [],
@@ -79,6 +85,14 @@ class OrderController extends Controller
 
         $statuses = $orders
             ->pluck('status')
+            ->filter()
+            ->map(fn ($status) => $status->value)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $paymentStatuses = $orders
+            ->pluck('payment_status')
             ->filter()
             ->map(fn ($status) => $status->value)
             ->unique()
@@ -103,15 +117,15 @@ class OrderController extends Controller
             ->values()
             ->toArray();
 
-        $states = $orders
-            ->pluck('shipping_address')
-            ->filter()
-            ->map(fn ($address) => $address['province'] ?? null)
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values()
-            ->toArray();
+        // Get Brazil states from the new service
+        // This provides all Brazilian states from IBGE API or fallback
+        $states = $this->locationsService->getStates();
+        $statesList = array_map(function ($state) {
+            return [
+                'sigla' => $state['sigla'],
+                'nome' => $state['nome'],
+            ];
+        }, $states);
 
         $cities = $orders
             ->pluck('shipping_address')
@@ -125,9 +139,10 @@ class OrderController extends Controller
 
         return response()->json([
             'statuses' => $statuses,
+            'payment_statuses' => $paymentStatuses,
             'coupons' => $coupons,
             'countries' => $countries,
-            'states' => $states,
+            'states' => $statesList,
             'cities' => $cities,
         ]);
     }

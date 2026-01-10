@@ -122,7 +122,7 @@ onUnmounted(() => {
                 <!-- Mobile Menu Button -->
                 <button
                     @click="emit('toggle-mobile-sidebar')"
-                    class="lg:hidden p-2 -ml-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
+                    class="lg:hidden p-2 -ml-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                 >
                     <Bars3Icon class="w-6 h-6" />
                 </button>
@@ -136,7 +136,7 @@ onUnmounted(() => {
                             @keyup.enter="handleSearch"
                             type="text"
                             placeholder="Buscar produtos, pedidos..."
-                            class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
+                            class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
                         />
                     </div>
                 </div>
@@ -144,7 +144,7 @@ onUnmounted(() => {
                 <!-- Mobile Search Button -->
                 <button
                     @click="showMobileSearch = !showMobileSearch"
-                    class="md:hidden p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
+                    class="md:hidden p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                 >
                     <MagnifyingGlassIcon class="w-6 h-6" />
                 </button>
@@ -162,7 +162,7 @@ onUnmounted(() => {
                 <div id="notifications-menu" class="relative">
                     <button
                         @click.stop="toggleNotifications"
-                        class="relative p-2 lg:p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors"
+                        class="relative p-2 lg:p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
                     >
                         <BellIcon class="w-5 h-5 lg:w-6 lg:h-6" />
                         <span
@@ -198,7 +198,7 @@ onUnmounted(() => {
                                     v-for="notification in notifications"
                                     :key="notification.id"
                                     :class="[
-                                        'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors cursor-pointer',
+                                        'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 cursor-pointer',
                                         !notification.read ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
                                     ]"
                                 >
@@ -225,7 +225,7 @@ onUnmounted(() => {
                 <div id="user-menu" class="relative">
                     <button
                         @click.stop="toggleUserMenu"
-                        class="flex items-center gap-2 lg:gap-3 p-1.5 lg:p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors"
+                        class="flex items-center gap-2 lg:gap-3 p-1.5 lg:p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700"
                     >
                         <div class="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold text-sm lg:text-base shadow-lg shadow-primary-500/30">
                             {{ userInitials }}
@@ -257,14 +257,14 @@ onUnmounted(() => {
                             <div class="p-2">
                                 <button
                                     @click="goToSettings"
-                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors text-sm"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 text-sm"
                                 >
                                     <UserCircleIcon class="w-5 h-5 text-gray-400" />
                                     <span>Meu Perfil</span>
                                 </button>
                                 <button
                                     @click="goToSettings"
-                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors text-sm"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 text-sm"
                                 >
                                     <Cog6ToothIcon class="w-5 h-5 text-gray-400" />
                                     <span>Configurações</span>
@@ -273,7 +273,7 @@ onUnmounted(() => {
                             <div class="border-t border-gray-100 dark:border-gray-700 p-2">
                                 <button
                                     @click="handleLogout"
-                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors text-sm"
+                                    class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20 text-sm"
                                 >
                                     <ArrowLeftOnRectangleIcon class="w-5 h-5" />
                                     <span>Sair</span>
@@ -302,7 +302,7 @@ onUnmounted(() => {
                         @keyup.enter="handleSearch"
                         type="text"
                         placeholder="Buscar produtos, pedidos..."
-                        class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
+                        class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
                         autofocus
                     />
                 </div>

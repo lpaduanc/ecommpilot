@@ -432,6 +432,29 @@ class IntegrationController extends Controller
         ]);
     }
 
+    public function syncStatus(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $activeStore = $user->activeStore;
+
+        if (! $activeStore) {
+            return response()->json([
+                'has_store' => false,
+                'sync_status' => null,
+                'is_syncing' => false,
+            ]);
+        }
+
+        return response()->json([
+            'has_store' => true,
+            'store_id' => $activeStore->id,
+            'store_name' => $activeStore->name,
+            'sync_status' => $activeStore->sync_status->value,
+            'is_syncing' => $activeStore->isSyncing(),
+            'last_sync_at' => $activeStore->last_sync_at?->toISOString(),
+        ]);
+    }
+
     public function selectStore(Request $request, int $storeId): JsonResponse
     {
         $user = $request->user();

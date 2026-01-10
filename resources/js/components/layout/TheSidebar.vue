@@ -181,7 +181,7 @@ async function handleLogout() {
             <div class="absolute top-4 right-4">
                 <button
                     @click="emit('close')"
-                    class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
                 >
                     <XMarkIcon class="w-5 h-5 text-gray-600 dark:text-gray-400 dark:text-gray-300" />
                 </button>
@@ -205,7 +205,7 @@ async function handleLogout() {
                         <button
                             @click="toggleMarketing"
                             :class="[
-                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                                 isSubmenuActive(item.submenu)
                                     ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
                                     : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
@@ -215,7 +215,7 @@ async function handleLogout() {
                             <span class="truncate">{{ item.label }}</span>
                             <ChevronDownIcon
                                 :class="[
-                                    'w-4 h-4 ml-auto transition-transform duration-200',
+                                    'w-4 h-4 ml-auto',
                                     isMarketingOpen ? 'rotate-180' : ''
                                 ]"
                             />
@@ -229,7 +229,7 @@ async function handleLogout() {
                                     :key="subitem.route"
                                     @click="navigateTo(subitem.route)"
                                     :class="[
-                                        'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm',
+                                        'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm',
                                         isActive(subitem.route)
                                             ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
                                             : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
@@ -246,7 +246,7 @@ async function handleLogout() {
                         v-else
                         @click="navigateTo(item.route)"
                         :class="[
-                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                             isActive(item.route)
                                 ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
                                 : item.highlight
@@ -283,7 +283,7 @@ async function handleLogout() {
                         <button
                             @click="navigateTo(item.route)"
                             :class="[
-                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                                 isActive(item.route)
                                     ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
                                     : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
@@ -300,7 +300,7 @@ async function handleLogout() {
             <div class="p-4 border-t border-gray-100 dark:border-gray-700">
                 <button
                     @click="handleLogout"
-                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-danger-50 dark:hover:bg-danger-900/20 hover:text-danger-600 dark:hover:text-danger-400 transition-all duration-200"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-danger-50 dark:hover:bg-danger-900/20 hover:text-danger-600 dark:hover:text-danger-400"
                 >
                     <ArrowLeftOnRectangleIcon class="w-5 h-5 flex-shrink-0" />
                     <span>Sair</span>
@@ -312,7 +312,7 @@ async function handleLogout() {
     <!-- Desktop Sidebar -->
     <aside
         :class="[
-            'hidden lg:flex lg:flex-col fixed left-0 top-0 h-full bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 shadow-sm z-40 transition-all duration-300',
+            'hidden lg:flex lg:flex-col fixed left-0 top-0 h-full bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 shadow-sm z-40 transition-[width] duration-300',
             sidebarStore.isCollapsed ? 'w-20' : 'w-72'
         ]"
     >
@@ -334,7 +334,7 @@ async function handleLogout() {
         <!-- Collapse Button -->
         <button
             @click="sidebarStore.toggle"
-            class="absolute -right-3 top-24 w-6 h-6 rounded-full bg-white dark:bg-gray-800 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 dark:border-gray-600 shadow-sm flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-600 transition-colors"
+            class="absolute -right-3 top-24 w-6 h-6 rounded-full bg-white dark:bg-gray-800 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 dark:border-gray-600 shadow-sm flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-600"
         >
             <ChevronDoubleLeftIcon v-if="!sidebarStore.isCollapsed" class="w-3 h-3 text-gray-500 dark:text-gray-400" />
             <ChevronDoubleRightIcon v-else class="w-3 h-3 text-gray-500 dark:text-gray-400" />
@@ -349,7 +349,7 @@ async function handleLogout() {
                     <button
                         @click="toggleMarketing"
                         :class="[
-                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                             isSubmenuActive(item.submenu)
                                 ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
                                 : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white',
@@ -362,7 +362,7 @@ async function handleLogout() {
                         <ChevronDownIcon
                             v-if="!sidebarStore.isCollapsed"
                             :class="[
-                                'w-4 h-4 ml-auto transition-transform duration-200',
+                                'w-4 h-4 ml-auto',
                                 isMarketingOpen ? 'rotate-180' : ''
                             ]"
                         />
@@ -376,7 +376,7 @@ async function handleLogout() {
                                 :key="subitem.route"
                                 @click="navigateTo(subitem.route)"
                                 :class="[
-                                    'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm',
+                                    'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm',
                                     isActive(subitem.route)
                                         ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
                                         : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
@@ -393,7 +393,7 @@ async function handleLogout() {
                     v-else
                     @click="navigateTo(item.route)"
                     :class="[
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                        'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                         isActive(item.route)
                             ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
                             : item.highlight
@@ -435,7 +435,7 @@ async function handleLogout() {
                     <button
                         @click="navigateTo(item.route)"
                         :class="[
-                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                             isActive(item.route)
                                 ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
                                 : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white',
@@ -455,7 +455,7 @@ async function handleLogout() {
             <button
                 @click="handleLogout"
                 :class="[
-                    'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-danger-50 dark:hover:bg-danger-900/20 hover:text-danger-600 dark:hover:text-danger-400 transition-all duration-200',
+                    'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-danger-50 dark:hover:bg-danger-900/20 hover:text-danger-600 dark:hover:text-danger-400',
                     sidebarStore.isCollapsed ? 'justify-center' : ''
                 ]"
                 :title="sidebarStore.isCollapsed ? 'Sair' : ''"
