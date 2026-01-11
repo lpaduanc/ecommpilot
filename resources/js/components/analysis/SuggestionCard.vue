@@ -1,16 +1,19 @@
 <script setup>
 import { computed } from 'vue';
-import { 
+import {
     EyeIcon,
     ArrowRightIcon,
     CheckCircleIcon,
+    ClockIcon,
+    PlayIcon,
+    XCircleIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     suggestion: { type: Object, required: true },
 });
 
-const emit = defineEmits(['view-detail', 'ask-ai']);
+const emit = defineEmits(['view-detail', 'ask-ai', 'status-change']);
 
 const categoryConfig = {
     marketing: { icon: '📣', label: 'Marketing', color: 'from-pink-500 to-rose-500', bg: 'bg-pink-50 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-400' },
@@ -27,35 +30,55 @@ const priorityConfig = {
     low: { label: 'Baixa', color: 'bg-success-500', ring: 'ring-success-500/30', glow: 'shadow-success-500/50' },
 };
 
+const statusConfig = {
+    pending: { label: 'Pendente', icon: ClockIcon, bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-300' },
+    in_progress: { label: 'Em Andamento', icon: PlayIcon, bg: 'bg-primary-100 dark:bg-primary-900/30', text: 'text-primary-700 dark:text-primary-400' },
+    completed: { label: 'Implementado', icon: CheckCircleIcon, bg: 'bg-success-100 dark:bg-success-900/30', text: 'text-success-700 dark:text-success-400' },
+    ignored: { label: 'Ignorada', icon: XCircleIcon, bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-500 dark:text-gray-400' },
+};
+
 const category = computed(() => categoryConfig[props.suggestion.category] || { icon: '💡', label: 'Geral', color: 'from-gray-500 to-gray-600', bg: 'bg-gray-50', text: 'text-gray-700' });
-const priority = computed(() => priorityConfig[props.suggestion.priority] || priorityConfig.medium);
-const isDone = computed(() => props.suggestion.is_done);
+const priority = computed(() => priorityConfig[props.suggestion.priority || props.suggestion.expected_impact] || priorityConfig.medium);
+
+// Support both legacy is_done and new status field
+const suggestionStatus = computed(() => {
+    if (props.suggestion.status) return props.suggestion.status;
+    return props.suggestion.is_done ? 'completed' : 'pending';
+});
+const statusInfo = computed(() => statusConfig[suggestionStatus.value] || statusConfig.pending);
+const isDone = computed(() => suggestionStatus.value === 'completed');
+const isInProgress = computed(() => suggestionStatus.value === 'in_progress');
+const isIgnored = computed(() => suggestionStatus.value === 'ignored');
 </script>
 
 <template>
-    <div 
+    <div
         :class="[
             'group relative bg-white dark:bg-gray-800 rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden',
-            isDone 
-                ? 'border-success-200 bg-success-50/30' 
-                : 'border-gray-100 dark:border-gray-700 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1'
+            isDone
+                ? 'border-success-200 dark:border-success-800 bg-success-50/30 dark:bg-success-900/10'
+                : isInProgress
+                    ? 'border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-900/10'
+                    : isIgnored
+                        ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 opacity-60'
+                        : 'border-gray-100 dark:border-gray-700 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1'
         ]"
         @click="emit('view-detail', suggestion)"
     >
-        <!-- Completed Badge -->
-        <div v-if="isDone" class="absolute top-3 right-3 z-10">
-            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success-100 text-success-700 text-xs font-medium">
-                <CheckCircleIcon class="w-3.5 h-3.5" />
-                Implementado
+        <!-- Status Badge -->
+        <div v-if="suggestionStatus !== 'pending'" class="absolute top-3 right-3 z-10">
+            <div :class="['flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', statusInfo.bg, statusInfo.text]">
+                <component :is="statusInfo.icon" class="w-3.5 h-3.5" />
+                {{ statusInfo.label }}
             </div>
         </div>
 
         <!-- Priority Indicator -->
-        <div 
+        <div
             :class="[
                 'absolute top-0 left-6 w-1 h-8 rounded-b-full transition-all duration-300',
                 priority.color,
-                !isDone && 'group-hover:h-12 group-hover:shadow-lg',
+                !isDone && !isIgnored && 'group-hover:h-12 group-hover:shadow-lg',
                 priority.glow
             ]"
         ></div>
@@ -92,21 +115,24 @@ const isDone = computed(() => props.suggestion.is_done);
 
             <!-- Footer -->
             <div class="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-                <div class="flex items-center gap-3 text-xs text-gray-400">
+                <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
                     <span v-if="suggestion.estimated_effort" class="flex items-center gap-1">
-                        ⚡ {{ suggestion.estimated_effort === 'low' ? 'Fácil' : suggestion.estimated_effort === 'medium' ? 'Médio' : 'Complexo' }}
+                        {{ suggestion.estimated_effort === 'low' ? 'Fácil' : suggestion.estimated_effort === 'medium' ? 'Médio' : 'Complexo' }}
                     </span>
                     <span v-if="suggestion.estimated_time">
-                        📅 {{ suggestion.estimated_time }}
+                        {{ suggestion.estimated_time }}
+                    </span>
+                    <span v-if="suggestion.expected_impact && !suggestion.estimated_effort" class="capitalize">
+                        Impacto {{ suggestion.expected_impact === 'high' ? 'Alto' : suggestion.expected_impact === 'medium' ? 'Médio' : 'Baixo' }}
                     </span>
                 </div>
-                <div 
+                <div
                     :class="[
                         'flex items-center gap-1.5 text-sm font-medium transition-all duration-200',
-                        isDone ? 'text-success-600' : 'text-primary-600 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
+                        isDone || isIgnored ? '' : 'text-primary-600 dark:text-primary-400 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
                     ]"
                 >
-                    <template v-if="!isDone">
+                    <template v-if="!isDone && !isIgnored">
                         Ver detalhes
                         <ArrowRightIcon class="w-4 h-4" />
                     </template>

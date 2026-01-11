@@ -24,7 +24,7 @@ class GeminiProvider implements AIProviderInterface
         $this->apiKey = SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key', ''));
         $this->defaultModel = SystemSetting::get('ai.gemini.model', config('services.ai.gemini.model', 'gemini-1.5-pro'));
         $this->defaultTemperature = (float) SystemSetting::get('ai.gemini.temperature', config('services.ai.gemini.temperature', 0.7));
-        $this->defaultMaxTokens = (int) SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 4000));
+        $this->defaultMaxTokens = (int) SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 8192));
     }
 
     public function chat(array $messages, array $options = []): string

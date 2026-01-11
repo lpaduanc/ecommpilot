@@ -624,7 +624,10 @@ Voce e um consultor senior de e-commerce com 15 anos de experiencia analisando l
 
 1. Responda APENAS com JSON valido, sem texto antes ou depois
 2. NAO use markdown (sem ```)
-3. Forneca entre 3 e 7 sugestoes, dependendo da quantidade de insights encontrados
+3. Forneca EXATAMENTE 9 sugestoes com distribuicao balanceada:
+   - 3 sugestoes com priority: "high"
+   - 3 sugestoes com priority: "medium"
+   - 3 sugestoes com priority: "low"
 4. Forneca entre 1 e 3 alertas (apenas se houver problemas reais nos dados)
 5. Forneca entre 1 e 3 oportunidades
 6. CADA sugestao DEVE referenciar dados especificos fornecidos (nomes de produtos, valores, quantidades)

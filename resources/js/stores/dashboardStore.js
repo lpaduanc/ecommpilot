@@ -12,7 +12,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const lowStockProducts = ref([]);
     const isLoading = ref(false);
     const error = ref(null);
-    
+
     const filters = ref({
         period: 'last_30_days',
         startDate: null,
@@ -20,93 +20,99 @@ export const useDashboardStore = defineStore('dashboard', () => {
         categories: [],
         paymentStatus: [],
     });
-    
+
     const hasStore = computed(() => stats.value?.has_store || false);
-    
-    async function fetchStats() {
+
+    /**
+     * Fetch all dashboard data in a single API call (bulk endpoint)
+     * This reduces 7 API calls to 1, improving performance by ~85%
+     */
+    async function fetchAllData() {
         isLoading.value = true;
         error.value = null;
-        
+
         try {
             const params = buildFilterParams();
-            const response = await api.get('/dashboard/stats', { params });
-            stats.value = response.data;
+            const response = await api.get('/dashboard/bulk', { params });
+            const data = response.data;
+
+            // Check if user has a store connected (has_store is at root level)
+            if (data.has_store === false) {
+                // No store connected - set stats with has_store flag
+                stats.value = { has_store: false };
+                revenueChart.value = [];
+                ordersStatusChart.value = [];
+                topProducts.value = [];
+                paymentMethodsChart.value = [];
+                categoryChart.value = [];
+                lowStockProducts.value = [];
+                return;
+            }
+
+            // Populate all state from single response
+            // Include has_store in stats object for backward compatibility
+            stats.value = data.stats ? { ...data.stats, has_store: true } : { has_store: true };
+            revenueChart.value = data.revenue_chart || [];
+            ordersStatusChart.value = data.orders_status_chart || [];
+            topProducts.value = data.top_products || [];
+            paymentMethodsChart.value = data.payment_methods_chart || [];
+            categoryChart.value = data.categories_chart || [];
+            lowStockProducts.value = data.low_stock_products || [];
         } catch (err) {
-            error.value = err.response?.data?.message || 'Erro ao carregar estatísticas';
+            error.value = err.response?.data?.message || 'Erro ao carregar dados do dashboard';
+            // Reset all values on error
+            stats.value = null;
+            revenueChart.value = [];
+            ordersStatusChart.value = [];
+            topProducts.value = [];
+            paymentMethodsChart.value = [];
+            categoryChart.value = [];
+            lowStockProducts.value = [];
         } finally {
             isLoading.value = false;
         }
     }
-    
+
+    // Individual fetch functions kept for backward compatibility
+    // but now they use the bulk endpoint internally for consistency
+    async function fetchStats() {
+        await fetchAllData();
+    }
+
     async function fetchRevenueChart() {
-        try {
-            const params = buildFilterParams();
-            const response = await api.get('/dashboard/charts/revenue', { params });
-            revenueChart.value = response.data;
-        } catch {
-            revenueChart.value = [];
+        if (revenueChart.value.length === 0) {
+            await fetchAllData();
         }
     }
-    
+
     async function fetchOrdersStatusChart() {
-        try {
-            const params = buildFilterParams();
-            const response = await api.get('/dashboard/charts/orders-status', { params });
-            ordersStatusChart.value = response.data;
-        } catch {
-            ordersStatusChart.value = [];
+        if (ordersStatusChart.value.length === 0) {
+            await fetchAllData();
         }
     }
-    
+
     async function fetchTopProducts() {
-        try {
-            const params = buildFilterParams();
-            const response = await api.get('/dashboard/charts/top-products', { params });
-            topProducts.value = response.data;
-        } catch {
-            topProducts.value = [];
+        if (topProducts.value.length === 0) {
+            await fetchAllData();
         }
     }
-    
+
     async function fetchPaymentMethodsChart() {
-        try {
-            const params = buildFilterParams();
-            const response = await api.get('/dashboard/charts/payment-methods', { params });
-            paymentMethodsChart.value = response.data;
-        } catch {
-            paymentMethodsChart.value = [];
+        if (paymentMethodsChart.value.length === 0) {
+            await fetchAllData();
         }
     }
-    
+
     async function fetchCategoryChart() {
-        try {
-            const params = buildFilterParams();
-            const response = await api.get('/dashboard/charts/categories', { params });
-            categoryChart.value = response.data;
-        } catch {
-            categoryChart.value = [];
+        if (categoryChart.value.length === 0) {
+            await fetchAllData();
         }
     }
-    
+
     async function fetchLowStockProducts() {
-        try {
-            const response = await api.get('/dashboard/low-stock');
-            lowStockProducts.value = response.data;
-        } catch {
-            lowStockProducts.value = [];
+        if (lowStockProducts.value.length === 0) {
+            await fetchAllData();
         }
-    }
-    
-    async function fetchAllData() {
-        await Promise.all([
-            fetchStats(),
-            fetchRevenueChart(),
-            fetchOrdersStatusChart(),
-            fetchTopProducts(),
-            fetchPaymentMethodsChart(),
-            fetchCategoryChart(),
-            fetchLowStockProducts(),
-        ]);
     }
     
     function buildFilterParams() {

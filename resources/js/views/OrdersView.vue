@@ -39,7 +39,7 @@ const cityFilter = ref('');
 
 // Filter options from API
 const filterOptions = ref({
-    statuses: [],
+    payment_statuses: [],
     coupons: [],
     countries: [],
     states: [],
@@ -55,13 +55,15 @@ const showDetailModal = ref(false);
 const selectedOrder = ref(null);
 
 const statusLabels = {
+    authorized: 'Autorizado',
     pending: 'Pendente',
     paid: 'Pago',
-    shipped: 'Enviado',
-    delivered: 'Entregue',
-    cancelled: 'Cancelado',
-    open: 'Aberto',
-    closed: 'Fechado',
+    partially_paid: 'Parcialmente Pago',
+    abandoned: 'Abandonado',
+    refunded: 'Reembolsado',
+    partially_refunded: 'Parcialmente Reembolsado',
+    voided: 'Recusado',
+    failed: 'Falhou',
 };
 
 const perPageOptions = [10, 20, 50, 100];
@@ -72,7 +74,7 @@ async function fetchOrders() {
         const response = await api.get('/orders', {
             params: {
                 search: searchQuery.value,
-                status: statusFilter.value,
+                payment_status: statusFilter.value,
                 coupon: couponFilter.value,
                 country: countryFilter.value,
                 state: stateFilter.value,
@@ -198,9 +200,14 @@ function getStatusConfig(status) {
 
 function getPaymentStatusConfig(status) {
     const configs = {
-        pending: { label: 'Aguardando', color: 'warning' },
+        authorized: { label: 'Autorizado', color: 'primary' },
+        pending: { label: 'Pendente', color: 'warning' },
         paid: { label: 'Pago', color: 'success' },
+        partially_paid: { label: 'Parcialmente Pago', color: 'warning' },
+        abandoned: { label: 'Abandonado', color: 'gray' },
         refunded: { label: 'Reembolsado', color: 'gray' },
+        partially_refunded: { label: 'Parcialmente Reembolsado', color: 'gray' },
+        voided: { label: 'Recusado', color: 'danger' },
         failed: { label: 'Falhou', color: 'danger' },
     };
     return configs[status] || { label: status, color: 'gray' };
@@ -244,7 +251,7 @@ async function exportOrders() {
     try {
         const params = new URLSearchParams();
         if (searchQuery.value) params.append('search', searchQuery.value);
-        if (statusFilter.value) params.append('status', statusFilter.value);
+        if (statusFilter.value) params.append('payment_status', statusFilter.value);
         if (couponFilter.value) params.append('coupon', couponFilter.value);
         if (countryFilter.value) params.append('country', countryFilter.value);
         if (stateFilter.value) params.append('state', stateFilter.value);
@@ -390,7 +397,7 @@ onMounted(() => {
                                     style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
                                     <option value="">Todos os Status</option>
-                                    <option v-for="status in filterOptions.statuses" :key="status" :value="status">
+                                    <option v-for="status in filterOptions.payment_statuses" :key="status" :value="status">
                                         {{ statusLabels[status] || status }}
                                     </option>
                                 </select>
@@ -549,8 +556,8 @@ onMounted(() => {
                                         {{ formatDate(order.external_created_at) }}
                                     </td>
                                     <td class="px-4 py-4">
-                                        <span :class="['badge', `badge-${getStatusConfig(order.status).color}`]">
-                                            {{ getStatusConfig(order.status).label }}
+                                        <span :class="['badge', `badge-${getPaymentStatusConfig(order.payment_status).color}`]">
+                                            {{ getPaymentStatusConfig(order.payment_status).label }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-4">
@@ -711,8 +718,8 @@ onMounted(() => {
                                     <p class="text-white/80 text-sm mb-1">Pedido</p>
                                     <p class="text-2xl font-display font-bold text-white">{{ selectedOrder.order_number }}</p>
                                 </div>
-                                <span :class="['badge bg-white dark:bg-gray-800/20 text-white border-white/30', `badge-${getStatusConfig(selectedOrder.status).color}`]">
-                                    {{ getStatusConfig(selectedOrder.status).label }}
+                                <span :class="['badge bg-white dark:bg-gray-800/20 text-white border-white/30', `badge-${getPaymentStatusConfig(selectedOrder.payment_status).color}`]">
+                                    {{ getPaymentStatusConfig(selectedOrder.payment_status).label }}
                                 </span>
                             </div>
                         </div>

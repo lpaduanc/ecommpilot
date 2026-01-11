@@ -1,14 +1,17 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import BaseModal from '../common/BaseModal.vue';
-import { 
-    CheckCircleIcon, 
+import {
+    CheckCircleIcon,
     ChatBubbleLeftRightIcon,
     SparklesIcon,
     ClockIcon,
     BoltIcon,
     ChartBarIcon,
     XMarkIcon,
+    PlayIcon,
+    XCircleIcon,
+    ChevronDownIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -16,7 +19,9 @@ const props = defineProps({
     suggestion: { type: Object, default: null },
 });
 
-const emit = defineEmits(['close', 'ask-ai', 'mark-done']);
+const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change']);
+
+const showStatusDropdown = ref(false);
 
 const categoryConfig = {
     marketing: { icon: '📣', label: 'Marketing', color: 'from-pink-500 to-rose-500', bg: 'bg-pink-100' },
@@ -39,19 +44,53 @@ const effortLabels = {
     high: 'Alto',
 };
 
-const category = computed(() => 
+const statusOptions = [
+    { value: 'pending', label: 'Pendente', icon: ClockIcon, color: 'text-gray-600 dark:text-gray-400' },
+    { value: 'in_progress', label: 'Em Andamento', icon: PlayIcon, color: 'text-primary-600 dark:text-primary-400' },
+    { value: 'completed', label: 'Implementado', icon: CheckCircleIcon, color: 'text-success-600 dark:text-success-400' },
+    { value: 'ignored', label: 'Ignorar', icon: XCircleIcon, color: 'text-gray-500 dark:text-gray-400' },
+];
+
+const category = computed(() =>
     categoryConfig[props.suggestion?.category] || { icon: '💡', label: 'Geral', color: 'from-gray-500 to-gray-600', bg: 'bg-gray-100' }
 );
 
-const priority = computed(() => 
-    priorityConfig[props.suggestion?.priority] || priorityConfig.medium
+const priority = computed(() =>
+    priorityConfig[props.suggestion?.priority || props.suggestion?.expected_impact] || priorityConfig.medium
 );
 
-// Get action_steps from either action_steps or implementation_steps
+// Get action_steps from either action_steps or implementation_steps or recommended_action
 const actionSteps = computed(() => {
     if (!props.suggestion) return [];
-    return props.suggestion.action_steps || props.suggestion.implementation_steps || [];
+    const steps = props.suggestion.action_steps || props.suggestion.implementation_steps;
+    if (steps && steps.length > 0) return steps;
+
+    // If we have recommended_action as a string, split it into steps
+    if (props.suggestion.recommended_action && typeof props.suggestion.recommended_action === 'string') {
+        const lines = props.suggestion.recommended_action.split('\n').filter(line => line.trim());
+        if (lines.length > 1) return lines;
+        return [props.suggestion.recommended_action];
+    }
+
+    return [];
 });
+
+// Support both legacy is_done and new status field
+const currentStatus = computed(() => {
+    if (props.suggestion?.status) return props.suggestion.status;
+    return props.suggestion?.is_done ? 'completed' : 'pending';
+});
+
+const currentStatusOption = computed(() =>
+    statusOptions.find(o => o.value === currentStatus.value) || statusOptions[0]
+);
+
+function selectStatus(status) {
+    showStatusDropdown.value = false;
+    if (status !== currentStatus.value) {
+        emit('status-change', { suggestion: props.suggestion, status });
+    }
+}
 </script>
 
 <template>
@@ -180,25 +219,49 @@ const actionSteps = computed(() => {
                     </div>
 
                     <!-- Footer -->
-                    <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100">
+                    <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                            <button
-                                v-if="!suggestion.is_done"
-                                @click="emit('mark-done', suggestion)"
-                                class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 dark:text-gray-400 font-medium hover:border-success-500 hover:text-success-600 hover:bg-success-50 transition-all"
-                            >
-                                <CheckCircleIcon class="w-5 h-5" />
-                                Marcar como Implementado
-                            </button>
-                            <div v-else class="flex items-center gap-2 text-success-600 font-semibold">
-                                <CheckCircleIcon class="w-5 h-5" />
-                                Implementado
+                            <!-- Status Dropdown -->
+                            <div class="relative">
+                                <button
+                                    @click="showStatusDropdown = !showStatusDropdown"
+                                    class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-medium transition-all hover:border-primary-300 dark:hover:border-primary-700"
+                                    :class="currentStatusOption.color"
+                                >
+                                    <component :is="currentStatusOption.icon" class="w-5 h-5" />
+                                    {{ currentStatusOption.label }}
+                                    <ChevronDownIcon class="w-4 h-4 ml-1" />
+                                </button>
+                                <Transition
+                                    enter-active-class="transition ease-out duration-100"
+                                    enter-from-class="transform opacity-0 scale-95"
+                                    enter-to-class="transform opacity-100 scale-100"
+                                    leave-active-class="transition ease-in duration-75"
+                                    leave-from-class="transform opacity-100 scale-100"
+                                    leave-to-class="transform opacity-0 scale-95"
+                                >
+                                    <div
+                                        v-if="showStatusDropdown"
+                                        class="absolute bottom-full mb-2 left-0 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-20"
+                                    >
+                                        <button
+                                            v-for="option in statusOptions"
+                                            :key="option.value"
+                                            @click="selectStatus(option.value)"
+                                            class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                            :class="[option.color, option.value === currentStatus ? 'bg-gray-50 dark:bg-gray-700' : '']"
+                                        >
+                                            <component :is="option.icon" class="w-5 h-5" />
+                                            {{ option.label }}
+                                        </button>
+                                    </div>
+                                </Transition>
                             </div>
 
                             <div class="flex items-center gap-3">
                                 <button
                                     @click="emit('close')"
-                                    class="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
+                                    class="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                 >
                                     Fechar
                                 </button>

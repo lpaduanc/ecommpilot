@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\Store;
+use App\Services\DashboardService;
 use App\Services\Integration\NuvemshopService;
+use App\Services\ProductAnalyticsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -72,8 +74,11 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         return 300;
     }
 
-    public function handle(NuvemshopService $nuvemshopService): void
-    {
+    public function handle(
+        NuvemshopService $nuvemshopService,
+        DashboardService $dashboardService,
+        ProductAnalyticsService $productAnalyticsService
+    ): void {
         $this->store->markAsSyncing();
         $checkpoint = $this->getCheckpoint();
 
@@ -113,6 +118,11 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
 
             $this->store->markAsSynced();
             $this->clearCheckpoint();
+
+            // Clear all caches after successful sync
+            $dashboardService->clearCache($this->store);
+            $productAnalyticsService->invalidateABCCache($this->store);
+            Log::info("All caches cleared for store: {$this->store->name}");
 
             Log::info("Sync completed for store: {$this->store->name}", [
                 'store_id' => $this->store->id,

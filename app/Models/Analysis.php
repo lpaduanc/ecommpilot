@@ -6,6 +6,7 @@ use App\Enums\AnalysisStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Analysis extends Model
@@ -50,6 +51,14 @@ class Analysis extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class);
+    }
+
+    /**
+     * Get the persistent suggestions for this analysis.
+     */
+    public function persistentSuggestions(): HasMany
+    {
+        return $this->hasMany(Suggestion::class);
     }
 
     public function isCompleted(): bool

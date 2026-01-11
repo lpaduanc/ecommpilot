@@ -12,6 +12,21 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const nextAvailableAt = ref(null);
     const credits = ref(0);
     const pollingInterval = ref(null);
+
+    // Persistent suggestions state
+    const persistentSuggestions = ref([]);
+    const suggestionStats = ref(null);
+    const suggestionsLoading = ref(false);
+    const suggestionsPagination = ref({
+        total: 0,
+        currentPage: 1,
+        lastPage: 1,
+    });
+    const suggestionsFilter = ref({
+        status: null,
+        category: null,
+        impact: null,
+    });
     
     const hasAnalysisInProgress = computed(() => {
         return pendingAnalysis.value !== null;
@@ -42,16 +57,37 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const opportunities = computed(() => currentAnalysis.value?.opportunities || []);
     const summary = computed(() => currentAnalysis.value?.summary || null);
     
-    const highPrioritySuggestions = computed(() => 
+    const highPrioritySuggestions = computed(() =>
         suggestions.value.filter(s => s.priority === 'high')
     );
-    
-    const mediumPrioritySuggestions = computed(() => 
+
+    const mediumPrioritySuggestions = computed(() =>
         suggestions.value.filter(s => s.priority === 'medium')
     );
-    
-    const lowPrioritySuggestions = computed(() => 
+
+    const lowPrioritySuggestions = computed(() =>
         suggestions.value.filter(s => s.priority === 'low')
+    );
+
+    // Persistent suggestions computed
+    const pendingSuggestions = computed(() =>
+        persistentSuggestions.value.filter(s => s.status === 'pending')
+    );
+
+    const inProgressSuggestions = computed(() =>
+        persistentSuggestions.value.filter(s => s.status === 'in_progress')
+    );
+
+    const completedSuggestions = computed(() =>
+        persistentSuggestions.value.filter(s => s.status === 'completed')
+    );
+
+    const ignoredSuggestions = computed(() =>
+        persistentSuggestions.value.filter(s => s.status === 'ignored')
+    );
+
+    const highImpactSuggestions = computed(() =>
+        persistentSuggestions.value.filter(s => s.expected_impact === 'high' && s.status !== 'completed' && s.status !== 'ignored')
     );
     
     async function fetchCurrentAnalysis() {
@@ -187,8 +223,93 @@ export const useAnalysisStore = defineStore('analysis', () => {
     function getSuggestionsByCategory(category) {
         return suggestions.value.filter(s => s.category === category);
     }
-    
+
+    // Persistent suggestions actions
+    async function fetchPersistentSuggestions(page = 1) {
+        suggestionsLoading.value = true;
+
+        try {
+            const params = new URLSearchParams();
+            params.append('page', page);
+
+            if (suggestionsFilter.value.status) {
+                params.append('status', suggestionsFilter.value.status);
+            }
+            if (suggestionsFilter.value.category) {
+                params.append('category', suggestionsFilter.value.category);
+            }
+            if (suggestionsFilter.value.impact) {
+                params.append('impact', suggestionsFilter.value.impact);
+            }
+
+            const response = await api.get(`/suggestions?${params.toString()}`);
+            persistentSuggestions.value = response.data.suggestions;
+            suggestionsPagination.value = {
+                total: response.data.total,
+                currentPage: response.data.current_page,
+                lastPage: response.data.last_page,
+            };
+        } catch (err) {
+            error.value = err.response?.data?.message || 'Erro ao carregar sugestões';
+        } finally {
+            suggestionsLoading.value = false;
+        }
+    }
+
+    async function fetchSuggestionStats() {
+        try {
+            const response = await api.get('/suggestions/stats');
+            suggestionStats.value = response.data.stats;
+        } catch {
+            suggestionStats.value = null;
+        }
+    }
+
+    async function updateSuggestionStatus(suggestionId, newStatus) {
+        try {
+            const response = await api.patch(`/suggestions/${suggestionId}`, {
+                status: newStatus,
+            });
+
+            // Update local state
+            const index = persistentSuggestions.value.findIndex(s => s.id === suggestionId);
+            if (index !== -1) {
+                persistentSuggestions.value[index] = response.data.suggestion;
+            }
+
+            // Refresh stats
+            await fetchSuggestionStats();
+
+            return { success: true, suggestion: response.data.suggestion };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao atualizar sugestão',
+            };
+        }
+    }
+
+    async function getSuggestionDetail(suggestionId) {
+        try {
+            const response = await api.get(`/suggestions/${suggestionId}`);
+            return response.data.suggestion;
+        } catch {
+            return null;
+        }
+    }
+
+    function setSuggestionsFilter(filter) {
+        suggestionsFilter.value = { ...suggestionsFilter.value, ...filter };
+        fetchPersistentSuggestions(1);
+    }
+
+    function clearSuggestionsFilter() {
+        suggestionsFilter.value = { status: null, category: null, impact: null };
+        fetchPersistentSuggestions(1);
+    }
+
     return {
+        // Analysis state
         currentAnalysis,
         pendingAnalysis,
         hasAnalysisInProgress,
@@ -207,6 +328,20 @@ export const useAnalysisStore = defineStore('analysis', () => {
         highPrioritySuggestions,
         mediumPrioritySuggestions,
         lowPrioritySuggestions,
+
+        // Persistent suggestions state
+        persistentSuggestions,
+        suggestionStats,
+        suggestionsLoading,
+        suggestionsPagination,
+        suggestionsFilter,
+        pendingSuggestions,
+        inProgressSuggestions,
+        completedSuggestions,
+        ignoredSuggestions,
+        highImpactSuggestions,
+
+        // Analysis actions
         fetchCurrentAnalysis,
         fetchAnalysisHistory,
         requestNewAnalysis,
@@ -215,6 +350,14 @@ export const useAnalysisStore = defineStore('analysis', () => {
         getSuggestionsByCategory,
         startPolling,
         stopPolling,
+
+        // Persistent suggestions actions
+        fetchPersistentSuggestions,
+        fetchSuggestionStats,
+        updateSuggestionStatus,
+        getSuggestionDetail,
+        setSuggestionsFilter,
+        clearSuggestionsFilter,
     };
 });
 

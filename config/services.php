@@ -47,12 +47,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | Configure the AI providers for analysis and chat features.
-    | Supported providers: openai, gemini
+    | Supported providers: openai, gemini, anthropic
     |
     */
 
     'ai' => [
-        // Default AI provider: 'openai' or 'gemini'
+        // Default AI provider: 'openai', 'gemini', or 'anthropic'
         'default' => env('AI_PROVIDER', 'gemini'),
 
         // OpenAI Configuration
@@ -69,6 +69,27 @@ return [
             'temperature' => (float) env('GEMINI_TEMPERATURE', 0.7),
             'max_tokens' => (int) env('GEMINI_MAX_TOKENS', 4000),
         ],
+
+        // Anthropic (Claude) Configuration
+        'anthropic' => [
+            'api_key' => env('ANTHROPIC_API_KEY'),
+            'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
+            'temperature' => (float) env('ANTHROPIC_TEMPERATURE', 0.7),
+            'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anthropic (Claude) Configuration
+    |--------------------------------------------------------------------------
+    */
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
+        'temperature' => (float) env('ANTHROPIC_TEMPERATURE', 0.7),
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
     ],
 
 ];

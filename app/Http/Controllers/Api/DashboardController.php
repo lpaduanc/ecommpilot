@@ -114,6 +114,27 @@ class DashboardController extends Controller
         return response()->json($data);
     }
 
+    /**
+     * Get all dashboard data in a single request.
+     * This endpoint consolidates all dashboard data into one API call with caching.
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $store = $request->user()->activeStore;
+
+        if (! $store) {
+            return response()->json([
+                'has_store' => false,
+                'message' => 'Nenhuma loja conectada.',
+            ]);
+        }
+
+        $filters = $this->getFilters($request);
+        $data = $this->dashboardService->getBulkDashboardData($store, $filters);
+
+        return response()->json(array_merge($data, ['has_store' => true]));
+    }
+
     private function getFilters(Request $request): array
     {
         return [

@@ -12,6 +12,7 @@ use App\Models\SyncedCoupon;
 use App\Models\SyncedCustomer;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
+use Carbon\Carbon;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -277,7 +278,7 @@ class NuvemshopService
         // Nuvemshop uses non-standard auth header: "Authentication: bearer {token}"
         $response = Http::withHeaders([
             'Authentication' => 'bearer '.$accessToken,
-            'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+            'User-Agent' => 'Ecomm Pilot (contato@softio.com.br)',
         ])
             ->timeout(30)
             ->retry(3, 100, function ($exception) {
@@ -318,7 +319,7 @@ class NuvemshopService
                 // NOT the standard "Authorization: Bearer {token}"
                 $response = Http::withHeaders([
                     'Authentication' => 'bearer '.$store->access_token,
-                    'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+                    'User-Agent' => 'Ecomm Pilot (contato@softio.com.br)',
                 ])
                     ->timeout(30)
                     ->retry(3, 100, function ($exception) {
@@ -525,9 +526,28 @@ class NuvemshopService
                 'phone' => $data['phone'] ?? null,
                 'total_orders' => $data['total_orders'] ?? 0,
                 'total_spent' => $data['total_spent'] ?? 0,
-                'external_created_at' => $data['created_at'] ?? null,
+                'external_created_at' => $this->parseDateTime($data['created_at'] ?? null),
             ]
         );
+    }
+
+    /**
+     * Parse datetime string from Nuvemshop API.
+     *
+     * Nuvemshop returns dates in ISO 8601 format with UTC timezone (+0000).
+     * This method parses the date and converts it to the application timezone.
+     */
+    private function parseDateTime(?string $datetime): ?Carbon
+    {
+        if (empty($datetime)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($datetime)->setTimezone(config('app.timezone'));
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Services\Integration;
 use App\Contracts\OrderAdapterInterface;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use Carbon\Carbon;
 
 /**
  * Adapter for transforming Nuvemshop order data to SyncedOrder structure.
@@ -84,7 +85,7 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
             'coupon' => $coupon,
             'items' => $items,
             'shipping_address' => $shippingAddress,
-            'external_created_at' => $externalData['created_at'] ?? null,
+            'external_created_at' => $this->parseDateTime($externalData['created_at'] ?? null),
         ];
     }
 
@@ -217,7 +218,7 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
     /**
      * Map Nuvemshop payment status to internal PaymentStatus enum value.
      *
-     * Nuvemshop payment statuses: pending, authorized, paid, refunded, voided
+     * Nuvemshop payment statuses: authorized, pending, paid, partially_paid, abandoned, refunded, partially_refunded, voided
      *
      * @param  string|null  $externalStatus  Nuvemshop payment status
      * @return string Internal payment status value
@@ -226,8 +227,9 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
     {
         return match ($externalStatus) {
             'pending', 'authorized' => PaymentStatus::Pending->value,
-            'paid' => PaymentStatus::Paid->value,
-            'refunded', 'voided' => PaymentStatus::Refunded->value,
+            'paid', 'partially_paid' => PaymentStatus::Paid->value,
+            'refunded', 'partially_refunded' => PaymentStatus::Refunded->value,
+            'voided' => PaymentStatus::Voided->value,
             'abandoned' => PaymentStatus::Failed->value,
             default => PaymentStatus::Pending->value,
         };
@@ -273,5 +275,31 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
             'type' => $coupon['type'] ?? null,
             'value' => isset($coupon['value']) ? $this->sanitizeNumericValue($coupon['value']) : null,
         ], fn ($value) => $value !== null);
+    }
+
+    /**
+     * Parse datetime string from Nuvemshop API.
+     *
+     * Nuvemshop returns dates in ISO 8601 format with UTC timezone (+0000).
+     * Example: "2022-11-15T19:36:59+0000"
+     *
+     * This method parses the date and converts it to the application timezone.
+     *
+     * @param  string|null  $datetime  The datetime string from Nuvemshop
+     * @return Carbon|null The parsed datetime in application timezone
+     */
+    private function parseDateTime(?string $datetime): ?Carbon
+    {
+        if (empty($datetime)) {
+            return null;
+        }
+
+        try {
+            // Parse the ISO 8601 date (Carbon automatically recognizes the timezone from +0000)
+            // Then convert to the application timezone
+            return Carbon::parse($datetime)->setTimezone(config('app.timezone'));
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

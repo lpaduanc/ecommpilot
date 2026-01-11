@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
 import BaseButton from '../common/BaseButton.vue';
 import {
@@ -12,6 +12,43 @@ const emit = defineEmits(['change']);
 const dashboardStore = useDashboardStore();
 
 const showFilters = ref(false);
+const buttonRef = ref(null);
+const dropdownPosition = ref({ top: 0, right: 0 });
+
+// Calculate dropdown position relative to the button
+function updateDropdownPosition() {
+    if (buttonRef.value && showFilters.value) {
+        const rect = buttonRef.value.$el?.getBoundingClientRect() || buttonRef.value.getBoundingClientRect();
+        dropdownPosition.value = {
+            top: rect.bottom + 8,
+            right: window.innerWidth - rect.right,
+        };
+    }
+}
+
+// Close dropdown when clicking outside
+function handleClickOutside(event) {
+    const button = buttonRef.value?.$el || buttonRef.value;
+    if (showFilters.value && button && !button.contains(event.target)) {
+        // Check if click is inside the dropdown (which is teleported)
+        const dropdown = document.getElementById('dashboard-filters-dropdown');
+        if (dropdown && !dropdown.contains(event.target)) {
+            showFilters.value = false;
+        }
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('click', handleClickOutside);
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+    window.removeEventListener('resize', updateDropdownPosition);
+    window.removeEventListener('scroll', updateDropdownPosition, true);
+});
 
 const periodOptions = [
     { value: 'today', label: 'Hoje' },
@@ -56,29 +93,36 @@ function clearFilters() {
 
 function toggleFilters() {
     showFilters.value = !showFilters.value;
+    if (showFilters.value) {
+        // Update position after Vue renders the change
+        setTimeout(updateDropdownPosition, 0);
+    }
 }
 </script>
 
 <template>
     <div class="relative">
-        <BaseButton variant="secondary" @click="toggleFilters">
+        <BaseButton ref="buttonRef" variant="secondary" @click="toggleFilters">
             <FunnelIcon class="w-4 h-4" />
             {{ currentPeriodLabel }}
         </BaseButton>
 
-        <!-- Dropdown -->
-        <transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 translate-y-1"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 translate-y-1"
-        >
-            <div
-                v-if="showFilters"
-                class="absolute right-0 mt-2 w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 z-50 p-4"
+        <!-- Dropdown - Teleported to body to avoid overflow:hidden issues -->
+        <Teleport to="body">
+            <transition
+                enter-active-class="transition ease-out duration-200"
+                enter-from-class="opacity-0 translate-y-1"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition ease-in duration-150"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 translate-y-1"
             >
+                <div
+                    v-if="showFilters"
+                    id="dashboard-filters-dropdown"
+                    class="fixed w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4"
+                    :style="{ top: dropdownPosition.top + 'px', right: dropdownPosition.right + 'px' }"
+                >
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold text-gray-900">Filtros</h3>
                     <button @click="showFilters = false" class="text-gray-400 hover:text-gray-600">
@@ -133,7 +177,7 @@ function toggleFilters() {
                 </div>
 
                 <!-- Actions -->
-                <div class="flex items-center gap-2 pt-4 border-t border-gray-100">
+                <div class="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
                     <BaseButton variant="ghost" size="sm" @click="clearFilters">
                         Limpar Filtros
                     </BaseButton>
@@ -141,8 +185,9 @@ function toggleFilters() {
                         Aplicar Filtros
                     </BaseButton>
                 </div>
-            </div>
-        </transition>
+                </div>
+            </transition>
+        </Teleport>
     </div>
 </template>
 

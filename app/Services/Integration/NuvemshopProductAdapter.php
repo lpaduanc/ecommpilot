@@ -3,6 +3,7 @@
 namespace App\Services\Integration;
 
 use App\Contracts\ProductAdapterInterface;
+use Carbon\Carbon;
 
 /**
  * Adapter for transforming Nuvemshop product data to SyncedProduct structure.
@@ -77,8 +78,8 @@ class NuvemshopProductAdapter implements ProductAdapterInterface
             'categories' => $this->extractCategories($externalData),
             'variants' => $this->extractVariants($externalData),
             'is_active' => (bool) ($externalData['published'] ?? true),
-            'external_created_at' => $externalData['created_at'] ?? null,
-            'external_updated_at' => $externalData['updated_at'] ?? null,
+            'external_created_at' => $this->parseDateTime($externalData['created_at'] ?? null),
+            'external_updated_at' => $this->parseDateTime($externalData['updated_at'] ?? null),
         ];
     }
 
@@ -329,5 +330,31 @@ class NuvemshopProductAdapter implements ProductAdapterInterface
 
         // Convert to integer, default to 0 if invalid
         return max(0, (int) $variant['stock']);
+    }
+
+    /**
+     * Parse datetime string from Nuvemshop API.
+     *
+     * Nuvemshop returns dates in ISO 8601 format with UTC timezone (+0000).
+     * Example: "2022-11-15T19:36:59+0000"
+     *
+     * This method parses the date and converts it to the application timezone.
+     *
+     * @param  string|null  $datetime  The datetime string from Nuvemshop
+     * @return Carbon|null The parsed datetime in application timezone
+     */
+    private function parseDateTime(?string $datetime): ?Carbon
+    {
+        if (empty($datetime)) {
+            return null;
+        }
+
+        try {
+            // Parse the ISO 8601 date (Carbon automatically recognizes the timezone from +0000)
+            // Then convert to the application timezone
+            return Carbon::parse($datetime)->setTimezone(config('app.timezone'));
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

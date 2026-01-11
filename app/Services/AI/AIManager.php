@@ -23,7 +23,7 @@ class AIManager
      */
     private function getDefaultProviderFromSettings(): string
     {
-        return SystemSetting::get('ai.provider', config('services.ai.default', 'openai'));
+        return SystemSetting::get('ai.provider', config('services.ai.default', 'gemini'));
     }
 
     /**
@@ -34,6 +34,7 @@ class AIManager
         $this->providers = [
             'openai' => new OpenAIProvider,
             'gemini' => new GeminiProvider,
+            'anthropic' => new AnthropicProvider,
         ];
     }
 

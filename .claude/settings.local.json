@@ -39,7 +39,9 @@
       "Bash(echo $env:USERPROFILE)",
       "Bash(echo:*)",
       "Bash(chmod:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(psql:*)"
     ]
   },
   "statusLine": {

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Store;
 use App\Models\SyncedOrder;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService
@@ -14,18 +15,45 @@ class DashboardService
         $dateRange = $this->getDateRange($filters);
         $previousRange = $this->getPreviousDateRange($dateRange);
 
-        // Current period stats
-        $currentRevenue = $this->getRevenue($store, $dateRange['start'], $dateRange['end']);
-        $currentOrders = $this->getOrdersCount($store, $dateRange['start'], $dateRange['end']);
-        $currentCustomers = $this->getCustomersCount($store, $dateRange['start'], $dateRange['end']);
+        // Consolidated query for current and previous period stats + product count in a single query
+        $stats = DB::table('synced_orders')
+            ->selectRaw('
+                -- Current period (paid orders)
+                SUM(CASE WHEN external_created_at BETWEEN ? AND ? AND payment_status = ? THEN total ELSE 0 END) as current_revenue,
+                COUNT(CASE WHEN external_created_at BETWEEN ? AND ? THEN 1 END) as current_orders,
+                COUNT(DISTINCT CASE WHEN external_created_at BETWEEN ? AND ? THEN customer_email END) as current_customers,
+                -- Previous period (paid orders)
+                SUM(CASE WHEN external_created_at BETWEEN ? AND ? AND payment_status = ? THEN total ELSE 0 END) as previous_revenue,
+                COUNT(CASE WHEN external_created_at BETWEEN ? AND ? THEN 1 END) as previous_orders,
+                COUNT(DISTINCT CASE WHEN external_created_at BETWEEN ? AND ? THEN customer_email END) as previous_customers,
+                -- Products count (scalar subquery - same store_id)
+                (SELECT COUNT(*) FROM synced_products WHERE store_id = ? AND is_active = true AND deleted_at IS NULL) as total_products
+            ', [
+                // Current period bindings
+                $dateRange['start'], $dateRange['end'], 'paid',
+                $dateRange['start'], $dateRange['end'],
+                $dateRange['start'], $dateRange['end'],
+                // Previous period bindings
+                $previousRange['start'], $previousRange['end'], 'paid',
+                $previousRange['start'], $previousRange['end'],
+                $previousRange['start'], $previousRange['end'],
+                // Product count binding
+                $store->id,
+            ])
+            ->where('store_id', $store->id)
+            ->whereNull('deleted_at')
+            ->first();
 
-        // Previous period stats
-        $previousRevenue = $this->getRevenue($store, $previousRange['start'], $previousRange['end']);
-        $previousOrders = $this->getOrdersCount($store, $previousRange['start'], $previousRange['end']);
-        $previousCustomers = $this->getCustomersCount($store, $previousRange['start'], $previousRange['end']);
+        // Extract product count from the consolidated query
+        $totalProducts = (int) ($stats->total_products ?? 0);
 
-        // Products
-        $totalProducts = $store->products()->active()->count();
+        // Extract values and convert to proper types
+        $currentRevenue = (float) ($stats->current_revenue ?? 0);
+        $currentOrders = (int) ($stats->current_orders ?? 0);
+        $currentCustomers = (int) ($stats->current_customers ?? 0);
+        $previousRevenue = (float) ($stats->previous_revenue ?? 0);
+        $previousOrders = (int) ($stats->previous_orders ?? 0);
+        $previousCustomers = (int) ($stats->previous_customers ?? 0);
 
         // Calculate changes
         $revenueChange = $this->calculateChange($currentRevenue, $previousRevenue);
@@ -93,39 +121,47 @@ class DashboardService
     {
         $dateRange = $this->getDateRange($filters);
 
-        // Get orders within the date range
-        $orders = SyncedOrder::where('store_id', $store->id)
-            ->paid()
-            ->whereBetween('external_created_at', [$dateRange['start'], $dateRange['end']])
-            ->get();
+        // Use PostgreSQL jsonb_array_elements to extract items and aggregate at database level
+        $results = DB::select("
+            WITH order_items AS (
+                SELECT
+                    jsonb_array_elements(items::jsonb) AS item
+                FROM synced_orders
+                WHERE store_id = ?
+                    AND payment_status = 'paid'
+                    AND external_created_at BETWEEN ? AND ?
+                    AND deleted_at IS NULL
+                    AND items IS NOT NULL
+            )
+            SELECT
+                COALESCE(
+                    item->>'product_name',
+                    item->>'name',
+                    'Produto'
+                ) as name,
+                SUM(COALESCE((item->>'quantity')::numeric, 1)) as quantity_sold,
+                SUM(
+                    COALESCE(
+                        (item->>'total')::numeric,
+                        COALESCE((item->>'unit_price')::numeric, 0) * COALESCE((item->>'quantity')::numeric, 1)
+                    )
+                ) as revenue
+            FROM order_items
+            GROUP BY name
+            ORDER BY quantity_sold DESC
+            LIMIT 10
+        ", [
+            $store->id,
+            $dateRange['start']->toDateTimeString(),
+            $dateRange['end']->toDateTimeString(),
+        ]);
 
-        // Aggregate product sales from order items
-        $productSales = [];
-
-        foreach ($orders as $order) {
-            $items = $order->items ?? [];
-            foreach ($items as $item) {
-                $productName = $item['product_name'] ?? $item['name'] ?? 'Produto';
-                $quantity = $item['quantity'] ?? 1;
-                $total = $item['total'] ?? ($item['unit_price'] ?? 0) * $quantity;
-
-                if (! isset($productSales[$productName])) {
-                    $productSales[$productName] = [
-                        'name' => $productName,
-                        'quantity_sold' => 0,
-                        'revenue' => 0,
-                    ];
-                }
-
-                $productSales[$productName]['quantity_sold'] += $quantity;
-                $productSales[$productName]['revenue'] += $total;
-            }
-        }
-
-        // Sort by quantity sold and return top 10
-        usort($productSales, fn ($a, $b) => $b['quantity_sold'] <=> $a['quantity_sold']);
-
-        return array_slice(array_values($productSales), 0, 10);
+        // Convert stdClass to array and format numbers
+        return array_map(fn ($item) => [
+            'name' => $item->name,
+            'quantity_sold' => (int) $item->quantity_sold,
+            'revenue' => (float) $item->revenue,
+        ], $results);
     }
 
     public function getPaymentMethodsChart(Store $store, array $filters): array
@@ -168,6 +204,57 @@ class DashboardService
                 'images' => $product->images,
             ])
             ->toArray();
+    }
+
+    /**
+     * Get all dashboard data in a single call with caching.
+     */
+    public function getBulkDashboardData(Store $store, array $filters): array
+    {
+        // Generate cache key based on store, filters, and data freshness
+        $cacheKey = $this->generateCacheKey($store, $filters);
+
+        // Cache for 5 minutes
+        return Cache::remember($cacheKey, 300, function () use ($store, $filters) {
+            return [
+                'stats' => $this->getStats($store, $filters),
+                'revenue_chart' => $this->getRevenueChart($store, $filters),
+                'orders_status_chart' => $this->getOrdersStatusChart($store, $filters),
+                'top_products' => $this->getTopProducts($store, $filters),
+                'payment_methods_chart' => $this->getPaymentMethodsChart($store, $filters),
+                'categories_chart' => $this->getCategoriesChart($store, $filters),
+                'low_stock_products' => $this->getLowStockProducts($store),
+            ];
+        });
+    }
+
+    /**
+     * Clear dashboard cache for a specific store.
+     */
+    public function clearCache(Store $store): void
+    {
+        // Clear all cache entries for this store
+        $patterns = [
+            "dashboard:{$store->id}:*",
+        ];
+
+        foreach ($patterns as $pattern) {
+            Cache::forget($pattern);
+        }
+    }
+
+    /**
+     * Generate a cache key based on store and filters.
+     */
+    private function generateCacheKey(Store $store, array $filters): string
+    {
+        $filterHash = md5(json_encode([
+            'period' => $filters['period'] ?? 'last_30_days',
+            'start_date' => $filters['start_date'] ?? null,
+            'end_date' => $filters['end_date'] ?? null,
+        ]));
+
+        return "dashboard:{$store->id}:{$filterHash}";
     }
 
     private function getDateRange(array $filters): array
@@ -213,29 +300,6 @@ class DashboardService
             'start' => $currentRange['start']->copy()->subDays($diff + 1),
             'end' => $currentRange['start']->copy()->subDay(),
         ];
-    }
-
-    private function getRevenue(Store $store, Carbon $start, Carbon $end): float
-    {
-        return (float) SyncedOrder::where('store_id', $store->id)
-            ->paid()
-            ->whereBetween('external_created_at', [$start, $end])
-            ->sum('total');
-    }
-
-    private function getOrdersCount(Store $store, Carbon $start, Carbon $end): int
-    {
-        return SyncedOrder::where('store_id', $store->id)
-            ->whereBetween('external_created_at', [$start, $end])
-            ->count();
-    }
-
-    private function getCustomersCount(Store $store, Carbon $start, Carbon $end): int
-    {
-        return SyncedOrder::where('store_id', $store->id)
-            ->whereBetween('external_created_at', [$start, $end])
-            ->distinct('customer_email')
-            ->count('customer_email');
     }
 
     private function calculateChange(float $current, float $previous): float

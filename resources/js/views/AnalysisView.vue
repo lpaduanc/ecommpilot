@@ -105,6 +105,26 @@ function viewSuggestionDetail(suggestion) {
     showSuggestionDetail.value = true;
 }
 
+async function handleStatusChange({ suggestion, status }) {
+    // For persistent suggestions (new system)
+    if (suggestion.id && typeof suggestion.id === 'number') {
+        const result = await analysisStore.updateSuggestionStatus(suggestion.id, status);
+        if (result.success) {
+            // Update the selected suggestion with new data
+            selectedSuggestion.value = result.suggestion;
+            notificationStore.success('Status da sugestão atualizado.');
+        } else {
+            notificationStore.error(result.message || 'Erro ao atualizar status.');
+        }
+    } else {
+        // Legacy system - mark as done via old API
+        if (status === 'completed' && currentAnalysis.value) {
+            await analysisStore.markSuggestionAsDone(currentAnalysis.value.id, suggestion.id);
+            notificationStore.success('Sugestão marcada como implementada.');
+        }
+    }
+}
+
 function startCountdown() {
     if (countdownInterval.value) {
         clearInterval(countdownInterval.value);
@@ -437,6 +457,7 @@ onUnmounted(() => {
             :show="showSuggestionDetail"
             :suggestion="selectedSuggestion"
             @close="showSuggestionDetail = false"
+            @status-change="handleStatusChange"
         />
     </div>
 </template>

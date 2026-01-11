@@ -3,6 +3,7 @@
 namespace App\Services\Integration;
 
 use App\Contracts\CouponAdapterInterface;
+use Carbon\Carbon;
 
 /**
  * Adapter for transforming Nuvemshop coupon data to SyncedCoupon structure.
@@ -42,8 +43,8 @@ class NuvemshopCouponAdapter implements CouponAdapterInterface
             'valid' => (bool) ($externalData['valid'] ?? true),
             'used' => (int) ($externalData['used'] ?? 0),
             'max_uses' => isset($externalData['max_uses']) ? (int) $externalData['max_uses'] : null,
-            'start_date' => $externalData['start_date'] ?? null,
-            'end_date' => $externalData['end_date'] ?? null,
+            'start_date' => $this->parseDateTime($externalData['start_date'] ?? null),
+            'end_date' => $this->parseDateTime($externalData['end_date'] ?? null),
             'min_price' => isset($externalData['min_price'])
                 ? $this->sanitizeNumericValue($externalData['min_price'])
                 : null,
@@ -118,5 +119,27 @@ class NuvemshopCouponAdapter implements CouponAdapterInterface
         }
 
         return $default;
+    }
+
+    /**
+     * Parse datetime string from Nuvemshop API.
+     *
+     * Nuvemshop returns dates in ISO 8601 format with UTC timezone (+0000).
+     * This method parses the date and converts it to the application timezone.
+     *
+     * @param  string|null  $datetime  The datetime string from Nuvemshop
+     * @return Carbon|null The parsed datetime in application timezone
+     */
+    private function parseDateTime(?string $datetime): ?Carbon
+    {
+        if (empty($datetime)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($datetime)->setTimezone(config('app.timezone'));
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

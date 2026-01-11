@@ -29,10 +29,13 @@ class ProductController extends Controller
             ]);
         }
 
-        $query = SyncedProduct::where('store_id', $store->id)
-            ->search($request->input('search'))
-            ->orderBy('name');
+        $periodDays = $request->input('period_days', 30);
 
+        // Build base query with filters that can be applied at database level
+        $query = SyncedProduct::where('store_id', $store->id)
+            ->search($request->input('search'));
+
+        // Apply stock status filters (database level)
         if ($request->has('status')) {
             if ($request->input('status') === 'low_stock') {
                 $query->lowStock();
@@ -41,53 +44,66 @@ class ProductController extends Controller
             }
         }
 
-        // Get all products for analytics calculation (before pagination)
-        $allProducts = $query->get();
+        // For ABC category filter, use cached categories and filter at DB level
+        $abcCategory = $request->input('abc_category');
+        if ($abcCategory) {
+            $abcCategories = $this->analyticsService->getABCCategories($store, $periodDays);
+            $productIdsInCategory = array_keys(array_filter($abcCategories, fn ($cat) => strtoupper($cat) === strtoupper($abcCategory)));
 
-        // Calculate analytics for all products
-        $analyticsData = $this->analyticsService->calculateProductAnalytics($store, $allProducts);
+            if (empty($productIdsInCategory)) {
+                return response()->json([
+                    'data' => [],
+                    'total' => 0,
+                    'last_page' => 1,
+                    'current_page' => 1,
+                    'totals' => $this->analyticsService->getEmptyTotals(),
+                    'abc_analysis' => $this->analyticsService->calculateABCAnalysisSummary($store, $periodDays),
+                ]);
+            }
 
-        // Attach analytics data to products
-        foreach ($allProducts as $product) {
+            $query->whereIn('id', $productIdsInCategory);
+        }
+
+        // For stock health filter, we need to pre-calculate stock health for all products
+        // This is cached and much faster than the previous approach
+        $stockHealth = $request->input('stock_health');
+        if ($stockHealth) {
+            $stockHealthData = $this->analyticsService->getStockHealthMapping($store, $periodDays);
+            $productIdsWithHealth = array_keys(array_filter($stockHealthData, fn ($health) => $health === $stockHealth));
+
+            if (empty($productIdsWithHealth)) {
+                return response()->json([
+                    'data' => [],
+                    'total' => 0,
+                    'last_page' => 1,
+                    'current_page' => 1,
+                    'totals' => $this->analyticsService->getEmptyTotals(),
+                    'abc_analysis' => $this->analyticsService->calculateABCAnalysisSummary($store, $periodDays),
+                ]);
+            }
+
+            $query->whereIn('id', $productIdsWithHealth);
+        }
+
+        // Paginate at database level
+        $perPage = $request->input('per_page', 20);
+        $paginator = $query->orderBy('name')->paginate($perPage);
+
+        // Calculate analytics ONLY for products on current page
+        $analyticsData = $this->analyticsService->calculateProductAnalytics($store, $paginator->getCollection(), $periodDays);
+
+        // Attach analytics to current page products
+        foreach ($paginator as $product) {
             if (isset($analyticsData['products'][$product->id])) {
                 $product->analytics = $analyticsData['products'][$product->id];
             }
         }
 
-        // Apply ABC category filter (after analytics calculation)
-        $abcCategory = $request->input('abc_category');
-        if ($abcCategory) {
-            $allProducts = $allProducts->filter(function ($product) use ($abcCategory) {
-                return isset($product->analytics['abc_category'])
-                    && strtoupper($product->analytics['abc_category']) === strtoupper($abcCategory);
-            });
-        }
-
-        // Apply stock health filter (after analytics calculation)
-        $stockHealth = $request->input('stock_health');
-        if ($stockHealth) {
-            $allProducts = $allProducts->filter(function ($product) use ($stockHealth) {
-                $productHealth = $product->analytics['stock_health'] ?? null;
-
-                return $productHealth === $stockHealth;
-            });
-        }
-
-        // Apply pagination manually
-        $perPage = $request->input('per_page', 20);
-        $page = $request->input('page', 1);
-        $offset = ($page - 1) * $perPage;
-
-        // Get paginated subset
-        $paginatedProducts = $allProducts->slice($offset, $perPage)->values();
-        $total = $allProducts->count();
-        $lastPage = (int) ceil($total / $perPage) ?: 1;
-
         return response()->json([
-            'data' => ProductResource::collection($paginatedProducts),
-            'total' => $total,
-            'last_page' => $lastPage,
-            'current_page' => $page,
+            'data' => ProductResource::collection($paginator->getCollection()),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
+            'current_page' => $paginator->currentPage(),
             'totals' => $analyticsData['totals'],
             'abc_analysis' => $analyticsData['abc_analysis'],
         ]);

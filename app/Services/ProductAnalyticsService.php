@@ -6,6 +6,8 @@ use App\Models\Store;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ProductAnalyticsService
 {
@@ -14,21 +16,33 @@ class ProductAnalyticsService
      */
     public function calculateProductAnalytics(Store $store, Collection $products, int $periodDays = 30): array
     {
-        // Get all paid orders from the store (last N days for velocity calculations)
-        $orders = SyncedOrder::where('store_id', $store->id)
-            ->paid()
-            ->where('external_created_at', '>=', now()->subDays($periodDays))
-            ->get();
+        if ($products->isEmpty()) {
+            return [
+                'products' => [],
+                'totals' => $this->getEmptyTotals(),
+                'abc_analysis' => $this->getEmptyABCAnalysis(),
+            ];
+        }
 
-        $totalOrders = $orders->count();
+        // Get aggregated sales metrics using database queries (much faster than PHP loops)
+        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $periodDays);
 
-        // Calculate sales data for each product
+        // Get ABC categories from cache (or calculate if needed)
+        $abcCategories = $this->getABCCategories($store, $periodDays);
+
+        // Get total orders count for conversion rate calculation
+        $totalOrders = $this->getTotalOrdersCount($store, $periodDays);
+
+        // Build product data array
         $productData = [];
         $totalRevenue = 0;
 
         foreach ($products as $product) {
-            $data = $this->calculateProductMetrics($product, $orders, $totalOrders, $periodDays);
-            $productData[$product->id] = $data;
+            $productId = $product->id;
+            $metrics = $salesMetrics[$productId] ?? null;
+
+            $data = $this->buildProductData($product, $metrics, $totalOrders, $periodDays);
+            $productData[$productId] = $data;
             $totalRevenue += $data['total_sold'];
         }
 
@@ -37,23 +51,17 @@ class ProductAnalyticsService
             $data['sales_percentage'] = $totalRevenue > 0
                 ? round(($data['total_sold'] / $totalRevenue) * 100, 2)
                 : 0;
+
+            // Assign ABC category from cache
+            $data['abc_category'] = $abcCategories[$data['product_id']] ?? 'C';
         }
 
-        // Sort products by revenue for ABC analysis
-        uasort($productData, fn ($a, $b) => $b['total_sold'] <=> $a['total_sold']);
-
-        // Calculate ABC categories
-        $this->assignABCCategories($productData, $totalRevenue);
-
-        // Calculate stock health
-        $this->assignStockHealth($productData, $products, $periodDays);
-
-        // Calculate BCG classification (optional - can be set to null if not needed)
+        // Calculate BCG classification
         $this->assignBCGClassification($productData);
 
         // Calculate totals and ABC analysis
         $totals = $this->calculateTotals($productData);
-        $abcAnalysis = $this->calculateABCAnalysis($productData);
+        $abcAnalysis = $this->calculateABCAnalysisFromCache($store, $periodDays);
 
         return [
             'products' => $productData,
@@ -63,56 +71,165 @@ class ProductAnalyticsService
     }
 
     /**
-     * Calculate metrics for a single product
+     * Calculate sales metrics from database using SQL aggregation
+     * This replaces the O(n*m) PHP loops with efficient database queries
      */
-    private function calculateProductMetrics(
-        SyncedProduct $product,
-        Collection $orders,
-        int $totalOrders,
-        int $periodDays
-    ): array {
-        $unitsSold = 0;
-        $totalSold = 0;
-        $ordersWithProduct = 0;
+    private function calculateSalesMetricsFromDatabase(Store $store, Collection $products, int $periodDays): array
+    {
+        $productIds = $products->pluck('id')->toArray();
+        $externalIds = $products->pluck('external_id')->map(fn ($id) => (string) $id)->toArray();
+        $productNames = $products->pluck('name')->toArray();
 
-        // Convert product external_id to string for comparison
-        $productExternalId = (string) $product->external_id;
+        // Create lookup maps
+        $externalIdToId = $products->pluck('id', 'external_id')->map(fn ($id, $extId) => $id)->toArray();
+        $nameToId = $products->pluck('id', 'name')->toArray();
 
-        foreach ($orders as $order) {
-            $items = $order->items ?? [];
-            $productFoundInOrder = false;
+        // Get database driver
+        $driver = DB::connection()->getDriverName();
+        $isPostgres = $driver === 'pgsql';
 
-            foreach ($items as $item) {
-                // Convert item product_id to string for comparison
-                $itemProductId = isset($item['product_id']) ? (string) $item['product_id'] : null;
-                $itemName = $item['product_name'] ?? $item['name'] ?? null;
+        if ($isPostgres) {
+            return $this->calculateSalesMetricsPostgres($store, $products, $periodDays, $externalIds, $productNames, $externalIdToId, $nameToId);
+        } else {
+            return $this->calculateSalesMetricsFallback($store, $products, $periodDays);
+        }
+    }
 
-                // Match by external_id or name (case-insensitive)
-                $matchesId = $itemProductId !== null && $itemProductId === $productExternalId;
-                $matchesName = $itemName !== null && strcasecmp($itemName, $product->name) === 0;
+    /**
+     * PostgreSQL optimized query using JSON operators
+     */
+    private function calculateSalesMetricsPostgres(Store $store, Collection $products, int $periodDays, array $externalIds, array $productNames, array $externalIdToId, array $nameToId): array
+    {
+        // Query to aggregate sales by product from JSON items array
+        $salesData = DB::select("
+            WITH order_items AS (
+                SELECT
+                    id as order_id,
+                    jsonb_array_elements(items) as item
+                FROM synced_orders
+                WHERE store_id = ?
+                    AND payment_status = 'paid'
+                    AND external_created_at >= ?
+                    AND deleted_at IS NULL
+            )
+            SELECT
+                item->>'product_id' as external_product_id,
+                item->>'name' as product_name,
+                COUNT(DISTINCT order_id) as order_count,
+                SUM(COALESCE((item->>'quantity')::integer, 1)) as units_sold,
+                SUM(
+                    CASE
+                        WHEN item->>'total' IS NOT NULL THEN (item->>'total')::numeric
+                        ELSE COALESCE((item->>'quantity')::integer, 1) * COALESCE((item->>'unit_price')::numeric, (item->>'price')::numeric, 0)
+                    END
+                ) as total_revenue
+            FROM order_items
+            GROUP BY item->>'product_id', item->>'name'
+        ", [$store->id, now()->subDays($periodDays)]);
 
-                if ($matchesId || $matchesName) {
-                    $quantity = $item['quantity'] ?? 1;
-                    // Use 'total' if available, otherwise calculate from unit_price * quantity
-                    if (isset($item['total'])) {
-                        $itemTotal = (float) $item['total'];
-                    } else {
-                        $price = $item['unit_price'] ?? $item['price'] ?? 0;
-                        $itemTotal = $quantity * $price;
-                    }
+        // Map results to product IDs
+        $metrics = [];
+        foreach ($salesData as $row) {
+            $externalId = $row->external_product_id;
+            $name = $row->product_name;
 
-                    $unitsSold += $quantity;
-                    $totalSold += $itemTotal;
-                    $productFoundInOrder = true;
-                }
+            // Try to match by external_id first, then by name
+            $productId = null;
+            if ($externalId && isset($externalIdToId[$externalId])) {
+                $productId = $externalIdToId[$externalId];
+            } elseif ($name && isset($nameToId[$name])) {
+                $productId = $nameToId[$name];
             }
 
-            if ($productFoundInOrder) {
-                $ordersWithProduct++;
+            if ($productId) {
+                $metrics[$productId] = [
+                    'order_count' => (int) $row->order_count,
+                    'units_sold' => (int) $row->units_sold,
+                    'total_revenue' => (float) $row->total_revenue,
+                ];
             }
         }
 
-        // Calculate conversion rate: (orders with product / total orders) * 100
+        return $metrics;
+    }
+
+    /**
+     * Fallback for SQLite and other databases
+     */
+    private function calculateSalesMetricsFallback(Store $store, Collection $products, int $periodDays): array
+    {
+        $orders = SyncedOrder::where('store_id', $store->id)
+            ->paid()
+            ->where('external_created_at', '>=', now()->subDays($periodDays))
+            ->get(['id', 'items']);
+
+        $metrics = [];
+        $productsById = $products->keyBy('id');
+        $productsByExternalId = $products->keyBy(fn ($p) => (string) $p->external_id);
+        $productsByName = $products->keyBy('name');
+
+        foreach ($orders as $order) {
+            $items = $order->items ?? [];
+
+            foreach ($items as $item) {
+                $product = null;
+                $itemProductId = isset($item['product_id']) ? (string) $item['product_id'] : null;
+                $itemName = $item['product_name'] ?? $item['name'] ?? null;
+
+                // Try to find product by external_id or name
+                if ($itemProductId && isset($productsByExternalId[$itemProductId])) {
+                    $product = $productsByExternalId[$itemProductId];
+                } elseif ($itemName && isset($productsByName[$itemName])) {
+                    $product = $productsByName[$itemName];
+                }
+
+                if ($product) {
+                    $productId = $product->id;
+
+                    if (! isset($metrics[$productId])) {
+                        $metrics[$productId] = [
+                            'order_count' => 0,
+                            'units_sold' => 0,
+                            'total_revenue' => 0.0,
+                            'order_ids' => [],
+                        ];
+                    }
+
+                    $quantity = $item['quantity'] ?? 1;
+                    $itemTotal = isset($item['total'])
+                        ? (float) $item['total']
+                        : $quantity * ($item['unit_price'] ?? $item['price'] ?? 0);
+
+                    $metrics[$productId]['units_sold'] += $quantity;
+                    $metrics[$productId]['total_revenue'] += $itemTotal;
+
+                    // Track unique orders
+                    if (! in_array($order->id, $metrics[$productId]['order_ids'])) {
+                        $metrics[$productId]['order_ids'][] = $order->id;
+                        $metrics[$productId]['order_count']++;
+                    }
+                }
+            }
+        }
+
+        // Remove temporary order_ids array
+        foreach ($metrics as &$metric) {
+            unset($metric['order_ids']);
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * Build product data array from metrics
+     */
+    private function buildProductData(SyncedProduct $product, ?array $metrics, int $totalOrders, int $periodDays): array
+    {
+        $unitsSold = $metrics['units_sold'] ?? 0;
+        $totalSold = $metrics['total_revenue'] ?? 0.0;
+        $ordersWithProduct = $metrics['order_count'] ?? 0;
+
+        // Calculate conversion rate
         $conversionRate = $totalOrders > 0
             ? round(($ordersWithProduct / $totalOrders) * 100, 2)
             : 0;
@@ -120,116 +237,183 @@ class ProductAnalyticsService
         // Calculate average price
         $averagePrice = $unitsSold > 0 ? $totalSold / $unitsSold : (float) $product->price;
 
-        // Use product cost if available, otherwise use 0
+        // Calculate cost and profit
         $cost = $product->cost !== null ? (float) $product->cost : 0.0;
-
-        // Calculate profit and margin
         $totalCost = $cost * $unitsSold;
         $totalProfit = $totalSold - $totalCost;
 
-        // Margin calculation: if no sales, margin is 0; if no cost, margin is 100%
-        if ($totalSold > 0) {
-            $margin = (($totalSold - $totalCost) / $totalSold) * 100;
-        } else {
-            $margin = 0;
-        }
+        // Calculate margin
+        $margin = $totalSold > 0
+            ? (($totalSold - $totalCost) / $totalSold) * 100
+            : 0;
+
+        // Calculate stock health
+        $avgSalesPerDay = $periodDays > 0 ? $unitsSold / $periodDays : 0;
+        $daysOfStock = $avgSalesPerDay > 0
+            ? $product->stock_quantity / $avgSalesPerDay
+            : ($product->stock_quantity > 0 ? 999 : 0);
+
+        $stockHealth = match (true) {
+            $daysOfStock > 30 => 'Alto',
+            $daysOfStock >= 14 => 'Adequado',
+            $daysOfStock >= 7 => 'Baixo',
+            default => 'Crítico',
+        };
 
         return [
+            'product_id' => $product->id,
             'name' => $product->name,
-            'sessions' => 0, // Not available - would need web analytics integration
+            'sessions' => 0,
             'units_sold' => $unitsSold,
             'conversion_rate' => $conversionRate,
             'total_sold' => round($totalSold, 2),
-            'sales_percentage' => 0, // Will be assigned later
+            'sales_percentage' => 0,
             'total_profit' => round($totalProfit, 2),
             'average_price' => round($averagePrice, 2),
             'cost' => round($cost, 2),
             'margin' => round($margin, 2),
             'stock' => $product->stock_quantity,
-            'abc_category' => null, // Will be assigned later
-            'stock_health' => null, // Will be assigned later
-            'classification' => null, // Will be assigned later (BCG Matrix)
+            'stock_health' => $stockHealth,
+            'days_of_stock' => round($daysOfStock, 1),
+            'abc_category' => null,
+            'classification' => null,
             'orders_with_product' => $ordersWithProduct,
         ];
     }
 
     /**
-     * Assign ABC categories based on cumulative revenue
+     * Get total orders count for conversion rate calculation
      */
-    private function assignABCCategories(array &$productData, float $totalRevenue): void
+    private function getTotalOrdersCount(Store $store, int $periodDays): int
     {
-        if ($totalRevenue <= 0) {
-            foreach ($productData as &$data) {
-                $data['abc_category'] = 'C';
-            }
-
-            return;
-        }
-
-        $cumulativeRevenue = 0;
-
-        foreach ($productData as &$data) {
-            $cumulativeRevenue += $data['total_sold'];
-            $cumulativePercentage = ($cumulativeRevenue / $totalRevenue) * 100;
-
-            if ($cumulativePercentage <= 80) {
-                $data['abc_category'] = 'A';
-            } elseif ($cumulativePercentage <= 95) {
-                $data['abc_category'] = 'B';
-            } else {
-                $data['abc_category'] = 'C';
-            }
-        }
+        return SyncedOrder::where('store_id', $store->id)
+            ->paid()
+            ->where('external_created_at', '>=', now()->subDays($periodDays))
+            ->count();
     }
 
     /**
-     * Assign stock health based on sales velocity
-     *
-     * Health levels based on days of stock remaining:
-     * - Alto: > 30 days
-     * - Adequado: 14-30 days
-     * - Baixo: 7-14 days
-     * - Crítico: < 7 days
+     * Get or calculate ABC categories with caching (public for controller access)
      */
-    private function assignStockHealth(array &$productData, Collection $products, int $periodDays): void
+    public function getABCCategories(Store $store, int $periodDays): array
     {
-        foreach ($productData as $productId => &$data) {
-            $product = $products->firstWhere('id', $productId);
-            if (! $product) {
-                $data['stock_health'] = 'Crítico';
-                $data['days_of_stock'] = 0;
+        $cacheKey = "abc_categories:{$store->id}:{$periodDays}";
 
-                continue;
-            }
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $periodDays) {
+            return $this->calculateABCCategoriesForAllProducts($store, $periodDays);
+        });
+    }
 
-            $stock = $product->stock_quantity;
-            $unitsSold = $data['units_sold'];
+    /**
+     * Calculate ABC categories for all products in the store
+     */
+    private function calculateABCCategoriesForAllProducts(Store $store, int $periodDays): array
+    {
+        // Get all products with sales data
+        $products = SyncedProduct::where('store_id', $store->id)->get();
 
-            // Calculate average sales per day (based on analysis period)
-            $avgSalesPerDay = $periodDays > 0 ? $unitsSold / $periodDays : 0;
+        if ($products->isEmpty()) {
+            return [];
+        }
 
-            // Calculate days of stock remaining
-            if ($avgSalesPerDay > 0) {
-                $daysOfStock = $stock / $avgSalesPerDay;
+        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $periodDays);
+
+        // Create array of [product_id => revenue]
+        $productRevenues = [];
+        foreach ($products as $product) {
+            $revenue = $salesMetrics[$product->id]['total_revenue'] ?? 0;
+            $productRevenues[$product->id] = $revenue;
+        }
+
+        // Sort by revenue descending
+        arsort($productRevenues);
+
+        $totalRevenue = array_sum($productRevenues);
+
+        if ($totalRevenue <= 0) {
+            return array_fill_keys(array_keys($productRevenues), 'C');
+        }
+
+        // Assign ABC categories
+        $categories = [];
+        $cumulativeRevenue = 0;
+
+        foreach ($productRevenues as $productId => $revenue) {
+            $cumulativeRevenue += $revenue;
+            $cumulativePercentage = ($cumulativeRevenue / $totalRevenue) * 100;
+
+            if ($cumulativePercentage <= 80) {
+                $categories[$productId] = 'A';
+            } elseif ($cumulativePercentage <= 95) {
+                $categories[$productId] = 'B';
             } else {
-                // No sales in period - if has stock, consider "Alto", otherwise "Crítico"
-                $daysOfStock = $stock > 0 ? 999 : 0;
-            }
-
-            // Store days of stock for reference
-            $data['days_of_stock'] = round($daysOfStock, 1);
-
-            // Assign health level based on days remaining
-            if ($daysOfStock > 30) {
-                $data['stock_health'] = 'Alto';
-            } elseif ($daysOfStock >= 14) {
-                $data['stock_health'] = 'Adequado';
-            } elseif ($daysOfStock >= 7) {
-                $data['stock_health'] = 'Baixo';
-            } else {
-                $data['stock_health'] = 'Crítico';
+                $categories[$productId] = 'C';
             }
         }
+
+        return $categories;
+    }
+
+    /**
+     * Get or calculate stock health mapping with caching
+     * Returns [product_id => 'Alto'|'Adequado'|'Baixo'|'Crítico']
+     */
+    public function getStockHealthMapping(Store $store, int $periodDays): array
+    {
+        $cacheKey = "stock_health:{$store->id}:{$periodDays}";
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $periodDays) {
+            return $this->calculateStockHealthForAllProducts($store, $periodDays);
+        });
+    }
+
+    /**
+     * Calculate stock health for all products
+     */
+    private function calculateStockHealthForAllProducts(Store $store, int $periodDays): array
+    {
+        $products = SyncedProduct::where('store_id', $store->id)->get(['id', 'stock_quantity']);
+
+        if ($products->isEmpty()) {
+            return [];
+        }
+
+        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $periodDays);
+
+        $stockHealthMap = [];
+
+        foreach ($products as $product) {
+            $unitsSold = $salesMetrics[$product->id]['units_sold'] ?? 0;
+            $avgSalesPerDay = $periodDays > 0 ? $unitsSold / $periodDays : 0;
+            $daysOfStock = $avgSalesPerDay > 0
+                ? $product->stock_quantity / $avgSalesPerDay
+                : ($product->stock_quantity > 0 ? 999 : 0);
+
+            $stockHealthMap[$product->id] = match (true) {
+                $daysOfStock > 30 => 'Alto',
+                $daysOfStock >= 14 => 'Adequado',
+                $daysOfStock >= 7 => 'Baixo',
+                default => 'Crítico',
+            };
+        }
+
+        return $stockHealthMap;
+    }
+
+    /**
+     * Invalidate ABC categories cache (call after order sync)
+     */
+    public function invalidateABCCache(Store $store): void
+    {
+        Cache::forget("abc_categories:{$store->id}:30");
+        Cache::forget("abc_categories:{$store->id}:7");
+        Cache::forget("abc_categories:{$store->id}:90");
+        Cache::forget("abc_analysis:{$store->id}:30");
+        Cache::forget("abc_analysis:{$store->id}:7");
+        Cache::forget("abc_analysis:{$store->id}:90");
+        Cache::forget("stock_health:{$store->id}:30");
+        Cache::forget("stock_health:{$store->id}:7");
+        Cache::forget("stock_health:{$store->id}:90");
     }
 
     /**
@@ -308,28 +492,69 @@ class ProductAnalyticsService
     }
 
     /**
-     * Calculate ABC analysis summary
+     * Calculate ABC analysis summary from cache (public alias for controller access)
      */
-    private function calculateABCAnalysis(array $productData): array
+    public function calculateABCAnalysisSummary(Store $store, int $periodDays): array
     {
-        $total = count($productData);
-        $categoryA = count(array_filter($productData, fn ($p) => $p['abc_category'] === 'A'));
-        $categoryB = count(array_filter($productData, fn ($p) => $p['abc_category'] === 'B'));
-        $categoryC = count(array_filter($productData, fn ($p) => $p['abc_category'] === 'C'));
+        return $this->calculateABCAnalysisFromCache($store, $periodDays);
+    }
 
+    /**
+     * Calculate ABC analysis summary from cache
+     */
+    private function calculateABCAnalysisFromCache(Store $store, int $periodDays): array
+    {
+        $cacheKey = "abc_analysis:{$store->id}:{$periodDays}";
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $periodDays) {
+            $categories = $this->getABCCategories($store, $periodDays);
+
+            $total = count($categories);
+            $categoryA = count(array_filter($categories, fn ($cat) => $cat === 'A'));
+            $categoryB = count(array_filter($categories, fn ($cat) => $cat === 'B'));
+            $categoryC = count(array_filter($categories, fn ($cat) => $cat === 'C'));
+
+            return [
+                'category_a' => [
+                    'count' => $categoryA,
+                    'percentage' => $total > 0 ? round(($categoryA / $total) * 100, 2) : 0,
+                ],
+                'category_b' => [
+                    'count' => $categoryB,
+                    'percentage' => $total > 0 ? round(($categoryB / $total) * 100, 2) : 0,
+                ],
+                'category_c' => [
+                    'count' => $categoryC,
+                    'percentage' => $total > 0 ? round(($categoryC / $total) * 100, 2) : 0,
+                ],
+            ];
+        });
+    }
+
+    /**
+     * Get empty totals structure (public for controller access)
+     */
+    public function getEmptyTotals(): array
+    {
         return [
-            'category_a' => [
-                'count' => $categoryA,
-                'percentage' => $total > 0 ? round(($categoryA / $total) * 100, 2) : 0,
-            ],
-            'category_b' => [
-                'count' => $categoryB,
-                'percentage' => $total > 0 ? round(($categoryB / $total) * 100, 2) : 0,
-            ],
-            'category_c' => [
-                'count' => $categoryC,
-                'percentage' => $total > 0 ? round(($categoryC / $total) * 100, 2) : 0,
-            ],
+            'total_products' => 0,
+            'total_sessions' => 0,
+            'total_units_sold' => 0,
+            'total_revenue' => 0,
+            'total_profit' => 0,
+            'average_margin' => 0,
+        ];
+    }
+
+    /**
+     * Get empty ABC analysis structure
+     */
+    private function getEmptyABCAnalysis(): array
+    {
+        return [
+            'category_a' => ['count' => 0, 'percentage' => 0],
+            'category_b' => ['count' => 0, 'percentage' => 0],
+            'category_c' => ['count' => 0, 'percentage' => 0],
         ];
     }
 }

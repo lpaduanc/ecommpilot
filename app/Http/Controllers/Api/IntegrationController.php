@@ -279,7 +279,7 @@ class IntegrationController extends Controller
                 try {
                     $storeResponse = Http::withHeaders([
                         'Authentication' => 'bearer '.$data['access_token'],
-                        'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+                        'User-Agent' => 'Ecomm Pilot (contato@softio.com.br)',
                     ])->get("https://api.tiendanube.com/2025-03/{$data['user_id']}/store");
 
                     if ($storeResponse->successful()) {

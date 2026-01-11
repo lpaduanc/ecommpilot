@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../services/api';
 import BaseCard from '../components/common/BaseCard.vue';
@@ -22,6 +22,42 @@ import {
 
 const route = useRoute();
 const { formatCurrency, formatPercentage } = useFormatters();
+
+// Debounce utility for search optimization
+let searchDebounceTimer = null;
+const DEBOUNCE_DELAY = 300; // ms
+
+function debounce(fn, delay) {
+    return (...args) => {
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => fn(...args), delay);
+    };
+}
+
+// Memoization cache for expensive formatting operations
+const formatCache = new Map();
+const CACHE_MAX_SIZE = 500;
+
+function memoizedFormat(key, value, formatter) {
+    const cacheKey = `${key}:${value}`;
+    if (formatCache.has(cacheKey)) {
+        return formatCache.get(cacheKey);
+    }
+    const result = formatter(value);
+    // Limit cache size to prevent memory issues
+    if (formatCache.size >= CACHE_MAX_SIZE) {
+        const firstKey = formatCache.keys().next().value;
+        formatCache.delete(firstKey);
+    }
+    formatCache.set(cacheKey, result);
+    return result;
+}
+
+// Cleanup on unmount
+onUnmounted(() => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    formatCache.clear();
+});
 
 const products = ref([]);
 const selectedProduct = ref(null);
@@ -127,15 +163,45 @@ function handleSearch() {
     fetchProducts();
 }
 
+// Debounced search for input typing - prevents excessive API calls
+const debouncedSearch = debounce(() => {
+    currentPage.value = 1;
+    fetchProducts();
+}, DEBOUNCE_DELAY);
+
+function handleSearchInput() {
+    debouncedSearch();
+}
+
 function goToPage(page) {
     if (page < 1 || page > totalPages.value) return;
     currentPage.value = page;
     fetchProducts();
 }
 
+// Pre-defined static mappings for O(1) lookup (no function calls in render)
+const STOCK_HEALTH_MAP = {
+    'alto': { label: 'Alto', color: 'success' },
+    'adequado': { label: 'Adequado', color: 'primary' },
+    'baixo': { label: 'Baixo', color: 'warning' },
+    'crítico': { label: 'Crítico', color: 'danger' },
+};
+
+const ABC_CATEGORY_MAP = {
+    'A': { label: 'A', color: 'success' },
+    'B': { label: 'B', color: 'warning' },
+    'C': { label: 'C', color: 'danger' },
+};
+
+const DEFAULT_BADGE = { label: '-', color: 'secondary' };
+
+// Cached Intl formatters (created once, reused)
+const numberFormatter = new Intl.NumberFormat('pt-BR');
+
+// Memoized formatting functions for table cells
 function formatNumber(value) {
     if (!value) return '0';
-    return new Intl.NumberFormat('pt-BR').format(value);
+    return memoizedFormat('num', value, (v) => numberFormatter.format(v));
 }
 
 function getStockStatus(quantity) {
@@ -144,25 +210,19 @@ function getStockStatus(quantity) {
     return { label: 'Em Estoque', color: 'success' };
 }
 
+// O(1) lookup with pre-defined map
 function getStockHealthStatus(health) {
-    const healthMap = {
-        'alto': { label: 'Alto', color: 'success' },
-        'adequado': { label: 'Adequado', color: 'primary' },
-        'baixo': { label: 'Baixo', color: 'warning' },
-        'crítico': { label: 'Crítico', color: 'danger' },
-    };
-    return healthMap[health?.toLowerCase()] || { label: health || '-', color: 'secondary' };
+    if (!health) return DEFAULT_BADGE;
+    return STOCK_HEALTH_MAP[health.toLowerCase()] || { label: health, color: 'secondary' };
 }
 
+// O(1) lookup with pre-defined map
 function getAbcCategoryBadge(category) {
-    const categoryMap = {
-        'A': { label: 'A', color: 'success' },
-        'B': { label: 'B', color: 'warning' },
-        'C': { label: 'C', color: 'danger' },
-    };
-    return categoryMap[category] || { label: category || '-', color: 'secondary' };
+    if (!category) return DEFAULT_BADGE;
+    return ABC_CATEGORY_MAP[category] || DEFAULT_BADGE;
 }
 
+// Simple conditionals - no function call overhead
 function getMarginColor(margin) {
     if (margin >= 30) return 'text-success-600 dark:text-success-400';
     if (margin >= 15) return 'text-warning-600 dark:text-warning-400';
@@ -245,6 +305,7 @@ onMounted(() => {
                             <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                             <input
                                 v-model="searchQuery"
+                                @input="handleSearchInput"
                                 @keyup.enter="handleSearch"
                                 type="search"
                                 placeholder="Buscar produto por nome ou SKU..."

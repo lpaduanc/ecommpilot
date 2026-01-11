@@ -47,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('dashboard')->middleware('can:dashboard.view')->group(function () {
+        Route::get('bulk', [DashboardController::class, 'bulk']); // Bulk endpoint for all dashboard data
         Route::get('stats', [DashboardController::class, 'stats']);
         Route::get('charts/revenue', [DashboardController::class, 'revenueChart']);
         Route::get('charts/orders-status', [DashboardController::class, 'ordersStatusChart']);
@@ -137,9 +138,21 @@ Route::middleware('auth:sanctum')->group(function () {
         // Solicitar nova análise - requer permissão específica
         Route::post('request', [AnalysisController::class, 'request'])->middleware('can:analysis.request');
 
-        // Marcar sugestão como feita - requer permissão de visualização
+        // Marcar sugestão como feita (legacy) - requer permissão de visualização
         Route::post('{analysisId}/suggestions/{suggestionId}/done', [AnalysisController::class, 'markSuggestionDone'])
             ->middleware('can:analysis.view');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Suggestions (Persistent)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('suggestions')->middleware('can:analysis.view')->group(function () {
+        Route::get('/', [AnalysisController::class, 'suggestions']);
+        Route::get('/stats', [AnalysisController::class, 'suggestionStats']);
+        Route::get('/{id}', [AnalysisController::class, 'showSuggestion']);
+        Route::patch('/{id}', [AnalysisController::class, 'updateSuggestion']);
     });
 
     /*

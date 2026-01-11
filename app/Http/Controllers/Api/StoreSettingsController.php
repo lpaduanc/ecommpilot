@@ -246,7 +246,7 @@ class StoreSettingsController extends Controller
         try {
             $response = Http::withToken($accessToken)
                 ->withHeaders([
-                    'User-Agent' => 'EcommPilot (contact@ecommpilot.com)',
+                    'User-Agent' => 'Ecomm Pilot (contato@softio.com.br)',
                 ])
                 ->timeout(10)
                 ->get(self::API_BASE_URL.'/'.$userId.'/store');

@@ -295,106 +295,106 @@ All routes in `routes/api.php`. Protected routes require Sanctum auth.
 - No refresh_token support - user must reconnect via OAuth when token invalid (401)
 - Store marked as `TokenExpired` on 401 - requires reconnection
 
-## Módulo de Análise IA para Lojas de E-commerce
+## AI Analysis Module for E-commerce Stores
 
-### Objetivo
-Sistema inteligente de análise que gera sugestões acionáveis para aumentar vendas das lojas conectadas, com aprendizado contínuo e personalização por loja/nicho.
+### Objective
+Intelligent analysis system that generates actionable suggestions to increase sales for connected stores, with continuous learning and personalization by store/niche.
 
-### Arquitetura
-Pipeline de agentes especializados com RAG e memória persistente:
+### Architecture
+Pipeline of specialized agents with RAG and persistent memory:
 
 ```
-Dados da Loja → Agente Coletor → Agente Analista → Agente Estrategista → Agente Crítico → Sugestões
-                     ↓                                                            ↓
-              [RAG: Knowledge Base]                                    [Memória: Histórico]
-                     ↓                                                            ↓
-              Benchmarks, boas práticas,                              Sugestões anteriores,
-              cases por nicho                                         feedback, resultados
+Store Data → Collector Agent → Analyst Agent → Strategist Agent → Critic Agent → Suggestions
+                  ↓                                                         ↓
+           [RAG: Knowledge Base]                                 [Memory: History]
+                  ↓                                                         ↓
+           Benchmarks, best practices,                          Previous suggestions,
+           cases by niche                                       feedback, results
 ```
 
-### Stack Técnica
+### Technical Stack
 - **Backend:** Laravel (PHP 8.x)
 - **Frontend:** Vue.js
-- **Banco:** PostgreSQL + pgvector (embeddings)
+- **Database:** PostgreSQL + pgvector (embeddings)
 - **LLM:** Claude API (Anthropic)
-- **Embeddings:** OpenAI text-embedding-3-small ou Voyage AI
+- **Embeddings:** OpenAI text-embedding-3-small or Voyage AI
 
-### Componentes Principais
+### Main Components
 
 1. **RAG (Retrieval Augmented Generation)**
-   - Base de conhecimento vetorial com boas práticas de e-commerce
-   - Benchmarks por nicho (moda, eletrônicos, etc.)
-   - Estratégias de cupons, precificação, sazonalidade
-   - Tabela: `knowledge_embeddings`
+   - Vector knowledge base with e-commerce best practices
+   - Benchmarks by niche (fashion, electronics, etc.)
+   - Coupon strategies, pricing, seasonality
+   - Table: `knowledge_embeddings`
 
-2. **Sistema de Memória por Loja**
-   - Histórico de análises e sugestões
-   - Status de cada sugestão (pendente/feita/ignorada)
-   - Resultados após implementação (feedback loop)
-   - Tabelas: `analises`, `sugestoes`, `resultados`
+2. **Store Memory System**
+   - Analysis and suggestions history
+   - Status of each suggestion (pending/done/ignored)
+   - Results after implementation (feedback loop)
+   - Tables: `analyses`, `suggestions`, `results`
 
-3. **Pipeline de Agentes**
-   - `AgenteColetorService`: contexto + histórico + benchmarks via RAG
-   - `AgenteAnalistaService`: métricas, padrões, anomalias
-   - `AgenteEstrategistaService`: gera sugestões novas e personalizadas
-   - `AgenteCriticoService`: filtra genéricas, valida, prioriza
+3. **Agent Pipeline**
+   - `CollectorAgentService`: context + history + benchmarks via RAG
+   - `AnalystAgentService`: metrics, patterns, anomalies
+   - `StrategistAgentService`: generates new and personalized suggestions
+   - `CriticAgentService`: filters generic ones, validates, prioritizes
 
 4. **Feedback Loop**
-   - Compara métricas antes/depois de sugestão implementada
-   - Alimenta base de conhecimento com o que funcionou
-   - Melhora sugestões futuras
+   - Compares metrics before/after implemented suggestion
+   - Feeds knowledge base with what worked
+   - Improves future suggestions
 
-### Estrutura de Diretórios
+### Directory Structure
 ```
 app/
 ├── Services/
-│   └── IA/
-│       ├── AnaliseLojaService.php      # Orquestrador principal
-│       ├── Agentes/
-│       │   ├── AgenteColetorService.php
-│       │   ├── AgenteAnalistaService.php
-│       │   ├── AgenteEstrategistaService.php
-│       │   └── AgenteCriticoService.php
+│   └── AI/
+│       ├── StoreAnalysisService.php    # Main orchestrator
+│       ├── Agents/
+│       │   ├── CollectorAgentService.php
+│       │   ├── AnalystAgentService.php
+│       │   ├── StrategistAgentService.php
+│       │   └── CriticAgentService.php
 │       ├── RAG/
 │       │   ├── EmbeddingService.php
 │       │   └── KnowledgeBaseService.php
-│       └── Memoria/
-│           ├── HistoricoService.php
+│       └── Memory/
+│           ├── HistoryService.php
 │           └── FeedbackLoopService.php
 ├── Models/
-│   ├── Analise.php
-│   ├── Sugestao.php
-│   ├── Resultado.php
+│   ├── Analysis.php
+│   ├── Suggestion.php
+│   ├── Result.php
 │   └── KnowledgeEmbedding.php
 ```
 
-### Fluxo Principal
+### Main Flow
 ```php
-// AnaliseLojaService@executar($lojaId)
-1. Coletar contexto (histórico, sugestões anteriores, benchmarks RAG)
-2. Analisar dados atuais (pedidos, produtos, estoque, cupons)
-3. Calcular métricas e detectar anomalias
-4. Gerar sugestões via Agente Estrategista
-5. Filtrar e validar via Agente Crítico
-6. Verificar similaridade (evitar repetições via embedding)
-7. Salvar e retornar sugestões priorizadas
+// StoreAnalysisService@execute($storeId)
+1. Collect context (history, previous suggestions, RAG benchmarks)
+2. Analyze current data (orders, products, stock, coupons)
+3. Calculate metrics and detect anomalies
+4. Generate suggestions via Strategist Agent
+5. Filter and validate via Critic Agent
+6. Check similarity (avoid repetitions via embedding)
+7. Save and return prioritized suggestions
 ```
 
-### Regras de Negócio
-- Sugestões não devem repetir (similaridade > 0.85 = descarta)
-- Cada sugestão tem impacto esperado (alto/médio/baixo)
-- Sugestões marcadas como "feitas" disparam comparação de métricas
-- Nicho da loja é identificado automaticamente pelos produtos
-- Benchmarks são específicos por nicho
+### Business Rules
+- Suggestions must not repeat (similarity > 0.85 = discard)
+- Each suggestion has expected impact (high/medium/low)
+- Suggestions marked as "done" trigger metrics comparison
+- Store niche is automatically identified by products
+- Benchmarks are niche-specific
 
-### Dependências
+### Dependencies
 ```bash
 composer require anthropic-ai/anthropic-php  # Claude API
 composer require pgvector/pgvector           # PostgreSQL vectors
 ```
 
-### Documentação Detalhada
-Ver: `docs/arquitetura-ia-ecommerce.md`
+### Detailed Documentation
+See: `docs/ai-ecommerce-architecture.md`
 
 ### Authentication & Authorization
 
