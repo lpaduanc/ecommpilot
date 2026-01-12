@@ -11,8 +11,18 @@ const props = defineProps({
 });
 
 const score = computed(() => props.summary?.health_score || 0);
-const status = computed(() => props.summary?.health_status || 'N/A');
 const insight = computed(() => props.summary?.main_insight || '');
+
+const statusLabels = {
+    critical: 'Crítico',
+    attention: 'Precisa Atenção',
+    healthy: 'Saudável',
+    excellent: 'Excelente',
+};
+const status = computed(() => {
+    const rawStatus = props.summary?.health_status || 'N/A';
+    return statusLabels[rawStatus] || rawStatus;
+});
 const animatedScore = ref(0);
 
 const scoreColor = computed(() => {

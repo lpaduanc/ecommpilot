@@ -33,9 +33,9 @@ const categoryConfig = {
 };
 
 const priorityConfig = {
-    high: { label: 'Alta Prioridade', color: 'from-rose-500 to-red-500', bg: 'bg-rose-100', text: 'text-rose-700' },
-    medium: { label: 'Média Prioridade', color: 'from-amber-500 to-orange-500', bg: 'bg-amber-100', text: 'text-amber-700' },
-    low: { label: 'Baixa Prioridade', color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+    high: { label: 'Alta Prioridade', color: 'from-orange-500 to-red-600', bg: 'bg-rose-100', text: 'text-rose-700' },
+    medium: { label: 'Média Prioridade', color: 'from-blue-500 to-purple-600', bg: 'bg-blue-100', text: 'text-blue-700' },
+    low: { label: 'Baixa Prioridade', color: 'from-emerald-500 to-green-600', bg: 'bg-emerald-100', text: 'text-emerald-700' },
 };
 
 const effortLabels = {
@@ -108,8 +108,8 @@ function selectStatus(status) {
 
                 <!-- Modal -->
                 <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl">
-                    <!-- Header with Gradient -->
-                    <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="category.color">
+                    <!-- Header with Gradient based on Priority -->
+                    <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="priority.color">
                         <!-- Background Pattern -->
                         <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px); background-size: 20px 20px;"></div>
                         

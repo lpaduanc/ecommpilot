@@ -66,6 +66,11 @@ class Store extends Model
         return $this->hasMany(SyncedCustomer::class);
     }
 
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(SyncedCoupon::class);
+    }
+
     public function analyses(): HasMany
     {
         return $this->hasMany(Analysis::class);

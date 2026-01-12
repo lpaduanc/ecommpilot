@@ -6,64 +6,70 @@ class CollectorAgentPrompt
 {
     public static function get(array $context): string
     {
-        $platform = $context['platform'] ?? 'unknown';
-        $niche = $context['niche'] ?? 'general';
-        $operationTime = $context['operation_time'] ?? 'unknown';
+        $platform = $context['platform'] ?? 'desconhecida';
+        $niche = $context['niche'] ?? 'geral';
+        $operationTime = $context['operation_time'] ?? 'desconhecido';
         $previousAnalyses = json_encode($context['previous_analyses'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $previousSuggestions = json_encode($context['previous_suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $benchmarks = json_encode($context['benchmarks'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         return <<<PROMPT
-You are a specialized agent for collecting and organizing context for e-commerce store analysis.
+Você é um agente especializado em coletar e organizar contexto para análise de lojas de e-commerce brasileiras.
 
-## Your Task
-Analyze the provided information and structure an executive summary of the store context.
+## Sua Tarefa
+Analise as informações fornecidas e estruture um resumo executivo do contexto da loja.
 
-## Store Data
-- **Platform:** {$platform}
-- **Identified niche:** {$niche}
-- **Operation time:** {$operationTime}
+## Dados da Loja
+- **Plataforma:** {$platform}
+- **Nicho identificado:** {$niche}
+- **Tempo de operação:** {$operationTime}
 
-## Previous Analyses History
+## Histórico de Análises Anteriores
 ```json
 {$previousAnalyses}
 ```
 
-## Previous Suggestions and Status
+## Sugestões Anteriores e Status
 ```json
 {$previousSuggestions}
 ```
 
-## Niche Benchmarks (via RAG)
+## Benchmarks do Nicho (via RAG)
 ```json
 {$benchmarks}
 ```
 
-## Instructions
-1. Summarize the store's historical context in 3-5 main points
-2. Identify patterns of suggestions that worked (status = completed with success)
-3. List suggestions that were ignored or did not work
-4. Highlight the most relevant benchmarks for this specific store
-5. Identify gaps between current performance and benchmarks
+## Instruções
+1. Resuma o contexto histórico da loja em 3-5 pontos principais
+2. Identifique padrões de sugestões que funcionaram (status = concluído com sucesso)
+3. Liste sugestões que foram ignoradas ou não funcionaram
+4. Destaque os benchmarks mais relevantes para esta loja específica
+5. Identifique lacunas entre o desempenho atual e os benchmarks
 
-## Output Format
-Return a structured JSON:
+## Formato de Saída
+Retorne um JSON estruturado:
 ```json
 {
-  "historical_summary": ["point 1", "point 2"],
-  "success_patterns": ["pattern 1", "pattern 2"],
-  "suggestions_to_avoid": ["type 1", "type 2"],
+  "historical_summary": ["ponto 1", "ponto 2"],
+  "success_patterns": ["padrão 1", "padrão 2"],
+  "suggestions_to_avoid": ["tipo 1", "tipo 2"],
   "relevant_benchmarks": {
     "conversion_rate": "X%",
     "average_order_value": "R$ X",
     "other": {}
   },
-  "identified_gaps": ["gap 1", "gap 2"],
-  "special_context": "additional observations"
+  "identified_gaps": ["lacuna 1", "lacuna 2"],
+  "special_context": "observações adicionais"
 }
 ```
 
-IMPORTANT: Return ONLY valid JSON, no additional text.
+## INSTRUÇÕES CRÍTICAS
+1. Retorne APENAS JSON válido, sem texto adicional antes ou depois do JSON
+2. Você DEVE retornar a estrutura JSON COMPLETA - não trunque ou abrevie
+3. TODOS os campos são OBRIGATÓRIOS - preencha cada campo com dados reais ou padrões apropriados
+4. Feche todos os colchetes e chaves do JSON corretamente
+5. O JSON deve ser parseável - verifique se sua saída é JSON válido antes de responder
+6. RESPONDA SEMPRE EM PORTUGUÊS BRASILEIRO
 PROMPT;
     }
 }

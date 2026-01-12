@@ -119,8 +119,9 @@ class StoreAnalysisService
      */
     private function identifyNiche(Store $store): string
     {
-        // Get most common categories
+        // Get most common categories (excluding gifts)
         $categories = $store->products()
+            ->excludeGifts()
             ->whereNotNull('categories')
             ->pluck('categories')
             ->flatten()
@@ -173,24 +174,32 @@ class StoreAnalysisService
     }
 
     /**
+     * Analysis period in days.
+     */
+    private const ANALYSIS_PERIOD_DAYS = 15;
+
+    /**
      * Prepare store data for analysis.
      */
     private function prepareStoreData(Store $store): array
     {
-        // Orders from last 90 days
+        $periodDays = self::ANALYSIS_PERIOD_DAYS;
+
+        // Orders from the analysis period (15 days)
         $orders = $store->orders()
-            ->where('external_created_at', '>=', now()->subDays(90))
+            ->where('external_created_at', '>=', now()->subDays($periodDays))
             ->get();
 
         $paidOrders = $orders->filter(fn ($o) => $o->isPaid());
 
-        // Products
-        $products = $store->products()->get();
-        $activeProducts = $products->filter(fn ($p) => $p->is_active);
+        // Products (excluding gifts/brindes)
+        $products = $store->products()->excludeGifts()->get();
+        $activeProducts = $products->filter(fn ($p) => $p->is_active && ! $p->isGift());
 
         return [
             'orders' => [
                 'total' => $orders->count(),
+                'period_days' => $periodDays,
                 'by_status' => $orders->groupBy('status')->map->count()->toArray(),
                 'total_revenue' => $paidOrders->sum('total'),
                 'average_order_value' => $paidOrders->avg('total') ?? 0,
@@ -204,17 +213,14 @@ class StoreAnalysisService
                 'active' => $activeProducts->count(),
                 'out_of_stock' => $products->filter(fn ($p) => $p->isOutOfStock())->count(),
                 'best_sellers' => $this->getBestSellers($store, $paidOrders),
-                'no_sales_30_days' => $this->getNoSalesProducts($store, 30),
+                'no_sales_period' => $this->getNoSalesProducts($store, $periodDays),
             ],
             'inventory' => [
                 'total_value' => $products->sum(fn ($p) => ($p->stock_quantity ?? 0) * ($p->cost ?? 0)),
                 'low_stock_products' => $products->filter(fn ($p) => $p->hasLowStock())->count(),
                 'excess_stock_products' => $products->filter(fn ($p) => ($p->stock_quantity ?? 0) > 100)->count(),
             ],
-            'coupons' => [
-                'active' => 0, // TODO: Implement if coupons are tracked
-                'last_30_days_usage' => [],
-            ],
+            'coupons' => $this->getCouponsData($store, $paidOrders),
         ];
     }
 
@@ -258,10 +264,85 @@ class StoreAnalysisService
             ->toArray();
 
         return $store->products()
+            ->excludeGifts()
             ->where('is_active', true)
             ->where('stock_quantity', '>', 0)
             ->whereNotIn('external_id', $soldProductIds)
             ->count();
+    }
+
+    /**
+     * Get coupons data for analysis.
+     */
+    private function getCouponsData(Store $store, $paidOrders): array
+    {
+        // Get registered coupons
+        $allCoupons = $store->coupons()->get();
+        $activeCoupons = $allCoupons->filter(fn ($c) => $c->isActive());
+
+        // Analyze coupon usage in paid orders
+        $ordersWithCoupon = $paidOrders->filter(fn ($o) => ! empty($o->coupon));
+        $couponUsage = [];
+        $totalDiscountFromCoupons = 0;
+
+        foreach ($ordersWithCoupon as $order) {
+            $couponData = $order->coupon;
+            $couponCode = $couponData['code'] ?? ($couponData['codes'][0]['code'] ?? 'unknown');
+
+            if (! isset($couponUsage[$couponCode])) {
+                $couponUsage[$couponCode] = [
+                    'code' => $couponCode,
+                    'times_used' => 0,
+                    'total_discount' => 0,
+                    'orders_value' => 0,
+                ];
+            }
+
+            $couponUsage[$couponCode]['times_used']++;
+            $couponUsage[$couponCode]['total_discount'] += (float) ($order->discount ?? 0);
+            $couponUsage[$couponCode]['orders_value'] += (float) $order->total;
+            $totalDiscountFromCoupons += (float) ($order->discount ?? 0);
+        }
+
+        // Sort by usage
+        usort($couponUsage, fn ($a, $b) => $b['times_used'] <=> $a['times_used']);
+
+        // Calculate usage rate
+        $totalPaidOrders = $paidOrders->count();
+        $usageRate = $totalPaidOrders > 0
+            ? round(($ordersWithCoupon->count() / $totalPaidOrders) * 100, 2)
+            : 0;
+
+        // Calculate average ticket impact
+        $avgTicketWithCoupon = $ordersWithCoupon->count() > 0
+            ? $ordersWithCoupon->avg('total')
+            : 0;
+        $avgTicketWithoutCoupon = $paidOrders->filter(fn ($o) => empty($o->coupon))->avg('total') ?? 0;
+        $ticketImpact = $avgTicketWithoutCoupon > 0
+            ? round((($avgTicketWithCoupon - $avgTicketWithoutCoupon) / $avgTicketWithoutCoupon) * 100, 2)
+            : 0;
+
+        return [
+            'registered_total' => $allCoupons->count(),
+            'registered_active' => $activeCoupons->count(),
+            'registered_expired' => $allCoupons->filter(fn ($c) => $c->isExpired())->count(),
+            'period_orders_with_coupon' => $ordersWithCoupon->count(),
+            'period_orders_total' => $totalPaidOrders,
+            'usage_rate_percent' => $usageRate,
+            'total_discount_given' => round($totalDiscountFromCoupons, 2),
+            'average_discount_per_order' => $ordersWithCoupon->count() > 0
+                ? round($totalDiscountFromCoupons / $ordersWithCoupon->count(), 2)
+                : 0,
+            'ticket_impact_percent' => $ticketImpact,
+            'most_used_coupons' => array_slice($couponUsage, 0, 5),
+            'active_coupons_list' => $activeCoupons->map(fn ($c) => [
+                'code' => $c->code,
+                'type' => $c->type,
+                'value' => $c->value,
+                'used' => $c->used,
+                'max_uses' => $c->max_uses,
+            ])->values()->toArray(),
+        ];
     }
 
     /**

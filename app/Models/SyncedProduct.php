@@ -91,6 +91,39 @@ class SyncedProduct extends Model
         return $query->where('stock_quantity', '<=', 0);
     }
 
+    /**
+     * Termos que identificam produtos brinde pelo nome.
+     */
+    private const GIFT_TERMS = ['brinde', 'gift', 'grátis', 'gratis', 'amostra', 'cortesia'];
+
+    /**
+     * Verifica se o produto é um brinde baseado no nome.
+     */
+    public function isGift(): bool
+    {
+        $nameLower = mb_strtolower($this->name ?? '');
+
+        foreach (self::GIFT_TERMS as $term) {
+            if (str_contains($nameLower, $term)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Scope para excluir produtos que são brindes.
+     */
+    public function scopeExcludeGifts($query)
+    {
+        foreach (self::GIFT_TERMS as $term) {
+            $query->whereRaw('LOWER(name) NOT LIKE ?', ["%{$term}%"]);
+        }
+
+        return $query;
+    }
+
     public function scopeSearch($query, ?string $search)
     {
         if (empty($search)) {
