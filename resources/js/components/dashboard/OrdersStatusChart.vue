@@ -6,17 +6,28 @@ const props = defineProps({
     data: { type: Array, default: () => [] },
 });
 
+// Payment status colors and labels (used for order status chart)
 const statusColors = {
+    // Payment statuses
     pending: '#fbbf24',
     paid: '#10b981',
-    shipped: '#0c87f7',
+    refunded: '#8b5cf6',
+    voided: '#ef4444',
+    failed: '#dc2626',
+    // Order statuses (fallback)
+    shipped: '#0ea5e9',
     delivered: '#059669',
-    cancelled: '#ef4444',
+    cancelled: '#f97316',
 };
 
 const statusLabels = {
+    // Payment statuses
     pending: 'Pendente',
     paid: 'Pago',
+    refunded: 'Reembolsado',
+    voided: 'Recusado',
+    failed: 'Falhou',
+    // Order statuses (fallback)
     shipped: 'Enviado',
     delivered: 'Entregue',
     cancelled: 'Cancelado',

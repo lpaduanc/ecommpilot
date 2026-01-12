@@ -3,7 +3,9 @@
 namespace App\Services\AI\Agents;
 
 use App\Services\AI\AIManager;
+use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\CollectorAgentPrompt;
+use Illuminate\Support\Facades\Log;
 
 class CollectorAgentService
 {
@@ -33,10 +35,14 @@ class CollectorAgentService
      */
     private function parseResponse(string $response): array
     {
+        Log::debug('Collector raw response (first 2000 chars): '.substr($response, 0, 2000));
+
         // Try to extract JSON from the response
         $json = $this->extractJson($response);
 
         if ($json === null) {
+            Log::warning('Collector: Could not extract JSON from response');
+
             // Return default structure if parsing fails
             return [
                 'historical_summary' => [],
@@ -48,6 +54,8 @@ class CollectorAgentService
             ];
         }
 
+        Log::info('Collector: Successfully parsed context with '.count($json).' keys');
+
         return $json;
     }
 
@@ -56,28 +64,6 @@ class CollectorAgentService
      */
     private function extractJson(string $content): ?array
     {
-        // Try to find JSON in markdown code blocks
-        if (preg_match('/```(?:json)?\s*(.*?)\s*```/s', $content, $matches)) {
-            $decoded = json_decode($matches[1], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        // Try direct parse
-        $decoded = json_decode($content, true);
-        if ($decoded !== null) {
-            return $decoded;
-        }
-
-        // Try to find JSON object in text
-        if (preg_match('/\{.*\}/s', $content, $matches)) {
-            $decoded = json_decode($matches[0], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        return null;
+        return JsonExtractor::extract($content, 'Collector');
     }
 }

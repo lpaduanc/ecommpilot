@@ -14,7 +14,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const error = ref(null);
 
     const filters = ref({
-        period: 'last_30_days',
+        period: 'last_15_days',
         startDate: null,
         endDate: null,
         categories: [],
@@ -117,27 +117,25 @@ export const useDashboardStore = defineStore('dashboard', () => {
     
     function buildFilterParams() {
         const params = {};
-        
-        if (filters.value.period) {
-            params.period = filters.value.period;
+
+        const period = filters.value.period || 'last_15_days';
+        params.period = period;
+
+        // Always send dates when period is custom
+        if (period === 'custom') {
+            // Ensure dates are sent even if they're empty (backend will validate)
+            params.start_date = filters.value.startDate || '';
+            params.end_date = filters.value.endDate || '';
         }
-        
-        if (filters.value.startDate) {
-            params.start_date = filters.value.startDate;
-        }
-        
-        if (filters.value.endDate) {
-            params.end_date = filters.value.endDate;
-        }
-        
+
         if (filters.value.categories.length > 0) {
             params.categories = filters.value.categories.join(',');
         }
-        
+
         if (filters.value.paymentStatus.length > 0) {
             params.payment_status = filters.value.paymentStatus.join(',');
         }
-        
+
         return params;
     }
     
@@ -147,7 +145,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     
     function resetFilters() {
         filters.value = {
-            period: 'last_30_days',
+            period: 'last_15_days',
             startDate: null,
             endDate: null,
             categories: [],

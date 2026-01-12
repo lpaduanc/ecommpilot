@@ -3,7 +3,9 @@
 namespace App\Services\AI\Agents;
 
 use App\Services\AI\AIManager;
+use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\StrategistAgentPrompt;
+use Illuminate\Support\Facades\Log;
 
 class StrategistAgentService
 {
@@ -33,24 +35,42 @@ class StrategistAgentService
      */
     private function parseResponse(string $response): array
     {
+        Log::debug('Strategist raw response (first 2000 chars): '.substr($response, 0, 2000));
+
         $json = $this->extractJson($response);
 
         if ($json === null) {
+            Log::warning('Strategist: Could not extract JSON from response');
+
             return [
                 'suggestions' => [],
                 'general_observations' => 'Could not generate suggestions',
             ];
         }
 
+        Log::debug('Strategist JSON extracted', ['has_suggestions' => isset($json['suggestions']), 'keys' => array_keys($json)]);
+
         // Validate suggestions structure
         $suggestions = $json['suggestions'] ?? [];
         $validatedSuggestions = [];
 
-        foreach ($suggestions as $suggestion) {
+        Log::info('Strategist: Found '.count($suggestions).' suggestions in JSON');
+
+        foreach ($suggestions as $index => $suggestion) {
             if ($this->isValidSuggestion($suggestion)) {
                 $validatedSuggestions[] = $this->normalizeSuggestion($suggestion);
+            } else {
+                Log::warning("Strategist: Suggestion {$index} failed validation", [
+                    'has_category' => ! empty($suggestion['category']),
+                    'has_title' => ! empty($suggestion['title']),
+                    'has_description' => ! empty($suggestion['description']),
+                    'has_recommended_action' => ! empty($suggestion['recommended_action']),
+                    'has_expected_impact' => ! empty($suggestion['expected_impact']),
+                ]);
             }
         }
+
+        Log::info('Strategist: '.count($validatedSuggestions).' suggestions passed validation');
 
         return [
             'suggestions' => $validatedSuggestions,
@@ -63,29 +83,7 @@ class StrategistAgentService
      */
     private function extractJson(string $content): ?array
     {
-        // Try to find JSON in markdown code blocks
-        if (preg_match('/```(?:json)?\s*(.*?)\s*```/s', $content, $matches)) {
-            $decoded = json_decode($matches[1], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        // Try direct parse
-        $decoded = json_decode($content, true);
-        if ($decoded !== null) {
-            return $decoded;
-        }
-
-        // Try to find JSON object in text
-        if (preg_match('/\{.*\}/s', $content, $matches)) {
-            $decoded = json_decode($matches[0], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        return null;
+        return JsonExtractor::extract($content, 'Strategist');
     }
 
     /**

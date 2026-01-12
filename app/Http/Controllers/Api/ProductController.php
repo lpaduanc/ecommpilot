@@ -86,7 +86,7 @@ class ProductController extends Controller
         }
 
         // Paginate at database level
-        $perPage = $request->input('per_page', 20);
+        $perPage = $request->input('per_page', 10);
         $paginator = $query->orderBy('name')->paginate($perPage);
 
         // Calculate analytics ONLY for products on current page

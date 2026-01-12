@@ -117,7 +117,14 @@ Analyze the store data and calculate critical metrics, identifying patterns and 
 }
 ```
 
-IMPORTANT: Return ONLY valid JSON, no additional text. Use numbers for numeric values, not strings.
+## CRITICAL INSTRUCTIONS
+1. Return ONLY valid JSON, no additional text before or after the JSON
+2. Use numbers for numeric values, not strings
+3. You MUST return the COMPLETE JSON structure shown above - do not truncate or abbreviate
+4. ALL fields in the output format are REQUIRED - fill every field with actual data or appropriate defaults
+5. Close all JSON brackets and braces properly
+6. If you cannot calculate a metric, use 0 or appropriate default values
+7. The JSON must be parseable - verify your output is valid JSON before responding
 PROMPT;
     }
 }

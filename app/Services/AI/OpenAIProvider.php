@@ -4,6 +4,9 @@ namespace App\Services\AI;
 
 use App\Contracts\AIProviderInterface;
 use App\Models\SystemSetting;
+use Illuminate\Support\Facades\Log;
+use OpenAI\Exceptions\ErrorException;
+use OpenAI\Exceptions\TransporterException;
 use OpenAI\Laravel\Facades\OpenAI;
 
 class OpenAIProvider implements AIProviderInterface
@@ -13,6 +16,10 @@ class OpenAIProvider implements AIProviderInterface
     private float $defaultTemperature;
 
     private int $defaultMaxTokens;
+
+    private int $maxRetries = 3;
+
+    private array $retryDelays = [5, 15, 30]; // seconds
 
     public function __construct()
     {
@@ -24,14 +31,69 @@ class OpenAIProvider implements AIProviderInterface
 
     public function chat(array $messages, array $options = []): string
     {
-        $response = OpenAI::chat()->create([
-            'model' => $options['model'] ?? $this->defaultModel,
-            'messages' => $messages,
-            'temperature' => $options['temperature'] ?? $this->defaultTemperature,
-            'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
+            try {
+                Log::debug("OpenAI API request attempt {$attempt}/{$this->maxRetries}", [
+                    'model' => $options['model'] ?? $this->defaultModel,
+                    'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
+                ]);
+
+                $response = OpenAI::chat()->create([
+                    'model' => $options['model'] ?? $this->defaultModel,
+                    'messages' => $messages,
+                    'temperature' => $options['temperature'] ?? $this->defaultTemperature,
+                    'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
+                ]);
+
+                Log::debug('OpenAI API request successful', [
+                    'attempt' => $attempt,
+                    'response_length' => strlen($response->choices[0]->message->content ?? ''),
+                ]);
+
+                return $response->choices[0]->message->content;
+
+            } catch (TransporterException $e) {
+                // Network/connection errors - retry
+                $lastException = $e;
+                Log::warning("OpenAI connection error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
+
+                if ($attempt < $this->maxRetries) {
+                    $delay = $this->retryDelays[$attempt - 1] ?? 30;
+                    Log::info("Retrying OpenAI API in {$delay} seconds...");
+                    sleep($delay);
+                }
+            } catch (ErrorException $e) {
+                // API errors - check if retryable
+                $errorCode = $e->getCode();
+
+                // Retry on server errors (5xx) or rate limits (429)
+                if ($errorCode >= 500 || $errorCode === 429) {
+                    $lastException = $e;
+                    Log::warning("OpenAI server error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
+
+                    if ($attempt < $this->maxRetries) {
+                        $delay = $this->retryDelays[$attempt - 1] ?? 30;
+                        Log::info("Retrying OpenAI API in {$delay} seconds...");
+                        sleep($delay);
+                    }
+                } else {
+                    // Non-retryable error (4xx except 429)
+                    throw $e;
+                }
+            }
+        }
+
+        // All retries exhausted
+        Log::error('OpenAI API request failed after all retries', [
+            'attempts' => $this->maxRetries,
+            'last_error' => $lastException?->getMessage(),
         ]);
 
-        return $response->choices[0]->message->content;
+        throw new \RuntimeException(
+            "OpenAI API request failed after {$this->maxRetries} attempts: ".($lastException?->getMessage() ?? 'Unknown error')
+        );
     }
 
     public function getName(): string

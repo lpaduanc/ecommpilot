@@ -44,7 +44,7 @@ class StoreAnalysisService
         // 4. Execute Collector Agent
         Log::info('Executing Collector Agent');
         $collectorContext = $this->collector->execute([
-            'platform' => $store->platform ?? 'nuvemshop',
+            'platform' => $store->platform?->value ?? 'nuvemshop',
             'niche' => $niche,
             'operation_time' => $store->created_at->diffForHumans(),
             'previous_analyses' => $previousAnalyses,
@@ -72,6 +72,8 @@ class StoreAnalysisService
             'rag_strategies' => $nicheStrategies,
         ]);
 
+        Log::info('Pipeline: Strategist generated '.count($generatedSuggestions['suggestions'] ?? []).' suggestions');
+
         // 7. Execute Critic Agent
         Log::info('Executing Critic Agent');
         $criticizedSuggestions = $this->critic->execute([
@@ -79,17 +81,22 @@ class StoreAnalysisService
             'previous_suggestions' => $previousSuggestions,
             'store_context' => [
                 'niche' => $niche,
-                'platform' => $store->platform ?? 'nuvemshop',
+                'platform' => $store->platform?->value ?? 'nuvemshop',
                 'metrics' => $analysisResult['metrics'] ?? [],
             ],
         ]);
 
+        Log::info('Pipeline: Critic approved '.count($criticizedSuggestions['approved_suggestions'] ?? []).' suggestions');
+
         // 8. Filter by similarity (avoid repetitions)
         Log::info('Filtering suggestions by similarity');
+        Log::info('Pipeline: Embedding configured: '.($this->embedding->isConfigured() ? 'yes' : 'no'));
         $finalSuggestions = $this->filterBySimilarity(
             $criticizedSuggestions['approved_suggestions'],
             $store->id
         );
+
+        Log::info('Pipeline: After similarity filter: '.count($finalSuggestions).' suggestions');
 
         // 9. Save analysis and suggestions
         Log::info('Saving analysis and suggestions');
@@ -113,7 +120,7 @@ class StoreAnalysisService
     private function identifyNiche(Store $store): string
     {
         // Get most common categories
-        $categories = $store->syncedProducts()
+        $categories = $store->products()
             ->whereNotNull('categories')
             ->pluck('categories')
             ->flatten()
@@ -171,14 +178,14 @@ class StoreAnalysisService
     private function prepareStoreData(Store $store): array
     {
         // Orders from last 90 days
-        $orders = $store->syncedOrders()
+        $orders = $store->orders()
             ->where('external_created_at', '>=', now()->subDays(90))
             ->get();
 
         $paidOrders = $orders->filter(fn ($o) => $o->isPaid());
 
         // Products
-        $products = $store->syncedProducts()->get();
+        $products = $store->products()->get();
         $activeProducts = $products->filter(fn ($p) => $p->is_active);
 
         return [
@@ -238,7 +245,7 @@ class StoreAnalysisService
      */
     private function getNoSalesProducts(Store $store, int $days): int
     {
-        $soldProductIds = $store->syncedOrders()
+        $soldProductIds = $store->orders()
             ->where('external_created_at', '>=', now()->subDays($days))
             ->get()
             ->flatMap(function ($order) {
@@ -250,7 +257,7 @@ class StoreAnalysisService
             ->unique()
             ->toArray();
 
-        return $store->syncedProducts()
+        return $store->products()
             ->where('is_active', true)
             ->where('stock_quantity', '>', 0)
             ->whereNotIn('external_id', $soldProductIds)

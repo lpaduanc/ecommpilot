@@ -3,7 +3,9 @@
 namespace App\Services\AI\Agents;
 
 use App\Services\AI\AIManager;
+use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\CriticAgentPrompt;
+use Illuminate\Support\Facades\Log;
 
 class CriticAgentService
 {
@@ -16,13 +18,15 @@ class CriticAgentService
      */
     public function execute(array $data): array
     {
+        Log::info('Critic Agent received '.count($data['suggestions'] ?? []).' suggestions to review');
+
         $prompt = CriticAgentPrompt::get($data);
 
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.3, // Lower temperature for consistent evaluation
-            'max_tokens' => 8192, // Ensure enough tokens for detailed critique
+            'max_tokens' => 16384, // Increased for detailed critique with many suggestions
         ]);
 
         return $this->parseResponse($response);
@@ -33,11 +37,17 @@ class CriticAgentService
      */
     private function parseResponse(string $response): array
     {
+        Log::debug('Critic raw response (first 2000 chars): '.substr($response, 0, 2000));
+
         $json = $this->extractJson($response);
 
         if ($json === null) {
+            Log::warning('Critic: Could not extract JSON from response');
+
             return $this->getDefaultResponse();
         }
+
+        Log::debug('Critic JSON extracted', ['keys' => array_keys($json)]);
 
         return $this->normalizeResponse($json);
     }
@@ -47,29 +57,7 @@ class CriticAgentService
      */
     private function extractJson(string $content): ?array
     {
-        // Try to find JSON in markdown code blocks
-        if (preg_match('/```(?:json)?\s*(.*?)\s*```/s', $content, $matches)) {
-            $decoded = json_decode($matches[1], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        // Try direct parse
-        $decoded = json_decode($content, true);
-        if ($decoded !== null) {
-            return $decoded;
-        }
-
-        // Try to find JSON object in text
-        if (preg_match('/\{.*\}/s', $content, $matches)) {
-            $decoded = json_decode($matches[0], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        return null;
+        return JsonExtractor::extract($content, 'Critic');
     }
 
     /**
@@ -79,7 +67,10 @@ class CriticAgentService
     {
         $approvedSuggestions = [];
 
-        foreach ($response['approved_suggestions'] ?? [] as $index => $approved) {
+        $rawApproved = $response['approved_suggestions'] ?? [];
+        Log::info('Critic: JSON has '.count($rawApproved).' approved_suggestions in response');
+
+        foreach ($rawApproved as $index => $approved) {
             $finalVersion = $approved['final_version'] ?? $approved['original'] ?? [];
 
             if (! empty($finalVersion)) {
@@ -90,8 +81,16 @@ class CriticAgentService
                     'quality_score' => floatval($approved['quality_score'] ?? 5.0),
                     'final_priority' => intval($approved['final_priority'] ?? ($index + 1)),
                 ];
+            } else {
+                Log::warning("Critic: Suggestion {$index} has empty final_version", [
+                    'has_final_version' => isset($approved['final_version']),
+                    'has_original' => isset($approved['original']),
+                ]);
             }
         }
+
+        Log::info('Critic: Normalized '.count($approvedSuggestions).' suggestions');
+        Log::info('Critic: Removed '.count($response['removed_suggestions'] ?? []).' suggestions');
 
         return [
             'approved_suggestions' => $approvedSuggestions,

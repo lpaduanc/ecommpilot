@@ -1,5 +1,8 @@
 <script setup>
+import { useRouter } from 'vue-router';
 import { ExclamationTriangleIcon, CubeIcon } from '@heroicons/vue/24/outline';
+
+const router = useRouter();
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
@@ -16,6 +19,13 @@ const stockColors = {
     danger: 'bg-danger-50 text-danger-600',
     warning: 'bg-accent-50 text-accent-600',
 };
+
+function goToProduct(product) {
+    router.push({
+        path: '/products',
+        query: { search: product.name }
+    });
+}
 </script>
 
 <template>
@@ -24,9 +34,14 @@ const stockColors = {
             <div
                 v-for="product in products"
                 :key="product.id"
-                class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
+                @click="goToProduct(product)"
+                role="button"
+                tabindex="0"
+                @keydown.enter="goToProduct(product)"
+                :aria-label="`Ver detalhes do produto ${product.name}`"
+                class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-primary-50 dark:hover:bg-primary-900/30 cursor-pointer transition-all hover:shadow-sm hover:ring-1 hover:ring-primary-200 dark:hover:ring-primary-700"
             >
-                <div class="w-10 h-10 rounded-lg bg-white dark:bg-gray-800 dark:bg-gray-600 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-700 dark:border-gray-600">
+                <div class="w-10 h-10 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-gray-600">
                     <img
                         v-if="product.images?.[0]"
                         :src="product.images[0]"

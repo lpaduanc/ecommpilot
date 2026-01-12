@@ -36,6 +36,8 @@ const creditsFilter = ref('');
 const currentPage = ref(1);
 const totalPages = ref(1);
 const totalItems = ref(0);
+const perPage = ref(10);
+const perPageOptions = [10, 20, 50, 100];
 
 // Modals
 const showCreateModal = ref(false);
@@ -100,7 +102,7 @@ async function fetchClients() {
                 status: statusFilter.value,
                 credits_filter: creditsFilter.value,
                 page: currentPage.value,
-                per_page: 20,
+                per_page: perPage.value,
             },
         });
         clients.value = response.data.data;
@@ -122,6 +124,12 @@ function handleSearch() {
 function goToPage(page) {
     if (page < 1 || page > totalPages.value) return;
     currentPage.value = page;
+    fetchClients();
+}
+
+function changePerPage(newPerPage) {
+    perPage.value = newPerPage;
+    currentPage.value = 1;
     fetchClients();
 }
 
@@ -361,23 +369,23 @@ onMounted(() => {
 <template>
     <div class="space-y-6">
         <!-- Page Header -->
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-display font-bold text-gray-900 flex items-center gap-3">
-                    <UsersIcon class="w-8 h-8 text-primary-500" />
+                <h1 class="text-xl sm:text-2xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                    <UsersIcon class="w-6 sm:w-8 h-6 sm:h-8 text-primary-500" />
                     Gerenciar Clientes
                 </h1>
-                <p class="text-gray-500 mt-1">{{ totalItems }} clientes cadastrados</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">{{ totalItems }} clientes cadastrados</p>
             </div>
-            <BaseButton @click="openCreateModal">
+            <BaseButton @click="openCreateModal" class="w-full sm:w-auto">
                 <PlusIcon class="w-4 h-4" />
                 Novo Cliente
             </BaseButton>
         </div>
 
         <!-- Filters -->
-        <div class="flex flex-wrap items-center gap-4">
-            <div class="flex-1 min-w-[200px] max-w-md">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:flex-wrap items-center gap-3 sm:gap-4">
+            <div class="sm:col-span-2 lg:col-span-2 xl:flex-1 xl:min-w-[200px] xl:max-w-md">
                 <div class="relative">
                     <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
@@ -385,21 +393,21 @@ onMounted(() => {
                         @keyup.enter="handleSearch"
                         type="text"
                         placeholder="Buscar por nome, e-mail ou telefone..."
-                        class="input pl-12"
+                        class="input pl-12 w-full"
                     />
                 </div>
             </div>
-            <select v-model="statusFilter" @change="handleSearch" class="input w-40">
+            <select v-model="statusFilter" @change="handleSearch" class="input w-full xl:w-40">
                 <option v-for="option in statusOptions" :key="option.value" :value="option.value">
                     {{ option.label }}
                 </option>
             </select>
-            <select v-model="creditsFilter" @change="handleSearch" class="input w-48">
+            <select v-model="creditsFilter" @change="handleSearch" class="input w-full xl:w-48">
                 <option v-for="option in creditsOptions" :key="option.value" :value="option.value">
                     {{ option.label }}
                 </option>
             </select>
-            <BaseButton variant="secondary" @click="handleSearch">
+            <BaseButton variant="secondary" @click="handleSearch" class="w-full sm:w-auto">
                 <FunnelIcon class="w-4 h-4" />
                 Filtrar
             </BaseButton>
@@ -411,7 +419,74 @@ onMounted(() => {
                 <LoadingSpinner size="lg" class="text-primary-500" />
             </div>
 
-            <div v-else-if="clients.length > 0" class="overflow-x-auto">
+            <!-- Mobile/Tablet Cards -->
+            <div v-else-if="clients.length > 0" class="xl:hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                    <div
+                        v-for="client in clients"
+                        :key="'card-' + client.id"
+                        class="bg-white dark:bg-gray-800 rounded-xl p-4 transition-all duration-200 border border-gray-200 dark:border-gray-700"
+                    >
+                        <!-- Header: Name + Status -->
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="font-bold text-gray-900 dark:text-gray-100 truncate">{{ client.name }}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ client.email }}</p>
+                                <p v-if="client.phone" class="text-xs text-gray-400 truncate">{{ client.phone }}</p>
+                            </div>
+                            <button
+                                @click="toggleStatus(client)"
+                                :class="['badge badge-sm cursor-pointer', client.is_active ? 'badge-success' : 'badge-danger']"
+                            >
+                                {{ client.is_active ? 'Ativo' : 'Inativo' }}
+                            </button>
+                        </div>
+
+                        <!-- Stats -->
+                        <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+                            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Lojas</p>
+                                <p class="font-semibold text-gray-900 dark:text-gray-100">{{ client.stores_count }}</p>
+                            </div>
+                            <div :class="['rounded-lg p-2.5', client.ai_credits === 0 ? 'bg-danger-50 dark:bg-danger-900/30' : client.ai_credits < 10 ? 'bg-warning-50 dark:bg-warning-900/30' : 'bg-success-50 dark:bg-success-900/30']">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Créditos IA</p>
+                                <p :class="['font-semibold', client.ai_credits === 0 ? 'text-danger-700 dark:text-danger-300' : client.ai_credits < 10 ? 'text-warning-700 dark:text-warning-300' : 'text-success-700 dark:text-success-300']">{{ client.ai_credits }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Dates -->
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-3 space-y-1">
+                            <p>Último login: {{ formatDate(client.last_login_at) }}</p>
+                            <p>Cadastro: {{ formatDate(client.created_at) }}</p>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex flex-wrap items-center gap-1 pt-3 border-t border-gray-100 dark:border-gray-700">
+                            <BaseButton variant="ghost" size="sm" @click="viewClient(client)" title="Ver detalhes">
+                                <EyeIcon class="w-4 h-4" />
+                            </BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="openEditModal(client)" title="Editar">
+                                <PencilIcon class="w-4 h-4 text-primary-500" />
+                            </BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="openAddCreditsModal(client)" title="Adicionar créditos">
+                                <CurrencyDollarIcon class="w-4 h-4 text-success-500" />
+                            </BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="openResetPasswordModal(client)" title="Redefinir senha">
+                                <LockClosedIcon class="w-4 h-4 text-warning-500" />
+                            </BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="impersonateClient(client)" title="Acessar como cliente">
+                                <ArrowPathIcon class="w-4 h-4 text-primary-500" />
+                            </BaseButton>
+                            <BaseButton variant="ghost" size="sm" @click="openDeleteModal(client)" title="Excluir">
+                                <XMarkIcon class="w-4 h-4 text-danger-500" />
+                            </BaseButton>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Desktop Table -->
+            <div v-if="clients.length > 0" class="hidden xl:block overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>
@@ -526,15 +601,26 @@ onMounted(() => {
             </div>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-                <p class="text-sm text-gray-500">
-                    Mostrando {{ (currentPage - 1) * 20 + 1 }} a {{ Math.min(currentPage * 20, totalItems) }} de {{ totalItems }}
-                </p>
+            <div v-if="totalPages > 1 || totalItems > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-700">
+                <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-left">
+                        <span class="hidden sm:inline">Mostrando </span>{{ (currentPage - 1) * perPage + 1 }}-{{ Math.min(currentPage * perPage, totalItems) }} de {{ totalItems }}
+                    </p>
+                    <select
+                        :value="perPage"
+                        @change="changePerPage(Number($event.target.value))"
+                        class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 cursor-pointer"
+                    >
+                        <option v-for="option in perPageOptions" :key="option" :value="option">
+                            {{ option }}/pág
+                        </option>
+                    </select>
+                </div>
                 <div class="flex items-center gap-2">
                     <BaseButton variant="ghost" size="sm" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">
                         <ChevronLeftIcon class="w-4 h-4" />
                     </BaseButton>
-                    <span class="text-sm text-gray-600">{{ currentPage }} / {{ totalPages }}</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300">{{ currentPage }}/{{ totalPages }}</span>
                     <BaseButton variant="ghost" size="sm" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">
                         <ChevronRightIcon class="w-4 h-4" />
                     </BaseButton>

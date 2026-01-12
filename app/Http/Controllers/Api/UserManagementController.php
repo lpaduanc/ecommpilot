@@ -32,15 +32,15 @@ class UserManagementController extends Controller
         // Search functionality
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                $q->whereRaw('name ILIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('email ILIKE ?', ["%{$search}%"]);
             });
         }
 
         // Order by created date
         $query->orderBy('created_at', 'desc');
 
-        $users = $query->paginate($request->input('per_page', 20));
+        $users = $query->paginate($request->input('per_page', 10));
 
         return response()->json([
             'data' => UserManagementResource::collection($users),

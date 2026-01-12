@@ -107,7 +107,15 @@ Only remove suggestions if they are truly problematic. Prefer to IMPROVE over RE
 - Actionability: 0-2 points
 - Originality: 0-2 points
 
-IMPORTANT: Return ONLY valid JSON, no additional text.
+## CRITICAL INSTRUCTIONS
+1. Return ONLY valid JSON, no additional text before or after the JSON
+2. You MUST return the COMPLETE JSON structure - do not truncate or abbreviate
+3. ALL approved suggestions must have the FULL structure with all fields populated
+4. Close all JSON brackets and braces properly
+5. Include ALL approved suggestions completely - do not cut off mid-suggestion
+6. If there are many suggestions, still include ALL of them with complete data
+7. The JSON must be parseable - verify your output is valid JSON before responding
+8. Do not stop generating until all suggestions are processed and the JSON is complete
 PROMPT;
     }
 }

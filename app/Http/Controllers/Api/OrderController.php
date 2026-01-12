@@ -56,7 +56,7 @@ class OrderController extends Controller
             $query->byCity($request->input('city'));
         }
 
-        $orders = $query->paginate($request->input('per_page', 20));
+        $orders = $query->paginate($request->input('per_page', 10));
 
         return response()->json([
             'data' => OrderResource::collection($orders),

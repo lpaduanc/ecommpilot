@@ -18,13 +18,15 @@ class DashboardService
         // Consolidated query for current and previous period stats + product count in a single query
         $stats = DB::table('synced_orders')
             ->selectRaw('
-                -- Current period (paid orders)
+                -- Current period (paid orders for revenue)
                 SUM(CASE WHEN external_created_at BETWEEN ? AND ? AND payment_status = ? THEN total ELSE 0 END) as current_revenue,
                 COUNT(CASE WHEN external_created_at BETWEEN ? AND ? THEN 1 END) as current_orders,
+                COUNT(CASE WHEN external_created_at BETWEEN ? AND ? AND payment_status = ? THEN 1 END) as current_paid_orders,
                 COUNT(DISTINCT CASE WHEN external_created_at BETWEEN ? AND ? THEN customer_email END) as current_customers,
-                -- Previous period (paid orders)
+                -- Previous period (paid orders for revenue)
                 SUM(CASE WHEN external_created_at BETWEEN ? AND ? AND payment_status = ? THEN total ELSE 0 END) as previous_revenue,
                 COUNT(CASE WHEN external_created_at BETWEEN ? AND ? THEN 1 END) as previous_orders,
+                COUNT(CASE WHEN external_created_at BETWEEN ? AND ? AND payment_status = ? THEN 1 END) as previous_paid_orders,
                 COUNT(DISTINCT CASE WHEN external_created_at BETWEEN ? AND ? THEN customer_email END) as previous_customers,
                 -- Products count (scalar subquery - same store_id)
                 (SELECT COUNT(*) FROM synced_products WHERE store_id = ? AND is_active = true AND deleted_at IS NULL) as total_products
@@ -32,10 +34,12 @@ class DashboardService
                 // Current period bindings
                 $dateRange['start'], $dateRange['end'], 'paid',
                 $dateRange['start'], $dateRange['end'],
+                $dateRange['start'], $dateRange['end'], 'paid',
                 $dateRange['start'], $dateRange['end'],
                 // Previous period bindings
                 $previousRange['start'], $previousRange['end'], 'paid',
                 $previousRange['start'], $previousRange['end'],
+                $previousRange['start'], $previousRange['end'], 'paid',
                 $previousRange['start'], $previousRange['end'],
                 // Product count binding
                 $store->id,
@@ -50,9 +54,11 @@ class DashboardService
         // Extract values and convert to proper types
         $currentRevenue = (float) ($stats->current_revenue ?? 0);
         $currentOrders = (int) ($stats->current_orders ?? 0);
+        $currentPaidOrders = (int) ($stats->current_paid_orders ?? 0);
         $currentCustomers = (int) ($stats->current_customers ?? 0);
         $previousRevenue = (float) ($stats->previous_revenue ?? 0);
         $previousOrders = (int) ($stats->previous_orders ?? 0);
+        $previousPaidOrders = (int) ($stats->previous_paid_orders ?? 0);
         $previousCustomers = (int) ($stats->previous_customers ?? 0);
 
         // Calculate changes
@@ -60,10 +66,15 @@ class DashboardService
         $ordersChange = $this->calculateChange($currentOrders, $previousOrders);
         $customersChange = $this->calculateChange($currentCustomers, $previousCustomers);
 
-        // Average ticket
-        $currentTicket = $currentOrders > 0 ? $currentRevenue / $currentOrders : 0;
-        $previousTicket = $previousOrders > 0 ? $previousRevenue / $previousOrders : 0;
+        // Average ticket (based on paid orders only for accuracy)
+        $currentTicket = $currentPaidOrders > 0 ? $currentRevenue / $currentPaidOrders : 0;
+        $previousTicket = $previousPaidOrders > 0 ? $previousRevenue / $previousPaidOrders : 0;
         $ticketChange = $this->calculateChange($currentTicket, $previousTicket);
+
+        // Conversion rate: percentage of orders that were paid
+        $currentConversionRate = $currentOrders > 0 ? ($currentPaidOrders / $currentOrders) * 100 : 0;
+        $previousConversionRate = $previousOrders > 0 ? ($previousPaidOrders / $previousOrders) * 100 : 0;
+        $conversionChange = $this->calculateChange($currentConversionRate, $previousConversionRate);
 
         return [
             'total_revenue' => $currentRevenue,
@@ -75,8 +86,8 @@ class DashboardService
             'customers_change' => $customersChange,
             'average_ticket' => $currentTicket,
             'ticket_change' => $ticketChange,
-            'conversion_rate' => 0, // Would need visits data
-            'conversion_change' => 0,
+            'conversion_rate' => round($currentConversionRate, 2),
+            'conversion_change' => $conversionChange,
         ];
     }
 
@@ -105,16 +116,21 @@ class DashboardService
     {
         $dateRange = $this->getDateRange($filters);
 
-        return SyncedOrder::where('store_id', $store->id)
+        // Use payment_status for better visibility of order states
+        // payment_status shows: pending, paid, refunded, voided, failed
+        $results = DB::table('synced_orders')
+            ->select('payment_status as status', DB::raw('COUNT(*) as count'))
+            ->where('store_id', $store->id)
             ->whereBetween('external_created_at', [$dateRange['start'], $dateRange['end']])
-            ->select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
-            ->get()
-            ->map(fn ($item) => [
-                'status' => $item->status?->value ?? $item->status,
-                'count' => $item->count,
-            ])
-            ->toArray();
+            ->whereNull('deleted_at')
+            ->whereNotNull('payment_status')
+            ->groupBy('payment_status')
+            ->get();
+
+        return $results->map(fn ($item) => [
+            'status' => $item->status,
+            'count' => (int) $item->count,
+        ])->toArray();
     }
 
     public function getTopProducts(Store $store, array $filters): array
@@ -191,8 +207,9 @@ class DashboardService
     public function getLowStockProducts(Store $store, int $threshold = 10): array
     {
         return $store->products()
-            ->active()
+            ->where('is_active', true)  // Explicitly filter active products only
             ->where('stock_quantity', '<=', $threshold)
+            ->where('stock_quantity', '>=', 0)  // Exclude negative stock
             ->orderBy('stock_quantity')
             ->limit(20)
             ->get()
@@ -248,10 +265,15 @@ class DashboardService
      */
     private function generateCacheKey(Store $store, array $filters): string
     {
+        $period = $filters['period'] ?? 'last_15_days';
+        $startDate = ! empty($filters['start_date']) ? $filters['start_date'] : null;
+        $endDate = ! empty($filters['end_date']) ? $filters['end_date'] : null;
+
+        // Normalize cache key for consistency
         $filterHash = md5(json_encode([
-            'period' => $filters['period'] ?? 'last_30_days',
-            'start_date' => $filters['start_date'] ?? null,
-            'end_date' => $filters['end_date'] ?? null,
+            'period' => $period,
+            'start_date' => $period === 'custom' ? $startDate : null,
+            'end_date' => $period === 'custom' ? $endDate : null,
         ]));
 
         return "dashboard:{$store->id}:{$filterHash}";
@@ -259,13 +281,23 @@ class DashboardService
 
     private function getDateRange(array $filters): array
     {
-        $period = $filters['period'] ?? 'last_30_days';
+        $period = $filters['period'] ?? 'last_15_days';
 
-        if ($period === 'custom' && $filters['start_date'] && $filters['end_date']) {
-            return [
-                'start' => Carbon::parse($filters['start_date'])->startOfDay(),
-                'end' => Carbon::parse($filters['end_date'])->endOfDay(),
-            ];
+        // Handle custom period with explicit date range
+        if ($period === 'custom') {
+            $startDate = $filters['start_date'] ?? null;
+            $endDate = $filters['end_date'] ?? null;
+
+            // Only use custom dates if both are provided and not empty
+            if (! empty($startDate) && ! empty($endDate)) {
+                return [
+                    'start' => Carbon::parse($startDate)->startOfDay(),
+                    'end' => Carbon::parse($endDate)->endOfDay(),
+                ];
+            }
+
+            // Fall back to default if custom dates are missing
+            $period = 'last_15_days';
         }
 
         return match ($period) {
@@ -277,6 +309,14 @@ class DashboardService
                 'start' => now()->subDays(7)->startOfDay(),
                 'end' => now()->endOfDay(),
             ],
+            'last_15_days' => [
+                'start' => now()->subDays(15)->startOfDay(),
+                'end' => now()->endOfDay(),
+            ],
+            'last_30_days' => [
+                'start' => now()->subDays(30)->startOfDay(),
+                'end' => now()->endOfDay(),
+            ],
             'this_month' => [
                 'start' => now()->startOfMonth(),
                 'end' => now()->endOfDay(),
@@ -285,8 +325,12 @@ class DashboardService
                 'start' => now()->subMonth()->startOfMonth(),
                 'end' => now()->subMonth()->endOfMonth(),
             ],
+            'all_time' => [
+                'start' => Carbon::create(2000, 1, 1)->startOfDay(),
+                'end' => now()->endOfDay(),
+            ],
             default => [
-                'start' => now()->subDays(30)->startOfDay(),
+                'start' => now()->subDays(15)->startOfDay(),
                 'end' => now()->endOfDay(),
             ],
         };

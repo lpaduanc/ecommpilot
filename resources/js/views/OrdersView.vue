@@ -301,7 +301,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12 -mx-8 -mt-8">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -330,8 +330,8 @@ onMounted(() => {
                     </div>
 
                     <!-- Search Bar -->
-                    <div class="flex items-center gap-3">
-                        <div class="relative flex-1 max-w-md">
+                    <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        <div class="relative flex-1 min-w-[200px] max-w-full sm:max-w-md">
                             <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                             <input
                                 v-model="searchQuery"
@@ -362,7 +362,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="py-8 px-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
+        <div class="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="w-full">
                 <!-- Filters Section -->
                 <BaseCard v-if="!isLoading" class="mb-6">
@@ -388,7 +388,7 @@ onMounted(() => {
                             </div>
 
                             <!-- Filters Row -->
-                            <div class="flex flex-wrap items-center gap-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap items-center gap-3">
                                 <!-- Status Filter -->
                                 <select
                                     v-model="statusFilter"
@@ -489,9 +489,59 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <!-- Table -->
-                    <div v-else-if="orders.length > 0" class="overflow-x-auto">
-                        <table class="min-w-[1400px] w-full table-fixed">
+                    <!-- Mobile/Tablet Cards -->
+                    <div v-else-if="orders.length > 0" class="xl:hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                            <div
+                                v-for="order in orders"
+                                :key="'card-' + order.id"
+                                @click="viewOrderDetail(order)"
+                                class="bg-white dark:bg-gray-800 rounded-xl p-4 cursor-pointer transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-600"
+                            >
+                                <!-- Header: Order Number + Status -->
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Pedido</p>
+                                        <p class="font-bold text-gray-900 dark:text-gray-100">{{ order.order_number }}</p>
+                                    </div>
+                                    <span :class="['badge badge-sm', `badge-${getPaymentStatusConfig(order.payment_status).color}`]">
+                                        {{ getPaymentStatusConfig(order.payment_status).label }}
+                                    </span>
+                                </div>
+
+                                <!-- Customer Info -->
+                                <div class="mb-3 pb-3 border-b border-gray-100 dark:border-gray-700">
+                                    <p class="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">{{ order.customer_name }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ order.customer_email }}</p>
+                                    <p class="text-xs text-gray-400 mt-1">{{ formatDate(order.external_created_at) }}</p>
+                                </div>
+
+                                <!-- Stats Grid -->
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Total</p>
+                                        <p class="font-bold text-gray-900 dark:text-gray-100">{{ formatCurrency(order.total) }}</p>
+                                    </div>
+                                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Itens</p>
+                                        <p class="font-semibold text-gray-900 dark:text-gray-100">{{ order.items_count }}</p>
+                                    </div>
+                                    <div v-if="order.cost > 0" class="bg-success-50 dark:bg-success-900/30 rounded-lg p-2.5">
+                                        <p class="text-xs text-success-600 dark:text-success-400">Lucro</p>
+                                        <p class="font-semibold text-success-700 dark:text-success-300">{{ formatCurrency(order.gross_profit) }}</p>
+                                    </div>
+                                    <div v-if="order.margin !== null && order.cost > 0" class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Margem</p>
+                                        <p :class="['font-semibold', getMarginColor(order.margin)]">{{ order.margin.toFixed(0) }}%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Desktop Table -->
+                    <div v-if="orders.length > 0" class="hidden xl:block overflow-x-auto">
+                        <table class="w-full table-fixed">
                             <colgroup>
                                 <col style="width: 100px;">  <!-- Pedido -->
                                 <col style="width: 100px;">  <!-- Data -->
@@ -643,9 +693,9 @@ onMounted(() => {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Mostrando {{ (currentPage - 1) * perPage + 1 }} a {{ Math.min(currentPage * perPage, totalItems) }} de {{ totalItems }} pedidos
+                    <div v-if="totalPages > 1" class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                        <p class="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-left">
+                            <span class="hidden sm:inline">Mostrando </span>{{ (currentPage - 1) * perPage + 1 }}-{{ Math.min(currentPage * perPage, totalItems) }} de {{ totalItems }}
                         </p>
                         <div class="flex items-center gap-2">
                             <BaseButton
@@ -656,7 +706,7 @@ onMounted(() => {
                             >
                                 <ChevronLeftIcon class="w-4 h-4" />
                             </BaseButton>
-                            <div class="flex items-center gap-1">
+                            <div class="hidden sm:flex items-center gap-1">
                                 <button
                                     v-for="page in visiblePages"
                                     :key="page"
@@ -671,6 +721,9 @@ onMounted(() => {
                                     {{ page }}
                                 </button>
                             </div>
+                            <span class="sm:hidden text-sm text-gray-600 dark:text-gray-300 px-2">
+                                {{ currentPage }}/{{ totalPages }}
+                            </span>
                             <BaseButton
                                 variant="ghost"
                                 size="sm"
@@ -699,7 +752,7 @@ onMounted(() => {
                     ></div>
 
                     <!-- Modal -->
-                    <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl">
+                    <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl shadow-2xl mx-2 sm:mx-4">
                         <!-- Header with Gradient -->
                         <div class="relative px-8 py-6 bg-gradient-to-r from-primary-500 to-secondary-500 overflow-hidden">
                             <!-- Background Pattern -->

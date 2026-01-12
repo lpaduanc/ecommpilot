@@ -6,6 +6,7 @@ use App\Models\Store;
 use App\Services\DashboardService;
 use App\Services\Integration\NuvemshopService;
 use App\Services\ProductAnalyticsService;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -82,36 +83,44 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         $this->store->markAsSyncing();
         $checkpoint = $this->getCheckpoint();
 
+        // Determine if this is an incremental sync (not the first sync)
+        // First sync: last_sync_at is null - fetch all data
+        // Subsequent syncs: fetch only data updated in the last 24 hours
+        $isFirstSync = $this->store->last_sync_at === null;
+        $updatedSince = $isFirstSync ? null : Carbon::now()->subHours(24);
+
         try {
             Log::info("Starting sync for store: {$this->store->name}", [
                 'store_id' => $this->store->id,
                 'checkpoint' => $checkpoint,
+                'is_first_sync' => $isFirstSync,
+                'updated_since' => $updatedSince?->toIso8601String(),
             ]);
 
             // Sync products (se ainda não foi feito)
             if (! in_array('products', $checkpoint)) {
-                $nuvemshopService->syncProducts($this->store);
+                $nuvemshopService->syncProducts($this->store, $updatedSince);
                 $this->saveCheckpoint('products');
                 Log::info("Products synced for store: {$this->store->name}");
             }
 
             // Sync orders (se ainda não foi feito)
             if (! in_array('orders', $checkpoint)) {
-                $nuvemshopService->syncOrders($this->store);
+                $nuvemshopService->syncOrders($this->store, $updatedSince);
                 $this->saveCheckpoint('orders');
                 Log::info("Orders synced for store: {$this->store->name}");
             }
 
             // Sync customers (se ainda não foi feito)
             if (! in_array('customers', $checkpoint)) {
-                $nuvemshopService->syncCustomers($this->store);
+                $nuvemshopService->syncCustomers($this->store, $updatedSince);
                 $this->saveCheckpoint('customers');
                 Log::info("Customers synced for store: {$this->store->name}");
             }
 
             // Sync coupons (se ainda não foi feito)
             if (! in_array('coupons', $checkpoint)) {
-                $nuvemshopService->syncCoupons($this->store);
+                $nuvemshopService->syncCoupons($this->store, $updatedSince);
                 $this->saveCheckpoint('coupons');
                 Log::info("Coupons synced for store: {$this->store->name}");
             }

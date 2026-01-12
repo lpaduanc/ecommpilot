@@ -30,8 +30,10 @@ class AnalysisService
             return false;
         }
 
+        // Get last SUCCESSFUL or PROCESSING analysis (ignore failed ones for rate limit)
         $lastAnalysis = Analysis::where('user_id', $user->id)
             ->where('store_id', $storeId)
+            ->whereIn('status', [AnalysisStatus::Completed, AnalysisStatus::Processing, AnalysisStatus::Pending])
             ->latest()
             ->first();
 
@@ -50,8 +52,10 @@ class AnalysisService
             return null;
         }
 
+        // Get last SUCCESSFUL or PROCESSING analysis (ignore failed ones)
         $lastAnalysis = Analysis::where('user_id', $user->id)
             ->where('store_id', $storeId)
+            ->whereIn('status', [AnalysisStatus::Completed, AnalysisStatus::Processing, AnalysisStatus::Pending])
             ->latest()
             ->first();
 

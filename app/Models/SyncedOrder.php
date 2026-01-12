@@ -97,9 +97,9 @@ class SyncedOrder extends Model
         }
 
         return $query->where(function ($q) use ($search) {
-            $q->where('order_number', 'like', "%{$search}%")
-                ->orWhere('customer_name', 'like', "%{$search}%")
-                ->orWhere('customer_email', 'like', "%{$search}%");
+            $q->whereRaw('order_number ILIKE ?', ["%{$search}%"])
+                ->orWhereRaw('customer_name ILIKE ?', ["%{$search}%"])
+                ->orWhereRaw('customer_email ILIKE ?', ["%{$search}%"]);
         });
     }
 

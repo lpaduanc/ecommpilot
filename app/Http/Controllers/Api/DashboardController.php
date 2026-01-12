@@ -138,7 +138,7 @@ class DashboardController extends Controller
     private function getFilters(Request $request): array
     {
         return [
-            'period' => $request->input('period', 'last_30_days'),
+            'period' => $request->input('period', 'last_15_days'),
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
             'categories' => $request->input('categories'),

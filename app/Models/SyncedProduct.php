@@ -98,8 +98,8 @@ class SyncedProduct extends Model
         }
 
         return $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-                ->orWhere('sku', 'like', "%{$search}%");
+            $q->whereRaw('name ILIKE ?', ["%{$search}%"])
+                ->orWhereRaw('sku ILIKE ?', ["%{$search}%"]);
         });
     }
 }

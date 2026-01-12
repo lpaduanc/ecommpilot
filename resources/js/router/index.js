@@ -73,7 +73,7 @@ const routes = [
         meta: { requiresAuth: true, permission: 'orders.view' },
     },
     {
-        path: '/marketing/descontos',
+        path: '/marketing/discounts',
         name: 'discounts',
         component: () => import(
             /* webpackChunkName: "discounts" */
@@ -218,32 +218,32 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore();
-    
+
     // Check if user data is loaded
     if (!authStore.isInitialized) {
         await authStore.initialize();
     }
-    
+
     const isAuthenticated = authStore.isAuthenticated;
     const requiresAuth = to.meta.requiresAuth;
     const isGuestOnly = to.meta.guest;
     const requiredPermission = to.meta.permission;
-    
+
     // Redirect to login if not authenticated
     if (requiresAuth && !isAuthenticated) {
         return next({ name: 'login', query: { redirect: to.fullPath } });
     }
-    
+
     // Redirect to dashboard if already authenticated
     if (isGuestOnly && isAuthenticated) {
         return next({ name: 'dashboard' });
     }
-    
+
     // Check permission
     if (requiredPermission && !authStore.hasPermission(requiredPermission)) {
         return next({ name: 'dashboard' });
     }
-    
+
     next();
 });
 

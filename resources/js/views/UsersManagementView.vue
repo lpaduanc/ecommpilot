@@ -113,9 +113,9 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="min-h-screen -m-8 -mt-8">
+    <div class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -126,16 +126,16 @@ onMounted(() => {
             </div>
 
             <div class="relative z-10 max-w-7xl mx-auto">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                            <UsersIcon class="w-7 h-7 text-white" />
+                        <div class="w-10 sm:w-14 h-10 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
+                            <UsersIcon class="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                         </div>
                         <div>
-                            <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
+                            <h1 class="text-xl sm:text-2xl lg:text-4xl font-display font-bold text-white">
                                 Usuários da Loja
                             </h1>
-                            <p class="text-primary-200/80 text-sm lg:text-base">
+                            <p class="text-primary-200/80 text-xs sm:text-sm lg:text-base">
                                 Gerencie os funcionários que terão acesso à sua loja
                             </p>
                         </div>
@@ -145,7 +145,7 @@ onMounted(() => {
                         v-if="canCreate"
                         @click="openCreateModal"
                         variant="primary"
-                        class="shadow-xl shadow-primary-500/30"
+                        class="shadow-xl shadow-primary-500/30 w-full sm:w-auto"
                     >
                         <PlusIcon class="w-5 h-5" />
                         Novo Usuário
@@ -155,7 +155,7 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="px-8 py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
+        <div class="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="max-w-7xl mx-auto">
                 <!-- Search and Filters -->
                 <BaseCard padding="sm" class="mb-6">
@@ -196,8 +196,68 @@ onMounted(() => {
                         </BaseButton>
                     </div>
 
-                    <!-- Users Table -->
-                    <div v-else class="overflow-x-auto">
+                    <!-- Mobile/Tablet Cards -->
+                    <div v-else class="xl:hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                            <div
+                                v-for="user in filteredUsers"
+                                :key="'card-' + user.id"
+                                class="bg-white dark:bg-gray-800 rounded-xl p-4 transition-all duration-200 border border-gray-200 dark:border-gray-700"
+                            >
+                                <!-- Header: Avatar + Name -->
+                                <div class="flex items-start gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+                                        {{ user.name.charAt(0).toUpperCase() }}
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-bold text-gray-900 dark:text-gray-100 truncate">{{ user.name }}</p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
+                                        <p v-if="user.role" class="text-xs text-gray-400 mt-0.5">
+                                            {{ user.role === 'admin' ? 'Administrador' : 'Cliente' }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Stats -->
+                                <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+                                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Permissões</p>
+                                        <div class="flex items-center gap-1">
+                                            <ShieldCheckIcon class="w-4 h-4 text-primary-600" />
+                                            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ getPermissionsCount(user) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Criado em</p>
+                                        <p class="font-semibold text-gray-900 dark:text-gray-100">{{ formatDate(user.created_at) }}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                                    <button
+                                        v-if="canEdit"
+                                        @click="openEditModal(user.id)"
+                                        class="flex-1 p-2 rounded-lg text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 transition-colors text-sm flex items-center justify-center gap-1"
+                                    >
+                                        <PencilIcon class="w-4 h-4" />
+                                        Editar
+                                    </button>
+                                    <button
+                                        v-if="canDelete && user.id !== authStore.user?.id"
+                                        @click="confirmDelete(user)"
+                                        class="flex-1 p-2 rounded-lg text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-danger-50 dark:hover:bg-danger-900/30 hover:text-danger-600 transition-colors text-sm flex items-center justify-center gap-1"
+                                    >
+                                        <TrashIcon class="w-4 h-4" />
+                                        Excluir
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Desktop Table -->
+                    <div v-if="hasUsers" class="hidden xl:block overflow-x-auto">
                         <table class="w-full">
                             <thead class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
                                 <tr>
@@ -280,11 +340,22 @@ onMounted(() => {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="hasUsers && userStore.totalPages > 1" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                        <div class="flex items-center justify-between">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                Mostrando {{ filteredUsers.length }} de {{ userStore.total }} usuários
-                            </p>
+                    <div v-if="hasUsers && (userStore.totalPages > 1 || userStore.total > 0)" class="px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                                <p class="text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
+                                    <span class="hidden sm:inline">Mostrando </span>{{ filteredUsers.length }} de {{ userStore.total }}
+                                </p>
+                                <select
+                                    :value="userStore.perPage"
+                                    @change="userStore.setPerPage(Number($event.target.value), searchQuery)"
+                                    class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 cursor-pointer"
+                                >
+                                    <option v-for="option in userStore.perPageOptions" :key="option" :value="option">
+                                        {{ option }}/pág
+                                    </option>
+                                </select>
+                            </div>
                             <div class="flex items-center gap-2">
                                 <BaseButton
                                     variant="secondary"
@@ -294,8 +365,8 @@ onMounted(() => {
                                 >
                                     <ChevronLeftIcon class="w-4 h-4" />
                                 </BaseButton>
-                                <span class="text-sm font-medium text-gray-900 px-3">
-                                    {{ userStore.currentPage }} / {{ userStore.totalPages }}
+                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100 px-2">
+                                    {{ userStore.currentPage }}/{{ userStore.totalPages }}
                                 </span>
                                 <BaseButton
                                     variant="secondary"

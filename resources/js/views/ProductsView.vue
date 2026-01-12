@@ -66,6 +66,9 @@ const searchQuery = ref(route.query.search || '');
 const currentPage = ref(1);
 const totalPages = ref(1);
 const totalItems = ref(0);
+const perPage = ref(10);
+
+const perPageOptions = [10, 20, 50, 100];
 
 // Filtros
 const selectedAbcCategory = ref(null);
@@ -131,7 +134,7 @@ async function fetchProducts() {
             params: {
                 search: searchQuery.value,
                 page: currentPage.value,
-                per_page: 20,
+                per_page: perPage.value,
                 abc_category: selectedAbcCategory.value,
                 stock_health: selectedStockHealth.value,
             },
@@ -176,6 +179,12 @@ function handleSearchInput() {
 function goToPage(page) {
     if (page < 1 || page > totalPages.value) return;
     currentPage.value = page;
+    fetchProducts();
+}
+
+function changePerPage(newPerPage) {
+    perPage.value = newPerPage;
+    currentPage.value = 1;
     fetchProducts();
 }
 
@@ -271,7 +280,7 @@ onMounted(() => {
 <template>
     <div class="min-h-screen">
         <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12 -mx-8 -mt-8">
+        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 lg:-mt-8">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 dark:bg-primary-500/10 rounded-full blur-3xl"></div>
@@ -283,16 +292,16 @@ onMounted(() => {
             
             <div class="relative z-10 max-w-7xl mx-auto">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                                <CubeIcon class="w-7 h-7 text-white" />
+                    <div class="space-y-3 sm:space-y-4">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <div class="w-10 sm:w-12 lg:w-14 h-10 sm:h-12 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 flex-shrink-0">
+                                <CubeIcon class="w-5 sm:w-6 lg:w-7 h-5 sm:h-6 lg:h-7 text-white" />
                             </div>
-                            <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
+                            <div class="min-w-0">
+                                <h1 class="text-xl sm:text-2xl lg:text-4xl font-display font-bold text-white dark:text-gray-100 truncate">
                                     Produtos
                                 </h1>
-                                <p class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base">
+                                <p class="text-primary-200/80 dark:text-gray-400 text-xs sm:text-sm lg:text-base">
                                     {{ totalItems }} produtos sincronizados
                                 </p>
                             </div>
@@ -300,8 +309,8 @@ onMounted(() => {
                     </div>
                     
                     <!-- Search Bar -->
-                    <div class="flex items-center gap-3">
-                        <div class="relative flex-1 max-w-md">
+                    <div class="flex items-center gap-3 w-full lg:w-auto">
+                        <div class="relative flex-1 max-w-full sm:max-w-md">
                             <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                             <input
                                 v-model="searchQuery"
@@ -327,94 +336,96 @@ onMounted(() => {
         </div>
 
         <!-- Main Content -->
-        <div class="py-8 px-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
+        <div class="py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
             <div class="w-full">
                 <div class="flex gap-6">
                     <!-- Products Table -->
                     <div class="flex-1 transition-all duration-300">
                         <!-- Summary Totals -->
-                        <div v-if="!isLoading && totals.total_products > 0" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                            <BaseCard padding="normal">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
-                                        <CubeIcon class="w-5 h-5 text-primary-600" />
+                        <div v-if="!isLoading && totals.total_products > 0" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
+                            <BaseCard padding="sm" class="!p-3 sm:!p-4">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30 flex items-center justify-center flex-shrink-0">
+                                        <CubeIcon class="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 dark:text-primary-400" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total de Produtos</p>
-                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatNumber(totals.total_products) }}</p>
+                                        <p class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1 truncate">Produtos</p>
+                                        <p class="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatNumber(totals.total_products) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
 
-                            <BaseCard padding="normal">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
-                                        <ChartBarIcon class="w-5 h-5 text-primary-600" />
+                            <BaseCard padding="sm" class="!p-3 sm:!p-4">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30 flex items-center justify-center flex-shrink-0">
+                                        <ChartBarIcon class="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 dark:text-primary-400" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Unidades Vendidas</p>
-                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatNumber(totals.units_sold) }}</p>
+                                        <p class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1 truncate">Vendidas</p>
+                                        <p class="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatNumber(totals.units_sold) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
 
-                            <BaseCard padding="normal">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-success-100 to-success-200 flex items-center justify-center flex-shrink-0">
-                                        <ChartBarIcon class="w-5 h-5 text-success-600" />
+                            <BaseCard padding="sm" class="!p-3 sm:!p-4">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-success-100 to-success-200 dark:from-success-900/30 dark:to-success-800/30 flex items-center justify-center flex-shrink-0">
+                                        <ChartBarIcon class="w-4 h-4 sm:w-5 sm:h-5 text-success-600 dark:text-success-400" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Receita Total</p>
-                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatCurrency(totals.total_revenue) }}</p>
+                                        <p class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1 truncate">Receita</p>
+                                        <p class="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100 truncate">{{ formatCurrency(totals.total_revenue) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
 
-                            <BaseCard padding="normal">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-success-100 to-success-200 flex items-center justify-center flex-shrink-0">
-                                        <ChartBarIcon class="w-5 h-5 text-success-600" />
+                            <BaseCard padding="sm" class="!p-3 sm:!p-4">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-success-100 to-success-200 dark:from-success-900/30 dark:to-success-800/30 flex items-center justify-center flex-shrink-0">
+                                        <ChartBarIcon class="w-4 h-4 sm:w-5 sm:h-5 text-success-600 dark:text-success-400" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Lucro Total</p>
-                                        <p class="text-lg font-bold text-success-600">{{ formatCurrency(totals.total_profit) }}</p>
+                                        <p class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1 truncate">Lucro</p>
+                                        <p class="text-sm sm:text-lg font-bold text-success-600 dark:text-success-400 truncate">{{ formatCurrency(totals.total_profit) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
 
-                            <BaseCard padding="normal">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-warning-100 to-warning-200 flex items-center justify-center flex-shrink-0">
-                                        <ChartBarIcon class="w-5 h-5 text-warning-600" />
+                            <BaseCard padding="sm" class="!p-3 sm:!p-4 col-span-2 sm:col-span-1">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-warning-100 to-warning-200 dark:from-warning-900/30 dark:to-warning-800/30 flex items-center justify-center flex-shrink-0">
+                                        <ChartBarIcon class="w-4 h-4 sm:w-5 sm:h-5 text-warning-600 dark:text-warning-400" />
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Margem Média</p>
-                                        <p class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatPercentage(totals.average_margin) }}</p>
+                                        <p class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-0.5 sm:mb-1 truncate">Margem Média</p>
+                                        <p class="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100">{{ formatPercentage(totals.average_margin) }}</p>
                                     </div>
                                 </div>
                             </BaseCard>
                         </div>
 
                         <!-- ABC Analysis and Filters -->
-                        <BaseCard v-if="!isLoading && products.length > 0" class="mb-6">
-                            <div class="flex items-start gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
-                                    <ChartBarIcon class="w-6 h-6 text-primary-600" />
+                        <BaseCard v-if="!isLoading && products.length > 0" class="mb-4 sm:mb-6">
+                            <div class="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+                                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30 flex items-center justify-center flex-shrink-0">
+                                    <ChartBarIcon class="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
                                 </div>
-                                <div class="flex-1">
-                                    <div class="flex items-center justify-between mb-4">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-3 sm:mb-4">
                                         <div>
-                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Análise ABC</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">Distribuição dos produtos por categoria de faturamento</p>
+                                            <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-0.5 sm:mb-1">Análise ABC</h3>
+                                            <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Distribuição por categoria de faturamento</p>
                                         </div>
                                         <BaseButton
                                             v-if="hasActiveFilters"
                                             variant="ghost"
                                             size="sm"
                                             @click="clearFilters"
+                                            class="self-start sm:self-auto"
                                         >
                                             <XMarkIcon class="w-4 h-4 mr-1" />
-                                            Limpar Filtros
+                                            <span class="hidden sm:inline">Limpar Filtros</span>
+                                            <span class="sm:hidden">Limpar</span>
                                         </BaseButton>
                                     </div>
 
@@ -461,7 +472,7 @@ onMounted(() => {
                                     </div>
 
                                     <!-- Legendas com Contadores -->
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
                                         <button
                                             type="button"
                                             @click="applyAbcFilter('A')"
@@ -577,9 +588,88 @@ onMounted(() => {
                                 </div>
                             </div>
 
-                            <!-- Table -->
-                            <div v-else-if="products.length > 0" class="overflow-x-auto">
-                                <table class="min-w-[1720px] w-full table-fixed">
+                            <!-- Mobile/Tablet Cards -->
+                            <div v-else-if="products.length > 0" class="xl:hidden">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                                    <div
+                                        v-for="product in products"
+                                        :key="'card-' + product.id"
+                                        @click="selectProduct(product)"
+                                        :class="[
+                                            'bg-white dark:bg-gray-800 rounded-xl p-4 cursor-pointer transition-all duration-200 border border-gray-200 dark:border-gray-700',
+                                            'hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-600',
+                                            selectedProduct?.id === product.id ? 'ring-2 ring-primary-500 border-primary-500' : ''
+                                        ]"
+                                    >
+                                        <!-- Header: Image + Name + Badges -->
+                                        <div class="flex items-start gap-3 mb-3">
+                                            <div class="w-14 h-14 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0">
+                                                <img
+                                                    v-if="product.images?.[0]"
+                                                    :src="product.images[0]"
+                                                    :alt="product.name"
+                                                    class="w-full h-full object-cover"
+                                                />
+                                                <CubeIcon v-else class="w-6 h-6 text-gray-400" />
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p class="font-semibold text-gray-900 dark:text-gray-100 text-sm line-clamp-2">{{ product.name }}</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{{ product.sku || 'Sem SKU' }}</p>
+                                                <div class="flex items-center gap-2 mt-1.5">
+                                                    <span
+                                                        v-if="product.analytics?.abc_category"
+                                                        :class="['badge badge-sm', `badge-${getAbcCategoryBadge(product.analytics.abc_category).color}`]"
+                                                    >
+                                                        {{ getAbcCategoryBadge(product.analytics.abc_category).label }}
+                                                    </span>
+                                                    <span
+                                                        v-if="product.analytics?.stock_health"
+                                                        :class="['badge badge-sm', `badge-${getStockHealthStatus(product.analytics.stock_health).color}`]"
+                                                    >
+                                                        {{ getStockHealthStatus(product.analytics.stock_health).label }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Stats Grid -->
+                                        <div class="grid grid-cols-2 gap-3 text-sm">
+                                            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Preço</p>
+                                                <p class="font-semibold text-gray-900 dark:text-gray-100">{{ formatCurrency(product.price || 0) }}</p>
+                                            </div>
+                                            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Estoque</p>
+                                                <p class="font-semibold text-gray-900 dark:text-gray-100">{{ formatNumber(product.stock || 0) }}</p>
+                                            </div>
+                                            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">Vendidas</p>
+                                                <p class="font-semibold text-gray-900 dark:text-gray-100">{{ formatNumber(product.analytics?.units_sold || 0) }}</p>
+                                            </div>
+                                            <div class="bg-success-50 dark:bg-success-900/30 rounded-lg p-2.5">
+                                                <p class="text-xs text-success-600 dark:text-success-400">Receita</p>
+                                                <p class="font-semibold text-success-700 dark:text-success-300">{{ formatCurrency(product.analytics?.total_sold || 0) }}</p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Footer: Margin -->
+                                        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">Margem</span>
+                                            <span
+                                                v-if="product.analytics?.margin !== null && product.analytics?.margin !== undefined"
+                                                :class="['font-semibold text-sm', getMarginColor(product.analytics.margin)]"
+                                            >
+                                                {{ formatPercentage(product.analytics.margin) }}
+                                            </span>
+                                            <span v-else class="text-gray-400 text-sm">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Desktop Table -->
+                            <div v-if="products.length > 0" class="hidden xl:block overflow-x-auto">
+                                <table class="w-full table-fixed">
                                     <colgroup>
                                         <col style="width: 280px"><!-- Nome -->
                                         <col style="width: 90px"><!-- Curva ABC -->
@@ -798,10 +888,21 @@ onMounted(() => {
                             </div>
 
                             <!-- Pagination -->
-                            <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-                                <p class="text-sm text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
-                                    Mostrando {{ (currentPage - 1) * 20 + 1 }} a {{ Math.min(currentPage * 20, totalItems) }} de {{ totalItems }} produtos
-                                </p>
+                            <div v-if="totalPages > 1 || totalItems > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                                <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-left" role="status" aria-live="polite">
+                                        <span class="hidden sm:inline">Mostrando </span>{{ (currentPage - 1) * perPage + 1 }}-{{ Math.min(currentPage * perPage, totalItems) }} de {{ totalItems }}
+                                    </p>
+                                    <select
+                                        :value="perPage"
+                                        @change="changePerPage(Number($event.target.value))"
+                                        class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 cursor-pointer"
+                                    >
+                                        <option v-for="option in perPageOptions" :key="option" :value="option">
+                                            {{ option }}/pág
+                                        </option>
+                                    </select>
+                                </div>
                                 <nav class="flex items-center gap-2" role="navigation" aria-label="Paginação de produtos">
                                     <BaseButton
                                         variant="ghost"
@@ -812,8 +913,8 @@ onMounted(() => {
                                     >
                                         <ChevronLeftIcon class="w-4 h-4" aria-hidden="true" />
                                     </BaseButton>
-                                    <span class="text-sm text-gray-600 dark:text-gray-300 px-3" aria-current="page">
-                                        Página {{ currentPage }} de {{ totalPages }}
+                                    <span class="text-sm text-gray-600 dark:text-gray-300 px-2 sm:px-3" aria-current="page">
+                                        {{ currentPage }}/{{ totalPages }}
                                     </span>
                                     <BaseButton
                                         variant="ghost"

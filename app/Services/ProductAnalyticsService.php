@@ -72,33 +72,62 @@ class ProductAnalyticsService
 
     /**
      * Calculate sales metrics from database using SQL aggregation
-     * This replaces the O(n*m) PHP loops with efficient database queries
+     * This replaces the O(n*m) PHP loops with efficient database queries.
+     * Now with caching for improved performance.
      */
     private function calculateSalesMetricsFromDatabase(Store $store, Collection $products, int $periodDays): array
     {
+        // Use cached store-wide sales data and filter to requested products
+        $allSalesMetrics = $this->getStoreSalesMetricsFromCache($store, $periodDays);
+
+        // Filter to only requested products
         $productIds = $products->pluck('id')->toArray();
-        $externalIds = $products->pluck('external_id')->map(fn ($id) => (string) $id)->toArray();
-        $productNames = $products->pluck('name')->toArray();
+        $productIdsSet = array_flip($productIds);
 
-        // Create lookup maps
-        $externalIdToId = $products->pluck('id', 'external_id')->map(fn ($id, $extId) => $id)->toArray();
-        $nameToId = $products->pluck('id', 'name')->toArray();
+        return array_filter($allSalesMetrics, function ($key) use ($productIdsSet) {
+            return isset($productIdsSet[$key]);
+        }, ARRAY_FILTER_USE_KEY);
+    }
 
-        // Get database driver
-        $driver = DB::connection()->getDriverName();
-        $isPostgres = $driver === 'pgsql';
+    /**
+     * Get store-wide sales metrics from cache
+     */
+    private function getStoreSalesMetricsFromCache(Store $store, int $periodDays): array
+    {
+        $cacheKey = "sales_metrics:{$store->id}:{$periodDays}";
 
-        if ($isPostgres) {
-            return $this->calculateSalesMetricsPostgres($store, $products, $periodDays, $externalIds, $productNames, $externalIdToId, $nameToId);
-        } else {
-            return $this->calculateSalesMetricsFallback($store, $products, $periodDays);
-        }
+        return Cache::remember($cacheKey, now()->addHours(1), function () use ($store, $periodDays) {
+            // Get all products for this store
+            $products = SyncedProduct::where('store_id', $store->id)->get(['id', 'external_id', 'name']);
+
+            if ($products->isEmpty()) {
+                return [];
+            }
+
+            // Create lookup maps
+            $externalIdToId = [];
+            $nameToId = [];
+            foreach ($products as $product) {
+                $externalIdToId[(string) $product->external_id] = $product->id;
+                $nameToId[$product->name] = $product->id;
+            }
+
+            // Get database driver
+            $driver = DB::connection()->getDriverName();
+
+            if ($driver === 'pgsql') {
+                return $this->calculateSalesMetricsPostgresOptimized($store, $periodDays, $externalIdToId, $nameToId);
+            } else {
+                return $this->calculateSalesMetricsFallback($store, $products, $periodDays);
+            }
+        });
     }
 
     /**
      * PostgreSQL optimized query using JSON operators
+     * Optimized version that gets all products at once
      */
-    private function calculateSalesMetricsPostgres(Store $store, Collection $products, int $periodDays, array $externalIds, array $productNames, array $externalIdToId, array $nameToId): array
+    private function calculateSalesMetricsPostgresOptimized(Store $store, int $periodDays, array $externalIdToId, array $nameToId): array
     {
         // Query to aggregate sales by product from JSON items array
         $salesData = DB::select("
@@ -401,19 +430,17 @@ class ProductAnalyticsService
     }
 
     /**
-     * Invalidate ABC categories cache (call after order sync)
+     * Invalidate all product analytics cache (call after order sync)
      */
     public function invalidateABCCache(Store $store): void
     {
-        Cache::forget("abc_categories:{$store->id}:30");
-        Cache::forget("abc_categories:{$store->id}:7");
-        Cache::forget("abc_categories:{$store->id}:90");
-        Cache::forget("abc_analysis:{$store->id}:30");
-        Cache::forget("abc_analysis:{$store->id}:7");
-        Cache::forget("abc_analysis:{$store->id}:90");
-        Cache::forget("stock_health:{$store->id}:30");
-        Cache::forget("stock_health:{$store->id}:7");
-        Cache::forget("stock_health:{$store->id}:90");
+        $periods = [7, 30, 90];
+        foreach ($periods as $period) {
+            Cache::forget("abc_categories:{$store->id}:{$period}");
+            Cache::forget("abc_analysis:{$store->id}:{$period}");
+            Cache::forget("stock_health:{$store->id}:{$period}");
+            Cache::forget("sales_metrics:{$store->id}:{$period}");
+        }
     }
 
     /**

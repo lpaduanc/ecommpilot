@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\CouponResource;
-use App\Models\SyncedCoupon;
 use App\Services\DiscountAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +12,49 @@ class DiscountController extends Controller
     public function __construct(
         private DiscountAnalyticsService $analyticsService
     ) {}
+
+    /**
+     * Get bulk data (stats + coupons + filters) in a single request.
+     * This is the recommended endpoint for the frontend.
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $store = $request->user()->activeStore;
+
+        if (! $store) {
+            return response()->json([
+                'stats' => $this->getEmptyStats(),
+                'coupons' => [
+                    'data' => [],
+                    'total' => 0,
+                    'last_page' => 1,
+                    'current_page' => 1,
+                    'totals' => $this->getEmptyTotals(),
+                ],
+                'filters' => [
+                    'types' => [],
+                    'statuses' => ['active', 'expired', 'invalid'],
+                ],
+            ]);
+        }
+
+        $params = [
+            'search' => $request->input('search'),
+            'status' => $request->input('status'),
+            'type' => $request->input('type'),
+            'page' => $request->input('page', 1),
+            'per_page' => $request->input('per_page', 10),
+            'sort_by' => $request->input('sort_by', 'used'),
+            'sort_order' => $request->input('sort_order', 'desc'),
+            'period' => $request->input('period', 'last_15_days'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+        ];
+
+        return response()->json(
+            $this->analyticsService->getBulkData($store, $params)
+        );
+    }
 
     /**
      * Get list of coupons with analytics.
@@ -27,54 +68,27 @@ class DiscountController extends Controller
                 'data' => [],
                 'total' => 0,
                 'last_page' => 1,
+                'current_page' => 1,
+                'totals' => $this->getEmptyTotals(),
             ]);
         }
 
-        $query = SyncedCoupon::where('store_id', $store->id)
-            ->search($request->input('search'))
-            ->orderBy('created_at', 'desc');
+        $params = [
+            'search' => $request->input('search'),
+            'status' => $request->input('status'),
+            'type' => $request->input('type'),
+            'page' => $request->input('page', 1),
+            'per_page' => $request->input('per_page', 10),
+            'sort_by' => $request->input('sort_by', 'used'),
+            'sort_order' => $request->input('sort_order', 'desc'),
+            'period' => $request->input('period', 'last_15_days'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+        ];
 
-        // Filter by status
-        if ($request->has('status')) {
-            $status = $request->input('status');
-            if ($status === 'active') {
-                $query->active();
-            } elseif ($status === 'expired') {
-                $query->expired();
-            } elseif ($status === 'invalid') {
-                $query->where('valid', false);
-            }
-        }
-
-        // Get all coupons for analytics calculation (before pagination)
-        $allCoupons = $query->get();
-
-        // Calculate analytics
-        $analyticsData = $this->analyticsService->calculateDiscountAnalytics($store);
-
-        // Attach analytics data to coupons
-        foreach ($allCoupons as $coupon) {
-            if (isset($analyticsData['coupons'][$coupon->id])) {
-                $coupon->analytics = $analyticsData['coupons'][$coupon->id];
-            }
-        }
-
-        // Apply pagination manually
-        $perPage = $request->input('per_page', 20);
-        $page = $request->input('page', 1);
-        $offset = ($page - 1) * $perPage;
-
-        // Get paginated subset
-        $paginatedCoupons = $allCoupons->slice($offset, $perPage)->values();
-        $total = $allCoupons->count();
-        $lastPage = ceil($total / $perPage);
-
-        return response()->json([
-            'data' => CouponResource::collection($paginatedCoupons),
-            'total' => $total,
-            'last_page' => $lastPage,
-            'current_page' => $page,
-        ]);
+        return response()->json(
+            $this->analyticsService->getCouponsWithAnalytics($store, $params)
+        );
     }
 
     /**
@@ -85,34 +99,63 @@ class DiscountController extends Controller
         $store = $request->user()->activeStore;
 
         if (! $store) {
+            return response()->json($this->getEmptyStats());
+        }
+
+        return response()->json(
+            $this->analyticsService->getGeneralStats($store)
+        );
+    }
+
+    /**
+     * Get filter options for coupons.
+     */
+    public function filters(Request $request): JsonResponse
+    {
+        $store = $request->user()->activeStore;
+
+        if (! $store) {
             return response()->json([
-                'total_orders' => 0,
-                'orders_with_discount' => 0,
-                'orders_with_coupon' => 0,
-                'total_revenue' => 0,
-                'total_discount' => 0,
-                'discount_percentage' => 0,
-                'active_coupons' => 0,
-                'expired_coupons' => 0,
+                'types' => [],
+                'statuses' => ['active', 'expired', 'invalid'],
             ]);
         }
 
-        // Calculate analytics
-        $analyticsData = $this->analyticsService->calculateDiscountAnalytics($store);
+        return response()->json(
+            $this->analyticsService->getFilterOptions($store)
+        );
+    }
 
-        // Get coupon counts
-        $activeCoupons = SyncedCoupon::where('store_id', $store->id)->active()->count();
-        $expiredCoupons = SyncedCoupon::where('store_id', $store->id)->expired()->count();
+    /**
+     * Get empty stats structure.
+     */
+    private function getEmptyStats(): array
+    {
+        return [
+            'total_orders' => 0,
+            'orders_with_discount' => 0,
+            'orders_with_coupon' => 0,
+            'total_revenue' => 0,
+            'total_discount' => 0,
+            'discount_percentage' => 0,
+            'active_coupons' => 0,
+            'expired_coupons' => 0,
+            'total_coupons' => 0,
+        ];
+    }
 
-        return response()->json([
-            'total_orders' => $analyticsData['general']['total_orders'],
-            'orders_with_discount' => $analyticsData['general']['orders_with_discount'],
-            'orders_with_coupon' => $analyticsData['general']['orders_with_coupon'],
-            'total_revenue' => $analyticsData['general']['total_revenue'],
-            'total_discount' => $analyticsData['general']['total_discount'],
-            'discount_percentage' => $analyticsData['general']['discount_percentage'],
-            'active_coupons' => $activeCoupons,
-            'expired_coupons' => $expiredCoupons,
-        ]);
+    /**
+     * Get empty totals structure.
+     */
+    private function getEmptyTotals(): array
+    {
+        return [
+            'revenue_products' => 0,
+            'revenue_shipping' => 0,
+            'total_revenue' => 0,
+            'total_discount' => 0,
+            'number_of_orders' => 0,
+            'new_customers' => 0,
+        ];
     }
 }

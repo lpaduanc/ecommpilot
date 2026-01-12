@@ -63,9 +63,9 @@ class AdminController extends Controller
         // Search
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
+                $q->whereRaw('name ILIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('email ILIKE ?', ["%{$search}%"])
+                    ->orWhereRaw('phone ILIKE ?', ["%{$search}%"]);
             });
         }
 
@@ -94,7 +94,7 @@ class AdminController extends Controller
         $sortDir = $request->input('sort_dir', 'desc');
         $query->orderBy($sortField, $sortDir);
 
-        $perPage = $request->input('per_page', 20);
+        $perPage = $request->input('per_page', 10);
         $clients = $query->paginate($perPage);
 
         // Transform data

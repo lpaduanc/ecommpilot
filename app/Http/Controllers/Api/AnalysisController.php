@@ -26,6 +26,9 @@ class AnalysisController extends Controller
         $user = $request->user();
         $store = $user->activeStore;
 
+        // Skip rate limit in local/dev environment
+        $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
+
         if (! $store) {
             return response()->json([
                 'analysis' => null,
@@ -42,7 +45,9 @@ class AnalysisController extends Controller
             ->first();
 
         $pendingAnalysis = $this->analysisService->getPendingAnalysis($user, $store);
-        $nextAvailableAt = $this->analysisService->getNextAvailableAt($user, $store);
+
+        // In local env, don't return next_available_at to allow unlimited requests
+        $nextAvailableAt = $isLocalEnv ? null : $this->analysisService->getNextAvailableAt($user, $store);
 
         return response()->json([
             'analysis' => $analysis ? new AnalysisResource($analysis) : null,
@@ -80,8 +85,11 @@ class AnalysisController extends Controller
             ], 409);
         }
 
+        // Skip rate limit and credits check in local/dev environment
+        $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
+
         // Check rate limit (per store)
-        if (! $this->analysisService->canRequestAnalysis($user, $store)) {
+        if (! $isLocalEnv && ! $this->analysisService->canRequestAnalysis($user, $store)) {
             $nextAvailableAt = $this->analysisService->getNextAvailableAt($user, $store);
 
             return response()->json([
@@ -91,15 +99,17 @@ class AnalysisController extends Controller
         }
 
         // Check credits
-        if (! $user->hasCredits()) {
+        if (! $isLocalEnv && ! $user->hasCredits()) {
             return response()->json([
                 'message' => 'Créditos insuficientes.',
                 'credits' => $user->ai_credits,
             ], 402);
         }
 
-        // Deduct credit
-        $user->deductCredits();
+        // Deduct credit (skip in local env)
+        if (! $isLocalEnv) {
+            $user->deductCredits();
+        }
 
         // Create analysis
         $analysis = Analysis::create([
@@ -208,7 +218,7 @@ class AnalysisController extends Controller
 
         $suggestions = $query->orderBy('priority')
             ->orderBy('created_at', 'desc')
-            ->paginate($request->get('per_page', 20));
+            ->paginate($request->get('per_page', 10));
 
         return response()->json([
             'suggestions' => $suggestions->items(),

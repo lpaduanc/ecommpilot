@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useDashboardStore } from '../../stores/dashboardStore';
 import BaseButton from '../common/BaseButton.vue';
 import {
@@ -14,6 +14,23 @@ const dashboardStore = useDashboardStore();
 const showFilters = ref(false);
 const buttonRef = ref(null);
 const dropdownPosition = ref({ top: 0, right: 0 });
+
+// Local state for the form
+const selectedPeriod = ref(dashboardStore.filters.period);
+const startDate = ref(dashboardStore.filters.startDate || '');
+const endDate = ref(dashboardStore.filters.endDate || '');
+
+// Sync local state with store when dropdown opens
+watch(showFilters, (isOpen) => {
+    if (isOpen) {
+        // Sync local state with store when opening
+        selectedPeriod.value = dashboardStore.filters.period;
+        startDate.value = dashboardStore.filters.startDate || '';
+        endDate.value = dashboardStore.filters.endDate || '';
+        // Update position after Vue renders
+        setTimeout(updateDropdownPosition, 0);
+    }
+});
 
 // Calculate dropdown position relative to the button
 function updateDropdownPosition() {
@@ -53,39 +70,59 @@ onUnmounted(() => {
 const periodOptions = [
     { value: 'today', label: 'Hoje' },
     { value: 'last_7_days', label: 'Últimos 7 dias' },
+    { value: 'last_15_days', label: 'Últimos 15 dias' },
     { value: 'last_30_days', label: 'Últimos 30 dias' },
     { value: 'this_month', label: 'Este mês' },
     { value: 'last_month', label: 'Último mês' },
+    { value: 'all_time', label: 'Todo o período' },
     { value: 'custom', label: 'Personalizado' },
 ];
 
-const selectedPeriod = ref(dashboardStore.filters.period);
-const startDate = ref(dashboardStore.filters.startDate || '');
-const endDate = ref(dashboardStore.filters.endDate || '');
-
 const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');
 
+// Show label from store's current period (not local)
 const currentPeriodLabel = computed(() => {
-    const option = periodOptions.find(o => o.value === selectedPeriod.value);
-    return option?.label || 'Selecionar';
+    const storePeriod = dashboardStore.filters.period;
+    if (storePeriod === 'custom' && dashboardStore.filters.startDate && dashboardStore.filters.endDate) {
+        // Format custom date range for display
+        const start = new Date(dashboardStore.filters.startDate);
+        const end = new Date(dashboardStore.filters.endDate);
+        return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    }
+    const option = periodOptions.find(o => o.value === storePeriod);
+    return option?.label || 'Últimos 15 dias';
 });
 
-function applyFilters() {
-    dashboardStore.setFilters({
-        period: selectedPeriod.value,
-        startDate: isCustomPeriod.value ? startDate.value : null,
-        endDate: isCustomPeriod.value ? endDate.value : null,
-    });
-    
-    showFilters.value = false;
-    emit('change');
+function selectPeriod(period) {
+    selectedPeriod.value = period;
+    if (period !== 'custom') {
+        dashboardStore.setFilters({
+            period: period,
+            startDate: null,
+            endDate: null,
+        });
+        showFilters.value = false;
+        emit('change');
+    }
+}
+
+function applyCustomPeriod() {
+    if (startDate.value && endDate.value) {
+        dashboardStore.setFilters({
+            period: 'custom',
+            startDate: startDate.value,
+            endDate: endDate.value,
+        });
+        showFilters.value = false;
+        emit('change');
+    }
 }
 
 function clearFilters() {
-    selectedPeriod.value = 'last_30_days';
+    selectedPeriod.value = 'last_15_days';
     startDate.value = '';
     endDate.value = '';
-    
+
     dashboardStore.resetFilters();
     showFilters.value = false;
     emit('change');
@@ -93,10 +130,6 @@ function clearFilters() {
 
 function toggleFilters() {
     showFilters.value = !showFilters.value;
-    if (showFilters.value) {
-        // Update position after Vue renders the change
-        setTimeout(updateDropdownPosition, 0);
-    }
 }
 </script>
 
@@ -124,65 +157,55 @@ function toggleFilters() {
                     :style="{ top: dropdownPosition.top + 'px', right: dropdownPosition.right + 'px' }"
                 >
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="font-semibold text-gray-900">Filtros</h3>
-                    <button @click="showFilters = false" class="text-gray-400 hover:text-gray-600">
+                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Período</h3>
+                    <button @click="showFilters = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                         <XMarkIcon class="w-5 h-5" />
                     </button>
                 </div>
 
                 <!-- Period Selection -->
-                <div class="space-y-3 mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Período</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button
-                            v-for="option in periodOptions"
-                            :key="option.value"
-                            @click="selectedPeriod = option.value"
-                            :class="[
-                                'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                                selectedPeriod === option.value
-                                    ? 'bg-primary-100 text-primary-700'
-                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
-                            ]"
-                        >
-                            {{ option.label }}
-                        </button>
-                    </div>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button
+                        v-for="option in periodOptions"
+                        :key="option.value"
+                        @click="selectPeriod(option.value)"
+                        :class="[
+                            'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                            selectedPeriod === option.value
+                                ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                                : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        ]"
+                    >
+                        {{ option.label }}
+                    </button>
                 </div>
 
                 <!-- Custom Date Range -->
-                <div v-if="isCustomPeriod" class="space-y-3 mb-4">
+                <div v-if="isCustomPeriod" class="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Inicial</label>
                         <div class="relative">
                             <CalendarIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                             <input
                                 v-model="startDate"
                                 type="date"
-                                class="input pl-10"
+                                class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Final</label>
                         <div class="relative">
                             <CalendarIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                             <input
                                 v-model="endDate"
                                 type="date"
-                                class="input pl-10"
+                                class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
                     </div>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex items-center gap-2 pt-4 border-t border-gray-100 dark:border-gray-700">
-                    <BaseButton variant="ghost" size="sm" @click="clearFilters">
-                        Limpar Filtros
-                    </BaseButton>
-                    <BaseButton size="sm" class="flex-1" @click="applyFilters">
-                        Aplicar Filtros
+                    <BaseButton size="sm" class="w-full" @click="applyCustomPeriod" :disabled="!startDate || !endDate">
+                        Aplicar Período
                     </BaseButton>
                 </div>
                 </div>

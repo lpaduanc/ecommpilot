@@ -113,7 +113,7 @@ class SyncedCoupon extends Model
         }
 
         return $query->where(function ($q) use ($search) {
-            $q->where('code', 'like', "%{$search}%");
+            $q->whereRaw('code ILIKE ?', ["%{$search}%"]);
         });
     }
 }

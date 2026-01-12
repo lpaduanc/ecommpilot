@@ -192,16 +192,28 @@ class NuvemshopService
         );
     }
 
-    public function syncProducts(Store $store): void
+    /**
+     * Sync products from Nuvemshop.
+     *
+     * @param  Store  $store  The store to sync
+     * @param  Carbon|null  $updatedSince  If provided, only sync products updated after this date
+     */
+    public function syncProducts(Store $store, ?Carbon $updatedSince = null): void
     {
         $page = 1;
         $perPage = 200;
 
         do {
-            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/products", [
+            $params = [
                 'page' => $page,
                 'per_page' => $perPage,
-            ]);
+            ];
+
+            if ($updatedSince) {
+                $params['updated_at_min'] = $updatedSince->toIso8601String();
+            }
+
+            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/products", $params);
 
             foreach ($response as $product) {
                 $this->upsertProduct($store, $product);
@@ -211,16 +223,28 @@ class NuvemshopService
         } while (count($response) === $perPage);
     }
 
-    public function syncOrders(Store $store): void
+    /**
+     * Sync orders from Nuvemshop.
+     *
+     * @param  Store  $store  The store to sync
+     * @param  Carbon|null  $updatedSince  If provided, only sync orders updated after this date
+     */
+    public function syncOrders(Store $store, ?Carbon $updatedSince = null): void
     {
         $page = 1;
         $perPage = 50; // Using smaller batch for stability with large stores
 
         do {
-            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/orders", [
+            $params = [
                 'page' => $page,
                 'per_page' => $perPage,
-            ]);
+            ];
+
+            if ($updatedSince) {
+                $params['updated_at_min'] = $updatedSince->toIso8601String();
+            }
+
+            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/orders", $params);
 
             foreach ($response as $order) {
                 $this->upsertOrder($store, $order);
@@ -235,16 +259,28 @@ class NuvemshopService
         } while (count($response) === $perPage);
     }
 
-    public function syncCustomers(Store $store): void
+    /**
+     * Sync customers from Nuvemshop.
+     *
+     * @param  Store  $store  The store to sync
+     * @param  Carbon|null  $updatedSince  If provided, only sync customers updated after this date
+     */
+    public function syncCustomers(Store $store, ?Carbon $updatedSince = null): void
     {
         $page = 1;
         $perPage = 200;
 
         do {
-            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/customers", [
+            $params = [
                 'page' => $page,
                 'per_page' => $perPage,
-            ]);
+            ];
+
+            if ($updatedSince) {
+                $params['updated_at_min'] = $updatedSince->toIso8601String();
+            }
+
+            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/customers", $params);
 
             foreach ($response as $customer) {
                 $this->upsertCustomer($store, $customer);
@@ -254,16 +290,28 @@ class NuvemshopService
         } while (count($response) === $perPage);
     }
 
-    public function syncCoupons(Store $store): void
+    /**
+     * Sync coupons from Nuvemshop.
+     *
+     * @param  Store  $store  The store to sync
+     * @param  Carbon|null  $updatedSince  If provided, only sync coupons updated after this date
+     */
+    public function syncCoupons(Store $store, ?Carbon $updatedSince = null): void
     {
         $page = 1;
         $perPage = 200;
 
         do {
-            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/coupons", [
+            $params = [
                 'page' => $page,
                 'per_page' => $perPage,
-            ]);
+            ];
+
+            if ($updatedSince) {
+                $params['updated_at_min'] = $updatedSince->toIso8601String();
+            }
+
+            $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/coupons", $params);
 
             foreach ($response as $coupon) {
                 $this->upsertCoupon($store, $coupon);

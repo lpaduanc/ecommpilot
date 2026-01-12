@@ -12,7 +12,8 @@ export const useUserManagementStore = defineStore('userManagement', () => {
     // Pagination
     const currentPage = ref(1);
     const totalPages = ref(1);
-    const perPage = ref(15);
+    const perPage = ref(10);
+    const perPageOptions = [10, 20, 50, 100];
     const total = ref(0);
 
     async function fetchUsers(page = 1, search = '') {
@@ -150,6 +151,12 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         error.value = null;
     }
 
+    function setPerPage(newPerPage, search = '') {
+        perPage.value = newPerPage;
+        currentPage.value = 1;
+        fetchUsers(1, search);
+    }
+
     return {
         users,
         currentUser,
@@ -159,6 +166,7 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         currentPage,
         totalPages,
         perPage,
+        perPageOptions,
         total,
         fetchUsers,
         fetchUser,
@@ -168,5 +176,6 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         fetchPermissions,
         clearCurrentUser,
         clearError,
+        setPerPage,
     };
 });

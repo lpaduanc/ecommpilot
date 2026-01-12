@@ -255,26 +255,76 @@ class NuvemshopOrderAdapter implements OrderAdapterInterface
     /**
      * Extract coupon information from Nuvemshop order data.
      *
-     * Nuvemshop may include coupon data in the order when a coupon is applied.
+     * Nuvemshop returns coupon as an ARRAY of coupon objects:
+     * - Empty array [] when no coupon is applied
+     * - Array with objects [{id, code, type, value}] when coupon(s) applied
+     *
+     * Also captures discount_coupon which is the actual discount amount from the coupon.
      *
      * @param  array  $externalData  Raw order data
      * @return array|null Coupon data or null if no coupon applied
      */
     private function extractCoupon(array $externalData): ?array
     {
-        $coupon = $externalData['coupon'] ?? null;
+        $coupons = $externalData['coupon'] ?? null;
+        $orderId = $externalData['id'] ?? 'unknown';
 
-        if (empty($coupon) || ! is_array($coupon)) {
+        // Nuvemshop sends coupon as an array (empty [] or [{...}])
+        if ($coupons === null) {
             return null;
         }
 
-        // Return normalized coupon data
-        return array_filter([
+        if (! is_array($coupons)) {
+            \Illuminate\Support\Facades\Log::warning('Coupon is not an array', [
+                'order_id' => $orderId,
+                'coupon_type' => gettype($coupons),
+                'coupon_value' => $coupons,
+            ]);
+
+            return null;
+        }
+
+        // Check if it's an empty array
+        if (count($coupons) === 0) {
+            return null;
+        }
+
+        // Get the first coupon from the array (most orders have only one coupon)
+        $coupon = $coupons[0] ?? null;
+
+        if (empty($coupon) || ! is_array($coupon)) {
+            \Illuminate\Support\Facades\Log::warning('First coupon element is invalid', [
+                'order_id' => $orderId,
+                'coupon_element' => $coupon,
+            ]);
+
+            return null;
+        }
+
+        // Get the actual discount amount from the coupon
+        $discountCoupon = $this->sanitizeNumericValue($externalData['discount_coupon'] ?? 0);
+
+        $result = [
             'id' => $coupon['id'] ?? null,
             'code' => $coupon['code'] ?? null,
             'type' => $coupon['type'] ?? null,
             'value' => isset($coupon['value']) ? $this->sanitizeNumericValue($coupon['value']) : null,
-        ], fn ($value) => $value !== null);
+            'discount_amount' => $discountCoupon > 0 ? $discountCoupon : null,
+        ];
+
+        // Filter out null values
+        $result = array_filter($result, fn ($value) => $value !== null);
+
+        // Log successful coupon extraction for debugging
+        if (! empty($result)) {
+            \Illuminate\Support\Facades\Log::info('Coupon extracted successfully', [
+                'order_id' => $orderId,
+                'coupon_code' => $result['code'] ?? 'unknown',
+                'coupon_data' => $result,
+            ]);
+        }
+
+        return ! empty($result) ? $result : null;
     }
 
     /**

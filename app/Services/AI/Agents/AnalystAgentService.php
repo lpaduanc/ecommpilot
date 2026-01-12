@@ -3,7 +3,9 @@
 namespace App\Services\AI\Agents;
 
 use App\Services\AI\AIManager;
+use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\AnalystAgentPrompt;
+use Illuminate\Support\Facades\Log;
 
 class AnalystAgentService
 {
@@ -22,7 +24,7 @@ class AnalystAgentService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.2, // Very low temperature for analytical accuracy
-            'max_tokens' => 4096, // Adequate for detailed metrics analysis
+            'max_tokens' => 8192, // Increased for detailed metrics analysis
         ]);
 
         return $this->parseResponse($response);
@@ -33,11 +35,19 @@ class AnalystAgentService
      */
     private function parseResponse(string $response): array
     {
+        Log::debug('Analyst raw response (first 2000 chars): '.substr($response, 0, 2000));
+
         $json = $this->extractJson($response);
 
         if ($json === null) {
+            Log::warning('Analyst: Could not extract JSON from response');
+            Log::debug('Analyst: Full response for debugging: '.$response);
+
             return $this->getDefaultAnalysis();
         }
+
+        Log::debug('Analyst JSON extracted', ['keys' => array_keys($json)]);
+        Log::info('Analyst: Successfully parsed analysis with health score: '.($json['overall_health']['score'] ?? 'N/A'));
 
         // Validate and normalize the structure
         return $this->normalizeAnalysis($json);
@@ -48,29 +58,7 @@ class AnalystAgentService
      */
     private function extractJson(string $content): ?array
     {
-        // Try to find JSON in markdown code blocks
-        if (preg_match('/```(?:json)?\s*(.*?)\s*```/s', $content, $matches)) {
-            $decoded = json_decode($matches[1], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        // Try direct parse
-        $decoded = json_decode($content, true);
-        if ($decoded !== null) {
-            return $decoded;
-        }
-
-        // Try to find JSON object in text
-        if (preg_match('/\{.*\}/s', $content, $matches)) {
-            $decoded = json_decode($matches[0], true);
-            if ($decoded !== null) {
-                return $decoded;
-            }
-        }
-
-        return null;
+        return JsonExtractor::extract($content, 'Analyst');
     }
 
     /**

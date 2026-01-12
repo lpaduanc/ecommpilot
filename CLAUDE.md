@@ -2,36 +2,72 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## CRITICAL RULES - READ FIRST
+## ⛔ CRITICAL RULES - READ FIRST ⛔
 
-### Preventing Code Regressions
+> **WARNING: CODE HAS BEEN LOST IN THE PAST DUE TO NOT FOLLOWING THESE RULES.**
+> **THESE RULES ARE NON-NEGOTIABLE AND MUST BE FOLLOWED 100% OF THE TIME.**
+
+### Preventing Code Regressions - MANDATORY
 
 **NEVER replace working code with old or incomplete versions.** Follow these mandatory rules:
 
-1. **Always read the CURRENT file before editing** - Use the Read tool to get the latest state of the file. Never assume you know the current content based on earlier reads in the conversation.
+1. **Always read the CURRENT file IMMEDIATELY before editing** - Use the Read tool to get the latest state of the file RIGHT BEFORE making any edit. Never assume you know the current content based on earlier reads in the conversation. Files may have changed since your last read.
 
-2. **Use Edit instead of Write for modifications** - The Edit tool makes precise replacements. The Write tool overwrites the entire file and can cause code loss.
+2. **Use Edit instead of Write for modifications** - The Edit tool makes precise replacements. The Write tool overwrites the entire file and can cause code loss. **ONLY use Write for creating NEW files that don't exist yet.**
 
-3. **Surgical edits, not complete replacements** - When modifying a file, change only the necessary section. Never rewrite functions, methods, or entire sections that don't need to be changed.
+3. **Surgical edits, not complete replacements** - When modifying a file, change ONLY the specific lines that need to change. Never rewrite functions, methods, or entire sections that don't need to be changed. If you need to change 5 lines, edit only those 5 lines.
 
-4. **Preserve existing working code** - If a function/component is already working, don't modify it unless explicitly requested.
+4. **Preserve existing working code** - If a function/component is already working, don't modify it unless explicitly requested. Working code is sacred.
 
-5. **Verify before removing** - Before removing any code, confirm it is truly no longer needed.
+5. **Verify before removing** - Before removing any code, confirm it is truly no longer needed. When in doubt, ASK the user.
 
-6. **After significant edits, validate** - Run `npm run build` for frontend or `./vendor/bin/pint` for backend to ensure there are no syntax errors.
+6. **MANDATORY: Run tests after ANY code change** - After making any edit to PHP or Vue files, run the appropriate tests to ensure nothing was broken. See "Mandatory Testing" section below.
 
 ### Mandatory Flow for Edits
 
 ```
-1. Read current file → 2. Identify specific section → 3. Edit only what's necessary → 4. Validate build/lint
+1. Read current file (IMMEDIATELY before editing)
+   ↓
+2. Identify the SPECIFIC lines to change
+   ↓
+3. Edit ONLY those lines (minimal change)
+   ↓
+4. Run tests: `composer test` for PHP, `npm run build` for Vue
+   ↓
+5. If tests fail, FIX immediately before proceeding
 ```
 
-### What to NEVER Do
+### What to NEVER Do - STRICT PROHIBITIONS
 
-- Never use Write to "update" an existing file without reading it first
-- Never copy code from earlier messages in the conversation as the "current version"
-- Never remove imports, functions, or variables without verifying they are unused
-- Never simplify or "clean up" code that wasn't requested to be changed
+- ❌ **NEVER** use Write to "update" an existing file - use Edit instead
+- ❌ **NEVER** copy code from earlier messages in the conversation as the "current version"
+- ❌ **NEVER** remove imports, functions, or variables without verifying they are unused
+- ❌ **NEVER** simplify or "clean up" code that wasn't requested to be changed
+- ❌ **NEVER** proceed to the next task if tests are failing
+- ❌ **NEVER** assume a file's content - always Read it first
+- ❌ **NEVER** make multiple unrelated changes in a single edit
+
+### Mandatory Testing - RUN AFTER EVERY CHANGE
+
+**After ANY code modification, you MUST run tests:**
+
+```bash
+# After PHP changes (controllers, services, models, jobs, etc.)
+composer test
+
+# After Vue/JS changes
+npm run build
+
+# After both PHP and Vue changes
+composer test && npm run build
+```
+
+**If tests fail:**
+1. **STOP** - Do not proceed with other tasks
+2. **FIX** - Resolve the failing test immediately
+3. **RE-RUN** - Confirm all tests pass before continuing
+
+**No exceptions.** A passing test suite is required before moving to the next task.
 
 ### Technology Stack Consistency
 
@@ -450,3 +486,137 @@ QUEUE_CONNECTION            # Use 'database' or 'redis' for background jobs
 - TypeScript for type safety
 - Tailwind CSS for styling
 - Components use props with types, emit events for parent communication
+
+## Performance Guidelines
+
+### Backend Query Optimization
+
+**ALWAYS prioritize performance** when implementing features that query the database:
+
+1. **Use single batch queries instead of N+1 loops**
+   ```php
+   // BAD - N+1 queries
+   foreach ($coupons as $coupon) {
+       $analytics = $this->getAnalytics($coupon);
+   }
+
+   // GOOD - Single batch query
+   $couponCodes = $coupons->pluck('code')->toArray();
+   $analytics = $this->batchGetAnalytics($couponCodes);
+   ```
+
+2. **Use DB::table for read-only queries** - Faster than Eloquent when you don't need model features
+
+3. **Cache expensive queries** - Use `Cache::remember()` with appropriate TTL (5 min for analytics)
+
+4. **Index frequently queried columns** - Always add indexes for columns used in WHERE, JOIN, ORDER BY
+
+5. **Limit result sets** - Always paginate, use `limit()`, avoid `get()` without limits on large tables
+
+6. **Use selectRaw for aggregations** - Let the database do the heavy lifting
+   ```php
+   DB::table('orders')
+       ->selectRaw('COUNT(*) as total, SUM(amount) as revenue')
+       ->where('status', 'paid')
+       ->first();
+   ```
+
+### Frontend Performance Optimization
+
+**ALWAYS implement these patterns** in Vue components that display lists or tables:
+
+1. **Debounce search inputs** - Minimum 300ms delay
+   ```javascript
+   const debouncedSearch = debounce(() => {
+       store.fetchData();
+   }, 300);
+   ```
+
+2. **Memoize expensive formatting operations**
+   ```javascript
+   const formatCache = new Map();
+   function memoizedFormat(value, formatter) {
+       if (formatCache.has(value)) return formatCache.get(value);
+       const result = formatter(value);
+       formatCache.set(value, result);
+       return result;
+   }
+   ```
+
+3. **Cleanup on unmount** - Clear timers, caches, event listeners
+   ```javascript
+   onUnmounted(() => {
+       if (debounceTimer) clearTimeout(debounceTimer);
+       formatCache.clear();
+   });
+   ```
+
+4. **Use Intl API for formatting** - Create formatters once, reuse
+   ```javascript
+   const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+   ```
+
+5. **Avoid inline functions in templates** - Define functions in script section
+
+## Layout & UI Consistency Guidelines
+
+### Standard List/Table View Pattern
+
+All list/table views (Products, Orders, Discounts, etc.) MUST follow this structure:
+
+1. **Hero Header with Gradient** - Dark gradient background with:
+   - Icon + Title + Subtitle (item count)
+   - Search input with glass effect
+   - Filter toggle button
+
+2. **Stats Cards** - 4-column grid with gradient backgrounds, white text
+
+3. **Filter Section** - BaseCard with filter buttons organized by category
+
+4. **Data Table** with:
+   - `table-fixed` layout with explicit `colgroup` widths
+   - Sticky header with gradient background
+   - Hover row highlighting with gradient
+   - Selection checkboxes (if applicable)
+   - Totals row at bottom
+   - Sortable columns with sort icons
+
+5. **Pagination** - Footer with "Showing X to Y of Z" and prev/next buttons
+
+### Dark Mode Support
+
+**ALWAYS include dark mode classes** for every UI element:
+```html
+<!-- Background -->
+class="bg-gray-50 dark:bg-gray-900"
+
+<!-- Text -->
+class="text-gray-900 dark:text-gray-100"
+
+<!-- Borders -->
+class="border-gray-200 dark:border-gray-700"
+
+<!-- Cards -->
+class="bg-white dark:bg-gray-800"
+```
+
+### Table Column Widths
+
+Use explicit `colgroup` with fixed pixel widths:
+```html
+<colgroup>
+    <col style="width: 50px">  <!-- Checkbox -->
+    <col style="width: 180px"> <!-- Name -->
+    <col style="width: 130px"> <!-- Value -->
+</colgroup>
+```
+
+### Color Tokens
+
+Use project color tokens, not raw Tailwind colors:
+- `primary-*` - Main brand color (buttons, links)
+- `secondary-*` - Secondary actions
+- `accent-*` - Highlights, badges
+- `success-*` - Positive states (active, completed)
+- `warning-*` - Warnings, discounts
+- `danger-*` - Errors, deletions

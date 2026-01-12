@@ -97,8 +97,10 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('discounts')->middleware('can:marketing.access')->group(function () {
+        Route::get('/bulk', [DiscountController::class, 'bulk']); // Single request for all data
         Route::get('/', [DiscountController::class, 'index']);
         Route::get('/stats', [DiscountController::class, 'stats']);
+        Route::get('/filters', [DiscountController::class, 'filters']);
     });
 
     /*
