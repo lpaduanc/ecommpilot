@@ -56,6 +56,14 @@ class OrderController extends Controller
             $query->byCity($request->input('city'));
         }
 
+        if ($request->filled('start_date')) {
+            $query->whereDate('external_created_at', '>=', $request->input('start_date'));
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('external_created_at', '<=', $request->input('end_date'));
+        }
+
         $orders = $query->paginate($request->input('per_page', 10));
 
         return response()->json([
@@ -177,6 +185,14 @@ class OrderController extends Controller
 
         if ($request->filled('city')) {
             $query->byCity($request->input('city'));
+        }
+
+        if ($request->filled('start_date')) {
+            $query->whereDate('external_created_at', '>=', $request->input('start_date'));
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('external_created_at', '<=', $request->input('end_date'));
         }
 
         $orders = $query->get();

@@ -27,6 +27,7 @@ const testingProvider = ref(null);
 
 const showOpenAIKey = ref(false);
 const showGeminiKey = ref(false);
+const showAnthropicKey = ref(false);
 
 const settings = reactive({
     provider: 'openai',
@@ -44,6 +45,13 @@ const settings = reactive({
         max_tokens: 4000,
         is_configured: false,
     },
+    anthropic: {
+        api_key: '',
+        model: 'claude-sonnet-4-20250514',
+        temperature: 0.7,
+        max_tokens: 8192,
+        is_configured: false,
+    },
 });
 
 const availableProviders = ref([]);
@@ -51,6 +59,7 @@ const availableModels = ref({});
 const testResults = reactive({
     openai: null,
     gemini: null,
+    anthropic: null,
 });
 
 // Brazil Locations Sync
@@ -121,7 +130,12 @@ async function testProvider(provider) {
 }
 
 function getProviderIcon(providerId) {
-    return providerId === 'openai' ? '🤖' : '✨';
+    const icons = {
+        openai: '🤖',
+        gemini: '✨',
+        anthropic: '🧠',
+    };
+    return icons[providerId] || '🤖';
 }
 
 async function fetchLocationsStatus() {
@@ -245,11 +259,11 @@ onMounted(() => {
                         </label>
                     </div>
 
-                    <div class="mt-6 p-4 bg-gray-50 rounded-xl">
-                        <p class="text-sm text-gray-600">
-                            <strong>Provedor ativo:</strong> {{ settings.provider === 'openai' ? 'OpenAI' : 'Google Gemini' }}
+                    <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <p class="text-sm text-gray-600 dark:text-gray-300">
+                            <strong>Provedor ativo:</strong> {{ { openai: 'OpenAI', gemini: 'Google Gemini', anthropic: 'Anthropic Claude' }[settings.provider] }}
                         </p>
-                        <p class="text-xs text-gray-500 mt-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Este provedor será usado para análises e chat de IA.
                         </p>
                     </div>
@@ -520,6 +534,140 @@ onMounted(() => {
                                     class="text-sm text-gray-600 mt-1"
                                 >
                                     Resposta: "{{ testResults.gemini.response }}"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </BaseCard>
+
+                <!-- Anthropic Settings -->
+                <BaseCard>
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="text-2xl">🧠</div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Anthropic Claude</h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Configurações do Claude Sonnet, Opus e Haiku</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span
+                                v-if="settings.anthropic.is_configured"
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400"
+                            >
+                                Configurado
+                            </span>
+                            <span
+                                v-else
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                            >
+                                Não configurado
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                            <div class="relative">
+                                <input
+                                    :type="showAnthropicKey ? 'text' : 'password'"
+                                    v-model="settings.anthropic.api_key"
+                                    placeholder="sk-ant-..."
+                                    class="input pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    @click="showAnthropicKey = !showAnthropicKey"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                >
+                                    <EyeIcon v-if="!showAnthropicKey" class="w-5 h-5" />
+                                    <EyeSlashIcon v-else class="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Modelo</label>
+                            <select v-model="settings.anthropic.model" class="input">
+                                <option
+                                    v-for="model in availableModels.anthropic"
+                                    :key="model.id"
+                                    :value="model.id"
+                                >
+                                    {{ model.name }} - {{ model.description }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Temperatura ({{ settings.anthropic.temperature }})
+                            </label>
+                            <input
+                                type="range"
+                                v-model.number="settings.anthropic.temperature"
+                                min="0"
+                                max="1"
+                                step="0.1"
+                                class="w-full"
+                            />
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>Preciso</span>
+                                <span>Criativo</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
+                            <input
+                                type="number"
+                                v-model.number="settings.anthropic.max_tokens"
+                                min="100"
+                                max="128000"
+                                class="input"
+                            />
+                        </div>
+
+                        <div class="flex items-end">
+                            <BaseButton
+                                variant="secondary"
+                                @click="testProvider('anthropic')"
+                                :loading="testingProvider === 'anthropic'"
+                                :disabled="!settings.anthropic.api_key || isTesting"
+                            >
+                                <BeakerIcon class="w-4 h-4" />
+                                Testar Conexão
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Test Result -->
+                    <div
+                        v-if="testResults.anthropic"
+                        :class="[
+                            'mt-4 p-4 rounded-xl',
+                            testResults.anthropic.success ? 'bg-success-50 dark:bg-success-900/20' : 'bg-danger-50 dark:bg-danger-900/20'
+                        ]"
+                    >
+                        <div class="flex items-start gap-3">
+                            <CheckCircleIcon
+                                v-if="testResults.anthropic.success"
+                                class="w-5 h-5 text-success-500 mt-0.5"
+                            />
+                            <XCircleIcon
+                                v-else
+                                class="w-5 h-5 text-danger-500 mt-0.5"
+                            />
+                            <div>
+                                <p :class="testResults.anthropic.success ? 'text-success-700 dark:text-success-400' : 'text-danger-700 dark:text-danger-400'">
+                                    {{ testResults.anthropic.message }}
+                                </p>
+                                <p
+                                    v-if="testResults.anthropic.response"
+                                    class="text-sm text-gray-600 dark:text-gray-400 mt-1"
+                                >
+                                    Resposta: "{{ testResults.anthropic.response }}"
                                 </p>
                             </div>
                         </div>

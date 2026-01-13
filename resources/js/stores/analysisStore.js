@@ -271,16 +271,43 @@ export const useAnalysisStore = defineStore('analysis', () => {
                 status: newStatus,
             });
 
-            // Update local state
+            const updatedData = response.data.suggestion;
+
+            // Update persistentSuggestions array (merge to preserve formatted fields)
             const index = persistentSuggestions.value.findIndex(s => s.id === suggestionId);
             if (index !== -1) {
-                persistentSuggestions.value[index] = response.data.suggestion;
+                const mergedPersistent = {
+                    ...persistentSuggestions.value[index],
+                    ...updatedData,
+                    is_done: updatedData.status === 'completed',
+                };
+                // Use splice to ensure Vue reactivity
+                persistentSuggestions.value.splice(index, 1, mergedPersistent);
+            }
+
+            // Update currentAnalysis.suggestions array (merge to preserve priority and other formatted fields)
+            let mergedSuggestion = { ...updatedData, is_done: updatedData.status === 'completed' };
+            if (currentAnalysis.value?.suggestions) {
+                const analysisIndex = currentAnalysis.value.suggestions.findIndex(
+                    s => s.id === suggestionId
+                );
+                if (analysisIndex !== -1) {
+                    // Merge: keep existing formatted fields (especially 'priority'), update with new data
+                    mergedSuggestion = {
+                        ...currentAnalysis.value.suggestions[analysisIndex],
+                        ...updatedData,
+                        status: updatedData.status,
+                        is_done: updatedData.status === 'completed',
+                    };
+                    // Use splice to ensure Vue reactivity
+                    currentAnalysis.value.suggestions.splice(analysisIndex, 1, mergedSuggestion);
+                }
             }
 
             // Refresh stats
             await fetchSuggestionStats();
 
-            return { success: true, suggestion: response.data.suggestion };
+            return { success: true, suggestion: mergedSuggestion };
         } catch (err) {
             return {
                 success: false,
@@ -306,6 +333,13 @@ export const useAnalysisStore = defineStore('analysis', () => {
     function clearSuggestionsFilter() {
         suggestionsFilter.value = { status: null, category: null, impact: null };
         fetchPersistentSuggestions(1);
+    }
+
+    /**
+     * Set current analysis (for viewing historical analyses)
+     */
+    function setCurrentAnalysis(analysis) {
+        currentAnalysis.value = analysis;
     }
 
     return {
@@ -346,6 +380,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
         fetchAnalysisHistory,
         requestNewAnalysis,
         getAnalysisById,
+        setCurrentAnalysis,
         markSuggestionAsDone,
         getSuggestionsByCategory,
         startPolling,

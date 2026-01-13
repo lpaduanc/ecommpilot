@@ -34,7 +34,7 @@ class AdminSettingsController extends Controller
     public function updateAISettings(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'provider' => ['sometimes', 'string', 'in:openai,gemini'],
+            'provider' => ['sometimes', 'string', 'in:openai,gemini,anthropic'],
             'openai.api_key' => ['sometimes', 'nullable', 'string'],
             'openai.model' => ['sometimes', 'string'],
             'openai.temperature' => ['sometimes', 'numeric', 'min:0', 'max:2'],
@@ -43,6 +43,10 @@ class AdminSettingsController extends Controller
             'gemini.model' => ['sometimes', 'string'],
             'gemini.temperature' => ['sometimes', 'numeric', 'min:0', 'max:2'],
             'gemini.max_tokens' => ['sometimes', 'integer', 'min:100', 'max:32000'],
+            'anthropic.api_key' => ['sometimes', 'nullable', 'string'],
+            'anthropic.model' => ['sometimes', 'string'],
+            'anthropic.temperature' => ['sometimes', 'numeric', 'min:0', 'max:2'],
+            'anthropic.max_tokens' => ['sometimes', 'integer', 'min:100', 'max:128000'],
         ]);
 
         $this->settingsService->updateAISettings($validated);
@@ -64,7 +68,7 @@ class AdminSettingsController extends Controller
     public function testAIProvider(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'provider' => ['required', 'string', 'in:openai,gemini'],
+            'provider' => ['required', 'string', 'in:openai,gemini,anthropic'],
         ]);
 
         $result = $this->settingsService->testAIProvider($validated['provider']);
@@ -96,6 +100,12 @@ class AdminSettingsController extends Controller
                 'description' => 'Gemini Pro e Flash',
                 'icon' => 'google',
             ],
+            [
+                'id' => 'anthropic',
+                'name' => 'Anthropic Claude',
+                'description' => 'Claude Sonnet, Opus e Haiku',
+                'icon' => 'anthropic',
+            ],
         ];
     }
 
@@ -116,6 +126,12 @@ class AdminSettingsController extends Controller
                 ['id' => 'gemini-1.5-pro', 'name' => 'Gemini 1.5 Pro', 'description' => 'Melhor qualidade'],
                 ['id' => 'gemini-1.5-flash', 'name' => 'Gemini 1.5 Flash', 'description' => 'Mais rápido'],
                 ['id' => 'gemini-1.0-pro', 'name' => 'Gemini 1.0 Pro', 'description' => 'Versão estável'],
+            ],
+            'anthropic' => [
+                ['id' => 'claude-sonnet-4-20250514', 'name' => 'Claude Sonnet 4', 'description' => 'Mais recente e recomendado'],
+                ['id' => 'claude-opus-4-20250514', 'name' => 'Claude Opus 4', 'description' => 'Mais poderoso'],
+                ['id' => 'claude-3-5-sonnet-20241022', 'name' => 'Claude 3.5 Sonnet', 'description' => 'Excelente custo-benefício'],
+                ['id' => 'claude-3-5-haiku-20241022', 'name' => 'Claude 3.5 Haiku', 'description' => 'Mais rápido e econômico'],
             ],
         ];
     }

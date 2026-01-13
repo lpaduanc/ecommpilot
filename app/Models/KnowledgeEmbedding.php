@@ -26,19 +26,28 @@ class KnowledgeEmbedding extends Model
      * Category constants
      */
     public const CATEGORY_BENCHMARK = 'benchmark';
+
     public const CATEGORY_STRATEGY = 'strategy';
+
     public const CATEGORY_CASE = 'case';
+
     public const CATEGORY_SEASONALITY = 'seasonality';
 
     /**
      * Niche constants
      */
     public const NICHE_GENERAL = 'general';
+
     public const NICHE_FASHION = 'fashion';
+
     public const NICHE_ELECTRONICS = 'electronics';
+
     public const NICHE_FOOD = 'food';
+
     public const NICHE_BEAUTY = 'beauty';
+
     public const NICHE_HOME = 'home';
+
     public const NICHE_SPORTS = 'sports';
 
     /**

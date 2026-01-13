@@ -8,7 +8,7 @@ class CollectorAgentPrompt
     {
         $platform = $context['platform'] ?? 'desconhecida';
         $niche = $context['niche'] ?? 'geral';
-        $operationTime = $context['operation_time'] ?? 'desconhecido';
+        $storeStats = json_encode($context['store_stats'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $previousAnalyses = json_encode($context['previous_analyses'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $previousSuggestions = json_encode($context['previous_suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $benchmarks = json_encode($context['benchmarks'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -22,7 +22,12 @@ Analise as informações fornecidas e estruture um resumo executivo do contexto 
 ## Dados da Loja
 - **Plataforma:** {$platform}
 - **Nicho identificado:** {$niche}
-- **Tempo de operação:** {$operationTime}
+
+## Estatísticas da Loja
+```json
+{$storeStats}
+```
+IMPORTANTE: Use os dados acima (total de pedidos, clientes, faturamento) para entender o tamanho e maturidade REAL da loja. O campo "operation_time" indica há quanto tempo a loja está operando baseado na data do primeiro pedido.
 
 ## Histórico de Análises Anteriores
 ```json

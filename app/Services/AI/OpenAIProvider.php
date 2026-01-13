@@ -24,9 +24,9 @@ class OpenAIProvider implements AIProviderInterface
     public function __construct()
     {
         // Try database settings first, then fall back to config
-        $this->defaultModel = SystemSetting::get('ai.openai.model', config('services.ai.openai.model', 'gpt-4o'));
-        $this->defaultTemperature = (float) SystemSetting::get('ai.openai.temperature', config('services.ai.openai.temperature', 0.7));
-        $this->defaultMaxTokens = (int) SystemSetting::get('ai.openai.max_tokens', config('services.ai.openai.max_tokens', 8192));
+        $this->defaultModel = SystemSetting::get('ai.openai.model', config('services.ai.openai.model', 'gpt-4o')) ?? 'gpt-4o';
+        $this->defaultTemperature = (float) (SystemSetting::get('ai.openai.temperature', config('services.ai.openai.temperature', 0.7)) ?? 0.7);
+        $this->defaultMaxTokens = (int) (SystemSetting::get('ai.openai.max_tokens', config('services.ai.openai.max_tokens', 8192)) ?? 8192);
     }
 
     public function chat(array $messages, array $options = []): string

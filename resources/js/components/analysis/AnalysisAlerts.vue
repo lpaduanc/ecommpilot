@@ -13,6 +13,39 @@ const props = defineProps({
 
 const dismissedAlerts = ref([]);
 
+// Mapeamento para traduzir tipos de alerta que possam vir com underscore
+const alertTypeLabels = {
+    concentracao_vendas: 'Concentração de Vendas',
+    estoque_critico: 'Estoque Crítico',
+    queda_vendas_recente: 'Queda de Vendas Recente',
+    cupons_excessivos: 'Cupons Excessivos',
+    sazonalidade_inicio_ano: 'Sazonalidade de Início de Ano',
+    dependencia_cupons: 'Dependência de Cupons',
+    produtos_estrela: 'Produtos Estrela',
+    gestao_estoque: 'Gestão de Estoque',
+    cancellation_rate: 'Taxa de Cancelamento',
+    refund_rate: 'Taxa de Reembolso',
+    inventory_critical: 'Estoque Crítico',
+    low_conversion: 'Baixa Conversão',
+    high_abandonment: 'Alto Abandono',
+    revenue_decline: 'Queda de Receita',
+    order_decline: 'Queda de Pedidos',
+    ticket_decline: 'Queda de Ticket Médio',
+    customer_churn: 'Perda de Clientes',
+    stock_out: 'Ruptura de Estoque',
+};
+
+function formatAlertTitle(title) {
+    if (!title) return 'Alerta';
+    // Se o título está no mapeamento, usa o label traduzido
+    if (alertTypeLabels[title]) return alertTypeLabels[title];
+    // Se contém underscore, transforma em título capitalizado
+    if (title.includes('_')) {
+        return title.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+    return title;
+}
+
 const alertConfig = {
     warning: {
         icon: ExclamationTriangleIcon,
@@ -85,7 +118,7 @@ function isVisible(index) {
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
                     <p v-if="alert.title" :class="['font-semibold', getConfig(alert.type).text]">
-                        {{ alert.title }}
+                        {{ formatAlertTitle(alert.title) }}
                     </p>
                     <p :class="['leading-relaxed', alert.title ? getConfig(alert.type).subtext : 'font-medium ' + getConfig(alert.type).text]">
                         {{ alert.message }}

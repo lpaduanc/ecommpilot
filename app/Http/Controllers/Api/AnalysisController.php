@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Enums\AnalysisStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AnalysisResource;
+use App\Http\Resources\SuggestionResource;
 use App\Jobs\ProcessAnalysisJob;
 use App\Models\ActivityLog;
 use App\Models\Analysis;
 use App\Models\Suggestion;
-use App\Models\SuggestionResult;
 use App\Services\AI\Memory\FeedbackLoopService;
 use App\Services\AnalysisService;
 use Illuminate\Http\JsonResponse;
@@ -221,7 +221,7 @@ class AnalysisController extends Controller
             ->paginate($request->get('per_page', 10));
 
         return response()->json([
-            'suggestions' => $suggestions->items(),
+            'suggestions' => SuggestionResource::collection($suggestions->items()),
             'total' => $suggestions->total(),
             'current_page' => $suggestions->currentPage(),
             'last_page' => $suggestions->lastPage(),
@@ -274,7 +274,7 @@ class AnalysisController extends Controller
 
         return response()->json([
             'message' => 'Status da sugestão atualizado.',
-            'suggestion' => $suggestion,
+            'suggestion' => new SuggestionResource($suggestion),
         ]);
     }
 
@@ -299,7 +299,7 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Sugestão não encontrada.'], 404);
         }
 
-        return response()->json(['suggestion' => $suggestion]);
+        return response()->json(['suggestion' => new SuggestionResource($suggestion)]);
     }
 
     /**

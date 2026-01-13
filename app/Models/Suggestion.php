@@ -39,27 +39,39 @@ class Suggestion extends Model
      * Status constants
      */
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_IGNORED = 'ignored';
 
     /**
      * Impact constants
      */
     public const IMPACT_HIGH = 'high';
+
     public const IMPACT_MEDIUM = 'medium';
+
     public const IMPACT_LOW = 'low';
 
     /**
      * Category constants
      */
     public const CATEGORY_INVENTORY = 'inventory';
+
     public const CATEGORY_COUPON = 'coupon';
+
     public const CATEGORY_PRODUCT = 'product';
+
     public const CATEGORY_MARKETING = 'marketing';
+
     public const CATEGORY_OPERATIONAL = 'operational';
+
     public const CATEGORY_CUSTOMER = 'customer';
+
     public const CATEGORY_CONVERSION = 'conversion';
+
     public const CATEGORY_PRICING = 'pricing';
 
     /**

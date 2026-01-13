@@ -89,7 +89,7 @@ class DiscountAnalyticsService
         $cacheKey = "discount_stats_{$store->id}_".md5(json_encode($dates));
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($store, $dates) {
-            // Single optimized query for order stats
+            // Single optimized query for order stats (filtered by period)
             $orderQuery = DB::table('synced_orders')
                 ->where('store_id', $store->id)
                 ->where('payment_status', 'paid')
@@ -98,12 +98,13 @@ class DiscountAnalyticsService
             // Apply date filter
             $this->applyDateFilter($orderQuery, $dates['start'], $dates['end']);
 
-            $orderStats = $orderQuery->selectRaw('
+            $orderStats = $orderQuery->selectRaw("
                     COUNT(*) as total_orders,
                     SUM(CASE WHEN discount > 0 THEN 1 ELSE 0 END) as orders_with_discount,
                     COALESCE(SUM(CASE WHEN discount > 0 THEN total ELSE 0 END), 0) as revenue_with_discount,
-                    COALESCE(SUM(discount), 0) as total_discount
-                ')
+                    COALESCE(SUM(discount), 0) as total_discount,
+                    SUM(CASE WHEN coupon->>'code' IS NOT NULL AND coupon->>'code' != '' THEN 1 ELSE 0 END) as orders_with_coupon
+                ")
                 ->first();
 
             // Single query for coupon stats (coupons don't filter by date, they're catalog data)
@@ -112,7 +113,6 @@ class DiscountAnalyticsService
                 ->whereNull('deleted_at')
                 ->selectRaw('
                     COUNT(*) as total_coupons,
-                    SUM(used) as total_uses,
                     SUM(CASE WHEN valid = true AND (end_date IS NULL OR end_date >= NOW()) THEN 1 ELSE 0 END) as active_coupons,
                     SUM(CASE WHEN end_date IS NOT NULL AND end_date < NOW() THEN 1 ELSE 0 END) as expired_coupons
                 ')
@@ -125,7 +125,7 @@ class DiscountAnalyticsService
             return [
                 'total_orders' => (int) ($orderStats->total_orders ?? 0),
                 'orders_with_discount' => $ordersWithDiscount,
-                'orders_with_coupon' => (int) ($couponStats->total_uses ?? 0),
+                'orders_with_coupon' => (int) ($orderStats->orders_with_coupon ?? 0),
                 'total_revenue' => $totalRevenue,
                 'total_discount' => $totalDiscount,
                 'discount_percentage' => $totalRevenue > 0

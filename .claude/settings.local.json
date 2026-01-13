@@ -46,7 +46,8 @@
       "Bash(composer test:*)",
       "Bash(1 <<'EOF'\n$analysis = App\\\\Models\\\\Analysis::find\\(25\\);\necho \"Analysis ID: \" . $analysis->id . \"\\\\n\";\necho \"Status: \" . $analysis->status->value . \"\\\\n\";\necho \"Store ID: \" . $analysis->store_id . \"\\\\n\";\necho \"Created at: \" . $analysis->created_at . \"\\\\n\";\necho \"Completed at: \" . $analysis->completed_at . \"\\\\n\";\necho \"\\\\nResult:\\\\n\";\nprint_r\\($analysis->result\\);\nexit\nEOF)",
       "Bash(del check_analysis.php)",
-      "Bash(git -C \"C:/projects/ecommpilot\" status --short)"
+      "Bash(git -C \"C:/projects/ecommpilot\" status --short)",
+      "Bash(findstr:*)"
     ]
   },
   "statusLine": {

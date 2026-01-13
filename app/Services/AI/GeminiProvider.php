@@ -28,10 +28,10 @@ class GeminiProvider implements AIProviderInterface
     public function __construct()
     {
         // Try database settings first, then fall back to config
-        $this->apiKey = SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key', ''));
-        $this->defaultModel = SystemSetting::get('ai.gemini.model', config('services.ai.gemini.model', 'gemini-1.5-pro'));
-        $this->defaultTemperature = (float) SystemSetting::get('ai.gemini.temperature', config('services.ai.gemini.temperature', 0.7));
-        $this->defaultMaxTokens = (int) SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 8192));
+        $this->apiKey = SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key')) ?? '';
+        $this->defaultModel = SystemSetting::get('ai.gemini.model', config('services.ai.gemini.model', 'gemini-1.5-pro')) ?? 'gemini-1.5-pro';
+        $this->defaultTemperature = (float) (SystemSetting::get('ai.gemini.temperature', config('services.ai.gemini.temperature', 0.7)) ?? 0.7);
+        $this->defaultMaxTokens = (int) (SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 8192)) ?? 8192);
     }
 
     public function chat(array $messages, array $options = []): string
@@ -115,7 +115,7 @@ class GeminiProvider implements AIProviderInterface
 
                 // Handle truncation - MAX_TOKENS means the response was cut off
                 if ($finishReason === 'MAX_TOKENS') {
-                    Log::warning("Gemini response truncated (MAX_TOKENS). Consider increasing max_tokens.", [
+                    Log::warning('Gemini response truncated (MAX_TOKENS). Consider increasing max_tokens.', [
                         'model' => $model,
                         'max_tokens' => $maxTokens,
                     ]);
@@ -141,6 +141,7 @@ class GeminiProvider implements AIProviderInterface
                     $maxTokens = min($maxTokens * 2, 32768); // Cap at 32k
                     Log::info("Retrying with increased max_tokens: {$maxTokens}");
                     $payload['generationConfig']['maxOutputTokens'] = $maxTokens;
+
                     continue; // Retry with more tokens
                 }
 

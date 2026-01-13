@@ -27,6 +27,21 @@ const stats = computed(() => dashboardStore.stats);
 const isLoading = computed(() => dashboardStore.isLoading);
 const hasStore = computed(() => dashboardStore.hasStore);
 
+// Verifica se o período selecionado é de apenas 1 dia
+const isSingleDayPeriod = computed(() => {
+    const { period, startDate, endDate } = dashboardStore.filters;
+
+    if (period === 'today') {
+        return true;
+    }
+
+    if (period === 'custom' && startDate && endDate) {
+        return startDate === endDate;
+    }
+
+    return false;
+});
+
 const statCards = computed(() => {
     if (!stats.value) return [];
     
@@ -162,7 +177,8 @@ onMounted(() => {
 
                     <!-- Charts Row 1 -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        <BaseCard padding="normal">
+                        <!-- Gráfico de Receita - oculto quando período é de 1 dia -->
+                        <BaseCard v-if="!isSingleDayPeriod" padding="normal">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
                                     <ArrowTrendingUpIcon class="w-4 h-4 text-white" />
@@ -172,7 +188,8 @@ onMounted(() => {
                             <RevenueChart :data="dashboardStore.revenueChart" />
                         </BaseCard>
 
-                        <BaseCard padding="normal">
+                        <!-- Gráfico de Pedidos - ocupa espaço completo quando período é de 1 dia -->
+                        <BaseCard padding="normal" :class="{ 'lg:col-span-2': isSingleDayPeriod }">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center">
                                     <ShoppingCartIcon class="w-4 h-4 text-white" />

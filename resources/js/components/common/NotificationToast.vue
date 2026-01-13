@@ -59,7 +59,7 @@ function removeNotification(id) {
 
 <template>
     <div
-        class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"
+        class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3"
         aria-live="polite"
         aria-atomic="true"
     >

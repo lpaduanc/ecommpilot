@@ -1,5 +1,5 @@
 <script setup>
-import { 
+import {
     ArrowTrendingUpIcon,
     CurrencyDollarIcon,
     SparklesIcon,
@@ -9,6 +9,38 @@ import {
 const props = defineProps({
     opportunities: { type: Array, default: () => [] },
 });
+
+const emit = defineEmits(['view-detail']);
+
+// Mapeamento para traduzir tipos de oportunidade que possam vir com underscore
+const opportunityTypeLabels = {
+    coupon_dependency: 'Dependência de Cupons',
+    bestseller_dominance: 'Dominância de Bestsellers',
+    inventory_imbalance: 'Desequilíbrio de Estoque',
+    ticket_medio_positivo: 'Ticket Médio Positivo',
+    cross_sell: 'Venda Cruzada',
+    upsell: 'Upsell',
+    seasonal_trend: 'Tendência Sazonal',
+    customer_retention: 'Retenção de Clientes',
+    price_optimization: 'Otimização de Preços',
+    bundle_opportunity: 'Oportunidade de Combo',
+    reactivation: 'Reativação de Clientes',
+    high_margin: 'Alta Margem',
+    growth_potential: 'Potencial de Crescimento',
+    market_expansion: 'Expansão de Mercado',
+    repeat_purchase: 'Compra Recorrente',
+};
+
+function formatOpportunityTitle(title) {
+    if (!title) return 'Oportunidade';
+    // Se o título está no mapeamento, usa o label traduzido
+    if (opportunityTypeLabels[title]) return opportunityTypeLabels[title];
+    // Se contém underscore, transforma em título capitalizado
+    if (title.includes('_')) {
+        return title.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+    return title;
+}
 </script>
 
 <template>
@@ -35,6 +67,7 @@ const props = defineProps({
                 v-for="(opportunity, index) in opportunities"
                 :key="index"
                 class="group p-5 hover:bg-gradient-to-r hover:from-emerald-50/50 dark:hover:from-emerald-900/20 hover:to-transparent transition-all duration-300 cursor-pointer"
+                @click="emit('view-detail', opportunity)"
             >
                 <div class="flex items-start gap-4">
                     <!-- Icon -->
@@ -46,7 +79,7 @@ const props = defineProps({
                     <div class="flex-1 min-w-0">
                         <div class="flex items-start justify-between gap-3 mb-2">
                             <h4 class="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
-                                {{ opportunity.title }}
+                                {{ formatOpportunityTitle(opportunity.title) }}
                             </h4>
                             <div class="flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold text-sm flex-shrink-0">
                                 <CurrencyDollarIcon class="w-4 h-4" />

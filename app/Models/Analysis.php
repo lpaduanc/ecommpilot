@@ -17,6 +17,7 @@ class Analysis extends Model
         'user_id',
         'store_id',
         'status',
+        'error_message',
         'summary',
         'suggestions',
         'alerts',
@@ -94,9 +95,12 @@ class Analysis extends Model
         ]);
     }
 
-    public function markAsFailed(): void
+    public function markAsFailed(?string $errorMessage = null): void
     {
-        $this->update(['status' => AnalysisStatus::Failed]);
+        $this->update([
+            'status' => AnalysisStatus::Failed,
+            'error_message' => $errorMessage,
+        ]);
     }
 
     public function healthScore(): ?int

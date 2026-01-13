@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import {
     HeartIcon,
     ArrowTrendingUpIcon,
@@ -14,10 +14,17 @@ const score = computed(() => props.summary?.health_score || 0);
 const insight = computed(() => props.summary?.main_insight || '');
 
 const statusLabels = {
+    // Valores em inglês (chaves do backend)
     critical: 'Crítico',
     attention: 'Precisa Atenção',
     healthy: 'Saudável',
     excellent: 'Excelente',
+    // Valores que a IA pode retornar em português
+    'Critico': 'Crítico',
+    'Crítico': 'Crítico',
+    'Precisa Atencao': 'Precisa Atenção',
+    'Bom': 'Saudável',
+    'Excelente': 'Excelente',
 };
 const status = computed(() => {
     const rawStatus = props.summary?.health_status || 'N/A';
@@ -74,17 +81,17 @@ const strokeDashoffset = computed(() => {
     return circumference - (animatedScore.value / 100) * circumference;
 });
 
-onMounted(() => {
-    // Animate the score
+// Função para animar o score
+function animateScore(targetScore) {
     const duration = 1500;
-    const start = 0;
-    const end = score.value;
+    const start = animatedScore.value;
+    const end = targetScore;
     const startTime = performance.now();
 
     const animate = (currentTime) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        
+
         // Easing function (ease-out cubic)
         const eased = 1 - Math.pow(1 - progress, 3);
         animatedScore.value = Math.round(start + (end - start) * eased);
@@ -95,6 +102,16 @@ onMounted(() => {
     };
 
     requestAnimationFrame(animate);
+}
+
+// Anima no mount inicial
+onMounted(() => {
+    animateScore(score.value);
+});
+
+// Re-anima quando o score mudar
+watch(score, (newScore) => {
+    animateScore(newScore);
 });
 </script>
 
@@ -150,7 +167,7 @@ onMounted(() => {
                 <div class="flex flex-col lg:flex-row items-center gap-3 mb-4">
                     <div class="flex items-center gap-2">
                         <HeartIcon class="w-6 h-6 text-gray-400" />
-                        <h3 class="text-xl font-display font-bold text-gray-900">Saúde da Loja</h3>
+                        <h3 class="text-xl font-display font-bold text-gray-900 dark:text-gray-100">Saúde da Loja</h3>
                     </div>
                     <span
                         :class="[

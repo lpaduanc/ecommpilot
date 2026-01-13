@@ -8,7 +8,7 @@ try {
     \Illuminate\Support\Facades\DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
     echo "✓ pgvector extension created successfully!\n";
 } catch (\Throwable $e) {
-    echo "✗ Error: " . $e->getMessage() . "\n";
+    echo '✗ Error: '.$e->getMessage()."\n";
     echo "\n";
     echo "The pgvector extension is not installed on your PostgreSQL.\n";
     echo "\n";

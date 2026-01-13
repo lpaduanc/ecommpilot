@@ -25,6 +25,12 @@ class SettingsService
                 'temperature' => SystemSetting::get('ai.gemini.temperature', config('services.ai.gemini.temperature', 0.7)),
                 'max_tokens' => SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 4000)),
             ],
+            'anthropic' => [
+                'api_key' => SystemSetting::get('ai.anthropic.api_key', config('services.anthropic.api_key', '')),
+                'model' => SystemSetting::get('ai.anthropic.model', config('services.anthropic.model', 'claude-sonnet-4-20250514')),
+                'temperature' => SystemSetting::get('ai.anthropic.temperature', config('services.anthropic.temperature', 0.7)),
+                'max_tokens' => SystemSetting::get('ai.anthropic.max_tokens', config('services.anthropic.max_tokens', 8192)),
+            ],
         ];
     }
 
@@ -38,10 +44,12 @@ class SettingsService
         // Mask API keys
         $settings['openai']['api_key'] = $this->maskApiKey($settings['openai']['api_key']);
         $settings['gemini']['api_key'] = $this->maskApiKey($settings['gemini']['api_key']);
+        $settings['anthropic']['api_key'] = $this->maskApiKey($settings['anthropic']['api_key']);
 
         // Add configured status
         $settings['openai']['is_configured'] = ! empty(SystemSetting::get('ai.openai.api_key', config('openai.api_key')));
         $settings['gemini']['is_configured'] = ! empty(SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key')));
+        $settings['anthropic']['is_configured'] = ! empty(SystemSetting::get('ai.anthropic.api_key', config('services.anthropic.api_key')));
 
         return $settings;
     }
@@ -69,6 +77,11 @@ class SettingsService
         // Update Gemini settings
         if (isset($data['gemini'])) {
             $this->updateGeminiSettings($data['gemini']);
+        }
+
+        // Update Anthropic settings
+        if (isset($data['anthropic'])) {
+            $this->updateAnthropicSettings($data['anthropic']);
         }
 
         // Clear settings cache
@@ -149,6 +162,45 @@ class SettingsService
                 'type' => 'integer',
                 'group' => 'ai',
                 'label' => 'Max Tokens Gemini',
+            ]);
+        }
+    }
+
+    /**
+     * Update Anthropic settings.
+     */
+    private function updateAnthropicSettings(array $data): void
+    {
+        if (isset($data['api_key']) && ! $this->isMaskedValue($data['api_key'])) {
+            SystemSetting::set('ai.anthropic.api_key', $data['api_key'], [
+                'type' => 'string',
+                'group' => 'ai',
+                'label' => 'Anthropic API Key',
+                'is_sensitive' => true,
+            ]);
+        }
+
+        if (isset($data['model'])) {
+            SystemSetting::set('ai.anthropic.model', $data['model'], [
+                'type' => 'string',
+                'group' => 'ai',
+                'label' => 'Modelo Anthropic',
+            ]);
+        }
+
+        if (isset($data['temperature'])) {
+            SystemSetting::set('ai.anthropic.temperature', (float) $data['temperature'], [
+                'type' => 'float',
+                'group' => 'ai',
+                'label' => 'Temperatura Anthropic',
+            ]);
+        }
+
+        if (isset($data['max_tokens'])) {
+            SystemSetting::set('ai.anthropic.max_tokens', (int) $data['max_tokens'], [
+                'type' => 'integer',
+                'group' => 'ai',
+                'label' => 'Max Tokens Anthropic',
             ]);
         }
     }

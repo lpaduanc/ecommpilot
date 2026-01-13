@@ -98,6 +98,13 @@ class ChatController extends Controller
                 'response' => $response,
             ]);
         } catch (\Exception $e) {
+            // Log the actual error for debugging
+            \Log::error('Chat error: '.$e->getMessage(), [
+                'user_id' => $user->id,
+                'message' => $validated['message'],
+                'exception' => $e->getTraceAsString(),
+            ]);
+
             // Delete user message on failure
             $userMessage->delete();
 

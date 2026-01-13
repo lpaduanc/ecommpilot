@@ -20,13 +20,22 @@ export const useChatStore = defineStore('chat', () => {
     async function fetchConversation() {
         isLoading.value = true;
         error.value = null;
-        
+
         try {
             const response = await api.get('/chat/conversation');
             messages.value = response.data.messages || [];
             conversationId.value = response.data.conversation_id;
+
+            // Add welcome message if no messages exist
+            if (messages.value.length === 0) {
+                addWelcomeMessage();
+            }
         } catch (err) {
             error.value = err.response?.data?.message || 'Erro ao carregar conversa';
+            // Add welcome message even on error (new user)
+            if (messages.value.length === 0) {
+                addWelcomeMessage();
+            }
         } finally {
             isLoading.value = false;
         }

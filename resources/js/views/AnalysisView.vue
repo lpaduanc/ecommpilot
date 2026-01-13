@@ -9,6 +9,7 @@ import BaseModal from '../components/common/BaseModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import SuggestionCard from '../components/analysis/SuggestionCard.vue';
 import SuggestionDetailModal from '../components/analysis/SuggestionDetailModal.vue';
+import OpportunityDetailModal from '../components/analysis/OpportunityDetailModal.vue';
 import HealthScore from '../components/analysis/HealthScore.vue';
 import AnalysisAlerts from '../components/analysis/AnalysisAlerts.vue';
 import OpportunitiesPanel from '../components/analysis/OpportunitiesPanel.vue';
@@ -20,6 +21,8 @@ import {
     BoltIcon,
     RocketLaunchIcon,
     ChartBarIcon,
+    CalendarIcon,
+    ArrowLeftIcon,
 } from '@heroicons/vue/24/outline';
 
 const analysisStore = useAnalysisStore();
@@ -33,8 +36,15 @@ const showCreditWarning = ref(false);
 const showRateLimitWarning = ref(false);
 const selectedSuggestion = ref(null);
 const showSuggestionDetail = ref(false);
+const selectedOpportunity = ref(null);
+const showOpportunityDetail = ref(false);
 const countdownInterval = ref(null);
 const showChat = ref(false);
+
+// Análises anteriores
+const selectedHistoricalId = ref(null);
+const isViewingHistorical = ref(false);
+const originalAnalysis = ref(null);
 
 const isLoading = computed(() => analysisStore.isLoading);
 const isRequesting = computed(() => analysisStore.isRequesting);
@@ -68,9 +78,18 @@ const groupedSuggestions = computed(() => {
 });
 
 const totalSuggestions = computed(() => suggestions.value.length);
-const completedSuggestions = computed(() => 
+const completedSuggestions = computed(() =>
     suggestions.value.filter(s => s.is_done).length
 );
+
+// Últimas 3 análises anteriores (excluindo a atual)
+const recentAnalyses = computed(() => {
+    const history = analysisStore.analysisHistory || [];
+    const currentId = currentAnalysis.value?.id;
+    return history
+        .filter(a => a.id !== currentId && a.status === 'completed')
+        .slice(0, 3);
+});
 
 function handleRequestAnalysis() {
     if (isStoreSyncing.value) {
@@ -105,6 +124,17 @@ function viewSuggestionDetail(suggestion) {
     showSuggestionDetail.value = true;
 }
 
+function viewOpportunityDetail(opportunity) {
+    selectedOpportunity.value = opportunity;
+    showOpportunityDetail.value = true;
+}
+
+function handleOpportunityAskAI(opportunity) {
+    showOpportunityDetail.value = false;
+    showChat.value = true;
+    // TODO: Pre-fill chat with opportunity context
+}
+
 async function handleStatusChange({ suggestion, status }) {
     // For persistent suggestions (new system)
     if (suggestion.id && typeof suggestion.id === 'number') {
@@ -125,11 +155,66 @@ async function handleStatusChange({ suggestion, status }) {
     }
 }
 
+// Funções para análises anteriores
+function formatAnalysisDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const now = new Date();
+
+    // Normalizar para início do dia (meia-noite) para comparar apenas datas do calendário
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const diffDays = Math.round((nowOnly - dateOnly) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Hoje';
+    if (diffDays === 1) return 'Ontem';
+    if (diffDays < 7) return `Há ${diffDays} dias`;
+    return date.toLocaleDateString('pt-BR');
+}
+
+function getScoreColorClasses(score) {
+    if (!score) return 'bg-gray-100 dark:bg-gray-700 text-gray-500';
+    if (score >= 80) return 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400';
+    if (score >= 60) return 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400';
+    if (score >= 40) return 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400';
+    return 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400';
+}
+
+function getScoreLabel(score) {
+    if (!score) return 'N/A';
+    if (score >= 80) return 'Excelente';
+    if (score >= 60) return 'Saudável';
+    if (score >= 40) return 'Atenção';
+    return 'Crítico';
+}
+
+async function viewHistoricalAnalysis(analysisId) {
+    if (!isViewingHistorical.value && currentAnalysis.value) {
+        originalAnalysis.value = currentAnalysis.value;
+    }
+    selectedHistoricalId.value = analysisId;
+    isViewingHistorical.value = true;
+    const historical = await analysisStore.getAnalysisById(analysisId);
+    if (historical) {
+        analysisStore.setCurrentAnalysis(historical);
+    }
+}
+
+function returnToCurrentAnalysis() {
+    if (originalAnalysis.value) {
+        analysisStore.setCurrentAnalysis(originalAnalysis.value);
+    }
+    selectedHistoricalId.value = null;
+    isViewingHistorical.value = false;
+    originalAnalysis.value = null;
+}
+
 function startCountdown() {
     if (countdownInterval.value) {
         clearInterval(countdownInterval.value);
     }
-    
+
     countdownInterval.value = setInterval(() => {
         analysisStore.nextAvailableAt = analysisStore.nextAvailableAt;
     }, 1000);
@@ -137,6 +222,7 @@ function startCountdown() {
 
 onMounted(() => {
     analysisStore.fetchCurrentAnalysis();
+    analysisStore.fetchAnalysisHistory();
     startCountdown();
 });
 
@@ -197,6 +283,83 @@ onUnmounted(() => {
             </div>
         </div>
 
+        <!-- Previous Analyses Section -->
+        <div v-if="recentAnalyses.length > 0 && !isLoading" class="relative">
+            <!-- Section Header -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <ClockIcon class="w-4 h-4 text-gray-400" />
+                    <h2 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Análises Anteriores
+                    </h2>
+                </div>
+                <button
+                    v-if="isViewingHistorical"
+                    @click="returnToCurrentAnalysis"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
+                >
+                    <ArrowLeftIcon class="w-3.5 h-3.5" />
+                    Voltar para atual
+                </button>
+            </div>
+
+            <!-- Horizontal Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                    v-for="analysis in recentAnalyses"
+                    :key="analysis.id"
+                    @click="viewHistoricalAnalysis(analysis.id)"
+                    :class="[
+                        'group relative text-left p-4 rounded-xl border transition-all duration-200',
+                        selectedHistoricalId === analysis.id
+                            ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 ring-2 ring-primary-500/20'
+                            : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-md'
+                    ]"
+                >
+                    <!-- Active Indicator -->
+                    <div
+                        v-if="selectedHistoricalId === analysis.id"
+                        class="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse"
+                    ></div>
+
+                    <!-- Date -->
+                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        <CalendarIcon class="w-3.5 h-3.5" />
+                        {{ formatAnalysisDate(analysis.created_at) }}
+                    </div>
+
+                    <!-- Health Score Mini -->
+                    <div class="flex items-center gap-3 mb-2">
+                        <div
+                            :class="[
+                                'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold',
+                                getScoreColorClasses(analysis.summary?.health_score)
+                            ]"
+                        >
+                            {{ analysis.summary?.health_score || '-' }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
+                                Saúde da Loja
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ getScoreLabel(analysis.summary?.health_score) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Suggestions Count -->
+                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <BoltIcon class="w-3.5 h-3.5" />
+                        {{ analysis.suggestions?.length || 0 }} sugestões
+                    </div>
+
+                    <!-- Hover Effect -->
+                    <div class="absolute inset-0 rounded-xl bg-gradient-to-t from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                </button>
+            </div>
+        </div>
+
         <!-- Analysis In Progress Banner -->
         <div v-if="hasAnalysisInProgress" class="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary-500/10 via-secondary-500/10 to-accent-500/10 dark:from-primary-500/20 dark:via-secondary-500/20 dark:to-accent-500/20 border border-primary-200 dark:border-primary-800">
             <div class="px-4 py-3">
@@ -247,7 +410,11 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Opportunities Row -->
-                    <OpportunitiesPanel v-if="opportunities.length > 0 && !showChat" :opportunities="opportunities" />
+                    <OpportunitiesPanel
+                        v-if="opportunities.length > 0 && !showChat"
+                        :opportunities="opportunities"
+                        @view-detail="viewOpportunityDetail"
+                    />
 
                     <!-- Suggestions -->
                     <div v-if="suggestions.length > 0" class="space-y-6">
@@ -458,6 +625,14 @@ onUnmounted(() => {
             :suggestion="selectedSuggestion"
             @close="showSuggestionDetail = false"
             @status-change="handleStatusChange"
+        />
+
+        <!-- Opportunity Detail Modal -->
+        <OpportunityDetailModal
+            :show="showOpportunityDetail"
+            :opportunity="selectedOpportunity"
+            @close="showOpportunityDetail = false"
+            @ask-ai="handleOpportunityAskAI"
         />
     </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted } from 'vue';
 import api from '../services/api';
 import BaseCard from '../components/common/BaseCard.vue';
 import BaseButton from '../components/common/BaseButton.vue';
@@ -18,6 +18,8 @@ import {
     ArrowDownTrayIcon,
     FunnelIcon,
     ChartBarIcon,
+    CalendarIcon,
+    ChevronDownIcon,
 } from '@heroicons/vue/24/outline';
 
 const { formatCurrency } = useFormatters();
@@ -36,6 +38,22 @@ const couponFilter = ref('');
 const countryFilter = ref('');
 const stateFilter = ref('');
 const cityFilter = ref('');
+
+// Period filter state
+const showPeriodDropdown = ref(false);
+const selectedPeriod = ref(null); // null = sem filtro de data
+const customStartDate = ref('');
+const customEndDate = ref('');
+
+const periodOptions = [
+    { value: 'today', label: 'Hoje' },
+    { value: 'last_7_days', label: 'Últimos 7 dias' },
+    { value: 'last_15_days', label: 'Últimos 15 dias' },
+    { value: 'last_30_days', label: 'Últimos 30 dias' },
+    { value: 'this_month', label: 'Este mês' },
+    { value: 'last_month', label: 'Último mês' },
+    { value: 'custom', label: 'Personalizado' },
+];
 
 // Filter options from API
 const filterOptions = ref({
@@ -71,18 +89,30 @@ const perPageOptions = [10, 20, 50, 100];
 async function fetchOrders() {
     isLoading.value = true;
     try {
-        const response = await api.get('/orders', {
-            params: {
-                search: searchQuery.value,
-                payment_status: statusFilter.value,
-                coupon: couponFilter.value,
-                country: countryFilter.value,
-                state: stateFilter.value,
-                city: cityFilter.value,
-                page: currentPage.value,
-                per_page: perPage.value,
-            },
-        });
+        const params = {
+            search: searchQuery.value,
+            payment_status: statusFilter.value,
+            coupon: couponFilter.value,
+            country: countryFilter.value,
+            state: stateFilter.value,
+            city: cityFilter.value,
+            page: currentPage.value,
+            per_page: perPage.value,
+        };
+
+        // Adicionar filtros de data apenas se um período foi selecionado
+        if (selectedPeriod.value) {
+            if (selectedPeriod.value === 'custom') {
+                if (customStartDate.value) params.start_date = customStartDate.value;
+                if (customEndDate.value) params.end_date = customEndDate.value;
+            } else {
+                const { startDate, endDate } = getDateRange(selectedPeriod.value);
+                if (startDate) params.start_date = startDate;
+                if (endDate) params.end_date = endDate;
+            }
+        }
+
+        const response = await api.get('/orders', { params });
         orders.value = response.data.data;
         totalPages.value = response.data.last_page;
         totalItems.value = response.data.total;
@@ -163,6 +193,9 @@ function clearFilters() {
     stateFilter.value = '';
     cityFilter.value = '';
     searchQuery.value = '';
+    selectedPeriod.value = null;
+    customStartDate.value = '';
+    customEndDate.value = '';
     filterOptions.value.cities = [];
     currentPage.value = 1;
     fetchOrders();
@@ -257,6 +290,18 @@ async function exportOrders() {
         if (stateFilter.value) params.append('state', stateFilter.value);
         if (cityFilter.value) params.append('city', cityFilter.value);
 
+        // Adicionar filtros de data
+        if (selectedPeriod.value) {
+            if (selectedPeriod.value === 'custom') {
+                if (customStartDate.value) params.append('start_date', customStartDate.value);
+                if (customEndDate.value) params.append('end_date', customEndDate.value);
+            } else {
+                const { startDate, endDate } = getDateRange(selectedPeriod.value);
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
+            }
+        }
+
         const url = `/orders/export?${params.toString()}`;
         const response = await api.get(url, { responseType: 'blob' });
 
@@ -288,13 +333,106 @@ const visiblePages = computed(() => {
 });
 
 const hasActiveFilters = computed(() => {
-    return statusFilter.value || couponFilter.value || countryFilter.value || stateFilter.value || cityFilter.value;
+    return statusFilter.value || couponFilter.value || countryFilter.value || stateFilter.value || cityFilter.value || selectedPeriod.value;
 });
+
+const currentPeriodLabel = computed(() => {
+    if (!selectedPeriod.value) return 'Período';
+    if (selectedPeriod.value === 'custom' && customStartDate.value && customEndDate.value) {
+        // Usar T00:00:00 para evitar problema de timezone (UTC vs local)
+        const start = new Date(customStartDate.value + 'T00:00:00');
+        const end = new Date(customEndDate.value + 'T00:00:00');
+        return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    }
+    const option = periodOptions.find(o => o.value === selectedPeriod.value);
+    return option?.label || 'Período';
+});
+
+const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');
+
+function getDateRange(period) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let startDate = null;
+    let endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999);
+
+    switch (period) {
+        case 'today':
+            startDate = new Date(today);
+            break;
+        case 'last_7_days':
+            startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 6);
+            break;
+        case 'last_15_days':
+            startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 14);
+            break;
+        case 'last_30_days':
+            startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 29);
+            break;
+        case 'this_month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            break;
+        case 'last_month':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        default:
+            return { startDate: null, endDate: null };
+    }
+
+    return {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+    };
+}
+
+function selectPeriod(period) {
+    selectedPeriod.value = period;
+    if (period !== 'custom') {
+        showPeriodDropdown.value = false;
+        currentPage.value = 1;
+        fetchOrders();
+    }
+}
+
+function applyCustomPeriod() {
+    if (customStartDate.value && customEndDate.value) {
+        showPeriodDropdown.value = false;
+        currentPage.value = 1;
+        fetchOrders();
+    }
+}
+
+function clearPeriodFilter() {
+    selectedPeriod.value = null;
+    customStartDate.value = '';
+    customEndDate.value = '';
+    showPeriodDropdown.value = false;
+    currentPage.value = 1;
+    fetchOrders();
+}
+
+function handleClickOutside(event) {
+    const dropdown = document.querySelector('[class*="fixed w-80 rounded-2xl"]');
+    const button = event.target.closest('button');
+    if (showPeriodDropdown.value && dropdown && !dropdown.contains(event.target) && (!button || !button.textContent.includes(currentPeriodLabel.value))) {
+        showPeriodDropdown.value = false;
+    }
+}
 
 onMounted(() => {
     fetchOrders();
     fetchFilterOptions();
     fetchStates();
+    document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
 });
 </script>
 
@@ -348,6 +486,109 @@ onMounted(() => {
                         >
                             <FunnelIcon class="w-5 h-5" />
                         </button>
+
+                        <!-- Period Selector -->
+                        <div class="relative">
+                            <button
+                                @click.stop="showPeriodDropdown = !showPeriodDropdown"
+                                type="button"
+                                :class="[
+                                    'flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-sm border font-medium transition-all focus:outline-none focus:ring-2 focus:ring-white/50',
+                                    selectedPeriod
+                                        ? 'bg-primary-500/30 border-primary-400/50 text-white'
+                                        : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                                ]"
+                            >
+                                <CalendarIcon class="w-5 h-5" />
+                                <span class="hidden sm:inline">{{ currentPeriodLabel }}</span>
+                                <ChevronDownIcon class="w-4 h-4" />
+                            </button>
+
+                            <!-- Period Dropdown -->
+                            <Teleport to="body">
+                                <transition
+                                    enter-active-class="transition ease-out duration-200"
+                                    enter-from-class="opacity-0 translate-y-1"
+                                    enter-to-class="opacity-100 translate-y-0"
+                                    leave-active-class="transition ease-in duration-150"
+                                    leave-from-class="opacity-100 translate-y-0"
+                                    leave-to-class="opacity-0 translate-y-1"
+                                >
+                                    <div
+                                        v-if="showPeriodDropdown"
+                                        class="fixed w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4"
+                                        style="top: 120px; right: 200px;"
+                                    >
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Período</h3>
+                                            <button @click="showPeriodDropdown = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                                <XMarkIcon class="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        <!-- Clear Period Button -->
+                                        <button
+                                            v-if="selectedPeriod"
+                                            @click="clearPeriodFilter"
+                                            class="w-full mb-3 px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        >
+                                            Limpar período
+                                        </button>
+
+                                        <!-- Period Options -->
+                                        <div class="grid grid-cols-2 gap-2 mb-4">
+                                            <button
+                                                v-for="option in periodOptions"
+                                                :key="option.value"
+                                                @click="selectPeriod(option.value)"
+                                                :class="[
+                                                    'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                                                    selectedPeriod === option.value
+                                                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                                                        : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                ]"
+                                            >
+                                                {{ option.label }}
+                                            </button>
+                                        </div>
+
+                                        <!-- Custom Date Range -->
+                                        <div v-if="isCustomPeriod" class="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Inicial</label>
+                                                <div class="relative">
+                                                    <CalendarIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                    <input
+                                                        v-model="customStartDate"
+                                                        type="date"
+                                                        class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Final</label>
+                                                <div class="relative">
+                                                    <CalendarIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                    <input
+                                                        v-model="customEndDate"
+                                                        type="date"
+                                                        class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button
+                                                @click="applyCustomPeriod"
+                                                :disabled="!customStartDate || !customEndDate"
+                                                class="w-full px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                                            >
+                                                Aplicar Período
+                                            </button>
+                                        </div>
+                                    </div>
+                                </transition>
+                            </Teleport>
+                        </div>
+
                         <button
                             @click="exportOrders"
                             type="button"

@@ -34,7 +34,8 @@ const router = useRouter();
 const authStore = useAuthStore();
 const sidebarStore = useSidebarStore();
 
-// Marketing submenu state
+// Submenu states
+const isAIAssistantsOpen = ref(true); // Aberto por padrão
 const isMarketingOpen = ref(false);
 
 // Close mobile sidebar on route change
@@ -43,6 +44,29 @@ watch(() => route.name, () => {
 });
 
 const menuItems = computed(() => [
+    {
+        name: 'Assistentes de IA',
+        label: 'Assistentes de IA',
+        icon: SparklesIcon,
+        permission: 'analysis.view',
+        highlight: true,
+        submenuKey: 'ai',
+        submenu: [
+            {
+                name: 'Análises IA',
+                label: 'Análises IA',
+                route: 'analysis',
+                permission: 'analysis.view',
+            },
+            {
+                name: 'Assistente IA',
+                label: 'Assistente IA',
+                route: 'chat',
+                permission: 'chat.use',
+            },
+        ],
+        separatorAfter: true,
+    },
     {
         name: 'Dashboard',
         label: 'Dashboard',
@@ -69,6 +93,7 @@ const menuItems = computed(() => [
         label: 'Marketing',
         icon: MegaphoneIcon,
         permission: 'marketing.access',
+        submenuKey: 'marketing',
         submenu: [
             {
                 name: 'Descontos',
@@ -77,21 +102,6 @@ const menuItems = computed(() => [
                 permission: 'marketing.access',
             },
         ],
-    },
-    {
-        name: 'Análises IA',
-        label: 'Análises IA',
-        icon: SparklesIcon,
-        route: 'analysis',
-        permission: 'analysis.view',
-        highlight: true,
-    },
-    {
-        name: 'Chat IA',
-        label: 'Chat IA',
-        icon: ChatBubbleLeftRightIcon,
-        route: 'chat',
-        permission: 'chat.use',
     },
     {
         name: 'Integrações',
@@ -155,8 +165,18 @@ function isSubmenuActive(submenu) {
     return submenu.some(item => route.name === item.route);
 }
 
-function toggleMarketing() {
-    isMarketingOpen.value = !isMarketingOpen.value;
+function toggleSubmenu(submenuKey) {
+    if (submenuKey === 'ai') {
+        isAIAssistantsOpen.value = !isAIAssistantsOpen.value;
+    } else if (submenuKey === 'marketing') {
+        isMarketingOpen.value = !isMarketingOpen.value;
+    }
+}
+
+function isSubmenuOpen(submenuKey) {
+    if (submenuKey === 'ai') return isAIAssistantsOpen.value;
+    if (submenuKey === 'marketing') return isMarketingOpen.value;
+    return false;
 }
 
 function navigateTo(routeName) {
@@ -198,32 +218,47 @@ async function handleLogout() {
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3">
+            <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-2">
                 <template v-for="item in visibleMenuItems" :key="item.name">
                     <!-- Item with submenu -->
-                    <div v-if="item.submenu">
+                    <div v-if="item.submenu" :class="{ 'mb-4': item.separatorAfter }">
                         <button
-                            @click="toggleMarketing"
+                            @click="toggleSubmenu(item.submenuKey)"
                             :class="[
-                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
-                                isSubmenuActive(item.submenu)
-                                    ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
-                                    : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
+                                'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                                item.highlight
+                                    ? 'bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 border border-primary-200 dark:border-primary-700 text-primary-700 dark:text-primary-300 hover:from-primary-500/20 hover:to-secondary-500/20 dark:hover:from-primary-500/30 dark:hover:to-secondary-500/30'
+                                    : isSubmenuActive(item.submenu)
+                                        ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                             ]"
                         >
-                            <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                            <component
+                                :is="item.icon"
+                                :class="[
+                                    'w-5 h-5 flex-shrink-0',
+                                    item.highlight ? 'text-primary-500' : ''
+                                ]"
+                            />
                             <span class="truncate">{{ item.label }}</span>
+                            <span
+                                v-if="item.highlight"
+                                class="ml-auto mr-2 text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-sm"
+                            >
+                                PRO
+                            </span>
                             <ChevronDownIcon
                                 :class="[
-                                    'w-4 h-4 ml-auto',
-                                    isMarketingOpen ? 'rotate-180' : ''
+                                    'w-4 h-4 transition-transform duration-200',
+                                    isSubmenuOpen(item.submenuKey) ? 'rotate-180' : '',
+                                    item.highlight ? '' : 'ml-auto'
                                 ]"
                             />
                         </button>
 
                         <!-- Submenu items -->
                         <Transition name="submenu">
-                            <div v-if="isMarketingOpen" class="ml-4 mt-1 space-y-1">
+                            <div v-if="isSubmenuOpen(item.submenuKey)" class="ml-4 mt-1 space-y-1">
                                 <button
                                     v-for="subitem in item.submenu"
                                     :key="subitem.route"
@@ -232,13 +267,17 @@ async function handleLogout() {
                                         'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm',
                                         isActive(subitem.route)
                                             ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                                            : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
+                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                                     ]"
                                 >
+                                    <SparklesIcon v-if="item.highlight" class="w-4 h-4 text-primary-400" />
                                     <span class="truncate">{{ subitem.label }}</span>
                                 </button>
                             </div>
                         </Transition>
+
+                        <!-- Separator after highlighted menu -->
+                        <div v-if="item.separatorAfter" class="mt-4 mx-2 border-t border-gray-200 dark:border-gray-700"></div>
                     </div>
 
                     <!-- Regular item -->
@@ -249,25 +288,11 @@ async function handleLogout() {
                             'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                             isActive(item.route)
                                 ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                                : item.highlight
-                                    ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/30'
-                                    : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                         ]"
                     >
-                        <component
-                            :is="item.icon"
-                            :class="[
-                                'w-5 h-5 flex-shrink-0',
-                                item.highlight && !isActive(item.route) ? 'text-primary-500' : ''
-                            ]"
-                        />
+                        <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
                         <span class="truncate">{{ item.label }}</span>
-                        <span
-                            v-if="item.highlight"
-                            class="ml-auto text-xs px-2 py-0.5 rounded-full bg-accent-400 text-white font-semibold"
-                        >
-                            IA
-                        </span>
                     </button>
                 </template>
 
@@ -341,36 +366,51 @@ async function handleLogout() {
         </button>
 
         <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3">
+        <nav class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-2">
             <!-- Main Menu -->
             <template v-for="item in visibleMenuItems" :key="item.name">
                 <!-- Item with submenu -->
-                <div v-if="item.submenu">
+                <div v-if="item.submenu" :class="{ 'mb-4': item.separatorAfter }">
                     <button
-                        @click="toggleMarketing"
+                        @click="toggleSubmenu(item.submenuKey)"
                         :class="[
-                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
-                            isSubmenuActive(item.submenu)
-                                ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
-                                : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white',
+                            'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
+                            item.highlight
+                                ? 'bg-gradient-to-r from-primary-500/10 to-secondary-500/10 dark:from-primary-500/20 dark:to-secondary-500/20 border border-primary-200 dark:border-primary-700 text-primary-700 dark:text-primary-300 hover:from-primary-500/20 hover:to-secondary-500/20 dark:hover:from-primary-500/30 dark:hover:to-secondary-500/30'
+                                : isSubmenuActive(item.submenu)
+                                    ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
                             sidebarStore.isCollapsed ? 'justify-center' : ''
                         ]"
                         :title="sidebarStore.isCollapsed ? item.label : ''"
                     >
-                        <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                        <component
+                            :is="item.icon"
+                            :class="[
+                                'w-5 h-5 flex-shrink-0',
+                                item.highlight ? 'text-primary-500' : ''
+                            ]"
+                        />
                         <span v-if="!sidebarStore.isCollapsed" class="truncate">{{ item.label }}</span>
+                        <span
+                            v-if="item.highlight && !sidebarStore.isCollapsed"
+                            class="ml-auto mr-2 text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-sm"
+                        >
+                            PRO
+                        </span>
                         <ChevronDownIcon
                             v-if="!sidebarStore.isCollapsed"
                             :class="[
-                                'w-4 h-4 ml-auto',
-                                isMarketingOpen ? 'rotate-180' : ''
+                                'w-4 h-4 transition-transform duration-200',
+                                isSubmenuOpen(item.submenuKey) ? 'rotate-180' : '',
+                                item.highlight ? '' : 'ml-auto'
                             ]"
                         />
                     </button>
 
                     <!-- Submenu items -->
                     <Transition name="submenu">
-                        <div v-if="isMarketingOpen && !sidebarStore.isCollapsed" class="ml-4 mt-1 space-y-1">
+                        <div v-if="isSubmenuOpen(item.submenuKey) && !sidebarStore.isCollapsed" class="ml-4 mt-1 space-y-1">
                             <button
                                 v-for="subitem in item.submenu"
                                 :key="subitem.route"
@@ -379,13 +419,20 @@ async function handleLogout() {
                                     'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm',
                                     isActive(subitem.route)
                                         ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                                        : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white'
+                                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                                 ]"
                             >
+                                <SparklesIcon v-if="item.highlight" class="w-4 h-4 text-primary-400" />
                                 <span class="truncate">{{ subitem.label }}</span>
                             </button>
                         </div>
                     </Transition>
+
+                    <!-- Separator after highlighted menu -->
+                    <div v-if="item.separatorAfter && !sidebarStore.isCollapsed" class="mt-4 mx-2 border-t border-gray-200 dark:border-gray-700"></div>
+                    <div v-if="item.separatorAfter && sidebarStore.isCollapsed" class="mt-4 flex justify-center">
+                        <div class="w-8 h-px bg-gray-200 dark:bg-gray-600"></div>
+                    </div>
                 </div>
 
                 <!-- Regular item -->
@@ -396,27 +443,13 @@ async function handleLogout() {
                         'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
                         isActive(item.route)
                             ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                            : item.highlight
-                                ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/30'
-                                : 'text-gray-600 dark:text-gray-400 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white',
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
                         sidebarStore.isCollapsed ? 'justify-center' : ''
                     ]"
                     :title="sidebarStore.isCollapsed ? item.label : ''"
                 >
-                    <component
-                        :is="item.icon"
-                        :class="[
-                            'w-5 h-5 flex-shrink-0',
-                            item.highlight && !isActive(item.route) ? 'text-primary-500' : ''
-                        ]"
-                    />
+                    <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
                     <span v-if="!sidebarStore.isCollapsed" class="truncate">{{ item.label }}</span>
-                    <span
-                        v-if="item.highlight && !sidebarStore.isCollapsed"
-                        class="ml-auto text-xs px-2 py-0.5 rounded-full bg-accent-400 text-white font-semibold"
-                    >
-                        IA
-                    </span>
                 </button>
             </template>
 

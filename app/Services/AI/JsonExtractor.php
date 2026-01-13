@@ -166,7 +166,7 @@ class JsonExtractor
             $closers = array_reverse($stack);
             $json .= implode('', $closers);
 
-            Log::debug("JsonExtractor: Added ".count($closers)." closing characters to repair truncated JSON");
+            Log::debug('JsonExtractor: Added '.count($closers).' closing characters to repair truncated JSON');
         }
 
         // Only return if we actually added something

@@ -30,6 +30,8 @@ const categoryConfig = {
     product: { icon: '🛍️', label: 'Produtos', color: 'from-violet-500 to-purple-500', bg: 'bg-violet-100' },
     customer: { icon: '👥', label: 'Clientes', color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-100' },
     conversion: { icon: '🎯', label: 'Conversão', color: 'from-orange-500 to-red-500', bg: 'bg-orange-100' },
+    coupon: { icon: '🏷️', label: 'Cupons', color: 'from-indigo-500 to-blue-500', bg: 'bg-indigo-100' },
+    operational: { icon: '⚙️', label: 'Operacional', color: 'from-slate-500 to-gray-500', bg: 'bg-slate-100' },
 };
 
 const priorityConfig = {
@@ -153,12 +155,14 @@ function selectStatus(status) {
                         </div>
 
                         <!-- Expected Impact -->
-                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-5 border border-emerald-100">
-                            <h3 class="flex items-center gap-2 font-semibold text-emerald-900 mb-2">
-                                <ChartBarIcon class="w-5 h-5 text-emerald-600" />
+                        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-2xl p-5 border border-emerald-100 dark:border-emerald-800">
+                            <h3 class="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-200 mb-2">
+                                <ChartBarIcon class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                                 Impacto Esperado
                             </h3>
-                            <p class="text-emerald-700 leading-relaxed">{{ suggestion.expected_impact }}</p>
+                            <p class="text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                                {{ suggestion.expected_impact === 'high' ? 'Alto - Resultados significativos esperados' : suggestion.expected_impact === 'medium' ? 'Médio - Melhoria moderada esperada' : suggestion.expected_impact === 'low' ? 'Baixo - Otimização incremental' : suggestion.expected_impact }}
+                            </p>
                         </div>
 
                         <!-- Implementation Steps -->
@@ -176,7 +180,7 @@ function selectStatus(status) {
                                     <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-primary-500/30">
                                         {{ index + 1 }}
                                     </div>
-                                    <span class="text-gray-700 pt-1">{{ step }}</span>
+                                    <span class="text-gray-700 dark:text-gray-300 pt-1">{{ step }}</span>
                                 </div>
                             </div>
                         </div>
@@ -188,7 +192,7 @@ function selectStatus(status) {
                                 <span
                                     v-for="metric in suggestion.metrics_to_track"
                                     :key="metric"
-                                    class="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl text-sm text-gray-700 border border-gray-200"
+                                    class="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600"
                                 >
                                     {{ metric }}
                                 </span>
@@ -197,22 +201,22 @@ function selectStatus(status) {
 
                         <!-- Effort & Time -->
                         <div class="flex flex-wrap gap-4">
-                            <div v-if="suggestion.estimated_effort" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50">
-                                <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                                    <BoltIcon class="w-5 h-5 text-amber-600" />
+                            <div v-if="suggestion.estimated_effort" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                                <div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <BoltIcon class="w-5 h-5 text-amber-600 dark:text-amber-400" />
                                 </div>
                                 <div>
                                     <span class="text-xs text-gray-500 dark:text-gray-400 block">Esforço</span>
-                                    <span class="font-semibold text-gray-900">{{ effortLabels[suggestion.estimated_effort] }}</span>
+                                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ effortLabels[suggestion.estimated_effort] }}</span>
                                 </div>
                             </div>
-                            <div v-if="suggestion.estimated_time" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50">
-                                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                    <ClockIcon class="w-5 h-5 text-blue-600" />
+                            <div v-if="suggestion.estimated_time" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                                <div class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                    <ClockIcon class="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <div>
                                     <span class="text-xs text-gray-500 dark:text-gray-400 block">Tempo Estimado</span>
-                                    <span class="font-semibold text-gray-900">{{ suggestion.estimated_time }}</span>
+                                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ suggestion.estimated_time }}</span>
                                 </div>
                             </div>
                         </div>

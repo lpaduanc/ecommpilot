@@ -22,6 +22,8 @@ const categoryConfig = {
     product: { icon: '🛍️', label: 'Produtos', color: 'from-violet-500 to-purple-500', bg: 'bg-violet-50 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-400' },
     customer: { icon: '👥', label: 'Clientes', color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400' },
     conversion: { icon: '🎯', label: 'Conversão', color: 'from-orange-500 to-red-500', bg: 'bg-orange-50 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400' },
+    coupon: { icon: '🏷️', label: 'Cupons', color: 'from-indigo-500 to-blue-500', bg: 'bg-indigo-50 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-400' },
+    operational: { icon: '⚙️', label: 'Operacional', color: 'from-slate-500 to-gray-500', bg: 'bg-slate-50 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-400' },
 };
 
 const priorityConfig = {
@@ -110,7 +112,9 @@ const isIgnored = computed(() => suggestionStatus.value === 'ignored');
             <!-- Expected Impact -->
             <div v-if="suggestion.expected_impact" class="flex items-start gap-2 mb-4 p-3 rounded-xl bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-700/50 dark:to-transparent">
                 <span class="text-lg">💡</span>
-                <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{{ suggestion.expected_impact }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                    Impacto {{ suggestion.expected_impact === 'high' ? 'Alto' : suggestion.expected_impact === 'medium' ? 'Médio' : suggestion.expected_impact === 'low' ? 'Baixo' : suggestion.expected_impact }}
+                </p>
             </div>
 
             <!-- Footer -->

@@ -43,10 +43,11 @@ class StoreAnalysisService
 
         // 4. Execute Collector Agent
         Log::info('Executing Collector Agent');
+        $storeStats = $this->getStoreStats($store);
         $collectorContext = $this->collector->execute([
             'platform' => $store->platform?->value ?? 'nuvemshop',
             'niche' => $niche,
-            'operation_time' => $store->created_at->diffForHumans(),
+            'store_stats' => $storeStats,
             'previous_analyses' => $previousAnalyses,
             'previous_suggestions' => $previousSuggestions,
             'benchmarks' => $benchmarks,
@@ -115,6 +116,44 @@ class StoreAnalysisService
     }
 
     /**
+     * Get store statistics to provide real context about the store operation.
+     */
+    private function getStoreStats(Store $store): array
+    {
+        $totalOrders = $store->orders()->count();
+        $totalCustomers = $store->customers()->count();
+        $totalProducts = $store->products()->count();
+        $activeProducts = $store->products()->where('is_active', true)->count();
+
+        // Get first order date to estimate real operation time
+        $firstOrder = $store->orders()->orderBy('external_created_at', 'asc')->first();
+        $operationTime = $firstOrder
+            ? $firstOrder->external_created_at->diffForHumans()
+            : $store->created_at->diffForHumans();
+
+        // Recent orders (last 15 days)
+        $recentOrders = $store->orders()
+            ->where('external_created_at', '>=', now()->subDays(15))
+            ->count();
+
+        // Total revenue (paid orders)
+        $totalRevenue = $store->orders()
+            ->whereIn('payment_status', ['paid', 'pago'])
+            ->sum('total');
+
+        return [
+            'operation_time' => $operationTime,
+            'total_orders' => $totalOrders,
+            'total_customers' => $totalCustomers,
+            'total_products' => $totalProducts,
+            'active_products' => $activeProducts,
+            'recent_orders_15d' => $recentOrders,
+            'total_revenue' => round($totalRevenue, 2),
+            'connected_at' => $store->created_at->format('Y-m-d'),
+        ];
+    }
+
+    /**
      * Identify the store niche based on products.
      */
     private function identifyNiche(Store $store): string
@@ -133,29 +172,52 @@ class StoreAnalysisService
 
         // Mapping of categories to niches
         $nicheMap = [
+            // Fashion
             'roupas' => 'fashion',
             'camisetas' => 'fashion',
             'vestidos' => 'fashion',
             'calças' => 'fashion',
             'moda' => 'fashion',
             'fashion' => 'fashion',
+            // Electronics
             'celulares' => 'electronics',
             'smartphones' => 'electronics',
             'computadores' => 'electronics',
             'eletrônicos' => 'electronics',
             'electronics' => 'electronics',
+            // Food
             'alimentos' => 'food',
             'bebidas' => 'food',
             'comida' => 'food',
             'food' => 'food',
+            // Beauty & Hair Care
             'beleza' => 'beauty',
             'cosméticos' => 'beauty',
             'maquiagem' => 'beauty',
             'beauty' => 'beauty',
+            'cabelo' => 'beauty',
+            'cabelos' => 'beauty',
+            'hair' => 'beauty',
+            'shampoo' => 'beauty',
+            'shampoos' => 'beauty',
+            'condicionador' => 'beauty',
+            'hidratação' => 'beauty',
+            'tratamento' => 'beauty',
+            'capilar' => 'beauty',
+            'lisos' => 'beauty',
+            'cacheados' => 'beauty',
+            'loiros' => 'beauty',
+            'coloração' => 'beauty',
+            'tintura' => 'beauty',
+            'perfumaria' => 'beauty',
+            'skincare' => 'beauty',
+            'cuidados' => 'beauty',
+            // Home
             'casa' => 'home',
             'decoração' => 'home',
             'móveis' => 'home',
             'home' => 'home',
+            // Sports
             'esportes' => 'sports',
             'fitness' => 'sports',
             'sports' => 'sports',
@@ -411,12 +473,42 @@ class StoreAnalysisService
         foreach ($analysis['anomalies'] ?? [] as $anomaly) {
             $alerts[] = [
                 'type' => $this->mapSeverityToAlertType($anomaly['severity'] ?? 'medium'),
-                'title' => $anomaly['type'] ?? 'Alert',
+                'title' => $this->mapAlertTypeToLabel($anomaly['type'] ?? 'alert'),
                 'message' => $anomaly['description'] ?? '',
             ];
         }
 
         return $alerts;
+    }
+
+    /**
+     * Map alert type to Portuguese label.
+     */
+    private function mapAlertTypeToLabel(string $type): string
+    {
+        $labels = [
+            'concentracao_vendas' => 'Concentração de Vendas',
+            'estoque_critico' => 'Estoque Crítico',
+            'queda_vendas_recente' => 'Queda de Vendas Recente',
+            'cupons_excessivos' => 'Cupons Excessivos',
+            'sazonalidade_inicio_ano' => 'Sazonalidade de Início de Ano',
+            'dependencia_cupons' => 'Dependência de Cupons',
+            'produtos_estrela' => 'Produtos Estrela',
+            'gestao_estoque' => 'Gestão de Estoque',
+            'cancellation_rate' => 'Taxa de Cancelamento',
+            'refund_rate' => 'Taxa de Reembolso',
+            'inventory_critical' => 'Estoque Crítico',
+            'low_conversion' => 'Baixa Conversão',
+            'high_abandonment' => 'Alto Abandono',
+            'revenue_decline' => 'Queda de Receita',
+            'order_decline' => 'Queda de Pedidos',
+            'ticket_decline' => 'Queda de Ticket Médio',
+            'customer_churn' => 'Perda de Clientes',
+            'stock_out' => 'Ruptura de Estoque',
+            'alert' => 'Alerta',
+        ];
+
+        return $labels[$type] ?? ucwords(str_replace('_', ' ', $type));
     }
 
     /**
@@ -440,13 +532,40 @@ class StoreAnalysisService
 
         foreach ($analysis['identified_patterns'] ?? [] as $pattern) {
             $opportunities[] = [
-                'title' => $pattern['type'] ?? 'Opportunity',
+                'title' => $this->mapOpportunityTypeToLabel($pattern['type'] ?? 'opportunity'),
                 'description' => $pattern['opportunity'] ?? $pattern['description'] ?? '',
                 'potential_revenue' => $pattern['potential_revenue'] ?? null,
             ];
         }
 
         return $opportunities;
+    }
+
+    /**
+     * Map opportunity type to Portuguese label.
+     */
+    private function mapOpportunityTypeToLabel(string $type): string
+    {
+        $labels = [
+            'coupon_dependency' => 'Dependência de Cupons',
+            'bestseller_dominance' => 'Dominância de Bestsellers',
+            'inventory_imbalance' => 'Desequilíbrio de Estoque',
+            'ticket_medio_positivo' => 'Ticket Médio Positivo',
+            'cross_sell' => 'Venda Cruzada',
+            'upsell' => 'Upsell',
+            'seasonal_trend' => 'Tendência Sazonal',
+            'customer_retention' => 'Retenção de Clientes',
+            'price_optimization' => 'Otimização de Preços',
+            'bundle_opportunity' => 'Oportunidade de Combo',
+            'reactivation' => 'Reativação de Clientes',
+            'high_margin' => 'Alta Margem',
+            'growth_potential' => 'Potencial de Crescimento',
+            'market_expansion' => 'Expansão de Mercado',
+            'repeat_purchase' => 'Compra Recorrente',
+            'opportunity' => 'Oportunidade',
+        ];
+
+        return $labels[$type] ?? ucwords(str_replace('_', ' ', $type));
     }
 
     /**

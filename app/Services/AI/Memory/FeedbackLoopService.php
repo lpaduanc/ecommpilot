@@ -59,7 +59,7 @@ class FeedbackLoopService
      */
     public function getCurrentMetrics(Store $store): array
     {
-        $orders = $store->syncedOrders()
+        $orders = $store->orders()
             ->where('external_created_at', '>=', now()->subDays(30))
             ->get();
 

@@ -85,8 +85,9 @@ const currentPeriodLabel = computed(() => {
     const storePeriod = dashboardStore.filters.period;
     if (storePeriod === 'custom' && dashboardStore.filters.startDate && dashboardStore.filters.endDate) {
         // Format custom date range for display
-        const start = new Date(dashboardStore.filters.startDate);
-        const end = new Date(dashboardStore.filters.endDate);
+        // Usar T00:00:00 para evitar problema de timezone (UTC vs local)
+        const start = new Date(dashboardStore.filters.startDate + 'T00:00:00');
+        const end = new Date(dashboardStore.filters.endDate + 'T00:00:00');
         return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
     }
     const option = periodOptions.find(o => o.value === storePeriod);

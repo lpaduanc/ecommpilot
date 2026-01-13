@@ -12,7 +12,7 @@ const message = ref('');
 
 function handleSubmit() {
     if (!message.value.trim() || props.disabled) return;
-    
+
     emit('send', message.value);
     message.value = '';
 }
@@ -32,16 +32,16 @@ function handleKeydown(event) {
                 v-model="message"
                 @keydown="handleKeydown"
                 :disabled="disabled"
-                placeholder="Digite sua mensagem..."
+                placeholder="Digite sua pergunta sobre vendas, produtos, clientes..."
                 rows="1"
-                class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 resize-none focus:bg-white dark:bg-gray-800 focus:border-primary-200 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style="min-height: 48px; max-height: 120px;"
+                class="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:border-primary-400 dark:focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                style="min-height: 52px; max-height: 120px;"
             ></textarea>
         </div>
         <button
             type="submit"
             :disabled="!message.trim() || disabled"
-            class="p-3 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            class="p-3.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl disabled:shadow-sm"
         >
             <PaperAirplaneIcon class="w-5 h-5" />
         </button>

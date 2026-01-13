@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -62,7 +62,7 @@ return new class extends Migration
         } catch (\Throwable $e) {
             // pgvector not installed - continue without embedding column
             // The system will work without similarity search
-            \Illuminate\Support\Facades\Log::warning('pgvector extension not available: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('pgvector extension not available: '.$e->getMessage());
         }
     }
 

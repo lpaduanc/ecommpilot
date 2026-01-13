@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\AnalysisStatus;
 use App\Models\Analysis;
 use App\Models\SystemSetting;
+use App\Services\AI\Agents\LiteStoreAnalysisService;
 use App\Services\AI\Agents\StoreAnalysisService;
 use App\Services\AnalysisService;
 use Illuminate\Bus\Queueable;
@@ -67,8 +68,11 @@ class ProcessAnalysisJob implements ShouldQueue
         return 'analysis-'.$this->analysis->id;
     }
 
-    public function handle(AnalysisService $legacyService, StoreAnalysisService $agentService): void
-    {
+    public function handle(
+        AnalysisService $legacyService,
+        StoreAnalysisService $agentService,
+        LiteStoreAnalysisService $liteAgentService
+    ): void {
         Log::info("Processing analysis: {$this->analysis->id}");
 
         // Refresh the analysis to get latest state
@@ -95,7 +99,7 @@ class ProcessAnalysisJob implements ShouldQueue
             $useAgentPipeline = SystemSetting::get('ai.use_agent_pipeline', true);
 
             if ($useAgentPipeline) {
-                $this->processWithAgentPipeline($agentService);
+                $this->processWithAgentPipeline($agentService, $liteAgentService);
             } else {
                 // Use legacy analysis service
                 $legacyService->processAnalysis($this->analysis);
@@ -118,20 +122,43 @@ class ProcessAnalysisJob implements ShouldQueue
     /**
      * Process analysis using the agent pipeline.
      */
-    private function processWithAgentPipeline(StoreAnalysisService $agentService): void
-    {
+    private function processWithAgentPipeline(
+        StoreAnalysisService $agentService,
+        LiteStoreAnalysisService $liteAgentService
+    ): void {
         $store = $this->analysis->store;
 
         if (! $store) {
             throw new \RuntimeException('Store not found for analysis');
         }
 
-        $result = $agentService->execute($store, $this->analysis);
+        // Determine which pipeline to use based on provider
+        $useLitePipeline = $this->shouldUseLitePipeline();
+
+        if ($useLitePipeline) {
+            Log::info("Using LITE pipeline for analysis {$this->analysis->id} (provider: anthropic)");
+            $result = $liteAgentService->execute($store, $this->analysis);
+        } else {
+            Log::info("Using FULL pipeline for analysis {$this->analysis->id}");
+            $result = $agentService->execute($store, $this->analysis);
+        }
 
         Log::info("Agent pipeline completed for analysis {$this->analysis->id}", [
             'suggestions_count' => $result['suggestions_count'] ?? 0,
             'niche' => $result['niche'] ?? 'unknown',
+            'pipeline' => $result['pipeline'] ?? 'full',
         ]);
+    }
+
+    /**
+     * Determine if the lite pipeline should be used.
+     * Uses lite pipeline when the default provider is Anthropic (30k token/min limit).
+     */
+    private function shouldUseLitePipeline(): bool
+    {
+        $defaultProvider = SystemSetting::get('ai.provider', config('services.ai.default', 'gemini'));
+
+        return $defaultProvider === 'anthropic';
     }
 
     /**
@@ -145,7 +172,9 @@ class ProcessAnalysisJob implements ShouldQueue
 
             // Only mark as failed if not already completed
             if ($this->analysis->status !== AnalysisStatus::Completed) {
-                $this->analysis->markAsFailed();
+                // Use a user-friendly message instead of technical details
+                $userMessage = $this->getUserFriendlyErrorMessage($exception);
+                $this->analysis->markAsFailed($userMessage);
 
                 // Refund credits if user exists
                 if ($this->analysis->user) {
@@ -156,6 +185,18 @@ class ProcessAnalysisJob implements ShouldQueue
         } catch (\Throwable $e) {
             Log::error("Error handling analysis failure: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Get a user-friendly error message based on the exception.
+     */
+    private function getUserFriendlyErrorMessage(\Throwable $exception): string
+    {
+        // Log the technical error for debugging
+        Log::error("Analysis error details: {$exception->getMessage()}");
+
+        // Return a generic, user-friendly message
+        return 'Ocorreu um erro ao processar sua análise. Por favor, tente novamente em alguns minutos.';
     }
 
     /**
