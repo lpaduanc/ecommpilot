@@ -71,7 +71,7 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div v-else class="space-y-6 max-w-4xl mx-auto">
+                <div v-else class="space-y-6 w-full">
                     <ChatMessage
                         v-for="message in messages"
                         :key="message.id"
@@ -96,7 +96,7 @@ onMounted(() => {
 
             <!-- Quick Suggestions - Always Visible at Bottom -->
             <div class="border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-900 px-4 sm:px-6 py-4">
-                <div class="max-w-4xl mx-auto">
+                <div class="w-full">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-6 h-6 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
                             <LightBulbIcon class="w-4 h-4 text-primary-600 dark:text-primary-400" />

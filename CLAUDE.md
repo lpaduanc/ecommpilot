@@ -126,8 +126,37 @@ private array $retryDelays = [5, 15, 30];  // segundos
 
 // Auto-retry com tokens dobrados se MAX_TOKENS
 if ($finishReason === 'MAX_TOKENS' && $attempt < $this->maxRetries) {
-    $maxTokens = min($maxTokens * 2, 32768);
+    $maxTokens = min($maxTokens * 2, 65536);  // Gemini 2.5 suporta até 65k output
 }
+```
+
+### Google Gemini 2.5 Flash
+
+**Modelos Disponíveis:**
+
+| Modelo | Descrição | Input Tokens | Output Tokens |
+|--------|-----------|--------------|---------------|
+| `gemini-2.5-flash` | Melhor custo-benefício, processamento em larga escala | 1,048,576 | 65,536 |
+| `gemini-2.5-flash-lite` | Leve e eficiente, inferência rápida | 1,048,576 | 65,536 |
+
+**Inputs Suportados:** Texto, Imagens, Vídeo, Áudio, PDF
+
+**Capacidades:**
+- ✅ Batch API, Caching, Code Execution
+- ✅ Function Calling, Structured Outputs
+- ✅ Search Grounding, File Search
+- ✅ Thinking Mode (raciocínio estendido)
+- ✅ URL Context
+- ❌ Audio/Image Generation, Live API
+
+**Knowledge Cutoff:** Janeiro 2025
+
+**Configuração Recomendada:**
+```php
+// config/services.php ou SystemSettings
+'ai.gemini.model' => 'gemini-2.5-flash',
+'ai.gemini.max_tokens' => 16384,  // Pode ir até 65536
+'ai.gemini.temperature' => 0.7,
 ```
 
 ### Prompts em Português

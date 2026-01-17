@@ -27,6 +27,14 @@ class Store extends Model
         'sync_status',
         'last_sync_at',
         'metadata',
+        'niche',
+        'niche_subcategory',
+        'monthly_goal',
+        'annual_goal',
+        'target_ticket',
+        'monthly_revenue',
+        'monthly_visits',
+        'competitors',
     ];
 
     protected $hidden = [
@@ -43,6 +51,12 @@ class Store extends Model
             'metadata' => 'array',
             'access_token' => 'encrypted',
             'refresh_token' => 'encrypted',
+            'monthly_goal' => 'decimal:2',
+            'annual_goal' => 'decimal:2',
+            'target_ticket' => 'decimal:2',
+            'monthly_revenue' => 'decimal:2',
+            'monthly_visits' => 'integer',
+            'competitors' => 'array',
         ];
     }
 
@@ -110,5 +124,40 @@ class Store extends Model
     public function requiresReconnection(): bool
     {
         return $this->token_requires_reconnection === true || $this->sync_status === SyncStatus::TokenExpired;
+    }
+
+    public function getFormattedGoals(): array
+    {
+        return [
+            'monthly_goal' => $this->monthly_goal,
+            'annual_goal' => $this->annual_goal,
+            'target_ticket' => $this->target_ticket,
+            'monthly_revenue' => $this->monthly_revenue,
+            'monthly_visits' => $this->monthly_visits,
+            'competitors' => $this->competitors ?? [],
+        ];
+    }
+
+    public function getNicheLabel(): ?string
+    {
+        if (! $this->niche) {
+            return null;
+        }
+
+        return config("niches.niches.{$this->niche}.label", $this->niche);
+    }
+
+    public function getSubcategoryLabel(): ?string
+    {
+        if (! $this->niche || ! $this->niche_subcategory) {
+            return null;
+        }
+
+        return config("niches.niches.{$this->niche}.subcategories.{$this->niche_subcategory}", $this->niche_subcategory);
+    }
+
+    public function hasConfiguredNiche(): bool
+    {
+        return $this->niche !== null && $this->niche_subcategory !== null;
     }
 }

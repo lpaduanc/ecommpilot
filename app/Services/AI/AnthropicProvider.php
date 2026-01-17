@@ -28,6 +28,8 @@ class AnthropicProvider implements AIProviderInterface
     // Delays for rate limits need to be longer (60s+ for token limits)
     private array $retryDelays = [30, 60, 90];
 
+    private string $logChannel = 'ai';
+
     public function __construct()
     {
         $this->apiKey = SystemSetting::get('ai.anthropic.api_key', config('services.anthropic.api_key')) ?? '';
@@ -74,9 +76,10 @@ class AnthropicProvider implements AIProviderInterface
 
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
-                Log::debug("Anthropic API request attempt {$attempt}/{$this->maxRetries}", [
+                Log::channel($this->logChannel)->info("        [ANTHROPIC] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
                     'model' => $payload['model'],
                     'max_tokens' => $payload['max_tokens'],
+                    'temperature' => $temperature,
                 ]);
 
                 $response = Http::withHeaders([
@@ -93,7 +96,7 @@ class AnthropicProvider implements AIProviderInterface
                     if ($statusCode === 429) {
                         // If the request itself exceeds the token limit, don't retry - fallback immediately
                         if (str_contains($error, 'would exceed') || str_contains($error, 'input tokens')) {
-                            Log::warning('Anthropic request exceeds token limit - falling back to another provider', [
+                            Log::channel($this->logChannel)->warning('        [ANTHROPIC] Token limit excedido - fallback para outro provider', [
                                 'error' => $error,
                             ]);
                             // Throw immediately to trigger fallback - waiting won't help
@@ -104,13 +107,13 @@ class AnthropicProvider implements AIProviderInterface
                         $retryAfter = $this->parseRetryAfter($response);
                         $delay = $retryAfter ?? ($this->retryDelays[$attempt - 1] ?? 60);
 
-                        Log::warning("Anthropic rate limit hit on attempt {$attempt}/{$this->maxRetries}", [
+                        Log::channel($this->logChannel)->warning("        [ANTHROPIC] Rate limit na tentativa {$attempt}/{$this->maxRetries}", [
                             'error' => $error,
                             'retry_after' => $delay,
                         ]);
 
                         if ($attempt < $this->maxRetries) {
-                            Log::info("Waiting {$delay} seconds before retry...");
+                            Log::channel($this->logChannel)->info("        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
                             sleep($delay);
 
                             continue;
@@ -146,31 +149,45 @@ class AnthropicProvider implements AIProviderInterface
                     throw new RuntimeException('Anthropic API returned no text content');
                 }
 
-                Log::debug('Anthropic API request successful', [
+                // Extract token usage from response
+                $usage = $response->json('usage', []);
+                $inputTokens = $usage['input_tokens'] ?? 0;
+                $outputTokens = $usage['output_tokens'] ?? 0;
+                $totalTokens = $inputTokens + $outputTokens;
+
+                Log::channel($this->logChannel)->info('        [ANTHROPIC] Requisicao concluida com sucesso', [
                     'attempt' => $attempt,
                     'response_length' => strlen($text),
+                    'model' => $payload['model'],
+                    'input_tokens' => $inputTokens,
+                    'output_tokens' => $outputTokens,
+                    'total_tokens' => $totalTokens,
                 ]);
 
                 return $text;
 
             } catch (ConnectionException $e) {
                 $lastException = $e;
-                Log::warning("Anthropic connection error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
+                Log::channel($this->logChannel)->warning("        [ANTHROPIC] Erro de conexao na tentativa {$attempt}/{$this->maxRetries}", [
+                    'error' => $e->getMessage(),
+                ]);
 
                 if ($attempt < $this->maxRetries) {
                     $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                    Log::info("Retrying Anthropic API in {$delay} seconds...");
+                    Log::channel($this->logChannel)->info("        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
                     sleep($delay);
                 }
             } catch (RuntimeException $e) {
                 // Check if it's a retryable error
                 if (str_contains($e->getMessage(), 'HTTP 5') || str_contains($e->getMessage(), 'server error')) {
                     $lastException = $e;
-                    Log::warning("Anthropic server error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
+                    Log::channel($this->logChannel)->warning("        [ANTHROPIC] Erro de servidor na tentativa {$attempt}/{$this->maxRetries}", [
+                        'error' => $e->getMessage(),
+                    ]);
 
                     if ($attempt < $this->maxRetries) {
                         $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                        Log::info("Retrying Anthropic API in {$delay} seconds...");
+                        Log::channel($this->logChannel)->info("        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
                         sleep($delay);
                     }
                 } else {
@@ -181,7 +198,7 @@ class AnthropicProvider implements AIProviderInterface
         }
 
         // All retries exhausted
-        Log::error('Anthropic API request failed after all retries', [
+        Log::channel($this->logChannel)->error('        [ANTHROPIC] ERRO: Falha apos todas as tentativas', [
             'attempts' => $this->maxRetries,
             'last_error' => $lastException?->getMessage(),
         ]);

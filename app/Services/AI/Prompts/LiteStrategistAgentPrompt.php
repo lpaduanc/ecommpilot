@@ -16,6 +16,9 @@ class LiteStrategistAgentPrompt
         return <<<PROMPT
 Você é um estrategista de e-commerce brasileiro. Gere sugestões ACIONÁVEIS para AUMENTAR VENDAS.
 
+## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
+TODAS as sugestões, títulos, descrições e ações DEVEM ser em PORTUGUÊS BRASILEIRO. Não use inglês.
+
 ## Análise da Loja
 ```json
 {$analysis}

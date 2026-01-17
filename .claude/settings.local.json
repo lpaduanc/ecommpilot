@@ -47,7 +47,17 @@
       "Bash(1 <<'EOF'\n$analysis = App\\\\Models\\\\Analysis::find\\(25\\);\necho \"Analysis ID: \" . $analysis->id . \"\\\\n\";\necho \"Status: \" . $analysis->status->value . \"\\\\n\";\necho \"Store ID: \" . $analysis->store_id . \"\\\\n\";\necho \"Created at: \" . $analysis->created_at . \"\\\\n\";\necho \"Completed at: \" . $analysis->completed_at . \"\\\\n\";\necho \"\\\\nResult:\\\\n\";\nprint_r\\($analysis->result\\);\nexit\nEOF)",
       "Bash(del check_analysis.php)",
       "Bash(git -C \"C:/projects/ecommpilot\" status --short)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(PGPASSWORD=root psql:*)",
+      "Bash(./vendor/bin/phpunit:*)",
+      "Bash(del:*)",
+      "Bash(./vendor/bin/pest --filter=StoreAnalysis)",
+      "Bash(timeout 30 tail:*)",
+      "Bash(git clean:*)",
+      "Bash(cmd //c \"del \\\\\\\\?\\\\C:\\\\projects\\\\ecommpilot\\\\nul\")",
+      "Bash(powershell -Command \"Remove-Item -LiteralPath ''\\\\?\\\\C:\\\\projects\\\\ecommpilot\\\\nul'' -Force\")",
+      "Bash(powershell -Command \"[System.IO.File]::Delete\\(''\\\\\\\\?\\\\C:\\\\projects\\\\ecommpilot\\\\nul''\\)\")",
+      "Bash(powershell -Command \"& { cd ''C:\\\\projects\\\\ecommpilot''; cmd /c ''ren \\\\.\\\\nul nul_delete.txt'' }\")"
     ]
   },
   "statusLine": {

@@ -115,7 +115,27 @@ export const useChatStore = defineStore('chat', () => {
             });
         }
     }
-    
+
+    function resetLocalState() {
+        messages.value = [];
+        conversationId.value = null;
+        error.value = null;
+        isLoading.value = false;
+        isSending.value = false;
+    }
+
+    async function resetAndClearBackend() {
+        // Limpa estado local imediatamente
+        resetLocalState();
+
+        // Tenta limpar no backend (sem bloquear)
+        try {
+            await api.delete('/chat/conversation');
+        } catch {
+            // Ignora erros - o importante é o estado local estar limpo
+        }
+    }
+
     return {
         messages,
         isLoading,
@@ -128,6 +148,8 @@ export const useChatStore = defineStore('chat', () => {
         sendMessage,
         clearConversation,
         addWelcomeMessage,
+        resetLocalState,
+        resetAndClearBackend,
     };
 });
 

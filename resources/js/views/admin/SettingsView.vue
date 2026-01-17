@@ -6,6 +6,7 @@ import BaseCard from '../../components/common/BaseCard.vue';
 import BaseButton from '../../components/common/BaseButton.vue';
 import BaseInput from '../../components/common/BaseInput.vue';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
+import BaseModal from '../../components/common/BaseModal.vue';
 import {
     Cog6ToothIcon,
     SparklesIcon,
@@ -16,9 +17,23 @@ import {
     EyeSlashIcon,
     MapPinIcon,
     ArrowPathIcon,
+    ChartBarIcon,
+    EnvelopeIcon,
+    PlusIcon,
+    PencilIcon,
+    TrashIcon,
 } from '@heroicons/vue/24/outline';
 
 const notificationStore = useNotificationStore();
+
+// Tab Management
+const activeTab = ref('analysis');
+const tabs = [
+    { id: 'analysis', name: 'Análise', icon: ChartBarIcon },
+    { id: 'ai', name: 'Configurações de IA', icon: SparklesIcon },
+    { id: 'email', name: 'E-mail', icon: EnvelopeIcon },
+    { id: 'sync', name: 'Sincronização', icon: MapPinIcon },
+];
 
 const isLoading = ref(true);
 const isSaving = ref(false);
@@ -28,6 +43,15 @@ const testingProvider = ref(null);
 const showOpenAIKey = ref(false);
 const showGeminiKey = ref(false);
 const showAnthropicKey = ref(false);
+
+// Email settings visibility
+const showSmtpPassword = ref(false);
+const showMailgunKey = ref(false);
+const showSesSecret = ref(false);
+const showPostmarkToken = ref(false);
+const showResendKey = ref(false);
+const showEmailApiKey = ref(false);
+const showEmailSecret = ref(false);
 
 const settings = reactive({
     provider: 'openai',
@@ -54,6 +78,47 @@ const settings = reactive({
     },
 });
 
+// Email Settings - Múltiplas configurações
+const emailConfigs = ref([]);
+const availableEmailProviders = ref([]);
+const isLoadingEmails = ref(false);
+const isSavingEmail = ref(false);
+const isTestingEmail = ref(false);
+const isDeletingEmail = ref(false);
+
+// Modal de adicionar/editar
+const showEmailModal = ref(false);
+const editingEmailConfig = ref(null);
+const emailForm = reactive({
+    id: null,
+    name: '',
+    identifier: '',
+    provider: 'smtp',
+    is_active: true,
+    config: {
+        // Campos gerais
+        api_key: '',
+        secret: '',
+        api_url: '',
+        // SMTP
+        host: '',
+        port: 587,
+        username: '',
+        password: '',
+        encryption: 'tls',
+        // Mailgun
+        domain: '',
+        // Amazon SES
+        key: '',
+        region: 'us-east-1',
+        // Postmark
+        token: '',
+        // Comum
+        from_address: '',
+        from_name: '',
+    },
+});
+
 const availableProviders = ref([]);
 const availableModels = ref({});
 const testResults = reactive({
@@ -70,6 +135,18 @@ const locationsStatus = reactive({
     cities_count: 0,
     needs_sync: true,
 });
+
+// Analysis Format Settings
+const analysisFormat = reactive({
+    format_version: 'v1',
+    v2_options: {
+        validate_field_lengths: true,
+        use_markdown_tables: true,
+        use_history_summary: true,
+    },
+});
+const availableFormats = ref([]);
+const isSavingFormat = ref(false);
 
 const selectedProviderConfig = computed(() => {
     return settings.provider === 'openai' ? settings.openai : settings.gemini;
@@ -178,9 +255,166 @@ function formatSyncDate(dateString) {
     });
 }
 
+// Analysis Format Functions
+async function fetchAnalysisFormat() {
+    try {
+        const response = await api.get('/admin/settings/analysis-format');
+        Object.assign(analysisFormat, response.data.settings);
+        availableFormats.value = response.data.available_formats;
+    } catch (error) {
+        console.error('Erro ao buscar formato de análise:', error);
+    }
+}
+
+async function saveAnalysisFormat() {
+    isSavingFormat.value = true;
+    try {
+        await api.put('/admin/settings/analysis-format', analysisFormat);
+        notificationStore.success('Formato de análise atualizado!');
+    } catch (error) {
+        notificationStore.error('Erro ao salvar formato de análise');
+    } finally {
+        isSavingFormat.value = false;
+    }
+}
+
+// Email Functions
+async function fetchEmailConfigs() {
+    isLoadingEmails.value = true;
+    try {
+        const response = await api.get('/admin/settings/email');
+        emailConfigs.value = response.data.configs || [];
+        availableEmailProviders.value = response.data.available_providers || [];
+    } catch (error) {
+        console.error('Erro ao buscar configurações de e-mail:', error);
+        notificationStore.error('Erro ao carregar configurações de e-mail');
+    } finally {
+        isLoadingEmails.value = false;
+    }
+}
+
+function openEmailModal(config = null) {
+    if (config) {
+        // Editar configuração existente
+        editingEmailConfig.value = config;
+        emailForm.id = config.id;
+        emailForm.name = config.name;
+        emailForm.identifier = config.identifier;
+        emailForm.provider = config.provider;
+        emailForm.is_active = config.is_active;
+        Object.assign(emailForm.config, config.config);
+    } else {
+        // Nova configuração
+        editingEmailConfig.value = null;
+        emailForm.id = null;
+        emailForm.name = '';
+        emailForm.identifier = '';
+        emailForm.provider = 'smtp';
+        emailForm.is_active = true;
+        // Reset config
+        Object.keys(emailForm.config).forEach(key => {
+            if (typeof emailForm.config[key] === 'number') {
+                emailForm.config[key] = key === 'port' ? 587 : 0;
+            } else {
+                emailForm.config[key] = key === 'encryption' ? 'tls' : key === 'region' ? 'us-east-1' : '';
+            }
+        });
+    }
+    showEmailModal.value = true;
+}
+
+function closeEmailModal() {
+    showEmailModal.value = false;
+    editingEmailConfig.value = null;
+}
+
+async function saveEmailConfig() {
+    isSavingEmail.value = true;
+    try {
+        const payload = {
+            name: emailForm.name,
+            identifier: emailForm.identifier,
+            provider: emailForm.provider,
+            is_active: emailForm.is_active,
+            config: emailForm.config,
+        };
+
+        if (emailForm.id) {
+            // Atualizar
+            await api.put(`/admin/settings/email/${emailForm.id}`, payload);
+            notificationStore.success('Configuração atualizada com sucesso!');
+        } else {
+            // Criar
+            await api.post('/admin/settings/email', payload);
+            notificationStore.success('Configuração criada com sucesso!');
+        }
+
+        await fetchEmailConfigs();
+        closeEmailModal();
+    } catch (error) {
+        const message = error.response?.data?.message || 'Erro ao salvar configuração de e-mail';
+        notificationStore.error(message);
+    } finally {
+        isSavingEmail.value = false;
+    }
+}
+
+async function deleteEmailConfig(id) {
+    if (!confirm('Tem certeza que deseja excluir esta configuração de e-mail?')) {
+        return;
+    }
+
+    isDeletingEmail.value = true;
+    try {
+        await api.delete(`/admin/settings/email/${id}`);
+        notificationStore.success('Configuração excluída com sucesso!');
+        await fetchEmailConfigs();
+    } catch (error) {
+        const message = error.response?.data?.message || 'Erro ao excluir configuração';
+        notificationStore.error(message);
+    } finally {
+        isDeletingEmail.value = false;
+    }
+}
+
+async function testEmailConfig(id) {
+    isTestingEmail.value = true;
+    try {
+        const response = await api.post(`/admin/settings/email/${id}/test`);
+        if (response.data.success) {
+            notificationStore.success('E-mail de teste enviado com sucesso!');
+        } else {
+            notificationStore.error(response.data.message || 'Falha ao enviar e-mail de teste');
+        }
+    } catch (error) {
+        const message = error.response?.data?.message || 'Erro ao testar configuração de e-mail';
+        notificationStore.error(message);
+    } finally {
+        isTestingEmail.value = false;
+    }
+}
+
+function getEmailProviderIcon(providerId) {
+    const icons = {
+        smtp: '📧',
+        mailgun: '📮',
+        ses: '📨',
+        postmark: '✉️',
+        resend: '🚀',
+    };
+    return icons[providerId] || '📧';
+}
+
+function getEmailProviderName(providerId) {
+    const provider = availableEmailProviders.value.find(p => p.id === providerId);
+    return provider ? provider.name : providerId.toUpperCase();
+}
+
 onMounted(() => {
     fetchSettings();
     fetchLocationsStatus();
+    fetchAnalysisFormat();
+    fetchEmailConfigs();
 });
 </script>
 
@@ -189,11 +423,11 @@ onMounted(() => {
         <!-- Page Header -->
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-display font-bold text-gray-900 flex items-center gap-3">
+                <h1 class="text-2xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
                     <Cog6ToothIcon class="w-8 h-8 text-primary-500" />
                     Configurações do Sistema
                 </h1>
-                <p class="text-gray-500 mt-1">Gerencie as configurações de IA e integrações</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-1">Gerencie as configurações de IA e integrações</p>
             </div>
         </div>
 
@@ -202,7 +436,150 @@ onMounted(() => {
             <LoadingSpinner size="lg" class="text-primary-500" />
         </div>
 
-        <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Tabs Navigation -->
+        <div v-else class="space-y-6">
+            <div class="border-b border-gray-200 dark:border-gray-700">
+                <nav class="-mb-px flex space-x-8">
+                    <button
+                        v-for="tab in tabs"
+                        :key="tab.id"
+                        @click="activeTab = tab.id"
+                        :class="[
+                            activeTab === tab.id
+                                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600',
+                            'group inline-flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors'
+                        ]"
+                    >
+                        <component
+                            :is="tab.icon"
+                            :class="[
+                                activeTab === tab.id ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300',
+                                'w-5 h-5'
+                            ]"
+                        />
+                        {{ tab.name }}
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Analysis Tab -->
+            <div v-show="activeTab === 'analysis'">
+                <BaseCard>
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <BeakerIcon class="w-6 h-6 text-primary-500" />
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Formato de Análise</h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Escolha o formato de análise de IA para teste</p>
+                            </div>
+                        </div>
+                        <span
+                            :class="[
+                                'px-3 py-1 text-xs font-medium rounded-full',
+                                analysisFormat.format_version === 'v2'
+                                    ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                            ]"
+                        >
+                            {{ analysisFormat.format_version === 'v2' ? 'Otimizado (v2)' : 'Detalhado (v1)' }}
+                        </span>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Format Selection -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label
+                                v-for="format in availableFormats"
+                                :key="format.id"
+                                :class="[
+                                    'flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all',
+                                    analysisFormat.format_version === format.id
+                                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                ]"
+                            >
+                                <input
+                                    type="radio"
+                                    :value="format.id"
+                                    v-model="analysisFormat.format_version"
+                                    class="mt-1"
+                                />
+                                <div class="flex-1">
+                                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ format.name }}</span>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ format.description }}</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- V2 Options (visible only when v2 selected) -->
+                        <div
+                            v-if="analysisFormat.format_version === 'v2'"
+                            class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-3"
+                        >
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Opções do Formato v2</h3>
+
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    v-model="analysisFormat.v2_options.use_markdown_tables"
+                                    class="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                />
+                                <div>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Usar tabelas Markdown</span>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Economia de tokens ao formatar produtos</p>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    v-model="analysisFormat.v2_options.use_history_summary"
+                                    class="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                />
+                                <div>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Usar resumo de histórico</span>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Reduz histórico de 8k para ~2k tokens</p>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    v-model="analysisFormat.v2_options.validate_field_lengths"
+                                    class="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                />
+                                <div>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Validar limites de caracteres</span>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Loga avisos quando campos excedem limites (não bloqueia)</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                            <p class="text-sm text-blue-700 dark:text-blue-300">
+                                <strong>Diferenças:</strong> O formato v2 inclui clarificação de status vs payment_status
+                                para evitar falsos alertas de "pedidos pendentes", além de usar tabelas Markdown
+                                e resumo de histórico para economizar ~30% de tokens.
+                            </p>
+                        </div>
+
+                        <!-- Save Button -->
+                        <div class="flex justify-end">
+                            <BaseButton
+                                @click="saveAnalysisFormat"
+                                :loading="isSavingFormat"
+                            >
+                                Salvar Formato
+                            </BaseButton>
+                        </div>
+                    </div>
+                </BaseCard>
+            </div>
+
+            <!-- AI Settings Tab -->
+            <div v-show="activeTab === 'ai'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Provider Selection -->
             <div class="lg:col-span-1">
                 <BaseCard>
@@ -685,9 +1062,529 @@ onMounted(() => {
                     </BaseButton>
                 </div>
             </div>
+        </div>
 
-            <!-- Brazil Locations Sync - Full Width -->
-            <div class="lg:col-span-3">
+            <!-- Email Tab -->
+            <div v-show="activeTab === 'email'">
+                <BaseCard>
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <EnvelopeIcon class="w-6 h-6 text-primary-500" />
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Configurações de E-mail</h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Gerencie múltiplas configurações de e-mail para diferentes propósitos</p>
+                            </div>
+                        </div>
+                        <BaseButton @click="openEmailModal()">
+                            <PlusIcon class="w-4 h-4" />
+                            Adicionar Configuração
+                        </BaseButton>
+                    </div>
+
+                    <!-- Loading -->
+                    <div v-if="isLoadingEmails" class="flex items-center justify-center py-12">
+                        <LoadingSpinner size="lg" class="text-primary-500" />
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-else-if="emailConfigs.length === 0" class="text-center py-12">
+                        <EnvelopeIcon class="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Nenhuma configuração de e-mail</h3>
+                        <p class="text-gray-500 dark:text-gray-400 mb-6">Adicione sua primeira configuração de e-mail para começar a enviar mensagens.</p>
+                        <BaseButton @click="openEmailModal()">
+                            <PlusIcon class="w-4 h-4" />
+                            Adicionar Configuração
+                        </BaseButton>
+                    </div>
+
+                    <!-- Configs List -->
+                    <div v-else class="space-y-4">
+                        <div
+                            v-for="config in emailConfigs"
+                            :key="config.id"
+                            class="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                        >
+                            <div class="text-2xl">{{ getEmailProviderIcon(config.provider) }}</div>
+
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ config.name }}</h3>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
+                                        {{ config.identifier }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-3 text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400">
+                                        {{ getEmailProviderName(config.provider) }}
+                                    </span>
+                                    <span class="text-gray-400 dark:text-gray-600">•</span>
+                                    <span class="text-gray-600 dark:text-gray-400 truncate">
+                                        {{ config.config.from_address || 'Sem e-mail configurado' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <span
+                                    :class="[
+                                        'px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap',
+                                        config.is_active
+                                            ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                    ]"
+                                >
+                                    {{ config.is_active ? 'Ativo' : 'Inativo' }}
+                                </span>
+
+                                <BaseButton
+                                    variant="secondary"
+                                    size="sm"
+                                    @click="testEmailConfig(config.id)"
+                                    :loading="isTestingEmail"
+                                    :disabled="isTestingEmail || isDeletingEmail"
+                                >
+                                    <BeakerIcon class="w-4 h-4" />
+                                    Testar
+                                </BaseButton>
+
+                                <BaseButton
+                                    variant="secondary"
+                                    size="sm"
+                                    @click="openEmailModal(config)"
+                                    :disabled="isTestingEmail || isDeletingEmail"
+                                >
+                                    <PencilIcon class="w-4 h-4" />
+                                    Editar
+                                </BaseButton>
+
+                                <BaseButton
+                                    variant="danger"
+                                    size="sm"
+                                    @click="deleteEmailConfig(config.id)"
+                                    :loading="isDeletingEmail"
+                                    :disabled="isTestingEmail || isDeletingEmail"
+                                >
+                                    <TrashIcon class="w-4 h-4" />
+                                    Excluir
+                                </BaseButton>
+                            </div>
+                        </div>
+                    </div>
+                </BaseCard>
+
+                <!-- Modal de Adicionar/Editar -->
+                <BaseModal
+                    :show="showEmailModal"
+                    :title="editingEmailConfig ? 'Editar Configuração de E-mail' : 'Nova Configuração de E-mail'"
+                    size="xl"
+                    @close="closeEmailModal"
+                >
+                    <div class="space-y-6">
+                        <!-- Informações Básicas -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Nome/Propósito *
+                                </label>
+                                <input
+                                    type="text"
+                                    v-model="emailForm.name"
+                                    placeholder="Ex: Sincronização, Análise IA, Notificações"
+                                    class="input"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Identificador *
+                                </label>
+                                <input
+                                    type="text"
+                                    v-model="emailForm.identifier"
+                                    placeholder="Ex: sync, ai-analysis, notifications"
+                                    class="input"
+                                />
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Slug único para uso no código
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Provedor e Status -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Provedor *
+                                </label>
+                                <select v-model="emailForm.provider" class="input">
+                                    <option
+                                        v-for="provider in availableEmailProviders"
+                                        :key="provider.id"
+                                        :value="provider.id"
+                                    >
+                                        {{ provider.name }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="flex items-center gap-3 cursor-pointer pt-6">
+                                    <input
+                                        type="checkbox"
+                                        v-model="emailForm.is_active"
+                                        class="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                    />
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Configuração ativa
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Configurações Específicas do Provedor -->
+
+                        <!-- SMTP -->
+                        <div v-if="emailForm.provider === 'smtp'" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-4">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <span class="text-xl">📧</span>
+                                Configurações SMTP
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Host</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.host"
+                                        placeholder="smtp.gmail.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Porta</label>
+                                    <input
+                                        type="number"
+                                        v-model.number="emailForm.config.port"
+                                        placeholder="587"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuário</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.username"
+                                        placeholder="user@example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Senha</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showSmtpPassword ? 'text' : 'password'"
+                                            v-model="emailForm.config.password"
+                                            placeholder="••••••••"
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showSmtpPassword = !showSmtpPassword"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showSmtpPassword" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Encryption</label>
+                                    <select v-model="emailForm.config.encryption" class="input">
+                                        <option value="tls">TLS</option>
+                                        <option value="ssl">SSL</option>
+                                        <option value="">Nenhum</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Address</label>
+                                    <input
+                                        type="email"
+                                        v-model="emailForm.config.from_address"
+                                        placeholder="noreply@example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.from_name"
+                                        placeholder="Nome da Empresa"
+                                        class="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mailgun -->
+                        <div v-if="emailForm.provider === 'mailgun'" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-4">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <span class="text-xl">📮</span>
+                                Configurações Mailgun
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showMailgunKey ? 'text' : 'password'"
+                                            v-model="emailForm.config.api_key"
+                                            placeholder="key-..."
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showMailgunKey = !showMailgunKey"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showMailgunKey" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Domain</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.domain"
+                                        placeholder="mg.example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Address</label>
+                                    <input
+                                        type="email"
+                                        v-model="emailForm.config.from_address"
+                                        placeholder="noreply@example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.from_name"
+                                        placeholder="Nome da Empresa"
+                                        class="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Amazon SES -->
+                        <div v-if="emailForm.provider === 'ses'" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-4">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <span class="text-xl">📨</span>
+                                Configurações Amazon SES
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Access Key ID</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.key"
+                                        placeholder="AKIA..."
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Secret Access Key</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showSesSecret ? 'text' : 'password'"
+                                            v-model="emailForm.config.secret"
+                                            placeholder="••••••••"
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showSesSecret = !showSesSecret"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showSesSecret" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Region</label>
+                                    <select v-model="emailForm.config.region" class="input">
+                                        <option value="us-east-1">US East (N. Virginia)</option>
+                                        <option value="us-west-2">US West (Oregon)</option>
+                                        <option value="eu-west-1">EU (Ireland)</option>
+                                        <option value="sa-east-1">South America (São Paulo)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Address</label>
+                                    <input
+                                        type="email"
+                                        v-model="emailForm.config.from_address"
+                                        placeholder="noreply@example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.from_name"
+                                        placeholder="Nome da Empresa"
+                                        class="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Postmark -->
+                        <div v-if="emailForm.provider === 'postmark'" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-4">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <span class="text-xl">✉️</span>
+                                Configurações Postmark
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Server Token</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showPostmarkToken ? 'text' : 'password'"
+                                            v-model="emailForm.config.token"
+                                            placeholder="..."
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showPostmarkToken = !showPostmarkToken"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showPostmarkToken" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Address</label>
+                                    <input
+                                        type="email"
+                                        v-model="emailForm.config.from_address"
+                                        placeholder="noreply@example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.from_name"
+                                        placeholder="Nome da Empresa"
+                                        class="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Resend -->
+                        <div v-if="emailForm.provider === 'resend'" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-4">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <span class="text-xl">🚀</span>
+                                Configurações Resend
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showResendKey ? 'text' : 'password'"
+                                            v-model="emailForm.config.api_key"
+                                            placeholder="re_..."
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showResendKey = !showResendKey"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showResendKey" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Address</label>
+                                    <input
+                                        type="email"
+                                        v-model="emailForm.config.from_address"
+                                        placeholder="noreply@example.com"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.from_name"
+                                        placeholder="Nome da Empresa"
+                                        class="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <template #footer>
+                        <div class="flex justify-end gap-3">
+                            <BaseButton
+                                variant="secondary"
+                                @click="closeEmailModal"
+                                :disabled="isSavingEmail"
+                            >
+                                Cancelar
+                            </BaseButton>
+                            <BaseButton
+                                @click="saveEmailConfig"
+                                :loading="isSavingEmail"
+                            >
+                                {{ editingEmailConfig ? 'Atualizar' : 'Criar' }} Configuração
+                            </BaseButton>
+                        </div>
+                    </template>
+                </BaseModal>
+            </div>
+
+            <!-- Sync Tab -->
+            <div v-show="activeTab === 'sync'">
                 <BaseCard>
                     <div class="flex items-center justify-between mb-6">
                         <div class="flex items-center gap-3">

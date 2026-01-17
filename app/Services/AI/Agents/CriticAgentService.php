@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Log;
 
 class CriticAgentService
 {
+    private string $logChannel = 'analysis';
+
     public function __construct(
         private AIManager $aiManager
     ) {}
@@ -18,18 +20,62 @@ class CriticAgentService
      */
     public function execute(array $data): array
     {
-        Log::info('Critic Agent received '.count($data['suggestions'] ?? []).' suggestions to review');
+        $startTime = microtime(true);
+
+        Log::channel($this->logChannel)->info('    ┌─── CRITIC AGENT ──────────────────────────────────────────────┐');
+        Log::channel($this->logChannel)->info('    │ Revisando e validando sugestoes geradas                      │');
+        Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────────┘');
+
+        // Log das variáveis usadas (sem dados reais)
+        Log::channel($this->logChannel)->info('    [CRITIC] Variaveis do contexto:', [
+            'suggestions_count' => count($data['suggestions'] ?? []),
+            'previous_suggestions_count' => count($data['previous_suggestions'] ?? []),
+            'store_context_keys' => array_keys($data['store_context'] ?? []),
+        ]);
+
+        // Log do template do prompt (sem dados do banco)
+        Log::channel($this->logChannel)->info('    [CRITIC] PROMPT TEMPLATE:');
+        Log::channel($this->logChannel)->info(CriticAgentPrompt::getTemplate());
 
         $prompt = CriticAgentPrompt::get($data);
 
+        Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
+            'temperature' => 0.3,
+            'prompt_chars' => strlen($prompt),
+        ]);
+
+        $apiStart = microtime(true);
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.3, // Lower temperature for consistent evaluation
-            'max_tokens' => 16384, // Increased for detailed critique with many suggestions
+        ]);
+        $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
+
+        Log::channel($this->logChannel)->info('    <<< Resposta recebida da AI', [
+            'response_chars' => strlen($response),
+            'api_time_ms' => $apiTime,
         ]);
 
-        return $this->parseResponse($response);
+        // Log da resposta completa da AI
+        Log::channel($this->logChannel)->info('    [CRITIC] RESPOSTA AI:');
+        Log::channel($this->logChannel)->info($response);
+
+        $result = $this->parseResponse($response);
+
+        $totalTime = round((microtime(true) - $startTime) * 1000, 2);
+
+        Log::channel($this->logChannel)->info('    [CRITIC] Concluido', [
+            'approved_count' => count($result['approved_suggestions'] ?? []),
+            'removed_count' => count($result['removed_suggestions'] ?? []),
+            'average_quality' => $result['general_analysis']['average_quality'] ?? 0,
+            'total_time_ms' => $totalTime,
+        ]);
+
+        // Adicionar prompt usado para logging no final do pipeline
+        $result['_prompt_used'] = $prompt;
+
+        return $result;
     }
 
     /**
@@ -37,17 +83,17 @@ class CriticAgentService
      */
     private function parseResponse(string $response): array
     {
-        Log::debug('Critic raw response (first 2000 chars): '.substr($response, 0, 2000));
-
         $json = $this->extractJson($response);
 
         if ($json === null) {
-            Log::warning('Critic: Could not extract JSON from response');
+            Log::channel($this->logChannel)->warning('    [CRITIC] ERRO: Nao foi possivel extrair JSON da resposta');
 
             return $this->getDefaultResponse();
         }
 
-        Log::debug('Critic JSON extracted', ['keys' => array_keys($json)]);
+        Log::channel($this->logChannel)->info('    [CRITIC] JSON extraido com sucesso', [
+            'keys' => array_keys($json),
+        ]);
 
         return $this->normalizeResponse($json);
     }
@@ -68,29 +114,33 @@ class CriticAgentService
         $approvedSuggestions = [];
 
         $rawApproved = $response['approved_suggestions'] ?? [];
-        Log::info('Critic: JSON has '.count($rawApproved).' approved_suggestions in response');
+        Log::channel($this->logChannel)->info('    [CRITIC] Processando sugestoes aprovadas', [
+            'total_no_json' => count($rawApproved),
+        ]);
 
         foreach ($rawApproved as $index => $approved) {
+            // Usar final_version se disponível, senão fallback para original (compatibilidade)
             $finalVersion = $approved['final_version'] ?? $approved['original'] ?? [];
 
             if (! empty($finalVersion)) {
+                // Formato simplificado: apenas campos necessários para persistência
                 $approvedSuggestions[] = [
-                    'original' => $approved['original'] ?? $finalVersion,
-                    'improvements_applied' => $approved['improvements_applied'] ?? [],
                     'final_version' => $this->normalizeFinalVersion($finalVersion),
                     'quality_score' => floatval($approved['quality_score'] ?? 5.0),
                     'final_priority' => intval($approved['final_priority'] ?? ($index + 1)),
                 ];
             } else {
-                Log::warning("Critic: Suggestion {$index} has empty final_version", [
+                Log::channel($this->logChannel)->warning("    [CRITIC] Sugestao {$index} com final_version vazio", [
                     'has_final_version' => isset($approved['final_version']),
                     'has_original' => isset($approved['original']),
                 ]);
             }
         }
 
-        Log::info('Critic: Normalized '.count($approvedSuggestions).' suggestions');
-        Log::info('Critic: Removed '.count($response['removed_suggestions'] ?? []).' suggestions');
+        Log::channel($this->logChannel)->info('    [CRITIC] Normalizacao concluida', [
+            'total_aprovadas' => count($approvedSuggestions),
+            'total_removidas' => count($response['removed_suggestions'] ?? []),
+        ]);
 
         return [
             'approved_suggestions' => $approvedSuggestions,

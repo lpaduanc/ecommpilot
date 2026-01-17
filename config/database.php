@@ -98,6 +98,20 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        'pgsql_testing' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_TEST_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DB_TEST_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_TEST_DATABASE', 'laravel_testing'),
+            'username' => env('DB_TEST_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_TEST_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

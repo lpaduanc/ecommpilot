@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, onBeforeUnmount } from 'vue';
 import { useChatStore } from '../stores/chatStore';
 import ChatContainer from '../components/chat/ChatContainer.vue';
 import { ExclamationTriangleIcon, SparklesIcon } from '@heroicons/vue/24/outline';
@@ -7,7 +7,14 @@ import { ExclamationTriangleIcon, SparklesIcon } from '@heroicons/vue/24/outline
 const chatStore = useChatStore();
 
 onMounted(() => {
-    chatStore.fetchConversation();
+    // Reseta o estado antes de buscar nova conversa
+    chatStore.resetLocalState();
+    chatStore.addWelcomeMessage();
+});
+
+onBeforeUnmount(() => {
+    // Limpa o chat ao sair da página (backend e frontend)
+    chatStore.resetAndClearBackend();
 });
 </script>
 
@@ -67,7 +74,7 @@ onMounted(() => {
 
         <!-- Chat Container -->
         <div class="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
-            <div class="max-w-7xl mx-auto">
+            <div class="w-full">
                 <ChatContainer />
             </div>
         </div>

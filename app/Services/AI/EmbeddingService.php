@@ -2,21 +2,83 @@
 
 namespace App\Services\AI;
 
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class EmbeddingService
 {
+    private string $provider;
+
     private string $apiKey;
 
-    private string $model = 'text-embedding-3-small';
+    private string $model;
 
-    private string $baseUrl = 'https://api.openai.com/v1/embeddings';
+    private int $dimensions;
 
     public function __construct()
     {
-        $this->apiKey = config('openai.api_key') ?? '';
+        // Busca provider do banco primeiro, depois config/env
+        $this->provider = SystemSetting::get(
+            'ai.embeddings.provider',
+            config('services.ai.embeddings.provider', 'gemini')
+        );
+        $this->initializeProvider();
+    }
+
+    /**
+     * Initialize the embedding provider configuration.
+     * Busca API keys do banco de dados (SystemSetting) primeiro,
+     * com fallback para config/env.
+     */
+    private function initializeProvider(): void
+    {
+        switch ($this->provider) {
+            case 'gemini':
+                // Busca key do banco primeiro (mesma key usada pelo GeminiProvider)
+                $this->apiKey = SystemSetting::get(
+                    'ai.gemini.api_key',
+                    config('services.ai.gemini.api_key')
+                ) ?? '';
+                $this->model = SystemSetting::get(
+                    'ai.embeddings.gemini.model',
+                    config('services.ai.embeddings.gemini.model', 'text-embedding-004')
+                );
+                $this->dimensions = (int) SystemSetting::get(
+                    'ai.embeddings.gemini.dimensions',
+                    config('services.ai.embeddings.gemini.dimensions', 768)
+                );
+                break;
+
+            case 'openai':
+                // Busca key do banco primeiro
+                $this->apiKey = SystemSetting::get(
+                    'ai.openai.api_key',
+                    config('openai.api_key')
+                ) ?? '';
+                $this->model = SystemSetting::get(
+                    'ai.embeddings.openai.model',
+                    config('services.ai.embeddings.openai.model', 'text-embedding-3-small')
+                );
+                $this->dimensions = (int) SystemSetting::get(
+                    'ai.embeddings.openai.dimensions',
+                    config('services.ai.embeddings.openai.dimensions', 1536)
+                );
+                break;
+
+            default:
+                throw new RuntimeException("Unsupported embedding provider: {$this->provider}");
+        }
+
+        Log::channel('embeddings')->debug('EmbeddingService inicializado', [
+            'provider' => $this->provider,
+            'model' => $this->model,
+            'dimensions' => $this->dimensions,
+            'api_key_configured' => ! empty($this->apiKey),
+            'api_key_source' => ! empty($this->apiKey) ? 'SystemSetting/config' : 'none',
+        ]);
     }
 
     /**
@@ -25,22 +87,157 @@ class EmbeddingService
     public function generate(string $text): array
     {
         if (empty($this->apiKey)) {
-            throw new RuntimeException('OpenAI API key is not configured for embeddings.');
+            throw new RuntimeException("API key is not configured for {$this->provider} embeddings.");
         }
 
+        return match ($this->provider) {
+            'gemini' => $this->generateWithGemini($text),
+            'openai' => $this->generateWithOpenAI($text),
+            default => throw new RuntimeException("Unsupported provider: {$this->provider}"),
+        };
+    }
+
+    /**
+     * Generate embedding using Google Gemini API.
+     */
+    private function generateWithGemini(string $text): array
+    {
+        $url = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:embedContent";
+
+        Log::channel('embeddings')->debug('Gemini API Request - Iniciando chamada', [
+            'url' => $url,
+            'model' => $this->model,
+            'task_type' => 'RETRIEVAL_DOCUMENT',
+            'text_length' => strlen($text),
+            'text_words' => str_word_count($text),
+        ]);
+
+        $startTime = microtime(true);
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+        ])->post($url.'?key='.$this->apiKey, [
+            'model' => "models/{$this->model}",
+            'content' => [
+                'parts' => [
+                    ['text' => $text],
+                ],
+            ],
+            'taskType' => 'RETRIEVAL_DOCUMENT',
+        ]);
+
+        $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+        if ($response->failed()) {
+            Log::channel('embeddings')->error('Gemini API Error - Falha na requisicao', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'response_time_ms' => $responseTime,
+            ]);
+            Log::error('Gemini embedding error', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            throw new RuntimeException('Error generating Gemini embedding: '.$response->body());
+        }
+
+        $embedding = $response->json('embedding.values');
+
+        if (empty($embedding)) {
+            Log::channel('embeddings')->error('Gemini API Error - Embedding vazio', [
+                'response' => $response->json(),
+            ]);
+            throw new RuntimeException('Empty embedding returned from Gemini API');
+        }
+
+        Log::channel('embeddings')->info('Gemini API Response - Sucesso', [
+            'status' => $response->status(),
+            'response_time_ms' => $responseTime,
+            'embedding_dimensions' => count($embedding),
+            'embedding_sample' => [
+                'first_5' => array_slice($embedding, 0, 5),
+                'last_5' => array_slice($embedding, -5),
+            ],
+            'embedding_stats' => [
+                'min' => round(min($embedding), 6),
+                'max' => round(max($embedding), 6),
+                'avg' => round(array_sum($embedding) / count($embedding), 6),
+            ],
+        ]);
+
+        return $embedding;
+    }
+
+    /**
+     * Generate embedding using OpenAI API.
+     */
+    private function generateWithOpenAI(string $text): array
+    {
         $response = Http::withHeaders([
             'Authorization' => 'Bearer '.$this->apiKey,
             'Content-Type' => 'application/json',
-        ])->post($this->baseUrl, [
+        ])->post('https://api.openai.com/v1/embeddings', [
             'model' => $this->model,
             'input' => $text,
         ]);
 
         if ($response->failed()) {
-            throw new RuntimeException('Error generating embedding: '.$response->body());
+            Log::error('OpenAI embedding error', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            throw new RuntimeException('Error generating OpenAI embedding: '.$response->body());
         }
 
         return $response->json('data.0.embedding');
+    }
+
+    /**
+     * Generate embedding for search queries (optimized for retrieval).
+     */
+    public function generateForQuery(string $text): array
+    {
+        if ($this->provider === 'gemini') {
+            return $this->generateWithGeminiQuery($text);
+        }
+
+        return $this->generate($text);
+    }
+
+    /**
+     * Generate embedding for queries using Gemini (different task type).
+     */
+    private function generateWithGeminiQuery(string $text): array
+    {
+        if (empty($this->apiKey)) {
+            throw new RuntimeException('Gemini API key is not configured for embeddings.');
+        }
+
+        $url = "https://generativelanguage.googleapis.com/v1/models/{$this->model}:embedContent";
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+        ])->post($url.'?key='.$this->apiKey, [
+            'model' => "models/{$this->model}",
+            'content' => [
+                'parts' => [
+                    ['text' => $text],
+                ],
+            ],
+            'taskType' => 'RETRIEVAL_QUERY',
+        ]);
+
+        if ($response->failed()) {
+            throw new RuntimeException('Error generating Gemini query embedding: '.$response->body());
+        }
+
+        $embedding = $response->json('embedding.values');
+
+        if (empty($embedding)) {
+            throw new RuntimeException('Empty embedding returned from Gemini API');
+        }
+
+        return $embedding;
     }
 
     /**
@@ -181,5 +378,29 @@ class EmbeddingService
     public function isConfigured(): bool
     {
         return ! empty($this->apiKey);
+    }
+
+    /**
+     * Get the current provider name.
+     */
+    public function getProvider(): string
+    {
+        return $this->provider;
+    }
+
+    /**
+     * Get the current model name.
+     */
+    public function getModel(): string
+    {
+        return $this->model;
+    }
+
+    /**
+     * Get the embedding dimensions for the current provider.
+     */
+    public function getDimensions(): int
+    {
+        return $this->dimensions;
     }
 }

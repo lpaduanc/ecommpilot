@@ -135,4 +135,51 @@ class AdminSettingsController extends Controller
             ],
         ];
     }
+
+    /**
+     * Get analysis format settings.
+     */
+    public function getAnalysisFormatSettings(): JsonResponse
+    {
+        return response()->json([
+            'settings' => $this->settingsService->getAnalysisFormatSettings(),
+            'available_formats' => [
+                [
+                    'id' => 'v1',
+                    'name' => 'Detalhado (Atual)',
+                    'description' => 'Formato completo com JSON detalhado. Análise padrão.',
+                ],
+                [
+                    'id' => 'v2',
+                    'name' => 'Otimizado (Novo)',
+                    'description' => 'Formato compacto com tabelas Markdown. ~30% menos tokens.',
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Update analysis format settings.
+     */
+    public function updateAnalysisFormatSettings(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'format_version' => ['sometimes', 'string', 'in:v1,v2'],
+            'v2_options.validate_field_lengths' => ['sometimes', 'boolean'],
+            'v2_options.use_markdown_tables' => ['sometimes', 'boolean'],
+            'v2_options.use_history_summary' => ['sometimes', 'boolean'],
+        ]);
+
+        $this->settingsService->updateAnalysisFormatSettings($validated);
+
+        ActivityLog::log('admin.analysis_format_updated', null, [
+            'admin_id' => $request->user()->id,
+            'format_version' => $validated['format_version'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => 'Configurações de formato de análise atualizadas.',
+            'settings' => $this->settingsService->getAnalysisFormatSettings(),
+        ]);
+    }
 }

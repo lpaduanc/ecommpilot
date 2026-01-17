@@ -14,6 +14,7 @@ import {
     TrashIcon,
     PlusIcon,
     SparklesIcon,
+    Cog6ToothIcon,
 } from '@heroicons/vue/24/outline';
 
 const authStore = useAuthStore();
@@ -265,6 +266,13 @@ function formatDate(date) {
 
                                     <!-- Actions -->
                                     <div v-if="authStore.hasPermission('integrations.manage')" class="flex items-center gap-2">
+                                        <router-link
+                                            :to="{ name: 'store-config', params: { id: store.id } }"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
+                                        >
+                                            <Cog6ToothIcon class="w-4 h-4" />
+                                            Configurar
+                                        </router-link>
                                         <BaseButton
                                             variant="secondary"
                                             size="sm"

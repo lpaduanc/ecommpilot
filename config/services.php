@@ -59,15 +59,15 @@ return [
         'openai' => [
             'model' => env('OPENAI_MODEL', 'gpt-4o'),
             'temperature' => (float) env('OPENAI_TEMPERATURE', 0.7),
-            'max_tokens' => (int) env('OPENAI_MAX_TOKENS', 4000),
+            'max_tokens' => (int) env('OPENAI_MAX_TOKENS', 16384),
         ],
 
         // Google Gemini Configuration
         'gemini' => [
-            'api_key' => env('GEMINI_API_KEY'),
+            'api_key' => env('GOOGLE_AI_API_KEY'),
             'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
             'temperature' => (float) env('GEMINI_TEMPERATURE', 0.7),
-            'max_tokens' => (int) env('GEMINI_MAX_TOKENS', 4000),
+            'max_tokens' => (int) env('GEMINI_MAX_TOKENS', 16384),
         ],
 
         // Anthropic (Claude) Configuration
@@ -75,7 +75,25 @@ return [
             'api_key' => env('ANTHROPIC_API_KEY'),
             'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
             'temperature' => (float) env('ANTHROPIC_TEMPERATURE', 0.7),
-            'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
+            'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 16384),
+        ],
+
+        // Embeddings Configuration
+        'embeddings' => [
+            // Provider for embeddings: 'gemini' or 'openai'
+            'provider' => env('EMBEDDINGS_PROVIDER', 'gemini'),
+
+            // Gemini Embedding Configuration
+            'gemini' => [
+                'model' => env('GEMINI_EMBEDDING_MODEL', 'text-embedding-004'),
+                'dimensions' => 768, // Gemini text-embedding-004 outputs 768 dimensions
+            ],
+
+            // OpenAI Embedding Configuration (fallback)
+            'openai' => [
+                'model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+                'dimensions' => 1536, // OpenAI text-embedding-3-small outputs 1536 dimensions
+            ],
         ],
     ],
 
@@ -89,7 +107,7 @@ return [
         'api_key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
         'temperature' => (float) env('ANTHROPIC_TEMPERATURE', 0.7),
-        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 16384),
     ],
 
 ];

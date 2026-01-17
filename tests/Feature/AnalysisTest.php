@@ -23,6 +23,7 @@ class AnalysisTest extends TestCase
     public function test_user_can_view_current_analysis(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('analysis.view');
         $store = Store::factory()->synced()->create(['user_id' => $user->id]);
         $user->update(['active_store_id' => $store->id]);
 
@@ -47,6 +48,7 @@ class AnalysisTest extends TestCase
     public function test_user_can_view_analysis_history(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('analysis.view');
         $store = Store::factory()->synced()->create(['user_id' => $user->id]);
         $user->update(['active_store_id' => $store->id]);
 
@@ -71,7 +73,9 @@ class AnalysisTest extends TestCase
     public function test_user_can_view_specific_analysis(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('analysis.view');
         $store = Store::factory()->synced()->create(['user_id' => $user->id]);
+        $user->update(['active_store_id' => $store->id]);
 
         $analysis = Analysis::factory()->completed()->create([
             'user_id' => $user->id,
@@ -82,23 +86,28 @@ class AnalysisTest extends TestCase
             ->getJson("/api/analysis/{$analysis->id}");
 
         $response->assertStatus(200)
-            ->assertJsonPath('analysis.id', $analysis->id);
+            ->assertJsonPath('id', $analysis->id);
     }
 
     public function test_user_cannot_view_other_users_analysis(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('analysis.view');
+        $userStore = Store::factory()->synced()->create(['user_id' => $user->id]);
+        $user->update(['active_store_id' => $userStore->id]);
+
         $otherUser = User::factory()->create();
-        $store = Store::factory()->synced()->create(['user_id' => $otherUser->id]);
+        $otherStore = Store::factory()->synced()->create(['user_id' => $otherUser->id]);
 
         $analysis = Analysis::factory()->completed()->create([
             'user_id' => $otherUser->id,
-            'store_id' => $store->id,
+            'store_id' => $otherStore->id,
         ]);
 
         $response = $this->actingAs($user)
             ->getJson("/api/analysis/{$analysis->id}");
 
-        $response->assertStatus(403);
+        // Now returns 404 instead of 403 because we filter by store_id
+        $response->assertStatus(404);
     }
 }

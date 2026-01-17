@@ -111,6 +111,15 @@ const routes = [
         meta: { requiresAuth: true, permission: 'integrations.manage' },
     },
     {
+        path: '/stores/:id/config',
+        name: 'store-config',
+        component: () => import(
+            /* webpackChunkName: "store-config" */
+            '../views/StoreConfigView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'integrations.manage' },
+    },
+    {
         path: '/settings',
         name: 'settings',
         component: () => import(

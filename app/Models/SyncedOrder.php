@@ -62,12 +62,12 @@ class SyncedOrder extends Model
 
     public function isPending(): bool
     {
-        return $this->status === OrderStatus::Pending;
+        return $this->payment_status === PaymentStatus::Pending;
     }
 
     public function isCancelled(): bool
     {
-        return $this->status === OrderStatus::Cancelled;
+        return $this->payment_status?->isCancelled() ?? false;
     }
 
     public function scopeByStatus($query, string $status)

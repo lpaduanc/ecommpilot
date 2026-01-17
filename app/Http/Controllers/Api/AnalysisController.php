@@ -140,8 +140,14 @@ class AnalysisController extends Controller
     public function history(Request $request): JsonResponse
     {
         $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json([]);
+        }
 
         $analyses = Analysis::where('user_id', $user->id)
+            ->where('store_id', $store->id)
             ->completed()
             ->latest()
             ->limit(10)
@@ -152,8 +158,16 @@ class AnalysisController extends Controller
 
     public function show(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
+        }
+
         $analysis = Analysis::where('id', $id)
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $user->id)
+            ->where('store_id', $store->id)
             ->first();
 
         if (! $analysis) {
@@ -165,8 +179,16 @@ class AnalysisController extends Controller
 
     public function markSuggestionDone(Request $request, int $analysisId, string $suggestionId): JsonResponse
     {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
+        }
+
         $analysis = Analysis::where('id', $analysisId)
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $user->id)
+            ->where('store_id', $store->id)
             ->first();
 
         if (! $analysis) {

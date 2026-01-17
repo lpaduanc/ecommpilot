@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminEmailConfigurationController;
 use App\Http\Controllers\Api\AdminSettingsController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\AuthController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\StoreConfigController;
 use App\Http\Controllers\Api\StoreSettingsController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -208,6 +210,20 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('ai', [AdminSettingsController::class, 'updateAISettings']);
             Route::post('ai/test', [AdminSettingsController::class, 'testAIProvider']);
 
+            // Analysis Format Settings
+            Route::get('analysis-format', [AdminSettingsController::class, 'getAnalysisFormatSettings']);
+            Route::put('analysis-format', [AdminSettingsController::class, 'updateAnalysisFormatSettings']);
+
+            // Email Configurations
+            Route::prefix('email')->group(function () {
+                Route::get('/', [AdminEmailConfigurationController::class, 'index']);
+                Route::post('/', [AdminEmailConfigurationController::class, 'store']);
+                Route::get('/{id}', [AdminEmailConfigurationController::class, 'show']);
+                Route::put('/{id}', [AdminEmailConfigurationController::class, 'update']);
+                Route::delete('/{id}', [AdminEmailConfigurationController::class, 'destroy']);
+                Route::post('/{id}/test', [AdminEmailConfigurationController::class, 'test']);
+            });
+
             // Store/Nuvemshop Settings
             Route::prefix('store')->group(function () {
                 Route::get('/', [StoreSettingsController::class, 'getStoreSettings']);
@@ -224,6 +240,17 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('sync', [LocationController::class, 'sync']);
             Route::get('sync-status', [LocationController::class, 'syncStatus']);
         });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Store Configuration
+    |--------------------------------------------------------------------------
+    */
+    Route::get('niches', [StoreConfigController::class, 'getNiches']);
+    Route::prefix('stores/{store}')->group(function () {
+        Route::get('config', [StoreConfigController::class, 'show']);
+        Route::put('config', [StoreConfigController::class, 'update'])->middleware('can:integrations.manage');
     });
 
     /*

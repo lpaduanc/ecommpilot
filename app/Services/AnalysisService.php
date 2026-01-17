@@ -7,6 +7,8 @@ use App\Models\Analysis;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\AI\AIManager;
+use App\Services\AI\Memory\HistorySummaryService;
+use App\Services\AI\ProductTableFormatter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -91,6 +93,9 @@ class AnalysisService
             $store = $analysis->store;
             $storeData = $this->prepareStoreData($store, $analysis->period_start, $analysis->period_end);
 
+            // Adicionar store_id aos dados para o HistorySummaryService
+            $storeData['store']['id'] = $store->id;
+
             // RAG: Get relevant strategies from knowledge base
             $relevantStrategies = $this->knowledgeBase->getRelevantStrategies($storeData);
             $strategiesContext = $this->knowledgeBase->formatForPrompt($relevantStrategies);
@@ -107,16 +112,21 @@ class AnalysisService
                 ['role' => 'user', 'content' => $prompt],
             ];
 
+            // Aumentado max_tokens para suportar resposta completa
             $content = $this->aiManager->chat($messages, [
                 'temperature' => 0.7,
-                'max_tokens' => 8192,
+                'max_tokens' => 16384,
             ]);
 
             Log::info('AI response received', ['length' => strlen($content)]);
             $data = $this->parseResponse($content);
 
+            // Validar limites de tamanho dos campos
+            $this->validateFieldLengths($data);
+
             $analysis->markAsCompleted($data);
         } catch (\Exception $e) {
+            Log::error('Analysis failed', ['error' => $e->getMessage()]);
             $analysis->markAsFailed();
             throw $e;
         }
@@ -364,6 +374,16 @@ class AnalysisService
     /**
      * Analyze order patterns and behaviors
      */
+    /**
+     * Analyze order patterns and behaviors
+     *
+     * IMPORTANTE: Diferença entre status e payment_status:
+     * - status = fluxo do pedido (pending, processing, shipped, delivered, cancelled)
+     * - payment_status = situação do pagamento (pending, paid, refunded, failed)
+     *
+     * Para análise de saúde financeira, o foco deve ser em payment_status.
+     * Pedidos com status='pending' mas payment_status='paid' estão em processamento normal.
+     */
     private function getOrderPatterns($orders): array
     {
         $totalOrders = $orders->count();
@@ -371,13 +391,17 @@ class AnalysisService
         if ($totalOrders === 0) {
             return [
                 'total_orders' => 0,
-                'by_status' => [],
                 'by_payment_status' => [],
+                'payment_pending_count' => 0,
+                'payment_pending_rate' => 0,
+                'payment_confirmed_count' => 0,
+                'payment_confirmed_rate' => 0,
                 'cancellation_rate' => 0,
                 'refund_rate' => 0,
                 'average_shipping' => 0,
                 'discount_usage_rate' => 0,
                 'peak_day' => null,
+                'orders_by_day' => [],
             ];
         }
 
@@ -389,24 +413,32 @@ class AnalysisService
         $peakDay = ! empty($ordersByDay) ? array_search(max($ordersByDay), $ordersByDay) : null;
         $dayNames = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
 
-        // Status distribution
-        $byStatus = $orders->groupBy(fn ($o) => $o->status?->value ?? $o->status ?? 'unknown')
-            ->map->count()
-            ->toArray();
-
+        // Status do pagamento - ÚNICA fonte de verdade para status de pedidos
         $byPaymentStatus = $orders->groupBy(fn ($o) => $o->payment_status?->value ?? $o->payment_status ?? 'unknown')
             ->map->count()
             ->toArray();
 
-        // Calculate rates
-        $cancelledCount = $orders->filter(fn ($o) => ($o->status?->value ?? $o->status) === 'cancelled')->count();
+        // Cancelamento baseado em payment_status (cancelled ou voided)
+        $cancelledCount = $orders->filter(fn ($o) => $o->isCancelled())->count();
+
+        // Reembolso baseado em payment_status
         $refundedCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'refunded')->count();
+
+        // Pagamentos pendentes (não confirmados) - MÉTRICA IMPORTANTE
+        $paymentPendingCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'pending')->count();
+
+        // Pagamentos confirmados
+        $paymentConfirmedCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'paid')->count();
+
         $ordersWithDiscount = $orders->filter(fn ($o) => ($o->discount ?? 0) > 0)->count();
 
         return [
             'total_orders' => $totalOrders,
-            'by_status' => $byStatus,
             'by_payment_status' => $byPaymentStatus,
+            'payment_pending_count' => $paymentPendingCount,
+            'payment_pending_rate' => round(($paymentPendingCount / $totalOrders) * 100, 1),
+            'payment_confirmed_count' => $paymentConfirmedCount,
+            'payment_confirmed_rate' => round(($paymentConfirmedCount / $totalOrders) * 100, 1),
             'cancellation_rate' => round(($cancelledCount / $totalOrders) * 100, 1),
             'refund_rate' => round(($refundedCount / $totalOrders) * 100, 1),
             'average_shipping' => round($orders->avg('shipping') ?? 0, 2),
@@ -446,24 +478,51 @@ class AnalysisService
 
     private function buildAnalysisPrompt(array $storeData, Carbon $startDate, Carbon $endDate, string $strategiesContext = ''): string
     {
-        $dataJson = json_encode($storeData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        // Usar helpers para formato compacto
+        $historyService = new HistorySummaryService;
         $periodDays = $startDate->diffInDays($endDate);
 
-        // Extrair dados para contexto resumido
-        $revenue = $storeData['metrics']['total_revenue'] ?? 0;
-        $products = $storeData['metrics']['total_products'] ?? 0;
-        $orders = $storeData['metrics']['total_orders'] ?? 0;
-        $trends = $storeData['trends'] ?? [];
+        // Dados básicos
+        $storeName = $storeData['store']['name'] ?? 'Loja';
+        $revenue = number_format($storeData['metrics']['total_revenue'] ?? 0, 0, ',', '.');
+        $paidOrders = $storeData['metrics']['paid_orders'] ?? 0;
+        $totalOrders = $storeData['metrics']['total_orders'] ?? 0;
+        $storeId = $storeData['store']['id'] ?? 0;
+
+        // Resumo de histórico (OTIMIZADO - reduz tokens)
+        $historySummary = $historyService->generateSummary($storeId);
+        $successRate = $historySummary['success_rate'];
+        $repeatedTopics = implode(', ', array_keys($historySummary['repeated_topics']));
+        $categoriesToAvoid = implode(', ', array_keys($historySummary['categories_to_avoid']));
+
+        // Produtos em tabela Markdown (OTIMIZADO)
+        $topSellersTable = ProductTableFormatter::formatTopSellers(
+            $storeData['product_performance']['top_sellers'] ?? []
+        );
+        $noSalesTable = ProductTableFormatter::formatNoSalesProducts(
+            $storeData['product_performance']['no_sales_products'] ?? []
+        );
+
+        // Inventário resumido
+        $inventorySummary = ProductTableFormatter::formatInventorySummary(
+            $storeData['inventory_alerts'] ?? []
+        );
+
+        // Insights de clientes
         $customerInsights = $storeData['customer_insights'] ?? [];
-        $inventoryAlerts = $storeData['inventory_alerts'] ?? [];
+        $repeatRate = $customerInsights['repeat_purchase_rate'] ?? 0;
+        $vipCount = $customerInsights['segments']['vip'] ?? 0;
+        $totalCustomers = $customerInsights['total_customers'] ?? 0;
 
-        $storeSize = match (true) {
-            $revenue > 50000 => 'grande (alto faturamento)',
-            $revenue > 10000 => 'medio',
-            default => 'pequeno/iniciante',
-        };
+        // Padrões de pedidos
+        $orderPatterns = $storeData['order_patterns'] ?? [];
+        $cancellationRate = $orderPatterns['cancellation_rate'] ?? 0;
+        $refundRate = $orderPatterns['refund_rate'] ?? 0;
+        $paymentPendingRate = $orderPatterns['payment_pending_rate'] ?? 0;
+        $paymentConfirmedRate = $orderPatterns['payment_confirmed_rate'] ?? 0;
 
-        // Resumo de tendencias
+        // Tendências
+        $trends = $storeData['trends'] ?? [];
         $revenueTrend = $trends['revenue']['trend'] ?? 'stable';
         $revenueChange = $trends['revenue']['change_percent'] ?? 0;
         $trendDescription = match ($revenueTrend) {
@@ -475,173 +534,326 @@ class AnalysisService
             default => 'sem dados anteriores',
         };
 
-        // Resumo de clientes
-        $repeatRate = $customerInsights['repeat_purchase_rate'] ?? 0;
-        $vipCount = $customerInsights['segments']['vip'] ?? 0;
-
-        // Resumo de estoque
-        $outOfStock = $inventoryAlerts['out_of_stock']['count'] ?? 0;
-        $lowStock = $inventoryAlerts['low_stock']['count'] ?? 0;
-
+        // PROMPT OTIMIZADO (Muito mais compacto)
         return <<<PROMPT
-## CONTEXTO DA ANALISE
-
-**Loja:** {$storeData['store']['name']}
-**Porte:** {$storeSize}
+# ANALISE: {$storeName}
 **Periodo:** {$startDate->format('d/m/Y')} a {$endDate->format('d/m/Y')} ({$periodDays} dias)
+**Faturamento:** R\$ {$revenue} | **Pagamentos Confirmados:** {$paymentConfirmedRate}%
 
-### METRICAS PRINCIPAIS
-- Faturamento: R$ {$revenue} ({$trendDescription} vs periodo anterior)
-- Pedidos: {$orders}
-- Produtos ativos: {$products}
+## RESUMO FINANCEIRO
+- **Faturamento Realizado:** R\$ {$revenue}
+- **Pedidos com Pagamento:** {$paidOrders} / {$totalOrders}
+- **Porte:** {$this->getStoreSize($storeData['metrics']['total_revenue'] ?? 0)}
+- **Tendencia:** {$trendDescription}
 
-### SITUACAO ATUAL
-- Tendencia de receita: {$trendDescription}
-- Taxa de recompra: {$repeatRate}% (clientes que voltam a comprar)
-- Clientes VIP (>R$1000): {$vipCount}
-- Produtos sem estoque: {$outOfStock}
-- Produtos com estoque baixo: {$lowStock}
+## HISTORICO DE SUGESTOES
+- **Taxa de Sucesso:** {$successRate}
+- **Topicos Ja Sugeridos (EVITAR):** {$repeatedTopics}
+- **Categorias que Loja Ignora:** {$categoriesToAvoid}
+
+## TOP 10 PRODUTOS COM VENDAS
+{$topSellersTable}
+
+## TOP 10 PRODUTOS SEM VENDAS (com estoque)
+{$noSalesTable}
+
+## ESTOQUE
+{$inventorySummary}
+
+## CLIENTES
+- **Taxa de Recompra:** {$repeatRate}%
+- **Clientes VIP (>R\$1000):** {$vipCount} de {$totalCustomers}
+- **Cancelamentos:** {$cancellationRate}%
+- **Reembolsos:** {$refundRate}%
+- **Pagamentos Pendentes:** {$paymentPendingRate}%
 
 {$strategiesContext}
 
-## DADOS COMPLETOS DA LOJA
+## INSTRUCAO
+Analise os dados acima e gere EXATAMENTE 9 sugestoes para aumentar vendas.
 
-{$dataJson}
+**RESTRICOES (CRITICAS):**
+- Titulo: maximo 80 caracteres
+- Descricao: maximo 200 caracteres
+- Expected Impact: maximo 80 caracteres (formato: "R\$ XXXX" ou "+X%")
+- Action Steps: SEMPRE 3, maximo 150 chars cada
 
-## SUA TAREFA
+**EVITE:**
+- Titulos com contexto: "Reduzir cancelamentos de 32% para 10% com..." (muito longo)
+- Descricoes genericas: "Melhore seu marketing"
+- Expected impact vago: "Aumento nas vendas"
+- Menos ou mais de 3 action steps
 
-Analise os dados acima e forneca recomendacoes ESPECIFICAS para esta loja.
+**FACA:**
+- Titulos diretos: "Reduzir cancelamentos de 32% para 10%"
+- Descricoes com numeros: "32% de 1.336 = R\$ 73.950/mes perdidos"
+- Expected impact com valor: "R\$ 73.950/mes" ou "+45% em recompras"
+- 3 passos claros: Diagnostico -> Implementacao -> Validacao
 
-FOQUE ESPECIALMENTE EM:
-1. **Tendencias**: Se houver queda, identifique possiveis causas. Se houver crescimento, como acelerar.
-2. **Top Sellers**: Use os dados de "product_performance.top_sellers" para sugestoes de estoque e marketing
-3. **Produtos parados**: "product_performance.no_sales_products" mostra produtos com estoque mas sem vendas - sugira acoes
-4. **Retencao**: Se "repeat_purchase_rate" for baixo (<20%), sugira estrategias de fidelizacao
-5. **Estoque critico**: Use "inventory_alerts" para alertar sobre produtos que precisam reposicao
-6. **Padroes de pedidos**: Use "order_patterns" para identificar problemas (cancelamentos, reembolsos)
-
-IMPORTANTE:
-- Use os NOMES DOS PRODUTOS que aparecem nos dados
-- Mencione os NUMEROS EXATOS (receita, quantidade, porcentagens)
-- Calcule impactos baseado nos valores reais
-- Compare com o periodo anterior quando relevante
-- Se houver ESTRATEGIAS RECOMENDADAS acima, use-as como INSPIRACAO mas ADAPTE para os dados especificos desta loja
-
-Forneca sua analise no formato JSON especificado nas instrucoes do sistema.
+**CRUCIAL:**
+- Evite repetir topicos: {$repeatedTopics}
+- Nao sugira para: {$categoriesToAvoid}
+- Cada sugestao deve mencionar produtos/numeros especificos
+- Priorize HIGH apenas se problema real nos dados
+- Responda APENAS em JSON: {summary, suggestions[], alerts[], opportunities[]}
 PROMPT;
+    }
+
+    private function getStoreSize(float $revenue): string
+    {
+        return match (true) {
+            $revenue > 50000 => 'Grande (>R$50k)',
+            $revenue > 10000 => 'Medio (R$10-50k)',
+            default => 'Pequeno (<R$10k)',
+        };
     }
 
     private function getSystemPrompt(): string
     {
         return <<<'PROMPT'
-Voce e um consultor senior de e-commerce com 15 anos de experiencia analisando lojas online brasileiras.
+Voce e um consultor senior de e-commerce analisando dados de vendas brasileiras.
 
-## PROCESSO DE ANALISE (siga estas etapas mentalmente)
+## RESTRICAO CRITICA: LIMITES DE CARACTERES
 
-1. DIAGNOSTICO: Analise os dados e identifique padroes
-   - Verifique as TENDENCIAS em "trends" - a receita esta crescendo ou caindo?
-   - Analise "product_performance.top_sellers" - quais produtos realmente vendem
-   - Verifique "product_performance.no_sales_products" - produtos parados com estoque
-   - Analise "customer_insights" - taxa de recompra e segmentacao
-   - Verifique "inventory_alerts" - produtos sem estoque ou com estoque critico
-   - Analise "order_patterns" - taxas de cancelamento, reembolso, dia de pico
+TODOS os campos tem limites ESTRITOS. NAO ultrapasse ou saida sera rejeitada:
 
-2. PRIORIZACAO: Determine o que e mais urgente
-   - Se tendencia de queda forte: PRIORIDADE MAXIMA - identificar causa
-   - Produtos sem estoque que sao top sellers: PRIORIDADE ALTA
-   - Taxa de recompra baixa (<15%): PRIORIDADE ALTA - problema de retencao
-   - Alto indice de cancelamentos (>5%): PRIORIDADE ALTA
-   - Produtos parados com estoque: PRIORIDADE MEDIA - capital parado
+```
+main_insight:           <=150 chars (1-2 linhas)
+alert.title:            <=80 chars
+alert.message:          <=200 chars
+opportunity.title:      <=80 chars
+opportunity.description:<=200 chars
+suggestion.title:       <=80 chars (maximo!)
+suggestion.description: <=200 chars
+suggestion.expected_impact: <=80 chars
+action_step:            <=150 chars (SEMPRE 3 passos)
+```
 
-3. RECOMENDACOES: Crie sugestoes ESPECIFICAS e ACIONAVEIS
-   - SEMPRE mencione produtos, numeros ou metricas ESPECIFICOS dos dados fornecidos
-   - NAO de conselhos genericos - cada sugestao deve ser unica para ESTA loja
-   - Use os dados de tendencia para justificar urgencia
-   - Calcule impactos usando os valores reais dos dados
+Se seu conteudo ultrapassa limites:
+1. Corte o menos importante
+2. Mude pra forma mais compacta
+3. Priorize: NUMEROS > ESPECIFICOS > CONTEXTO
 
-## EXEMPLOS DE SUGESTOES
+## DIFERENCA: STATUS vs PAYMENT_STATUS
 
-### EXEMPLO RUIM (generico - NAO FACA ISSO):
-{
-  "title": "Melhore suas campanhas de marketing",
-  "description": "Invista em marketing digital para atrair mais clientes",
-  "expected_impact": "Aumento nas vendas"
-}
+**status** = Fluxo/Processamento do pedido
+- 'pending': Em processamento (NORMAL - nao e anomalia!)
+- 'processing', 'shipped', 'delivered', 'cancelled'
 
-### EXEMPLO BOM (especifico - FACA ASSIM):
-{
-  "title": "Reabastecer 'Camiseta Polo Azul' - produto esgotado",
-  "description": "Este produto aparece nos top 10 por preco (R$ 89,90) mas esta com estoque zerado. Reponha estoque para capturar vendas perdidas.",
-  "expected_impact": "Potencial de R$ 899 em vendas se vender 10 unidades"
-}
+**payment_status** = Confirmacao de pagamento
+- 'pending': Pagamento nao confirmado (ALERTA real)
+- 'paid': Pagamento CONFIRMADO
+- 'refunded': Reembolsado
+- 'failed': Falha na transacao
 
-### EXEMPLO RUIM (generico):
-{
-  "title": "Fidelize seus clientes",
-  "description": "Crie programas de fidelidade para aumentar recorrencia"
-}
+REGRA: Pedidos com status='pending' + payment_status='paid' = NORMAL
+ANOMALIA: payment_status='pending' em alta taxa (>5%)
 
-### EXEMPLO BOM (especifico):
-{
-  "title": "Reduzir taxa de pedidos cancelados (atualmente em 15%)",
-  "description": "Dos 120 pedidos do periodo, 18 foram cancelados. Isso representa R$ 2.700 em vendas perdidas. Investigue os motivos: prazo de entrega? Pagamento recusado?",
-  "expected_impact": "Recuperar ate R$ 1.350 reduzindo cancelamentos pela metade"
-}
+## PROCESSO DE ANALISE
 
-## FORMATO DE RESPOSTA (JSON estrito)
+1. DIAGNOSTICO: Identifique padroes reais nos dados
+   - Tendencias em "trends" (receita crescendo ou caindo?)
+   - Produtos que realmente vendem (top_sellers)
+   - Produtos parados com estoque (no_sales_products)
+   - Taxa de recompra de clientes
+   - Produtos fora/com baixo estoque
+   - Pagamentos: qual % tem payment_status='paid'?
+
+2. PRIORIZACAO: O que e mais urgente?
+   - Queda forte de receita: HIGH PRIORITY
+   - Produtos top sem estoque: HIGH PRIORITY
+   - Taxa recompra baixa: HIGH PRIORITY
+   - Muitos pagamentos pendentes: HIGH PRIORITY
+   - Produtos parados com estoque: MEDIUM PRIORITY
+
+3. RECOMENDACOES: Crie sugestoes ESPECIFICAS
+   - SEMPRE mencione produtos, numeros, nomes reais
+   - NUNCA generico ("melhore marketing")
+   - Cada sugestao = unica para ESTA loja
+   - Use dados dos 3 ultimos periodos quando houver
+
+## FORMATO EXATO DE RESPOSTA (JSON)
 
 {
   "summary": {
-    "health_score": 0-100,
-    "health_status": "Critico|Precisa Atencao|Bom|Excelente",
-    "main_insight": "Uma frase de 1-2 linhas com a observacao mais importante sobre a loja"
+    "health_score": <numero 0-100>,
+    "health_status": "<Critico|Precisa Atencao|Bom|Excelente>",
+    "main_insight": "<Uma frase de impacto maximo 150 chars>"
   },
-  "suggestions": [
-    {
-      "id": "sug1",
-      "category": "marketing|pricing|inventory|product|customer|conversion",
-      "priority": "high|medium|low",
-      "title": "Titulo claro e especifico com dados da loja (max 80 chars)",
-      "description": "Descricao detalhada mencionando produtos e numeros especificos dos dados (max 200 chars)",
-      "expected_impact": "Impacto estimado em R$ ou % baseado nos dados (max 100 chars)",
-      "action_steps": ["Passo 1 concreto", "Passo 2 concreto", "Passo 3 concreto"],
-      "is_done": false
-    }
-  ],
   "alerts": [
     {
-      "type": "danger|warning|info",
-      "title": "Titulo do alerta",
-      "message": "Descricao do problema com dados especificos da loja"
+      "type": "<danger|warning|info>",
+      "title": "<Titulo maximo 80 chars>",
+      "message": "<Mensagem maximo 200 chars>"
     }
   ],
   "opportunities": [
     {
-      "title": "Oportunidade identificada nos dados",
-      "potential_revenue": "R$ X.XXX",
-      "description": "Como capturar esta oportunidade baseado nos dados da loja"
+      "title": "<Titulo maximo 80 chars>",
+      "potential_revenue": "<R$ X.XXX>",
+      "description": "<Descricao maximo 200 chars>"
     }
+  ],
+  "suggestions": [
+    {
+      "id": "sug1",
+      "category": "<marketing|pricing|inventory|product|customer|conversion|operational>",
+      "priority": "<high|medium|low>",
+      "title": "<Maximo 80 CHARS - comece com verbo>",
+      "description": "<Maximo 200 chars - POR QUE? responda>",
+      "expected_impact": "<Maximo 80 chars - formato: R$ XXXX ou +X%>",
+      "target_metrics": ["metrica1", "metrica2"],
+      "action_steps": [
+        "<Maximo 150 chars - Passo 1: O que fazer>",
+        "<Maximo 150 chars - Passo 2: Como fazer>",
+        "<Maximo 150 chars - Passo 3: Como validar>"
+      ],
+      "is_done": false
+    }
+  ]
+}
+
+## EXEMPLO DE SUGESTAO CORRETA
+
+BAD (nao faca isso):
+{
+  "title": "Reduzir taxa de cancelamento de 32% para 10% com melhorias operacionais" (92 chars X),
+  "description": "A taxa de cancelamento atual de 32% esta perdendo...[200+ chars de contexto]" X,
+  "expected_impact": "Reduzir a taxa de cancelamento para 10%" (sem R$ ou %) X
+}
+
+GOOD (faca assim):
+{
+  "title": "Reduzir cancelamentos de 32% para 10%" (38 chars OK),
+  "description": "32% dos 1.336 pedidos sao cancelados. Isso sao ~427 pedidos perdidos = R$ 73.950/mes em receita. Investigar motivos: pagamento recusado? Frete alto?" (194 chars OK),
+  "expected_impact": "R$ 73.950/mes recuperados" (26 chars OK),
+  "action_steps": [
+    "Auditar ultimos 100 cancelamentos: encontrar padrao comum (gateway, frete, produto?)" (87 chars OK),
+    "Contatar clientes que cancelaram para entender frustracoes (amostra de 20)" (75 chars OK),
+    "Implementar 1 mudanca piloto: ex - se for frete, testar desconto para pedidos <R$50" (83 chars OK)
   ]
 }
 
 ## REGRAS CRITICAS
 
-1. Responda APENAS com JSON valido, sem texto antes ou depois
-2. NAO use markdown (sem ```)
-3. Forneca EXATAMENTE 9 sugestoes com distribuicao balanceada:
-   - 3 sugestoes com priority: "high"
-   - 3 sugestoes com priority: "medium"
-   - 3 sugestoes com priority: "low"
-4. Forneca entre 1 e 3 alertas (apenas se houver problemas reais nos dados)
-5. Forneca entre 1 e 3 oportunidades
-6. CADA sugestao DEVE referenciar dados especificos fornecidos (nomes de produtos, valores, quantidades)
-7. Se nao houver dados suficientes para uma categoria, NAO invente - pule essa sugestao
-8. Calcule valores de impacto baseado nos dados reais (ex: se produto custa R$50 e tem 20 em estoque, potencial = R$1000)
+1. **EXATAMENTE 9 sugestoes**: 3 high, 3 medium, 3 low (ou menos se houver so 2 problemas high reais)
 
-Categorias validas: marketing, pricing, inventory, product, customer, conversion
-Prioridades validas: high, medium, low
-Tipos de alerta: danger (urgente), warning (atencao), info (informativo)
+2. **Sugestoes HIGH**: So se houver problema real nos dados
+   - Queda forte de receita
+   - Produto top sem estoque
+   - Taxa recompra <15%
+   - Pagamentos pendentes >5%
+
+3. **Titulos**: SEM contexto, SEM justificacao
+   - X "Reduzir taxa de cancelamento de 32% para 10% com melhorias operacionais"
+   - OK "Reduzir cancelamentos de 32% para 10%"
+   - OK "Aumentar estoque de Camiseta Azul (+150 unidades)"
+
+4. **Descricoes**: POR QUE? responda (nao COMO)
+   - X "Implemente um programa de fidelidade para reter clientes"
+   - OK "Taxa de recompra e 8% (abaixo da meta 20%). Significa perder R$ 45k/mes em clientes unicos"
+
+5. **Expected Impact**: Numero + unidade, sem prosa
+   - X "Impacto esperado: Aumento significativo nas vendas"
+   - OK "R$ 2.500/mes" ou "+15% de ticket medio" ou "200 unidades/mes"
+
+6. **Action Steps**: SEMPRE 3, cada um uma acao clara
+   - OK Passo 1: DIAGNOSTICAR (investigar o problema)
+   - OK Passo 2: IMPLEMENTAR (fazer a mudanca)
+   - OK Passo 3: VALIDAR (medir o resultado)
+
+7. **Responda APENAS em JSON valido**
+   - Sem texto antes ou depois
+   - Sem markdown (sem ```)
+   - Sem comentarios
+   - JSON bem formatado e fechado corretamente
+
+8. **Cada sugestao deve referenciar dados especificos**
+   - Nomes de produtos (nao "um produto")
+   - Numeros exatos (nao "alguns" ou "muitos")
+   - Metricas do periodo (nao generico)
+
+Responda APENAS com JSON valido.
 PROMPT;
+    }
+
+    /**
+     * Valida limites de tamanho dos campos da resposta AI
+     * Lanca excecao se campos excedem limites (bloqueia saida invalida)
+     */
+    private function validateFieldLengths(array $data): void
+    {
+        $errors = [];
+
+        // Main insight
+        $mainInsight = $data['summary']['main_insight'] ?? '';
+        if (strlen($mainInsight) > 150) {
+            $errors[] = 'main_insight: '.strlen($mainInsight).' chars (maximo 150)';
+        }
+
+        // Alerts
+        foreach ($data['alerts'] ?? [] as $i => $alert) {
+            if (strlen($alert['title'] ?? '') > 80) {
+                $errors[] = "alert[{$i}].title: ".strlen($alert['title']).' chars (maximo 80)';
+            }
+            if (strlen($alert['message'] ?? '') > 200) {
+                $errors[] = "alert[{$i}].message: ".strlen($alert['message']).' chars (maximo 200)';
+            }
+        }
+
+        // Opportunities
+        foreach ($data['opportunities'] ?? [] as $i => $opp) {
+            if (strlen($opp['title'] ?? '') > 80) {
+                $errors[] = "opportunity[{$i}].title: ".strlen($opp['title']).' chars (maximo 80)';
+            }
+            if (strlen($opp['description'] ?? '') > 200) {
+                $errors[] = "opportunity[{$i}].description: ".strlen($opp['description']).' chars (maximo 200)';
+            }
+        }
+
+        // Suggestions
+        foreach ($data['suggestions'] ?? [] as $i => $sug) {
+            // Titulo
+            if (strlen($sug['title'] ?? '') > 80) {
+                $errors[] = "suggestion[{$i}].title: ".strlen($sug['title']).' chars (maximo 80)';
+            }
+
+            // Descricao
+            if (strlen($sug['description'] ?? '') > 200) {
+                $errors[] = "suggestion[{$i}].description: ".strlen($sug['description']).' chars (maximo 200)';
+            }
+
+            // Expected Impact
+            if (strlen($sug['expected_impact'] ?? '') > 80) {
+                $errors[] = "suggestion[{$i}].expected_impact: ".strlen($sug['expected_impact']).' chars (maximo 80)';
+            }
+
+            // Action Steps - exatamente 3
+            $stepCount = count($sug['action_steps'] ?? []);
+            if ($stepCount !== 3) {
+                $errors[] = "suggestion[{$i}].action_steps: tem {$stepCount} passos (deve ser exatamente 3)";
+            }
+
+            // Cada passo maximo 150 chars
+            foreach (($sug['action_steps'] ?? []) as $j => $step) {
+                if (strlen($step) > 150) {
+                    $errors[] = "suggestion[{$i}].action_steps[{$j}]: ".strlen($step).' chars (maximo 150)';
+                }
+            }
+        }
+
+        if (! empty($errors)) {
+            Log::error('Field length validation failed', [
+                'error_count' => count($errors),
+                'errors' => $errors,
+            ]);
+
+            throw new \RuntimeException(
+                "Saida violou limites de tamanho:\n".
+                implode("\n", $errors).
+                "\nAI deve respeitar todos os limites."
+            );
+        }
     }
 
     private function parseResponse(string $content): array

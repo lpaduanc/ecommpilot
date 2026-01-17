@@ -21,6 +21,11 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Canal de log para sincronizacao
+     */
+    private string $logChannel = 'sync';
+
+    /**
      * Número de tentativas antes de falhar
      */
     public int $tries = 3;
@@ -80,6 +85,7 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         DashboardService $dashboardService,
         ProductAnalyticsService $productAnalyticsService
     ): void {
+        $startTime = microtime(true);
         $this->store->markAsSyncing();
         $checkpoint = $this->getCheckpoint();
 
@@ -90,39 +96,101 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         $updatedSince = $isFirstSync ? null : Carbon::now()->subHours(24);
 
         try {
-            Log::info("Starting sync for store: {$this->store->name}", [
+            Log::channel($this->logChannel)->info('╔══════════════════════════════════════════════════════════════════╗');
+            Log::channel($this->logChannel)->info('║     SYNC STORE DATA - INICIO DA SINCRONIZACAO                   ║');
+            Log::channel($this->logChannel)->info('╚══════════════════════════════════════════════════════════════════╝');
+            Log::channel($this->logChannel)->info('Configuracao da sincronizacao', [
                 'store_id' => $this->store->id,
+                'store_name' => $this->store->name,
                 'checkpoint' => $checkpoint,
                 'is_first_sync' => $isFirstSync,
                 'updated_since' => $updatedSince?->toIso8601String(),
+                'attempt' => $this->attempts(),
+                'timestamp' => now()->toIso8601String(),
             ]);
 
             // Sync products (se ainda não foi feito)
             if (! in_array('products', $checkpoint)) {
+                $stepStart = microtime(true);
+                Log::channel($this->logChannel)->info('>>> Iniciando sync de PRODUTOS', [
+                    'store' => $this->store->name,
+                ]);
+
                 $nuvemshopService->syncProducts($this->store, $updatedSince);
                 $this->saveCheckpoint('products');
-                Log::info("Products synced for store: {$this->store->name}");
+
+                $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
+                Log::channel($this->logChannel)->info('<<< Sync de PRODUTOS concluido', [
+                    'store' => $this->store->name,
+                    'time_ms' => $stepTime,
+                ]);
+            } else {
+                Log::channel($this->logChannel)->info('--- Sync de PRODUTOS ignorado (checkpoint)', [
+                    'store' => $this->store->name,
+                ]);
             }
 
             // Sync orders (se ainda não foi feito)
             if (! in_array('orders', $checkpoint)) {
+                $stepStart = microtime(true);
+                Log::channel($this->logChannel)->info('>>> Iniciando sync de PEDIDOS', [
+                    'store' => $this->store->name,
+                ]);
+
                 $nuvemshopService->syncOrders($this->store, $updatedSince);
                 $this->saveCheckpoint('orders');
-                Log::info("Orders synced for store: {$this->store->name}");
+
+                $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
+                Log::channel($this->logChannel)->info('<<< Sync de PEDIDOS concluido', [
+                    'store' => $this->store->name,
+                    'time_ms' => $stepTime,
+                ]);
+            } else {
+                Log::channel($this->logChannel)->info('--- Sync de PEDIDOS ignorado (checkpoint)', [
+                    'store' => $this->store->name,
+                ]);
             }
 
             // Sync customers (se ainda não foi feito)
             if (! in_array('customers', $checkpoint)) {
+                $stepStart = microtime(true);
+                Log::channel($this->logChannel)->info('>>> Iniciando sync de CLIENTES', [
+                    'store' => $this->store->name,
+                ]);
+
                 $nuvemshopService->syncCustomers($this->store, $updatedSince);
                 $this->saveCheckpoint('customers');
-                Log::info("Customers synced for store: {$this->store->name}");
+
+                $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
+                Log::channel($this->logChannel)->info('<<< Sync de CLIENTES concluido', [
+                    'store' => $this->store->name,
+                    'time_ms' => $stepTime,
+                ]);
+            } else {
+                Log::channel($this->logChannel)->info('--- Sync de CLIENTES ignorado (checkpoint)', [
+                    'store' => $this->store->name,
+                ]);
             }
 
             // Sync coupons (se ainda não foi feito)
             if (! in_array('coupons', $checkpoint)) {
+                $stepStart = microtime(true);
+                Log::channel($this->logChannel)->info('>>> Iniciando sync de CUPONS', [
+                    'store' => $this->store->name,
+                ]);
+
                 $nuvemshopService->syncCoupons($this->store, $updatedSince);
                 $this->saveCheckpoint('coupons');
-                Log::info("Coupons synced for store: {$this->store->name}");
+
+                $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
+                Log::channel($this->logChannel)->info('<<< Sync de CUPONS concluido', [
+                    'store' => $this->store->name,
+                    'time_ms' => $stepTime,
+                ]);
+            } else {
+                Log::channel($this->logChannel)->info('--- Sync de CUPONS ignorado (checkpoint)', [
+                    'store' => $this->store->name,
+                ]);
             }
 
             $this->store->markAsSynced();
@@ -131,22 +199,43 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
             // Clear all caches after successful sync
             $dashboardService->clearCache($this->store);
             $productAnalyticsService->invalidateABCCache($this->store);
-            Log::info("All caches cleared for store: {$this->store->name}");
 
-            Log::info("Sync completed for store: {$this->store->name}", [
+            $totalTime = round((microtime(true) - $startTime), 2);
+
+            Log::channel($this->logChannel)->info('╔══════════════════════════════════════════════════════════════════╗');
+            Log::channel($this->logChannel)->info('║     SYNC STORE DATA - SINCRONIZACAO CONCLUIDA                   ║');
+            Log::channel($this->logChannel)->info('╚══════════════════════════════════════════════════════════════════╝');
+            Log::channel($this->logChannel)->info('Estatisticas finais da sincronizacao', [
                 'store_id' => $this->store->id,
+                'store_name' => $this->store->name,
+                'total_time_seconds' => $totalTime,
+                'status' => 'success',
+                'caches_cleared' => true,
+                'timestamp_end' => now()->toIso8601String(),
             ]);
         } catch (\Exception $e) {
-            Log::error("Sync failed for store {$this->store->name}: {$e->getMessage()}", [
+            $totalTime = round((microtime(true) - $startTime), 2);
+
+            Log::channel($this->logChannel)->error('!!! ERRO NA SINCRONIZACAO', [
                 'store_id' => $this->store->id,
+                'store_name' => $this->store->name,
+                'error' => $e->getMessage(),
                 'exception' => $e::class,
                 'checkpoint' => $this->getCheckpoint(),
+                'attempt' => $this->attempts(),
+                'total_time_seconds' => $totalTime,
             ]);
 
             // Não marca como falho se ainda há tentativas
             if ($this->attempts() >= $this->tries) {
                 $this->store->markAsFailed();
                 $this->clearCheckpoint();
+
+                Log::channel($this->logChannel)->error('!!! SINCRONIZACAO FALHOU PERMANENTEMENTE', [
+                    'store_id' => $this->store->id,
+                    'store_name' => $this->store->name,
+                    'max_attempts_reached' => true,
+                ]);
             }
 
             throw $e;
@@ -192,10 +281,16 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         $this->store->markAsFailed();
         $this->clearCheckpoint();
 
-        Log::error("SyncStoreDataJob permanently failed for store {$this->store->id}", [
+        Log::channel($this->logChannel)->error('╔══════════════════════════════════════════════════════════════════╗');
+        Log::channel($this->logChannel)->error('║     SYNC STORE DATA - FALHA PERMANENTE                          ║');
+        Log::channel($this->logChannel)->error('╚══════════════════════════════════════════════════════════════════╝');
+        Log::channel($this->logChannel)->error('Detalhes da falha permanente', [
             'store_id' => $this->store->id,
-            'exception' => $exception->getMessage(),
+            'store_name' => $this->store->name,
+            'error' => $exception->getMessage(),
+            'exception_class' => get_class($exception),
             'trace' => $exception->getTraceAsString(),
+            'timestamp' => now()->toIso8601String(),
         ]);
     }
 }

@@ -47,9 +47,18 @@ class OpenAIProvider implements AIProviderInterface
                     'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
                 ]);
 
-                Log::debug('OpenAI API request successful', [
+                // Extract token usage from response
+                $inputTokens = $response->usage->promptTokens ?? 0;
+                $outputTokens = $response->usage->completionTokens ?? 0;
+                $totalTokens = $response->usage->totalTokens ?? 0;
+
+                Log::channel('ai')->info('        [OPENAI] Requisicao concluida com sucesso', [
                     'attempt' => $attempt,
+                    'model' => $options['model'] ?? $this->defaultModel,
                     'response_length' => strlen($response->choices[0]->message->content ?? ''),
+                    'input_tokens' => $inputTokens,
+                    'output_tokens' => $outputTokens,
+                    'total_tokens' => $totalTokens,
                 ]);
 
                 return $response->choices[0]->message->content;

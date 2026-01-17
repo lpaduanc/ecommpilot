@@ -261,4 +261,46 @@ class SettingsService
 
         return str_contains($value, '****') || $value === '********';
     }
+
+    /**
+     * Get analysis format settings.
+     */
+    public function getAnalysisFormatSettings(): array
+    {
+        return [
+            'format_version' => SystemSetting::get('analysis.format_version', 'v1'),
+            'v2_options' => [
+                'validate_field_lengths' => (bool) SystemSetting::get('analysis.v2.validate_field_lengths', true),
+                'use_markdown_tables' => (bool) SystemSetting::get('analysis.v2.use_markdown_tables', true),
+                'use_history_summary' => (bool) SystemSetting::get('analysis.v2.use_history_summary', true),
+            ],
+        ];
+    }
+
+    /**
+     * Update analysis format settings.
+     */
+    public function updateAnalysisFormatSettings(array $data): void
+    {
+        if (isset($data['format_version'])) {
+            SystemSetting::set('analysis.format_version', $data['format_version'], [
+                'type' => 'string',
+                'group' => 'analysis',
+                'label' => 'Versão do Formato de Análise',
+                'description' => 'Formato de análise de IA (v1=detalhado, v2=otimizado)',
+            ]);
+        }
+
+        if (isset($data['v2_options'])) {
+            foreach ($data['v2_options'] as $key => $value) {
+                SystemSetting::set("analysis.v2.{$key}", (bool) $value, [
+                    'type' => 'boolean',
+                    'group' => 'analysis',
+                    'label' => "Opção v2: {$key}",
+                ]);
+            }
+        }
+
+        SystemSetting::clearCache();
+    }
 }
