@@ -123,9 +123,21 @@ class AdminController extends Controller
 
     public function clientDetail(int $id): JsonResponse
     {
+        // Load client with permissions only, use withCount for stats
         $client = User::where('role', UserRole::Client)
-            ->with(['stores.products', 'stores.orders', 'stores.customers', 'analyses', 'permissions'])
+            ->with(['permissions'])
             ->findOrFail($id);
+
+        // Load stores with counts (not full relations to avoid memory issues)
+        $stores = Store::where('user_id', $client->id)
+            ->withCount(['products', 'orders', 'customers'])
+            ->get();
+
+        // Get recent analyses (limited)
+        $analyses = $client->analyses()
+            ->latest()
+            ->limit(10)
+            ->get();
 
         // Get activity logs
         $activityLogs = ActivityLog::where('user_id', $client->id)
@@ -133,11 +145,17 @@ class AdminController extends Controller
             ->limit(20)
             ->get();
 
-        // Calculate stats
-        $totalOrders = $client->stores->sum(fn ($s) => $s->orders->count());
-        $totalRevenue = $client->stores->sum(fn ($s) => $s->orders->where('payment_status', 'paid')->sum('total'));
-        $totalProducts = $client->stores->sum(fn ($s) => $s->products->count());
-        $totalCustomers = $client->stores->sum(fn ($s) => $s->customers->count());
+        // Calculate stats using efficient queries
+        $storeIds = $stores->pluck('id');
+
+        $totalOrders = $stores->sum('orders_count');
+        $totalProducts = $stores->sum('products_count');
+        $totalCustomers = $stores->sum('customers_count');
+
+        // Calculate revenue with a single query
+        $totalRevenue = SyncedOrder::whereIn('store_id', $storeIds)
+            ->where('payment_status', 'paid')
+            ->sum('total');
 
         return response()->json([
             'id' => $client->id,
@@ -150,18 +168,18 @@ class AdminController extends Controller
             'email_verified_at' => $client->email_verified_at?->toISOString(),
             'last_login_at' => $client->last_login_at?->toISOString(),
             'created_at' => $client->created_at->toISOString(),
-            'stores' => $client->stores->map(fn ($s) => [
+            'stores' => $stores->map(fn ($s) => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'domain' => $s->domain,
                 'platform' => $s->platform,
                 'sync_status' => $s->sync_status,
                 'last_sync_at' => $s->last_sync_at?->toISOString(),
-                'products_count' => $s->products->count(),
-                'orders_count' => $s->orders->count(),
-                'customers_count' => $s->customers->count(),
+                'products_count' => $s->products_count,
+                'orders_count' => $s->orders_count,
+                'customers_count' => $s->customers_count,
             ]),
-            'analyses' => $client->analyses->map(fn ($a) => [
+            'analyses' => $analyses->map(fn ($a) => [
                 'id' => $a->id,
                 'status' => $a->status,
                 'health_score' => $a->healthScore(),
@@ -179,7 +197,7 @@ class AdminController extends Controller
                 'total_revenue' => $totalRevenue,
                 'total_products' => $totalProducts,
                 'total_customers' => $totalCustomers,
-                'analyses_count' => $client->analyses->count(),
+                'analyses_count' => $analyses->count(),
             ],
         ]);
     }

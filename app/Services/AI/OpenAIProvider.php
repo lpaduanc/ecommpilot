@@ -32,34 +32,45 @@ class OpenAIProvider implements AIProviderInterface
     public function chat(array $messages, array $options = []): string
     {
         $lastException = null;
+        $maxTokens = $options['max_tokens'] ?? $this->defaultMaxTokens;
 
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
-                Log::debug("OpenAI API request attempt {$attempt}/{$this->maxRetries}", [
+                Log::channel('ai')->info("        [OPENAI] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
                     'model' => $options['model'] ?? $this->defaultModel,
-                    'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
+                    'max_tokens' => $maxTokens,
                 ]);
 
                 $response = OpenAI::chat()->create([
                     'model' => $options['model'] ?? $this->defaultModel,
                     'messages' => $messages,
                     'temperature' => $options['temperature'] ?? $this->defaultTemperature,
-                    'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
+                    'max_tokens' => $maxTokens,
                 ]);
 
                 // Extract token usage from response
                 $inputTokens = $response->usage->promptTokens ?? 0;
                 $outputTokens = $response->usage->completionTokens ?? 0;
                 $totalTokens = $response->usage->totalTokens ?? 0;
+                $finishReason = $response->choices[0]->finishReason ?? 'unknown';
 
-                Log::channel('ai')->info('        [OPENAI] Requisicao concluida com sucesso', [
+                Log::channel('ai')->info('        [OPENAI] Requisicao concluida', [
                     'attempt' => $attempt,
                     'model' => $options['model'] ?? $this->defaultModel,
+                    'finish_reason' => $finishReason,
                     'response_length' => strlen($response->choices[0]->message->content ?? ''),
                     'input_tokens' => $inputTokens,
                     'output_tokens' => $outputTokens,
                     'total_tokens' => $totalTokens,
                 ]);
+
+                // Check for truncation (finish_reason: 'length')
+                if ($finishReason === 'length' && $attempt < $this->maxRetries) {
+                    Log::channel('ai')->warning('        [OPENAI] Resposta truncada (length), retry com mais tokens');
+                    $maxTokens = min($maxTokens * 2, 16384); // OpenAI max is 16k for most models
+
+                    continue;
+                }
 
                 return $response->choices[0]->message->content;
 

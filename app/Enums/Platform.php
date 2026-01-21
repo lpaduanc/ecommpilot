@@ -7,6 +7,8 @@ enum Platform: string
     case Nuvemshop = 'nuvemshop';
     case Shopify = 'shopify';
     case WooCommerce = 'woocommerce';
+    case Vtex = 'vtex';
+    case Tray = 'tray';
 
     public function label(): string
     {
@@ -14,6 +16,8 @@ enum Platform: string
             self::Nuvemshop => 'Nuvemshop',
             self::Shopify => 'Shopify',
             self::WooCommerce => 'WooCommerce',
+            self::Vtex => 'VTEX',
+            self::Tray => 'Tray',
         };
     }
 

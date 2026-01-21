@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useNotificationStore } from '../../stores/notificationStore';
+import { useConfirmDialog } from '../../composables/useConfirmDialog';
 import api from '../../services/api';
 import BaseCard from '../../components/common/BaseCard.vue';
 import BaseButton from '../../components/common/BaseButton.vue';
@@ -25,6 +26,7 @@ import {
 } from '@heroicons/vue/24/outline';
 
 const notificationStore = useNotificationStore();
+const { confirm } = useConfirmDialog();
 
 // Tab Management
 const activeTab = ref('analysis');
@@ -52,6 +54,7 @@ const showPostmarkToken = ref(false);
 const showResendKey = ref(false);
 const showEmailApiKey = ref(false);
 const showEmailSecret = ref(false);
+const showMailjetSecretKey = ref(false);
 
 const settings = reactive({
     provider: 'openai',
@@ -89,6 +92,11 @@ const isDeletingEmail = ref(false);
 // Modal de adicionar/editar
 const showEmailModal = ref(false);
 const editingEmailConfig = ref(null);
+
+// Modal de teste de e-mail
+const showTestEmailModal = ref(false);
+const testEmailConfigId = ref(null);
+const testEmailAddress = ref('');
 const emailForm = reactive({
     id: null,
     name: '',
@@ -113,6 +121,8 @@ const emailForm = reactive({
         region: 'us-east-1',
         // Postmark
         token: '',
+        // Mailjet
+        secret_key: '',
         // Comum
         from_address: '',
         from_name: '',
@@ -302,7 +312,7 @@ function openEmailModal(config = null) {
         emailForm.identifier = config.identifier;
         emailForm.provider = config.provider;
         emailForm.is_active = config.is_active;
-        Object.assign(emailForm.config, config.config);
+        Object.assign(emailForm.config, config.settings || {});
     } else {
         // Nova configuração
         editingEmailConfig.value = null;
@@ -336,7 +346,7 @@ async function saveEmailConfig() {
             identifier: emailForm.identifier,
             provider: emailForm.provider,
             is_active: emailForm.is_active,
-            config: emailForm.config,
+            settings: emailForm.config,
         };
 
         if (emailForm.id) {
@@ -360,9 +370,14 @@ async function saveEmailConfig() {
 }
 
 async function deleteEmailConfig(id) {
-    if (!confirm('Tem certeza que deseja excluir esta configuração de e-mail?')) {
-        return;
-    }
+    const confirmed = await confirm({
+        title: 'Excluir Configuração',
+        message: 'Tem certeza que deseja excluir esta configuração de e-mail?',
+        confirmText: 'Excluir',
+        variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     isDeletingEmail.value = true;
     try {
@@ -377,12 +392,32 @@ async function deleteEmailConfig(id) {
     }
 }
 
-async function testEmailConfig(id) {
+function openTestEmailModal(id) {
+    testEmailConfigId.value = id;
+    testEmailAddress.value = '';
+    showTestEmailModal.value = true;
+}
+
+function closeTestEmailModal() {
+    showTestEmailModal.value = false;
+    testEmailConfigId.value = null;
+    testEmailAddress.value = '';
+}
+
+async function sendTestEmail() {
+    if (!testEmailAddress.value) {
+        notificationStore.error('Digite um e-mail de destino');
+        return;
+    }
+
     isTestingEmail.value = true;
     try {
-        const response = await api.post(`/admin/settings/email/${id}/test`);
+        const response = await api.post(`/admin/settings/email/${testEmailConfigId.value}/test`, {
+            test_email: testEmailAddress.value,
+        });
         if (response.data.success) {
             notificationStore.success('E-mail de teste enviado com sucesso!');
+            closeTestEmailModal();
         } else {
             notificationStore.error(response.data.message || 'Falha ao enviar e-mail de teste');
         }
@@ -401,6 +436,7 @@ function getEmailProviderIcon(providerId) {
         ses: '📨',
         postmark: '✉️',
         resend: '🚀',
+        mailjet: '✈️',
     };
     return icons[providerId] || '📧';
 }
@@ -1119,7 +1155,7 @@ onMounted(() => {
                                     </span>
                                     <span class="text-gray-400 dark:text-gray-600">•</span>
                                     <span class="text-gray-600 dark:text-gray-400 truncate">
-                                        {{ config.config.from_address || 'Sem e-mail configurado' }}
+                                        {{ config.settings?.from_address || 'Sem e-mail configurado' }}
                                     </span>
                                 </div>
                             </div>
@@ -1139,8 +1175,7 @@ onMounted(() => {
                                 <BaseButton
                                     variant="secondary"
                                     size="sm"
-                                    @click="testEmailConfig(config.id)"
-                                    :loading="isTestingEmail"
+                                    @click="openTestEmailModal(config.id)"
                                     :disabled="isTestingEmail || isDeletingEmail"
                                 >
                                     <BeakerIcon class="w-4 h-4" />
@@ -1561,6 +1596,76 @@ onMounted(() => {
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Mailjet -->
+                        <div v-if="emailForm.provider === 'mailjet'" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-4">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <span class="text-xl">✈️</span>
+                                Configurações Mailjet
+                            </h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key (Pública)</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showEmailApiKey ? 'text' : 'password'"
+                                            v-model="emailForm.config.api_key"
+                                            placeholder="Sua API Key pública"
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showEmailApiKey = !showEmailApiKey"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showEmailApiKey" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Secret Key (Privada)</label>
+                                    <div class="relative">
+                                        <input
+                                            :type="showMailjetSecretKey ? 'text' : 'password'"
+                                            v-model="emailForm.config.secret_key"
+                                            placeholder="Sua Secret Key privada"
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showMailjetSecretKey = !showMailjetSecretKey"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showMailjetSecretKey" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Address</label>
+                                    <input
+                                        type="email"
+                                        v-model="emailForm.config.from_address"
+                                        placeholder="contato@ecommpilot.com.br"
+                                        class="input"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Name</label>
+                                    <input
+                                        type="text"
+                                        v-model="emailForm.config.from_name"
+                                        placeholder="EcommPilot"
+                                        class="input"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <template #footer>
@@ -1577,6 +1682,53 @@ onMounted(() => {
                                 :loading="isSavingEmail"
                             >
                                 {{ editingEmailConfig ? 'Atualizar' : 'Criar' }} Configuração
+                            </BaseButton>
+                        </div>
+                    </template>
+                </BaseModal>
+
+                <!-- Modal de Teste de E-mail -->
+                <BaseModal
+                    :show="showTestEmailModal"
+                    title="Testar Configuração de E-mail"
+                    size="md"
+                    @close="closeTestEmailModal"
+                >
+                    <div class="space-y-4">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            Digite o endereço de e-mail para onde deseja enviar o e-mail de teste.
+                        </p>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                E-mail de destino *
+                            </label>
+                            <input
+                                type="email"
+                                v-model="testEmailAddress"
+                                placeholder="seu@email.com"
+                                class="input"
+                                @keyup.enter="sendTestEmail"
+                            />
+                        </div>
+                    </div>
+
+                    <template #footer>
+                        <div class="flex justify-end gap-3">
+                            <BaseButton
+                                variant="secondary"
+                                @click="closeTestEmailModal"
+                                :disabled="isTestingEmail"
+                            >
+                                Cancelar
+                            </BaseButton>
+                            <BaseButton
+                                @click="sendTestEmail"
+                                :loading="isTestingEmail"
+                                :disabled="!testEmailAddress"
+                            >
+                                <BeakerIcon class="w-4 h-4" />
+                                Enviar Teste
                             </BaseButton>
                         </div>
                     </template>

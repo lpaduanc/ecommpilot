@@ -19,7 +19,12 @@ const statusLabels = {
     attention: 'Precisa Atenção',
     healthy: 'Saudável',
     excellent: 'Excelente',
-    // Valores que a IA pode retornar em português
+    // V3: classificações em português minúsculo
+    critico: 'Crítico',
+    atencao: 'Precisa Atenção',
+    saudavel: 'Saudável',
+    excelente: 'Excelente',
+    // Valores que a IA pode retornar em português com acentos
     'Critico': 'Crítico',
     'Crítico': 'Crítico',
     'Precisa Atencao': 'Precisa Atenção',

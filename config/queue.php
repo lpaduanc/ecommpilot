@@ -66,10 +66,30 @@ return [
 
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
-            'block_for' => null,
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 600), // 10 min para jobs de sync
+            'block_for' => 5, // Aguarda 5s por novos jobs (mais eficiente que polling)
+            'after_commit' => false,
+        ],
+
+        // Fila dedicada para sincronização com configurações otimizadas
+        'redis-sync' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
+            'queue' => 'sync',
+            'retry_after' => (int) env('REDIS_SYNC_RETRY_AFTER', 900), // 15 min para sync de lojas grandes
+            'block_for' => 5,
+            'after_commit' => false,
+        ],
+
+        // Fila dedicada para análise AI
+        'redis-analysis' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
+            'queue' => 'analysis',
+            'retry_after' => (int) env('REDIS_ANALYSIS_RETRY_AFTER', 900), // 15 min para análise AI
+            'block_for' => 5,
             'after_commit' => false,
         ],
 
@@ -84,8 +104,8 @@ return [
         'failover' => [
             'driver' => 'failover',
             'connections' => [
-                'database',
-                'deferred',
+                'redis',     // Primário: Redis (mais rápido)
+                'database',  // Fallback: Database (sempre disponível)
             ],
         ],
 

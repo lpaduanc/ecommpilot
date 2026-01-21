@@ -15,7 +15,7 @@ const props = defineProps({
     size: {
         type: String,
         default: 'md',
-        validator: (v) => ['sm', 'md', 'lg', 'xl'].includes(v),
+        validator: (v) => ['sm', 'md', 'lg', 'xl', '2xl', 'full', 'ultra'].includes(v),
     },
     closable: {
         type: Boolean,
@@ -30,6 +30,9 @@ const sizeClasses = {
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    '2xl': 'max-w-6xl',
+    full: 'max-w-[90vw]',
+    ultra: 'max-w-[95vw]',
 };
 
 // Refs para acessibilidade
@@ -139,7 +142,7 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Content -->
-                        <div :id="descriptionId" class="px-6 py-4">
+                        <div :id="descriptionId" class="px-6 py-4 max-h-[80vh] overflow-y-auto">
                             <slot />
                         </div>
 

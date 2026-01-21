@@ -12,6 +12,7 @@ class KnowledgeEmbedding extends Model
     protected $fillable = [
         'category',
         'niche',
+        'subcategory',
         'title',
         'content',
         'metadata',
@@ -64,6 +65,31 @@ class KnowledgeEmbedding extends Model
     public function scopeByNiche($query, string $niche)
     {
         return $query->where('niche', $niche);
+    }
+
+    /**
+     * Scope for subcategory.
+     */
+    public function scopeBySubcategory($query, string $subcategory)
+    {
+        return $query->where('subcategory', $subcategory);
+    }
+
+    /**
+     * Scope for niche and subcategory together.
+     */
+    public function scopeByNicheAndSubcategory($query, string $niche, ?string $subcategory = null)
+    {
+        $query->where('niche', $niche);
+
+        if ($subcategory) {
+            $query->where(function ($q) use ($subcategory) {
+                $q->where('subcategory', $subcategory)
+                    ->orWhereNull('subcategory');
+            });
+        }
+
+        return $query;
     }
 
     /**

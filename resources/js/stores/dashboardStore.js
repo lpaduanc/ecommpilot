@@ -12,6 +12,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const lowStockProducts = ref([]);
     const isLoading = ref(false);
     const error = ref(null);
+    const upgradeRequired = ref(false);
 
     const filters = ref({
         period: 'last_15_days',
@@ -59,7 +60,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
             categoryChart.value = data.categories_chart || [];
             lowStockProducts.value = data.low_stock_products || [];
         } catch (err) {
-            error.value = err.response?.data?.message || 'Erro ao carregar dados do dashboard';
+            // Check for upgrade required error (403 with upgrade_required flag)
+            if (err.response?.status === 403 && err.response?.data?.upgrade_required) {
+                upgradeRequired.value = true;
+                error.value = err.response?.data?.message || 'Upgrade de plano necessário';
+            } else {
+                error.value = err.response?.data?.message || 'Erro ao carregar dados do dashboard';
+            }
+
             // Reset all values on error
             stats.value = null;
             revenueChart.value = [];
@@ -163,6 +171,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         lowStockProducts,
         isLoading,
         error,
+        upgradeRequired,
         filters,
         hasStore,
         fetchStats,

@@ -6,6 +6,7 @@ import BaseCard from '../components/common/BaseCard.vue';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
+import UpgradeBanner from '../components/common/UpgradeBanner.vue';
 import {
     LinkIcon,
     CheckCircleIcon,
@@ -18,6 +19,9 @@ import {
 } from '@heroicons/vue/24/outline';
 
 const authStore = useAuthStore();
+
+// Verifica acesso pelo plano
+const canAccessIntegrations = computed(() => authStore.canAccessExternalIntegrations);
 
 // Use integration composable - will auto-process OAuth callback
 const {
@@ -157,9 +161,18 @@ function formatDate(date) {
 </script>
 
 <template>
-    <div class="min-h-screen -m-8 -mt-8">
-        <!-- Hero Header with Gradient -->
-        <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
+    <div class="space-y-6">
+        <!-- Banner de Upgrade - Plano não inclui Integrações Externas -->
+        <UpgradeBanner
+            v-if="!canAccessIntegrations"
+            title="Recurso não disponível no seu plano"
+            description="Seu plano atual não inclui acesso às Integrações Externas. Faça upgrade para conectar suas lojas e sincronizar dados automaticamente."
+        />
+
+        <!-- Conteúdo normal - só mostra se tiver acesso -->
+        <div v-else class="min-h-screen -m-8 -mt-8">
+            <!-- Hero Header with Gradient -->
+            <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-8 py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
                 <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 rounded-full blur-3xl"></div>
@@ -443,5 +456,6 @@ function formatDate(date) {
                 </div>
             </div>
         </BaseModal>
+        </div>
     </div>
 </template>

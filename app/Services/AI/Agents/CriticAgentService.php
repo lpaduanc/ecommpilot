@@ -49,6 +49,7 @@ class CriticAgentService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.3, // Lower temperature for consistent evaluation
+            'max_tokens' => 32768, // Increased to prevent JSON truncation
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
@@ -123,11 +124,17 @@ class CriticAgentService
             $finalVersion = $approved['final_version'] ?? $approved['original'] ?? [];
 
             if (! empty($finalVersion)) {
+                // Extrair quality_score de múltiplos locais possíveis
+                $qualityScore = $approved['review']['quality_score']
+                    ?? $approved['quality_score']
+                    ?? $approved['review']['score']
+                    ?? 5.0;
+
                 // Formato simplificado: apenas campos necessários para persistência
                 $approvedSuggestions[] = [
                     'final_version' => $this->normalizeFinalVersion($finalVersion),
-                    'quality_score' => floatval($approved['quality_score'] ?? 5.0),
-                    'final_priority' => intval($approved['final_priority'] ?? ($index + 1)),
+                    'quality_score' => floatval($qualityScore),
+                    'final_priority' => intval($approved['review']['final_priority'] ?? $approved['final_priority'] ?? ($index + 1)),
                 ];
             } else {
                 Log::channel($this->logChannel)->warning("    [CRITIC] Sugestao {$index} com final_version vazio", [
@@ -141,6 +148,9 @@ class CriticAgentService
             'total_aprovadas' => count($approvedSuggestions),
             'total_removidas' => count($response['removed_suggestions'] ?? []),
         ]);
+
+        // Enforce 3-3-3 distribution
+        $approvedSuggestions = $this->enforceDistribution($approvedSuggestions);
 
         return [
             'approved_suggestions' => $approvedSuggestions,
@@ -201,6 +211,110 @@ class CriticAgentService
         $total = array_sum(array_column($suggestions, 'quality_score'));
 
         return round($total / count($suggestions), 1);
+    }
+
+    /**
+     * Enforce 3-3-3 distribution of suggestions.
+     */
+    private function enforceDistribution(array $suggestions): array
+    {
+        $high = [];
+        $medium = [];
+        $low = [];
+
+        // Separate by impact
+        foreach ($suggestions as $suggestion) {
+            $impact = $suggestion['final_version']['expected_impact'] ?? 'medium';
+            switch ($impact) {
+                case 'high':
+                    $high[] = $suggestion;
+                    break;
+                case 'low':
+                    $low[] = $suggestion;
+                    break;
+                default:
+                    $medium[] = $suggestion;
+                    break;
+            }
+        }
+
+        Log::channel($this->logChannel)->info('    [CRITIC] Distribuicao antes do rebalanceamento', [
+            'high' => count($high),
+            'medium' => count($medium),
+            'low' => count($low),
+        ]);
+
+        // Rebalance if needed
+        $result = $this->rebalanceDistribution($high, $medium, $low);
+
+        // Reassign priorities
+        $priority = 1;
+        foreach ($result as &$suggestion) {
+            $suggestion['final_priority'] = $priority++;
+        }
+
+        $finalHigh = count(array_filter($result, fn ($s) => $s['final_version']['expected_impact'] === 'high'));
+        $finalMedium = count(array_filter($result, fn ($s) => $s['final_version']['expected_impact'] === 'medium'));
+        $finalLow = count(array_filter($result, fn ($s) => $s['final_version']['expected_impact'] === 'low'));
+
+        Log::channel($this->logChannel)->info('    [CRITIC] Distribuicao apos rebalanceamento', [
+            'high' => $finalHigh,
+            'medium' => $finalMedium,
+            'low' => $finalLow,
+            'total' => count($result),
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Rebalance arrays to achieve 3-3-3 distribution.
+     */
+    private function rebalanceDistribution(array $high, array $medium, array $low): array
+    {
+        $targetPerCategory = 3;
+
+        // If we have excess in high, redistribute to medium or low
+        while (count($high) > $targetPerCategory && (count($medium) < $targetPerCategory || count($low) < $targetPerCategory)) {
+            $item = array_pop($high);
+            if (count($medium) < $targetPerCategory) {
+                $item['final_version']['expected_impact'] = 'medium';
+                $medium[] = $item;
+            } else {
+                $item['final_version']['expected_impact'] = 'low';
+                $low[] = $item;
+            }
+        }
+
+        // If we have excess in medium, redistribute to low
+        while (count($medium) > $targetPerCategory && count($low) < $targetPerCategory) {
+            $item = array_pop($medium);
+            $item['final_version']['expected_impact'] = 'low';
+            $low[] = $item;
+        }
+
+        // If we have shortages in high, promote from medium
+        while (count($high) < $targetPerCategory && count($medium) > $targetPerCategory) {
+            $item = array_shift($medium);
+            $item['final_version']['expected_impact'] = 'high';
+            $high[] = $item;
+        }
+
+        // If we have shortages in medium, promote from low
+        while (count($medium) < $targetPerCategory && count($low) > $targetPerCategory) {
+            $item = array_shift($low);
+            $item['final_version']['expected_impact'] = 'medium';
+            $medium[] = $item;
+        }
+
+        // Take exactly 3 from each (or all if less than 3)
+        $result = array_merge(
+            array_slice($high, 0, $targetPerCategory),
+            array_slice($medium, 0, $targetPerCategory),
+            array_slice($low, 0, $targetPerCategory)
+        );
+
+        return $result;
     }
 
     /**

@@ -4,278 +4,339 @@ namespace App\Services\AI\Prompts;
 
 class CollectorAgentPrompt
 {
+    /**
+     * COLLECTOR AGENT V4 - COM LISTA DETALHADA DE SUGESTÕES ANTERIORES
+     *
+     * Melhorias incluídas:
+     * - Seção dedicada "SUGESTÕES ANTERIORES - NÃO REPETIR"
+     * - Lista de temas saturados com contagem
+     * - Output inclui prohibited_suggestions formatada para Strategist
+     */
+
     public static function get(array $context): string
     {
-        $platform = $context['platform'] ?? 'desconhecida';
+        $storeName = $context['store_name'] ?? 'Loja';
+        $platform = $context['platform'] ?? 'nuvemshop';
+        $platformName = $context['platform_name'] ?? 'Nuvemshop';
         $niche = $context['niche'] ?? 'geral';
+        $subcategory = $context['subcategory'] ?? 'geral';
         $storeStats = json_encode($context['store_stats'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $previousAnalyses = json_encode($context['previous_analyses'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $previousSuggestions = json_encode($context['previous_suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $benchmarks = json_encode($context['benchmarks'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
+        // Processar sugestões anteriores
+        $previousSuggestions = $context['previous_suggestions'] ?? [];
+        $formattedSuggestions = self::formatPreviousSuggestions($previousSuggestions);
+        $saturatedThemes = self::identifySaturatedThemes($previousSuggestions);
+        $suggestionsByCategory = self::groupByCategory($previousSuggestions);
+        $totalSuggestions = count($previousSuggestions);
+
+        // Dados externos
+        $externalData = $context['external_data'] ?? [];
+        $trendsData = $externalData['dados_mercado']['google_trends'] ?? [];
+        $marketData = $externalData['dados_mercado']['precos_mercado'] ?? [];
+        $competitors = $externalData['concorrentes'] ?? [];
+
+        $tendencia = $trendsData['tendencia'] ?? 'nao_disponivel';
+        $interesseBusca = $trendsData['interesse_busca'] ?? 0;
+        $trendsSucesso = $trendsData['sucesso'] ?? false;
+
+        $precoMedioMercado = $marketData['faixa_preco']['media'] ?? 0;
+        $precoMinMercado = $marketData['faixa_preco']['min'] ?? 0;
+        $precoMaxMercado = $marketData['faixa_preco']['max'] ?? 0;
+        $marketSucesso = $marketData['sucesso'] ?? false;
+        $fonteMercado = $marketData['fonte'] ?? 'google_shopping';
+
+        // Formatar concorrentes
+        $concorrentesFormatados = self::formatCompetitors($competitors);
+        $mediaPrecosConcorrentes = self::calculateAverageCompetitorPrice($competitors);
+        $diferenciaisUnicos = self::extractUniqueFeatures($competitors);
+        $totalConcorrentes = count($competitors);
+        $concorrentesSucesso = count(array_filter($competitors, fn($c) => $c['sucesso'] ?? false));
+
         return <<<PROMPT
-Você é um agente especializado em coletar e organizar contexto para análise de lojas de e-commerce brasileiras.
+# COLLECTOR AGENT — COLETA E ORGANIZAÇÃO DE DADOS
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-TODOS os resumos, padrões, lacunas e observações DEVEM ser escritos em PORTUGUÊS BRASILEIRO. Não use inglês em nenhuma parte da resposta.
+## SEU PAPEL
+Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mercado.
 
-## Sua Tarefa
-Analise as informações fornecidas e estruture um resumo executivo do contexto da loja.
+## REGRA FUNDAMENTAL
+**NUNCA INVENTE DADOS.** Se não disponível, escreva "NÃO DISPONÍVEL".
 
-## Dados da Loja
-- **Plataforma:** {$platform}
-- **Nicho identificado:** {$niche}
+---
 
-## Estatísticas da Loja
+## DADOS DA LOJA
+
+| Campo | Valor |
+|-------|-------|
+| Nome | {$storeName} |
+| Plataforma | {$platformName} |
+| Nicho | {$niche} |
+| Subcategoria | {$subcategory} |
+
+### Estatísticas
 ```json
 {$storeStats}
 ```
-IMPORTANTE: Use os dados acima (total de pedidos, clientes, faturamento) para entender o tamanho e maturidade REAL da loja. O campo "operation_time" indica há quanto tempo a loja está operando baseado na data do primeiro pedido.
 
-## Histórico de Análises Anteriores
+### Histórico de Análises
 ```json
 {$previousAnalyses}
 ```
 
-## Sugestões Anteriores e Status
-```json
-{$previousSuggestions}
-```
+---
 
-## Benchmarks do Nicho (via RAG)
+## 🚫 SUGESTÕES ANTERIORES - NÃO REPETIR
+
+### Total: {$totalSuggestions} sugestões já dadas para esta loja
+
+### Temas SATURADOS (3+ vezes):
+{$saturatedThemes}
+
+### Por Categoria:
+{$suggestionsByCategory}
+
+**IMPORTANTE:** Inclua esta lista no seu output para o Strategist usar.
+
+---
+
+### Benchmarks ({$subcategory})
 ```json
 {$benchmarks}
 ```
 
-## Instruções de Análise
+---
 
-### 1. Resumo Histórico (3-5 pontos)
-- Foque em FATOS dos dados, não interpretações
-- Inclua: tempo de operação, volume de pedidos, base de clientes, produtos ativos
-- Mencione tendências observáveis (crescimento, estabilidade, queda)
+## DADOS EXTERNOS DE MERCADO
 
-### 2. Padrões de Sucesso
-- Liste APENAS sugestões com status "completed" E was_successful = true
-- Se não houver sugestões concluídas com sucesso, retorne array vazio
-- NÃO invente padrões - baseie-se apenas nos dados
+### Google Trends
+| Métrica | Valor |
+|---------|-------|
+| Sucesso | {$trendsSucesso} |
+| Tendência | {$tendencia} |
+| Interesse | {$interesseBusca}/100 |
 
-### 3. Sugestões a Evitar
-- Liste sugestões com status "completed" E was_successful = false
-- Liste sugestões com status "ignored"
-- Agrupe por categoria/tipo para identificar padrões de rejeição
+### Preços de Mercado ({$fonteMercado})
+| Métrica | Valor |
+|---------|-------|
+| Sucesso | {$marketSucesso} |
+| Mínimo | R$ {$precoMinMercado} |
+| Máximo | R$ {$precoMaxMercado} |
+| Média | R$ {$precoMedioMercado} |
 
-### 4. Benchmarks Relevantes
-- Selecione APENAS benchmarks específicos do nicho "{$niche}"
-- Se o nicho for "beauty", use benchmarks de beleza, NÃO do e-commerce geral
-- Indique a fonte de cada benchmark
+### Concorrentes ({$totalConcorrentes} informados, {$concorrentesSucesso} analisados)
+{$concorrentesFormatados}
 
-### 5. Lacunas Identificadas
-- Compare dados da loja com benchmarks DO MESMO NICHO
-- Seja específico: "Ticket médio R$ X vs benchmark beleza R$ Y (diferença de Z%)"
-- NÃO use benchmark geral (R$ 492) para nichos específicos
+**Média concorrentes:** R$ {$mediaPrecosConcorrentes}
+**Diferenciais:** {$diferenciaisUnicos}
 
-### 6. Contexto Especial
-- Observações que não se encaixam nas categorias acima
-- Sazonalidade, eventos recentes, particularidades do nicho
+---
 
-## BENCHMARKS DE REFERÊNCIA POR NICHO
+## SUA TAREFA
 
-### Beleza/Cosméticos
-- Ticket Médio: R$ 150-200 (haircare: R$ 120-180, skincare: R$ 180-250, maquiagem: R$ 100-150)
-- Taxa de Conversão: 0.8-1.2% desktop, 0.4-0.6% mobile
-- Taxa de Recompra 90 dias: 15-25%
-- Abandono de Carrinho: 78-85%
+Produza relatório JSON com:
 
-### Moda/Vestuário
-- Ticket Médio: R$ 180-280
-- Taxa de Conversão: 1.0-1.8%
-- Taxa de Recompra 90 dias: 20-30%
+1. **Identificação da Loja**
+2. **Resumo Histórico** (5-7 fatos com números)
+3. **Padrões de Sucesso** (sugestões completed + successful)
+4. **Sugestões a Evitar** (failed ou ignored)
+5. **Benchmarks Relevantes**
+6. **Posicionamento de Mercado** (tripla comparação)
+7. **Análise Competitiva Detalhada**
+8. **Gaps Identificados**
+9. **Dados Não Disponíveis**
+10. **Alertas para o Analyst**
 
-### Eletrônicos
-- Ticket Médio: R$ 400-800
-- Taxa de Conversão: 0.8-1.5%
-- Taxa de Recompra 90 dias: 8-15%
+---
 
-### Geral (usar apenas se nicho não identificado)
-- Ticket Médio: R$ 492
-- Taxa de Conversão: 1.65%
+## FORMATO DE SAÍDA
 
-## Formato de Saída
 ```json
 {
-  "historical_summary": [
-    "ponto factual 1",
-    "ponto factual 2"
-  ],
+  "store_identification": {
+    "name": "string",
+    "niche": "string",
+    "subcategory": "string",
+    "platform": "string",
+    "operation_time_months": 0,
+    "total_orders": 0,
+    "total_revenue": 0
+  },
+  "historical_summary": ["fato1", "fato2"],
   "success_patterns": [
-    "padrão baseado em sugestão concluída com sucesso"
+    {"suggestion_title": "", "category": "", "what_worked": ""}
   ],
   "suggestions_to_avoid": [
-    "tipo de sugestão que foi ignorada ou falhou"
+    {"suggestion_title": "", "category": "", "why_failed": "", "status": "failed|ignored"}
   ],
-  "relevant_benchmarks": {
-    "ticket_medio": {
-      "valor": "R$ X",
-      "fonte": "Benchmark nicho beleza",
-      "aplicavel": true
-    },
-    "taxa_conversao": {
-      "valor": "X%",
-      "fonte": "nome da fonte",
-      "aplicavel": true
-    },
-    "outros": {}
+  "prohibited_suggestions": {
+    "total": {$totalSuggestions},
+    "saturated_themes": ["tema1", "tema2"],
+    "by_category": {},
+    "all_titles": []
   },
-  "identified_gaps": [
-    "Gap específico: métrica atual vs benchmark do nicho (fonte)"
-  ],
-  "special_context": "observações adicionais relevantes"
+  "relevant_benchmarks": {},
+  "market_positioning": {
+    "ticket_loja": 0,
+    "vs_benchmark": {},
+    "vs_mercado": {},
+    "vs_concorrentes": {}
+  },
+  "competitive_analysis": {
+    "total_concorrentes": {$totalConcorrentes},
+    "por_concorrente": [],
+    "diferenciais_que_loja_nao_tem": [],
+    "oportunidades": []
+  },
+  "identified_gaps": [],
+  "data_not_available": [],
+  "market_context": {
+    "tendencia": "{$tendencia}",
+    "interesse": {$interesseBusca}
+  },
+  "alerts_for_analyst": {
+    "critical": [],
+    "warnings": [],
+    "info": []
+  }
 }
 ```
 
-## INSTRUÇÕES CRÍTICAS
-1. Retorne APENAS JSON válido, sem texto antes ou depois
-2. TODOS os campos são OBRIGATÓRIOS
-3. Use benchmarks DO NICHO ESPECÍFICO, não genéricos
-4. Baseie-se apenas em DADOS FORNECIDOS, não suponha
-5. Se um dado não estiver disponível, indique "não disponível nos dados"
-6. RESPONDA SEMPRE EM PORTUGUÊS BRASILEIRO
+---
+
+PORTUGUÊS BRASILEIRO
 PROMPT;
     }
 
-    /**
-     * Retorna o template do prompt com placeholders para log.
-     * Não inclui dados do banco, apenas indica onde as variáveis são inseridas.
-     */
+    private static function formatPreviousSuggestions(array $suggestions): array
+    {
+        return [
+            'total' => count($suggestions),
+            'titles' => array_column($suggestions, 'title'),
+        ];
+    }
+
+    private static function identifySaturatedThemes(array $suggestions): string
+    {
+        if (empty($suggestions)) {
+            return "Nenhuma sugestão anterior.";
+        }
+
+        $keywords = [
+            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito'],
+            'Fidelidade' => ['fidelidade', 'pontos', 'cashback'],
+            'Kits/Combos' => ['kit', 'combo', 'bundle', 'cronograma'],
+            'Estoque' => ['estoque', 'avise-me', 'reposição'],
+            'Email' => ['email', 'newsletter', 'automação'],
+            'Vídeos' => ['vídeo', 'tutorial'],
+            'Assinatura' => ['assinatura', 'recorrência'],
+        ];
+
+        $counts = [];
+        foreach ($suggestions as $s) {
+            $title = mb_strtolower($s['title'] ?? '');
+            foreach ($keywords as $theme => $kws) {
+                foreach ($kws as $kw) {
+                    if (strpos($title, $kw) !== false) {
+                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $saturated = array_filter($counts, fn($c) => $c >= 3);
+        arsort($saturated);
+
+        if (empty($saturated)) {
+            return "Nenhum tema saturado.";
+        }
+
+        $output = "";
+        foreach ($saturated as $theme => $count) {
+            $output .= "🔴 **{$theme}**: {$count}x — EVITAR\n";
+        }
+        return $output;
+    }
+
+    private static function groupByCategory(array $suggestions): string
+    {
+        if (empty($suggestions)) {
+            return "Nenhuma sugestão anterior.";
+        }
+
+        $grouped = [];
+        foreach ($suggestions as $s) {
+            $cat = $s['category'] ?? 'outros';
+            $title = $s['title'] ?? 'Sem título';
+            if (!isset($grouped[$cat])) $grouped[$cat] = [];
+            $grouped[$cat][] = $title;
+        }
+
+        $output = "";
+        foreach ($grouped as $cat => $titles) {
+            $unique = array_unique($titles);
+            $output .= "\n**{$cat}** (" . count($unique) . "):\n";
+            foreach ($unique as $t) {
+                $count = array_count_values($titles)[$t];
+                $m = $count >= 3 ? "🔴" : ($count >= 2 ? "⚠️" : "•");
+                $output .= "{$m} {$t}" . ($count > 1 ? " ({$count}x)" : "") . "\n";
+            }
+        }
+        return $output;
+    }
+
+    private static function formatCompetitors(array $competitors): string
+    {
+        $output = "";
+        foreach ($competitors as $c) {
+            if (!($c['sucesso'] ?? false)) continue;
+            $nome = $c['nome'] ?? 'Concorrente';
+            $preco = $c['faixa_preco']['media'] ?? 0;
+            $difs = implode(', ', $c['diferenciais'] ?? []) ?: 'nenhum';
+            $output .= "- **{$nome}**: R$ {$preco} | Diferenciais: {$difs}\n";
+        }
+        return $output ?: 'Nenhum concorrente analisado.';
+    }
+
+    private static function calculateAverageCompetitorPrice(array $competitors): float
+    {
+        $prices = [];
+        foreach ($competitors as $c) {
+            if (($c['sucesso'] ?? false) && isset($c['faixa_preco']['media'])) {
+                $prices[] = $c['faixa_preco']['media'];
+            }
+        }
+        return count($prices) > 0 ? round(array_sum($prices) / count($prices), 2) : 0;
+    }
+
+    private static function extractUniqueFeatures(array $competitors): string
+    {
+        $features = [];
+        foreach ($competitors as $c) {
+            if ($c['sucesso'] ?? false) {
+                $features = array_merge($features, $c['diferenciais'] ?? []);
+            }
+        }
+        return implode(', ', array_unique($features)) ?: 'nenhum';
+    }
+
     public static function getTemplate(): string
     {
         return <<<'TEMPLATE'
-Você é um agente especializado em coletar e organizar contexto para análise de lojas de e-commerce brasileiras.
+# COLLECTOR AGENT
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-TODOS os resumos, padrões, lacunas e observações DEVEM ser escritos em PORTUGUÊS BRASILEIRO. Não use inglês em nenhuma parte da resposta.
+## PAPEL
+Coletar e organizar dados sobre a loja e mercado.
 
-## Sua Tarefa
-Analise as informações fornecidas e estruture um resumo executivo do contexto da loja.
+## SAÍDA
+JSON com: identificação, histórico, benchmarks, posicionamento, análise competitiva, gaps, alertas.
 
-## Dados da Loja
-- **Plataforma:** {{platform}}
-- **Nicho identificado:** {{niche}}
+## REGRA
+NUNCA INVENTE DADOS.
 
-## Estatísticas da Loja
-```json
-{{store_stats}}
-```
-IMPORTANTE: Use os dados acima (total de pedidos, clientes, faturamento) para entender o tamanho e maturidade REAL da loja. O campo "operation_time" indica há quanto tempo a loja está operando baseado na data do primeiro pedido.
-
-## Histórico de Análises Anteriores
-```json
-{{previous_analyses}}
-```
-
-## Sugestões Anteriores e Status
-```json
-{{previous_suggestions}}
-```
-
-## Benchmarks do Nicho (via RAG)
-```json
-{{benchmarks}}
-```
-
-## Instruções de Análise
-
-### 1. Resumo Histórico (3-5 pontos)
-- Foque em FATOS dos dados, não interpretações
-- Inclua: tempo de operação, volume de pedidos, base de clientes, produtos ativos
-- Mencione tendências observáveis (crescimento, estabilidade, queda)
-
-### 2. Padrões de Sucesso
-- Liste APENAS sugestões com status "completed" E was_successful = true
-- Se não houver sugestões concluídas com sucesso, retorne array vazio
-- NÃO invente padrões - baseie-se apenas nos dados
-
-### 3. Sugestões a Evitar
-- Liste sugestões com status "completed" E was_successful = false
-- Liste sugestões com status "ignored"
-- Agrupe por categoria/tipo para identificar padrões de rejeição
-
-### 4. Benchmarks Relevantes
-- Selecione APENAS benchmarks específicos do nicho "{{niche}}"
-- Se o nicho for "beauty", use benchmarks de beleza, NÃO do e-commerce geral
-- Indique a fonte de cada benchmark
-
-### 5. Lacunas Identificadas
-- Compare dados da loja com benchmarks DO MESMO NICHO
-- Seja específico: "Ticket médio R$ X vs benchmark beleza R$ Y (diferença de Z%)"
-- NÃO use benchmark geral (R$ 492) para nichos específicos
-
-### 6. Contexto Especial
-- Observações que não se encaixam nas categorias acima
-- Sazonalidade, eventos recentes, particularidades do nicho
-
-## BENCHMARKS DE REFERÊNCIA POR NICHO
-
-### Beleza/Cosméticos
-- Ticket Médio: R$ 150-200 (haircare: R$ 120-180, skincare: R$ 180-250, maquiagem: R$ 100-150)
-- Taxa de Conversão: 0.8-1.2% desktop, 0.4-0.6% mobile
-- Taxa de Recompra 90 dias: 15-25%
-- Abandono de Carrinho: 78-85%
-
-### Moda/Vestuário
-- Ticket Médio: R$ 180-280
-- Taxa de Conversão: 1.0-1.8%
-- Taxa de Recompra 90 dias: 20-30%
-
-### Eletrônicos
-- Ticket Médio: R$ 400-800
-- Taxa de Conversão: 0.8-1.5%
-- Taxa de Recompra 90 dias: 8-15%
-
-### Geral (usar apenas se nicho não identificado)
-- Ticket Médio: R$ 492
-- Taxa de Conversão: 1.65%
-
-## Formato de Saída
-```json
-{
-  "historical_summary": [
-    "ponto factual 1",
-    "ponto factual 2"
-  ],
-  "success_patterns": [
-    "padrão baseado em sugestão concluída com sucesso"
-  ],
-  "suggestions_to_avoid": [
-    "tipo de sugestão que foi ignorada ou falhou"
-  ],
-  "relevant_benchmarks": {
-    "ticket_medio": {
-      "valor": "R$ X",
-      "fonte": "Benchmark nicho beleza",
-      "aplicavel": true
-    },
-    "taxa_conversao": {
-      "valor": "X%",
-      "fonte": "nome da fonte",
-      "aplicavel": true
-    },
-    "outros": {}
-  },
-  "identified_gaps": [
-    "Gap específico: métrica atual vs benchmark do nicho (fonte)"
-  ],
-  "special_context": "observações adicionais relevantes"
-}
-```
-
-## INSTRUÇÕES CRÍTICAS
-1. Retorne APENAS JSON válido, sem texto antes ou depois
-2. TODOS os campos são OBRIGATÓRIOS
-3. Use benchmarks DO NICHO ESPECÍFICO, não genéricos
-4. Baseie-se apenas em DADOS FORNECIDOS, não suponha
-5. Se um dado não estiver disponível, indique "não disponível nos dados"
-6. RESPONDA SEMPRE EM PORTUGUÊS BRASILEIRO
+PORTUGUÊS BRASILEIRO
 TEMPLATE;
     }
 }

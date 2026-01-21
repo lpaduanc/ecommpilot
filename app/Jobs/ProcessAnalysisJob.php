@@ -3,11 +3,15 @@
 namespace App\Jobs;
 
 use App\Enums\AnalysisStatus;
+use App\Mail\AnalysisCompletedMail;
+use App\Models\ActivityLog;
 use App\Models\Analysis;
 use App\Models\SystemSetting;
 use App\Services\AI\Agents\LiteStoreAnalysisService;
 use App\Services\AI\Agents\StoreAnalysisService;
 use App\Services\AnalysisService;
+use App\Services\EmailConfigurationService;
+use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,6 +19,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\View;
 
 class ProcessAnalysisJob implements ShouldQueue
 {
@@ -76,7 +82,8 @@ class ProcessAnalysisJob implements ShouldQueue
     public function handle(
         AnalysisService $legacyService,
         StoreAnalysisService $agentService,
-        LiteStoreAnalysisService $liteAgentService
+        LiteStoreAnalysisService $liteAgentService,
+        NotificationService $notificationService
     ): void {
         $startTime = microtime(true);
 
@@ -117,6 +124,9 @@ class ProcessAnalysisJob implements ShouldQueue
             // Mark as processing
             $this->analysis->markAsProcessing();
 
+            // Notificar início da análise
+            $notificationService->notifyAnalysisStarted($this->analysis);
+
             Log::channel($this->logChannel)->info('>>> Status atualizado para PROCESSING', [
                 'analysis_id' => $this->analysis->id,
             ]);
@@ -145,6 +155,12 @@ class ProcessAnalysisJob implements ShouldQueue
                 'status' => 'success',
                 'timestamp_end' => now()->toIso8601String(),
             ]);
+
+            // Notificar conclusão da análise
+            $notificationService->notifyAnalysisCompleted($this->analysis);
+
+            // Send completion email to user
+            $this->sendCompletionEmail($notificationService);
         } catch (\Throwable $e) {
             $totalTime = round((microtime(true) - $startTime), 2);
 
@@ -157,7 +173,7 @@ class ProcessAnalysisJob implements ShouldQueue
             ]);
 
             // Mark as failed immediately (don't wait for failed() method)
-            $this->handleFailure($e);
+            $this->handleFailure($e, $notificationService);
 
             throw $e;
         }
@@ -218,28 +234,42 @@ class ProcessAnalysisJob implements ShouldQueue
 
     /**
      * Handle failure - mark analysis as failed and refund credits.
+     * The user will be notified to try again later.
      */
-    private function handleFailure(\Throwable $exception): void
+    private function handleFailure(\Throwable $exception, NotificationService $notificationService): void
     {
         try {
             // Refresh to get latest state
             $this->analysis->refresh();
 
-            // Only mark as failed if not already completed
-            if ($this->analysis->status !== AnalysisStatus::Completed) {
-                // Use a user-friendly message instead of technical details
-                $userMessage = $this->getUserFriendlyErrorMessage($exception);
-                $this->analysis->markAsFailed($userMessage);
+            // Only handle if not already completed
+            if ($this->analysis->status === AnalysisStatus::Completed) {
+                return;
+            }
 
-                // Refund credits if user exists
-                if ($this->analysis->user) {
-                    $this->analysis->user->addCredits($this->analysis->credits_used ?? 1);
-                    Log::channel($this->logChannel)->info('>>> Creditos reembolsados ao usuario', [
-                        'analysis_id' => $this->analysis->id,
-                        'user_id' => $this->analysis->user_id,
-                        'credits_refunded' => $this->analysis->credits_used ?? 1,
-                    ]);
-                }
+            $userMessage = $this->getUserFriendlyErrorMessage($exception);
+
+            Log::channel($this->logChannel)->warning('>>> Marcando analise como falha', [
+                'analysis_id' => $this->analysis->id,
+                'attempts' => $this->attempts(),
+                'max_tries' => $this->tries,
+                'error' => $exception->getMessage(),
+            ]);
+
+            // Mark as failed with clear message for user
+            $this->analysis->markAsFailed($userMessage);
+
+            // Notify user about the failure
+            $notificationService->notifyAnalysisFailed($this->analysis, $userMessage);
+
+            // Refund credits since analysis failed
+            if ($this->analysis->user) {
+                $this->analysis->user->addCredits($this->analysis->credits_used ?? 1);
+                Log::channel($this->logChannel)->info('>>> Creditos reembolsados ao usuario', [
+                    'analysis_id' => $this->analysis->id,
+                    'user_id' => $this->analysis->user_id,
+                    'credits_refunded' => $this->analysis->credits_used ?? 1,
+                ]);
             }
         } catch (\Throwable $e) {
             Log::channel($this->logChannel)->error('!!! Erro ao tratar falha da analise', [
@@ -269,6 +299,7 @@ class ProcessAnalysisJob implements ShouldQueue
 
     /**
      * Handle a job failure (called by Laravel after all retries exhausted).
+     * Mark as failed and notify user to try again later.
      */
     public function failed(\Throwable $exception): void
     {
@@ -283,7 +314,17 @@ class ProcessAnalysisJob implements ShouldQueue
             'timestamp' => now()->toIso8601String(),
         ]);
 
-        $this->handleFailure($exception);
+        // Refresh analysis to get latest state
+        $this->analysis->refresh();
+
+        // If analysis is already completed, don't do anything
+        if ($this->analysis->status === AnalysisStatus::Completed) {
+            return;
+        }
+
+        // Mark as failed, notify user, and refund credits
+        $notificationService = app(NotificationService::class);
+        $this->handleFailure($exception, $notificationService);
     }
 
     /**
@@ -293,5 +334,120 @@ class ProcessAnalysisJob implements ShouldQueue
     {
         // Give up after 30 minutes total
         return now()->addMinutes(30);
+    }
+
+    /**
+     * Send completion email to the user.
+     */
+    private function sendCompletionEmail(NotificationService $notificationService): void
+    {
+        try {
+            // Refresh to get latest data with relationships
+            $this->analysis->refresh();
+            $this->analysis->load(['user', 'store', 'persistentSuggestions']);
+
+            $user = $this->analysis->user;
+
+            if (! $user || empty($user->email)) {
+                $this->analysis->update([
+                    'email_error' => 'Usuário sem e-mail cadastrado.',
+                ]);
+
+                Log::channel($this->logChannel)->warning('>>> Email de conclusao nao enviado - usuario sem email', [
+                    'analysis_id' => $this->analysis->id,
+                    'user_id' => $this->analysis->user_id,
+                ]);
+
+                return;
+            }
+
+            // Log tentativa de envio
+            Log::channel('mail')->info('Tentando enviar email de conclusao de analise', [
+                'analysis_id' => $this->analysis->id,
+                'user_email' => $user->email,
+                'store_name' => $this->analysis->store->name ?? 'N/A',
+            ]);
+
+            // Prepare email data using AnalysisCompletedMail for data extraction
+            $mailData = new AnalysisCompletedMail($this->analysis);
+
+            // Render the email template to HTML
+            $htmlContent = View::make('emails.analysis-completed', [
+                'userName' => $mailData->userName,
+                'storeName' => $mailData->storeName,
+                'periodStart' => $mailData->periodStart,
+                'periodEnd' => $mailData->periodEnd,
+                'healthScore' => $mailData->healthScore,
+                'healthStatus' => $mailData->healthStatus,
+                'mainInsight' => $mailData->mainInsight,
+                'suggestions' => $mailData->suggestions,
+            ])->render();
+
+            // Send email directly via EmailConfigurationService (bypasses Laravel Mail caching)
+            $emailService = app(EmailConfigurationService::class);
+            $result = $emailService->sendHtmlEmail(
+                'ai-analysis',
+                $user->email,
+                $user->name ?? '',
+                "Análise de IA Concluída - {$mailData->storeName}",
+                $htmlContent
+            );
+
+            if (! $result['success']) {
+                throw new \RuntimeException($result['message']);
+            }
+
+            // Atualizar campos de email com sucesso
+            $this->analysis->update([
+                'email_sent_at' => now(),
+                'email_error' => null,
+            ]);
+
+            // Notificar envio de email bem-sucedido
+            $notificationService->notifyEmailSent($user, 'analysis_completed', $user->email);
+
+            Log::channel('mail')->info('Email de conclusao de analise enviado com sucesso', [
+                'analysis_id' => $this->analysis->id,
+                'user_email' => $user->email,
+                'store_name' => $this->analysis->store->name ?? 'N/A',
+            ]);
+
+            Log::channel($this->logChannel)->info('>>> Email de conclusao enviado com sucesso', [
+                'analysis_id' => $this->analysis->id,
+                'user_email' => $user->email,
+                'store_name' => $this->analysis->store->name ?? 'N/A',
+            ]);
+
+            ActivityLog::log('email.analysis_sent', $this->analysis, [
+                'user_email' => $user->email,
+                'store_name' => $this->analysis->store->name ?? 'N/A',
+            ]);
+        } catch (\Throwable $e) {
+            // Salvar erro no banco
+            $this->analysis->update([
+                'email_error' => $e->getMessage(),
+            ]);
+
+            // Notificar falha no envio de email
+            if ($user) {
+                $notificationService->notifyEmailFailed($user, 'analysis_completed', $user->email ?? '', $e->getMessage());
+            }
+
+            // Log error but don't fail the job - email is secondary
+            Log::channel('mail')->error('Falha ao enviar email de conclusao de analise', [
+                'analysis_id' => $this->analysis->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            Log::channel($this->logChannel)->warning('>>> Falha ao enviar email de conclusao', [
+                'analysis_id' => $this->analysis->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            ActivityLog::log('email.analysis_failed', $this->analysis, [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

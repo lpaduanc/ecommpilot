@@ -11,6 +11,7 @@ use App\Models\ActivityLog;
 use App\Models\Store;
 use App\Models\SystemSetting;
 use App\Services\Integration\NuvemshopService;
+use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,8 @@ use Illuminate\Support\Facades\Log;
 class IntegrationController extends Controller
 {
     public function __construct(
-        private NuvemshopService $nuvemshopService
+        private NuvemshopService $nuvemshopService,
+        private PlanLimitService $planLimitService
     ) {}
 
     public function stores(Request $request): JsonResponse
@@ -259,6 +261,27 @@ class IntegrationController extends Controller
             // Also create/update a Store record for this user
             // Use platform + external_store_id as unique key (matches database constraint)
             $user = $request->user();
+
+            // Check if this would be a NEW store (not reconnecting an existing one)
+            $existingStore = Store::where('platform', Platform::Nuvemshop)
+                ->where('external_store_id', (string) ($data['user_id'] ?? ''))
+                ->first();
+
+            // Skip plan limits in local/dev environment
+            $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
+
+            // If it's a new store, check plan limits
+            if (! $existingStore && ! $isLocalEnv && ! $this->planLimitService->canAddStore($user)) {
+                $plan = $user->currentPlan();
+
+                return response()->json([
+                    'message' => 'Você atingiu o limite de lojas do seu plano.',
+                    'stores_limit' => $plan?->stores_limit ?? 0,
+                    'current_stores' => $user->stores()->count(),
+                    'upgrade_required' => true,
+                ], 403);
+            }
+
             $store = Store::updateOrCreate(
                 [
                     'platform' => Platform::Nuvemshop,

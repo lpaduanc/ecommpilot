@@ -82,6 +82,15 @@ const routes = [
         meta: { requiresAuth: true, permission: 'marketing.access' },
     },
     {
+        path: '/notifications',
+        name: 'notifications',
+        component: () => import(
+            /* webpackChunkName: "notifications" */
+            '../views/NotificationsView.vue'
+        ),
+        meta: { requiresAuth: true },
+    },
+    {
         path: '/analysis',
         name: 'analysis',
         component: () => import(
@@ -205,6 +214,36 @@ const routes = [
             /* webpackChunkName: "admin" */
             /* webpackPreload: false */
             '../views/admin/SettingsView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'admin.access' },
+    },
+    {
+        path: '/admin/plans',
+        name: 'admin-plans',
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/PlansView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'admin.access' },
+    },
+    {
+        path: '/admin/integrations',
+        name: 'admin-integrations',
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/IntegrationsView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'admin.access' },
+    },
+    {
+        path: '/admin/analyses',
+        name: 'admin-analyses',
+        component: () => import(
+            /* webpackChunkName: "admin" */
+            /* webpackPreload: false */
+            '../views/admin/AnalysesView.vue'
         ),
         meta: { requiresAuth: true, permission: 'admin.access' },
     },

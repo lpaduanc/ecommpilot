@@ -8,6 +8,7 @@ export const useChatStore = defineStore('chat', () => {
     const isSending = ref(false);
     const error = ref(null);
     const conversationId = ref(null);
+    const upgradeRequired = ref(false);
     
     const hasMessages = computed(() => messages.value.length > 0);
     
@@ -79,10 +80,17 @@ export const useChatStore = defineStore('chat', () => {
         } catch (err) {
             // Remove failed user message
             messages.value.pop();
-            
+
+            // Check for upgrade required (403)
+            if (err.response?.status === 403 && err.response?.data?.upgrade_required) {
+                upgradeRequired.value = true;
+                error.value = err.response.data.message || 'Seu plano não inclui acesso ao Assistente IA.';
+                return { success: false, message: error.value, upgradeRequired: true };
+            }
+
             const message = err.response?.data?.message || 'Erro ao enviar mensagem';
             error.value = message;
-            
+
             return { success: false, message };
         } finally {
             isSending.value = false;
@@ -122,6 +130,7 @@ export const useChatStore = defineStore('chat', () => {
         error.value = null;
         isLoading.value = false;
         isSending.value = false;
+        upgradeRequired.value = false;
     }
 
     async function resetAndClearBackend() {
@@ -142,6 +151,7 @@ export const useChatStore = defineStore('chat', () => {
         isSending,
         error,
         conversationId,
+        upgradeRequired,
         hasMessages,
         lastMessage,
         fetchConversation,

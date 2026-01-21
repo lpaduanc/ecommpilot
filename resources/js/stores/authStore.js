@@ -13,6 +13,28 @@ export const useAuthStore = defineStore('auth', () => {
     const userName = computed(() => user.value?.name || '');
     const userEmail = computed(() => user.value?.email || '');
     const userPermissions = computed(() => user.value?.permissions || []);
+    const planLimits = computed(() => user.value?.plan_limits || null);
+
+    // Plan feature checks
+    const canAccessAiAnalysis = computed(() => {
+        if (isAdmin.value) return true;
+        return planLimits.value?.has_ai_analysis ?? false;
+    });
+
+    const canAccessAiChat = computed(() => {
+        if (isAdmin.value) return true;
+        return planLimits.value?.has_ai_chat ?? false;
+    });
+
+    const canAccessCustomDashboards = computed(() => {
+        if (isAdmin.value) return true;
+        return planLimits.value?.has_custom_dashboards ?? false;
+    });
+
+    const canAccessExternalIntegrations = computed(() => {
+        if (isAdmin.value) return true;
+        return planLimits.value?.has_external_integrations ?? false;
+    });
     
     function hasPermission(permission) {
         if (isAdmin.value) return true;
@@ -194,6 +216,11 @@ export const useAuthStore = defineStore('auth', () => {
         userName,
         userEmail,
         userPermissions,
+        planLimits,
+        canAccessAiAnalysis,
+        canAccessAiChat,
+        canAccessCustomDashboards,
+        canAccessExternalIntegrations,
         hasPermission,
         hasAnyPermission,
         initialize,

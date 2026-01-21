@@ -57,7 +57,20 @@
       "Bash(cmd //c \"del \\\\\\\\?\\\\C:\\\\projects\\\\ecommpilot\\\\nul\")",
       "Bash(powershell -Command \"Remove-Item -LiteralPath ''\\\\?\\\\C:\\\\projects\\\\ecommpilot\\\\nul'' -Force\")",
       "Bash(powershell -Command \"[System.IO.File]::Delete\\(''\\\\\\\\?\\\\C:\\\\projects\\\\ecommpilot\\\\nul''\\)\")",
-      "Bash(powershell -Command \"& { cd ''C:\\\\projects\\\\ecommpilot''; cmd /c ''ren \\\\.\\\\nul nul_delete.txt'' }\")"
+      "Bash(powershell -Command \"& { cd ''C:\\\\projects\\\\ecommpilot''; cmd /c ''ren \\\\.\\\\nul nul_delete.txt'' }\")",
+      "mcp__postgres__query",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\projects\\\\ecommpilot\\\\database\\\\seeders\\\\KnowledgeBaseSeeder.php'\\).Count\":*)",
+      "Bash(claude mcp remove:*)",
+      "Bash(composer require:*)",
+      "Bash(composer show:*)",
+      "WebFetch(domain:help.hotjar.com)",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebFetch(domain:claude.ai)",
+      "WebFetch(domain:serpapi.com)",
+      "WebFetch(domain:docs.decodo.com)",
+      "WebFetch(domain:decodo.com)",
+      "Bash(composer dump-autoload:*)",
+      "Bash(dir:*)"
     ]
   },
   "statusLine": {

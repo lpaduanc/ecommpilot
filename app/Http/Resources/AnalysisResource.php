@@ -29,6 +29,13 @@ class AnalysisResource extends JsonResource
             'credits_used' => $this->credits_used,
             'completed_at' => $this->completed_at?->toISOString(),
             'created_at' => $this->created_at->toISOString(),
+            'email_sent_at' => $this->email_sent_at?->toISOString(),
+            'email_error' => $this->email_error,
+            // Progress tracking fields
+            'current_stage' => $this->current_stage ?? 0,
+            'total_stages' => $this->total_stages ?? 9,
+            'progress_percentage' => $this->getProgressPercentage(),
+            'current_stage_name' => $this->getCurrentStageName(),
         ];
     }
 }

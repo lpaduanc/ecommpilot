@@ -4,131 +4,294 @@ namespace App\Services\AI\Prompts;
 
 class CriticAgentPrompt
 {
+    /**
+     * CRITIC AGENT V4 - COM TODAS AS MELHORIAS
+     *
+     * Melhorias incluídas:
+     * [2] Validação de plataforma (verificar viabilidade Nuvemshop)
+     * [6] Avaliar e ajustar campo de confiança
+     * + Validação de repetição interna e histórica
+     * + Criação de substitutas quando necessário
+     */
+
+    public static function getSubcategoryProducts(string $niche, string $subcategory): array
+    {
+        $config = config('subcategories', []);
+        $nicheConfig = $config[$niche] ?? $config['geral'] ?? [];
+        $subcategoryConfig = $nicheConfig[$subcategory] ?? $nicheConfig['geral'] ?? [];
+
+        return [
+            'permitidos' => $subcategoryConfig['produtos_permitidos'] ?? [],
+            'proibidos' => $subcategoryConfig['produtos_proibidos'] ?? [],
+        ];
+    }
+
+    public static function getPlatformValidation(): string
+    {
+        return <<<'VALIDATION'
+## 🔧 VALIDAÇÃO DE PLATAFORMA NUVEMSHOP [MELHORIA 2]
+
+### ✅ RECURSOS NATIVOS (aprovar com complexity: "baixa")
+- Cupons de desconto (% ou valor fixo)
+- Frete grátis condicional
+- "Avise-me quando disponível"
+- Produtos relacionados
+- SEO básico
+- Múltiplas formas de pagamento
+
+### 📦 APPS DISPONÍVEIS (aprovar com custo mensal)
+| Funcionalidade | Apps | Custo |
+|----------------|------|-------|
+| Quiz | Pregão, Lily AI | R$ 30-100/mês |
+| Fidelidade | Fidelizar+, Remember | R$ 49-150/mês |
+| Reviews | Lily Reviews, Trustvox | R$ 20-80/mês |
+| Carrinho abandonado | CartStack, Enviou | R$ 30-100/mês |
+| Chat/WhatsApp | JivoChat, Zenvia | R$ 0-100/mês |
+| Assinatura | Vindi, Asaas | R$ 50-150/mês |
+
+### ❌ NÃO DISPONÍVEIS (REJEITAR ou ajustar)
+- Realidade aumentada
+- IA generativa nativa
+- Live commerce nativo
+- Integração B2B nativa
+
+### REGRAS DE VALIDAÇÃO
+1. Se sugestão usa recurso NATIVO → APROVAR, ajustar complexity para "baixa"
+2. Se sugestão usa APP → APROVAR, adicionar nome do app e custo
+3. Se sugestão requer recurso NÃO DISPONÍVEL → REJEITAR ou AJUSTAR para alternativa
+VALIDATION;
+    }
+
+    public static function getConfidenceGuidelines(): string
+    {
+        return <<<'CONFIDENCE'
+## 📊 DIRETRIZES DE CONFIANÇA [MELHORIA 6]
+
+### COMO AVALIAR CONFIANÇA
+
+| Fator | Alta (80-100) | Média (50-79) | Baixa (0-49) |
+|-------|---------------|---------------|--------------|
+| data_quality | Dados completos, recentes | Dados parciais | Dados ausentes ou antigos |
+| market_data | Trends + Preços + Concorrentes | Apenas 1-2 fontes | Sem dados de mercado |
+| historical_success | Categoria com >60% sucesso | 40-60% sucesso | <40% sucesso |
+
+### AJUSTES DE CONFIANÇA
+- Se sugestão HIGH sem dados externos → confidence.score máximo = 70
+- Se categoria tem baixo histórico de sucesso → reduzir confidence.score em 20%
+- Se implementação requer desenvolvimento custom → reduzir confidence.score em 15%
+- Se é quick_win comprovado → aumentar confidence.score em 10%
+
+### SCORES DE REFERÊNCIA POR CATEGORIA
+| Categoria | Score Base (se dados ok) |
+|-----------|--------------------------|
+| inventory | 85 (alta taxa sucesso) |
+| customer | 80 (alta taxa sucesso) |
+| pricing | 75 (quando implementado) |
+| operational | 75 |
+| conversion | 70 |
+| product | 65 |
+| marketing | 60 (resultado variável) |
+| coupon | 55 (pode viciar) |
+CONFIDENCE;
+    }
+
     public static function get(array $data): string
     {
+        $storeName = $data['store_name'] ?? 'Loja';
+        $platform = $data['platform'] ?? 'nuvemshop';
+        $platformName = $data['platform_name'] ?? 'Nuvemshop';
+        $niche = $data['niche'] ?? 'geral';
+        $subcategory = $data['subcategory'] ?? 'geral';
+        $ticketMedio = $data['ticket_medio'] ?? 0;
+        $pedidosMes = $data['pedidos_mes'] ?? 0;
+        $faturamentoMes = $ticketMedio * $pedidosMes;
+
+        // Dados de mercado
+        $externalData = $data['external_data'] ?? [];
+        $trends = $externalData['dados_mercado']['google_trends'] ?? [];
+        $market = $externalData['dados_mercado']['precos_mercado'] ?? [];
+        $competitors = $externalData['concorrentes'] ?? [];
+
+        $tendenciaMercado = $trends['tendencia'] ?? 'nao_disponivel';
+        $precoMedioMercado = $market['faixa_preco']['media'] ?? 0;
+
+        // Processar concorrentes
+        $concorrentesSucesso = 0;
+        $nomesConc = [];
+        $todosDiferenciais = [];
+        foreach ($competitors as $c) {
+            if (!($c['sucesso'] ?? false)) continue;
+            $concorrentesSucesso++;
+            $nomesConc[] = $c['nome'] ?? 'Concorrente';
+            $todosDiferenciais = array_merge($todosDiferenciais, $c['diferenciais'] ?? []);
+        }
+        $listaConc = !empty($nomesConc) ? implode(', ', $nomesConc) : 'nenhum';
+        $todosDiferenciais = array_values(array_unique($todosDiferenciais));
+        $diferenciaisLista = !empty($todosDiferenciais) ? implode(', ', $todosDiferenciais) : 'nenhum';
+
+        // Calcular posicionamento
+        $posicaoPreco = 'nao_calculado';
+        if ($precoMedioMercado > 0 && $ticketMedio > 0) {
+            $ratio = $ticketMedio / $precoMedioMercado;
+            if ($ratio < 0.85) $posicaoPreco = 'abaixo';
+            elseif ($ratio > 1.15) $posicaoPreco = 'acima';
+            else $posicaoPreco = 'dentro';
+        }
+
+        // Sugestões
         $suggestions = json_encode($data['suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $previousSuggestions = json_encode($data['previous_suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $storeContext = json_encode($data['store_context'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        // Formatar sugestões anteriores para comparação
+        $previousSuggestions = $data['previous_suggestions'] ?? [];
+        $previousFormatted = self::formatPreviousSuggestions($previousSuggestions);
+        $saturatedThemes = self::identifySaturatedThemes($previousSuggestions);
+
+        // Produtos permitidos/proibidos
+        $subcategoryProducts = self::getSubcategoryProducts($niche, $subcategory);
+        $produtosPermitidos = implode(', ', $subcategoryProducts['permitidos']) ?: 'todos do nicho';
+        $produtosProibidos = implode(', ', $subcategoryProducts['proibidos']) ?: 'nenhum';
+
+        // Guidelines
+        $platformValidation = self::getPlatformValidation();
+        $confidenceGuidelines = self::getConfidenceGuidelines();
 
         return <<<PROMPT
-Você é um crítico especializado em validar sugestões para e-commerce brasileiro.
+# CRITIC AGENT — REVISÃO E GARANTIA DE QUALIDADE
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
+## SEU PAPEL
+1. Revisar as 9 sugestões do Strategist
+2. REJEITAR sugestões repetidas ou inviáveis
+3. VALIDAR viabilidade na plataforma
+4. AJUSTAR campo de confiança
+5. CRIAR substitutas para rejeitadas
+6. Garantir EXATAMENTE 9 sugestões de qualidade
 
-## Seu Objetivo
-Revisar RIGOROSAMENTE as sugestões, removendo as fracas e refinando as boas.
-
----
-
-## ⚠️ REGRAS DE REJEIÇÃO OBRIGATÓRIA ⚠️
-
-### REJEITAR AUTOMATICAMENTE se a sugestão:
-
-1. **É genérica** - Aplicável a qualquer loja sem modificação
-   - ❌ "Melhorar experiência do usuário"
-   - ✅ "Adicionar zoom nas fotos dos 10 produtos mais vendidos"
-
-2. **Repete sugestão anterior** - Mesmo problema + mesma solução
-   - Compare semanticamente com as sugestões anteriores
-   - Se similaridade > 70%, REJEITAR
-
-3. **Não cita dados da loja** - Sem números específicos
-   - ❌ "Muitos produtos estão sem estoque"
-   - ✅ "48 dos 95 produtos ativos (50,5%) estão sem estoque"
-
-4. **Ação vaga** - Sem passos concretos
-   - ❌ "Considere implementar estratégias de fidelização"
-   - ✅ "Passo 1: Instalar app Fidelizar+. Passo 2: Configurar 1 ponto por R\$1. Passo 3: Criar campanha de lançamento por email"
-
-5. **ROI não calculado** - Sem estimativa de retorno
-   - Deve ter potential_revenue E implementation_cost
-
-6. **Inviável para o porte** - Complexidade desproporcional
-   - Loja pequena (<1000 pedidos/mês) + sugestão de marketplace = REJEITAR
-
-7. **Sem justificativa de dados** - Não conecta com anomalia/padrão identificado
+**FILOSOFIA:** Melhorar > Rejeitar (exceto repetições e impossíveis)
 
 ---
 
-## SUGESTÕES A REVISAR
+## CONTEXTO DA LOJA
+
+| Campo | Valor |
+|-------|-------|
+| Nome | {$storeName} |
+| Plataforma | {$platformName} |
+| Subcategoria | {$subcategory} |
+| Ticket Médio | R$ {$ticketMedio} |
+| Pedidos/Mês | {$pedidosMes} |
+| Faturamento/Mês | R$ {$faturamentoMes} |
+
+---
+
+## CONTEXTO DE MERCADO
+
+| Dado | Valor |
+|------|-------|
+| Tendência | {$tendenciaMercado} |
+| Preço médio mercado | R$ {$precoMedioMercado} |
+| Posição da loja | {$posicaoPreco} |
+| Concorrentes | {$listaConc} |
+| Diferenciais concorrentes | {$diferenciaisLista} |
+
+---
+
+## 🚫 DETECÇÃO DE REPETIÇÕES
+
+### Sugestões Anteriores (para detectar repetição HISTÓRICA)
+{$previousFormatted}
+
+### Temas Saturados
+{$saturatedThemes}
+
+### REGRA DE REPETIÇÃO
+Duas sugestões são REPETIDAS se:
+- Têm o mesmo TEMA CENTRAL
+- Propõem a MESMA SOLUÇÃO
+- Diferem apenas em palavras
+
+**Detectar REPETIÇÃO INTERNA:** Comparar sugestões 1-9 entre si
+**Detectar REPETIÇÃO HISTÓRICA:** Comparar com lista anterior
+
+---
+
+{$platformValidation}
+
+---
+
+{$confidenceGuidelines}
+
+---
+
+## SUGESTÕES PARA REVISAR
 
 ```json
 {$suggestions}
 ```
 
-## SUGESTÕES ANTERIORES (para detectar repetições)
+---
 
-```json
-{$previousSuggestions}
-```
+## PRODUTOS DE {$subcategory}
 
-## CONTEXTO DA LOJA
+- ✅ **PERMITIDOS:** {$produtosPermitidos}
+- ❌ **PROIBIDOS:** {$produtosProibidos}
 
-```json
-{$storeContext}
-```
+---
+
+## CRITÉRIOS DE AVALIAÇÃO
+
+| Critério | Peso | Score 10 | Score 5 | Score 0 |
+|----------|------|----------|---------|---------|
+| Especificidade | 20% | Específica para {$subcategory} | Parcial | Genérica |
+| Base em dados | 20% | Números específicos | Dados vagos | Sem dados |
+| Dados externos | 15% | Cita concorrente/mercado | Ref. indireta | Ignora |
+| Acionabilidade | 20% | 3-4 passos claros | Passos vagos | Sem passos |
+| Viabilidade | 15% | Nativo ou app disponível | Requer dev | Impossível |
+| Originalidade | 10% | Nova | Similar mas diferente | Repetição |
+
+**Score mínimo:** 6.0
+**HIGH sem dados externos:** máximo 7.0
 
 ---
 
 ## PROCESSO DE REVISÃO
 
-Para CADA sugestão, execute:
+Para CADA sugestão:
 
-### 1. Teste de Repetição (CRÍTICO)
-- Sugestão atual: [título]
-- Problema atacado: [extrair]
-- Solução proposta: [extrair]
-- Comparar com cada sugestão anterior
-- Se AMBOS (problema + solução) similares → REJEITAR
+### 1. Verificar Repetição
+- É igual a outra desta análise? → REJEITAR
+- É igual a uma histórica? → REJEITAR
+- Tema saturado? → REJEITAR
 
-### 2. Teste de Especificidade
-- Contém números específicos da loja? (não benchmarks genéricos)
-- Menciona produtos, categorias ou períodos específicos?
-- Se NÃO → MELHORAR ou REJEITAR
+### 2. Verificar Viabilidade na Plataforma
+- Usa recurso nativo? → OK, ajustar complexity
+- Usa app disponível? → OK, adicionar nome/custo do app
+- Requer recurso inexistente? → REJEITAR ou AJUSTAR
 
-### 3. Teste de Acionabilidade
-- Os passos podem ser executados HOJE?
-- Indica ferramentas/apps específicos?
-- Tem prazo estimado realista?
-- Se NÃO → MELHORAR
+### 3. Avaliar/Ajustar Confiança
+- Verificar se confidence.score está coerente
+- Ajustar conforme diretrizes
+- Sugestão HIGH sem dados externos → máximo 70
 
-### 4. Teste de ROI
-- Cálculo de receita potencial é baseado em dados da loja?
-- Custo de implementação é realista?
-- Se NÃO → RECALCULAR
-
-### 5. Teste de Viabilidade Nuvemshop
-- É possível na plataforma?
-- Complexidade está correta?
-- Se NÃO → AJUSTAR
+### 4. Calcular Score e Decidir
+- Score ≥ 6.0 → APROVAR (com melhorias se necessário)
+- Score < 6.0 → MELHORAR ou REJEITAR
 
 ---
 
-## CRITÉRIOS DE PONTUAÇÃO (0-10)
+## REGRAS DE DECISÃO
 
-| Critério | Peso | 0-3 pontos | 4-6 pontos | 7-10 pontos |
-|----------|------|------------|------------|-------------|
-| Especificidade | 30% | Genérica | Parcialmente específica | Totalmente específica com dados |
-| Acionabilidade | 25% | Vaga | Passos gerais | Passos concretos e executáveis |
-| Base em dados | 20% | Sem dados | Dados parciais | Dados completos da loja |
-| ROI estimado | 15% | Sem ROI | ROI genérico | ROI calculado com dados |
-| Originalidade | 10% | Repetição clara | Similar a anterior | Totalmente original |
+### REJEITAR (criar substituta)
+- Repetição exata ou temática
+- Produto fora do nicho
+- Funcionalidade impossível na plataforma
+- Score < 4.0 mesmo com melhorias
 
-**Score mínimo para aprovação: 6.0**
-
----
-
-## LIMITES OBRIGATÓRIOS
-
-- **MÁXIMO de sugestões aprovadas: 7**
-- **MÍNIMO de sugestões aprovadas: 5**
-- **Distribuição obrigatória:**
-  - Mínimo 2 de alto impacto
-  - Mínimo 2 de médio impacto
-  - Mínimo 1 de baixo impacto
-
-Se receber 9 sugestões boas, escolha as 7 melhores.
-Se menos de 5 passarem nos testes, indique que o Strategist precisa regenerar.
+### MELHORAR (aprovar com ajustes)
+- Falta dado específico → adicionar
+- ROI mal calculado → recalcular
+- Ação genérica → especificar
+- Confidence inadequado → ajustar
+- Falta referência de mercado → adicionar
 
 ---
 
@@ -137,182 +300,229 @@ Se menos de 5 passarem nos testes, indique que o Strategist precisa regenerar.
 ```json
 {
   "review_summary": {
-    "total_received": 9,
-    "total_approved": 0,
-    "total_rejected": 0,
-    "total_improved": 0,
-    "regeneration_needed": false
+    "total_recebidas": 9,
+    "total_aprovadas": 0,
+    "total_melhoradas": 0,
+    "total_rejeitadas": 0,
+    "total_substitutas": 0,
+    "score_medio": 0.0
   },
+
+  "similarity_analysis": {
+    "internal_duplicates_found": 0,
+    "historical_duplicates_found": 0,
+    "saturated_themes_used": [],
+    "platform_issues_found": 0
+  },
+
+  "quality_analysis": {
+    "pontos_fortes": [""],
+    "pontos_fracos": [""],
+    "gaps_identificados": [""],
+    "feedback_strategist": ""
+  },
+
   "approved_suggestions": [
     {
-      "original_title": "título original",
+      "original_title": "",
+      "status": "aprovada|melhorada|substituta",
+
+      "validation": {
+        "repetition_check": {
+          "is_original": true,
+          "similar_to": null
+        },
+        "platform_check": {
+          "is_viable": true,
+          "resource_type": "nativo|app|terceiro",
+          "app_suggested": null,
+          "adjustment_made": null
+        },
+        "confidence_adjusted": true|false
+      },
+
       "final_version": {
-        "category": "string",
-        "title": "título (melhorado se necessário)",
-        "problem_addressed": "string",
-        "description": "string",
-        "recommended_action": "string",
+        "priority": 1-9,
         "expected_impact": "high|medium|low",
-        "target_metrics": [],
+        "category": "",
+        "title": "",
+        "problem_addressed": "",
+        "description": "",
+        "recommended_action": "",
+        "data_justification": "",
+        "market_context": "",
+        "competitive_reference": "",
         "implementation": {
-          "nuvemshop_native": true,
-          "required_tools": [],
-          "estimated_hours": 0,
-          "complexity": "low|medium|high"
+          "platform": "{$platform}",
+          "type": "nativo|app|terceiro|desenvolvimento",
+          "app_name": "nome do app se aplicável",
+          "complexity": "baixa|media|alta",
+          "cost": ""
         },
         "roi_estimate": {
-          "potential_revenue": "string",
-          "implementation_cost": "string",
-          "payback_period": "string",
-          "confidence": "high|medium|low"
+          "calculation_base": "R$ {$faturamentoMes}/mês",
+          "formula": "",
+          "potential_revenue": ""
         },
-        "specific_data": {},
-        "data_justification": "string"
+        "confidence": {
+          "score": 0-100,
+          "factors": {
+            "data_quality": "alta|media|baixa",
+            "market_data": "alta|media|baixa",
+            "historical_success": "alta|media|baixa"
+          },
+          "adjustments_made": [""]
+        },
+        "target_metrics": [""]
       },
+
       "review": {
-        "quality_score": 0.0,
-        "score_breakdown": {
+        "original_score": 0.0,
+        "final_score": 0.0,
+        "scores_by_criteria": {
           "especificidade": 0,
-          "acionabilidade": 0,
           "base_dados": 0,
-          "roi": 0,
+          "dados_externos": 0,
+          "acionabilidade": 0,
+          "viabilidade": 0,
           "originalidade": 0
         },
-        "improvements_made": ["lista de melhorias aplicadas"],
-        "final_priority": 1
+        "improvements_made": [""],
+        "justification": ""
       }
     }
   ],
+
   "rejected_suggestions": [
     {
-      "title": "título da sugestão",
-      "rejection_reason": "motivo específico",
-      "rejection_category": "repetition|generic|no_data|vague_action|no_roi|infeasible",
-      "similar_to_previous": "ID da sugestão anterior similar (se aplicável)"
+      "original_title": "",
+      "rejection_reason": "",
+      "rejection_category": "repetition|wrong_subcategory|platform_impossible|low_quality",
+      "replacement_created": true
     }
   ],
-  "quality_analysis": {
-    "strongest_suggestions": ["títulos das 2 melhores"],
-    "weakest_approved": "título da sugestão aprovada mais fraca",
-    "common_issues": ["problemas recorrentes nas sugestões"],
-    "strategist_feedback": "feedback para melhorar próximas gerações"
+
+  "distribution_check": {
+    "high_count": 3,
+    "medium_count": 3,
+    "low_count": 3,
+    "total": 9,
+    "is_valid": true
   }
 }
 ```
 
 ---
 
-## INSTRUÇÕES CRÍTICAS
+## CHECKLIST FINAL
 
-1. Retorne APENAS JSON válido
-2. SEJA RIGOROSO - é melhor rejeitar sugestão fraca do que aprovar
-3. Se detectar repetição, REJEITE sem exceção
-4. Melhore sugestões boas que têm pequenos problemas
-5. Máximo 7 aprovações, mesmo que todas pareçam boas
-6. RESPONDA EM PORTUGUÊS BRASILEIRO
+- [ ] EXATAMENTE 9 sugestões aprovadas?
+- [ ] Distribuição 3-3-3 (HIGH-MEDIUM-LOW)?
+- [ ] Nenhuma repetição interna?
+- [ ] Nenhuma repetição histórica?
+- [ ] Todas viáveis na Nuvemshop?
+- [ ] Confidence ajustado conforme diretrizes?
+- [ ] Todas HIGH têm dados externos?
+- [ ] Score médio ≥ 7.0?
+
+---
+
+PORTUGUÊS BRASILEIRO
 PROMPT;
     }
 
-    /**
-     * Retorna o template do prompt com placeholders para log.
-     */
+    private static function formatPreviousSuggestions(array $previousSuggestions): string
+    {
+        if (empty($previousSuggestions)) {
+            return "Nenhuma sugestão anterior. Todas serão consideradas originais.";
+        }
+
+        $grouped = [];
+        $titleCounts = [];
+
+        foreach ($previousSuggestions as $s) {
+            $title = $s['title'] ?? 'Sem título';
+            $category = $s['category'] ?? 'outros';
+            $titleCounts[$title] = ($titleCounts[$title] ?? 0) + 1;
+            if (!isset($grouped[$category])) $grouped[$category] = [];
+            if (!in_array($title, $grouped[$category])) $grouped[$category][] = $title;
+        }
+
+        $output = "**Total:** " . count($previousSuggestions) . " sugestões\n\n";
+        foreach ($grouped as $cat => $titles) {
+            $output .= "**{$cat}:**\n";
+            foreach ($titles as $t) {
+                $c = $titleCounts[$t];
+                $m = $c >= 3 ? "🔴" : ($c >= 2 ? "⚠️" : "•");
+                $output .= "{$m} {$t}" . ($c > 1 ? " ({$c}x)" : "") . "\n";
+            }
+        }
+        return $output;
+    }
+
+    private static function identifySaturatedThemes(array $previousSuggestions): string
+    {
+        if (empty($previousSuggestions)) return "Nenhum tema saturado.";
+
+        $keywords = [
+            'Quiz' => ['quiz', 'questionário', 'personalizado'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito'],
+            'Fidelidade' => ['fidelidade', 'pontos', 'cashback'],
+            'Kits' => ['kit', 'combo', 'bundle'],
+            'Estoque' => ['estoque', 'avise-me', 'reposição'],
+            'Email' => ['email', 'newsletter', 'automação'],
+            'Assinatura' => ['assinatura', 'recorrência'],
+        ];
+
+        $counts = [];
+        foreach ($previousSuggestions as $s) {
+            $text = mb_strtolower(($s['title'] ?? '') . ' ' . ($s['description'] ?? ''));
+            foreach ($keywords as $theme => $kws) {
+                foreach ($kws as $kw) {
+                    if (strpos($text, $kw) !== false) {
+                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $saturated = array_filter($counts, fn($c) => $c >= 3);
+        if (empty($saturated)) return "Nenhum tema saturado.";
+
+        $out = "";
+        foreach ($saturated as $t => $c) {
+            $out .= "🔴 **{$t}**: {$c}x — NÃO APROVAR\n";
+        }
+        return $out;
+    }
+
     public static function getTemplate(): string
     {
         return <<<'TEMPLATE'
-Você é um crítico especializado em validar sugestões para e-commerce brasileiro.
+# CRITIC AGENT — REVISÃO E QUALIDADE
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
+## PAPEL
+Revisar sugestões, garantir qualidade, originalidade e viabilidade.
 
-## Seu Objetivo
-Revisar RIGOROSAMENTE as sugestões, removendo as fracas e refinando as boas.
+## VALIDAÇÕES OBRIGATÓRIAS
+1. Repetição (interna e histórica)
+2. Viabilidade na plataforma
+3. Ajuste de confiança
+4. Score de qualidade
 
----
+## FILOSOFIA
+Melhorar > Rejeitar (exceto repetições e impossíveis)
 
-## ⚠️ REGRAS DE REJEIÇÃO OBRIGATÓRIA ⚠️
+## DISTRIBUIÇÃO
+3 HIGH + 3 MEDIUM + 3 LOW = 9 total
 
-REJEITAR AUTOMATICAMENTE se a sugestão:
-1. **É genérica** - Aplicável a qualquer loja sem modificação
-2. **Repete sugestão anterior** - Mesmo problema + mesma solução (similaridade > 70%)
-3. **Não cita dados da loja** - Sem números específicos
-4. **Ação vaga** - Sem passos concretos
-5. **ROI não calculado** - Sem estimativa de retorno
-6. **Inviável para o porte** - Complexidade desproporcional
-7. **Sem justificativa de dados** - Não conecta com anomalia/padrão
-
----
-
-## SUGESTÕES A REVISAR
-```json
-{{suggestions}}
-```
-
-## SUGESTÕES ANTERIORES (para detectar repetições)
-```json
-{{previous_suggestions}}
-```
-
-## CONTEXTO DA LOJA
-```json
-{{store_context}}
-```
-
----
-
-## CRITÉRIOS DE PONTUAÇÃO (0-10)
-
-| Critério | Peso |
-|----------|------|
-| Especificidade | 30% |
-| Acionabilidade | 25% |
-| Base em dados | 20% |
-| ROI estimado | 15% |
-| Originalidade | 10% |
-
-**Score mínimo para aprovação: 6.0**
-
----
-
-## LIMITES OBRIGATÓRIOS
-
-- **MÁXIMO aprovadas: 7** | **MÍNIMO aprovadas: 5**
-- Distribuição: mín 2 high, mín 2 medium, mín 1 low
-- Se < 5 passarem, indicar regeneration_needed = true
-
----
-
-## FORMATO DE SAÍDA
-
-```json
-{
-  "review_summary": {"total_received": 9, "total_approved": 0, "total_rejected": 0, "total_improved": 0, "regeneration_needed": false},
-  "approved_suggestions": [
-    {
-      "original_title": "título original",
-      "final_version": {
-        "category": "string", "title": "string", "problem_addressed": "string",
-        "description": "string", "recommended_action": "string", "expected_impact": "high|medium|low",
-        "target_metrics": [], "implementation": {"nuvemshop_native": true, "required_tools": [], "estimated_hours": 0, "complexity": "low|medium|high"},
-        "roi_estimate": {"potential_revenue": "string", "implementation_cost": "string", "payback_period": "string", "confidence": "high|medium|low"},
-        "specific_data": {}, "data_justification": "string"
-      },
-      "review": {"quality_score": 0.0, "score_breakdown": {"especificidade": 0, "acionabilidade": 0, "base_dados": 0, "roi": 0, "originalidade": 0}, "improvements_made": [], "final_priority": 1}
-    }
-  ],
-  "rejected_suggestions": [{"title": "string", "rejection_reason": "string", "rejection_category": "repetition|generic|no_data|vague_action|no_roi|infeasible", "similar_to_previous": null}],
-  "quality_analysis": {"strongest_suggestions": [], "weakest_approved": "string", "common_issues": [], "strategist_feedback": "string"}
-}
-```
-
----
-
-## INSTRUÇÕES CRÍTICAS
-
-1. Retorne APENAS JSON válido
-2. SEJA RIGOROSO - é melhor rejeitar sugestão fraca do que aprovar
-3. Se detectar repetição, REJEITE sem exceção
-4. Melhore sugestões boas que têm pequenos problemas
-5. Máximo 7 aprovações, mesmo que todas pareçam boas
-6. RESPONDA EM PORTUGUÊS BRASILEIRO
+PORTUGUÊS BRASILEIRO
 TEMPLATE;
+    }
+
+    public static function build(array $context): string
+    {
+        return self::get($context);
     }
 }

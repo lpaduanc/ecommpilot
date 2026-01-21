@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\AdminAnalysesController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AdminEmailConfigurationController;
+use App\Http\Controllers\Api\AdminIntegrationsController;
+use App\Http\Controllers\Api\AdminPlanController;
 use App\Http\Controllers\Api\AdminSettingsController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\AuthController;
@@ -10,10 +13,12 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StoreConfigController;
 use App\Http\Controllers\Api\StoreSettingsController;
+use App\Http\Controllers\Api\TrackingSettingsController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -137,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('current', [AnalysisController::class, 'current']);
             Route::get('history', [AnalysisController::class, 'history']);
             Route::get('{id}', [AnalysisController::class, 'show']);
+            Route::post('{id}/resend-email', [AnalysisController::class, 'resendEmail']);
         });
 
         // Solicitar nova análise - requer permissão específica
@@ -157,6 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/stats', [AnalysisController::class, 'suggestionStats']);
         Route::get('/{id}', [AnalysisController::class, 'showSuggestion']);
         Route::patch('/{id}', [AnalysisController::class, 'updateSuggestion']);
+        Route::post('/{id}/feedback', [AnalysisController::class, 'submitFeedback']); // V4: Feedback loop
     });
 
     /*
@@ -169,6 +176,19 @@ Route::middleware('auth:sanctum')->group(function () {
         // Rate limit: 20 mensagens por minuto por usuário
         Route::post('message', [ChatController::class, 'sendMessage'])->middleware('throttle:20,1');
         Route::delete('conversation', [ChatController::class, 'clearConversation']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('/unread', [NotificationController::class, 'unread']);
+        Route::post('/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/read-all', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
     });
 
     /*
@@ -240,6 +260,37 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('sync', [LocationController::class, 'sync']);
             Route::get('sync-status', [LocationController::class, 'syncStatus']);
         });
+
+        // Plans Management
+        Route::prefix('plans')->group(function () {
+            Route::get('/', [AdminPlanController::class, 'index']);
+            Route::post('/', [AdminPlanController::class, 'store']);
+            Route::get('/{id}', [AdminPlanController::class, 'show']);
+            Route::put('/{id}', [AdminPlanController::class, 'update']);
+            Route::delete('/{id}', [AdminPlanController::class, 'destroy']);
+            Route::post('/{id}/assign', [AdminPlanController::class, 'assignToClient']);
+        });
+
+        // Client Plan Management
+        Route::get('clients/{id}/usage', [AdminPlanController::class, 'clientUsage']);
+        Route::get('clients/{id}/subscription', [AdminPlanController::class, 'clientSubscription']);
+        Route::delete('clients/{id}/subscription', [AdminPlanController::class, 'removeFromClient']);
+        Route::get('clients-with-plans', [AdminPlanController::class, 'clientsWithPlans']);
+
+        // Integrations (External Data Services)
+        Route::prefix('integrations')->group(function () {
+            Route::get('external-data', [AdminIntegrationsController::class, 'getExternalData']);
+            Route::put('external-data', [AdminIntegrationsController::class, 'updateExternalData']);
+            Route::post('external-data/test', [AdminIntegrationsController::class, 'testExternalData']);
+            Route::post('external-data/test-decodo', [AdminIntegrationsController::class, 'testDecodo']);
+        });
+
+        // Analyses Management
+        Route::prefix('analyses')->group(function () {
+            Route::get('/', [AdminAnalysesController::class, 'index']);
+            Route::get('/stats', [AdminAnalysesController::class, 'stats']);
+            Route::get('/{analysis}', [AdminAnalysesController::class, 'show']);
+        });
     });
 
     /*
@@ -281,6 +332,14 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('test-connection', [StoreSettingsController::class, 'testConnection']);
                 Route::post('disconnect', [StoreSettingsController::class, 'disconnect']);
             });
+        });
+
+        // Tracking Settings (por loja)
+        Route::prefix('tracking')->group(function () {
+            Route::get('/', [TrackingSettingsController::class, 'show']);  // Config para frontend
+            Route::get('/edit', [TrackingSettingsController::class, 'edit']); // Config completa para edição
+            Route::put('/', [TrackingSettingsController::class, 'update'])->middleware('can:settings.edit');
+            Route::patch('/{provider}', [TrackingSettingsController::class, 'updateProvider'])->middleware('can:settings.edit');
         });
     });
 

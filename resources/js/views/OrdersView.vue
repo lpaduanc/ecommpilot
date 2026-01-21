@@ -116,7 +116,7 @@ async function fetchOrders() {
         orders.value = response.data.data;
         totalPages.value = response.data.last_page;
         totalItems.value = response.data.total;
-    } catch {
+    } catch (err) {
         orders.value = [];
     } finally {
         isLoading.value = false;

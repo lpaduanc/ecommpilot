@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Services\ChatbotService;
+use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ChatController extends Controller
 {
     public function __construct(
-        private ChatbotService $chatbotService
+        private ChatbotService $chatbotService,
+        private PlanLimitService $planLimitService
     ) {}
 
     public function conversation(Request $request): JsonResponse
@@ -46,6 +48,18 @@ class ChatController extends Controller
 
     public function sendMessage(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        // Check plan access to chat (skip in local/dev environment)
+        $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
+
+        if (! $isLocalEnv && ! $this->planLimitService->canAccessChat($user)) {
+            return response()->json([
+                'message' => 'Seu plano não inclui acesso ao Assistente IA.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:2000'],
             'context' => ['nullable', 'array'],
@@ -54,7 +68,6 @@ class ChatController extends Controller
             'message.max' => 'A mensagem é muito longa.',
         ]);
 
-        $user = $request->user();
         $store = $user->activeStore;
 
         // Get or create conversation

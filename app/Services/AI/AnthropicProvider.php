@@ -154,15 +154,25 @@ class AnthropicProvider implements AIProviderInterface
                 $inputTokens = $usage['input_tokens'] ?? 0;
                 $outputTokens = $usage['output_tokens'] ?? 0;
                 $totalTokens = $inputTokens + $outputTokens;
+                $stopReason = $response->json('stop_reason', 'end_turn');
 
-                Log::channel($this->logChannel)->info('        [ANTHROPIC] Requisicao concluida com sucesso', [
+                Log::channel($this->logChannel)->info('        [ANTHROPIC] Requisicao concluida', [
                     'attempt' => $attempt,
+                    'stop_reason' => $stopReason,
                     'response_length' => strlen($text),
                     'model' => $payload['model'],
                     'input_tokens' => $inputTokens,
                     'output_tokens' => $outputTokens,
                     'total_tokens' => $totalTokens,
                 ]);
+
+                // Check for truncation (stop_reason: 'max_tokens')
+                if ($stopReason === 'max_tokens' && $attempt < $this->maxRetries) {
+                    Log::channel($this->logChannel)->warning('        [ANTHROPIC] Resposta truncada (max_tokens), retry com mais tokens');
+                    $payload['max_tokens'] = min($payload['max_tokens'] * 2, 16384);
+
+                    continue;
+                }
 
                 return $text;
 

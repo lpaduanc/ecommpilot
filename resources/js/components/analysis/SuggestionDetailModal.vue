@@ -67,11 +67,37 @@ const actionSteps = computed(() => {
     const steps = props.suggestion.action_steps || props.suggestion.implementation_steps;
     if (steps && steps.length > 0) return steps;
 
-    // If we have recommended_action as a string, split it into steps
-    if (props.suggestion.recommended_action && typeof props.suggestion.recommended_action === 'string') {
-        const lines = props.suggestion.recommended_action.split('\n').filter(line => line.trim());
+    // Handle recommended_action (can be array or string)
+    const action = props.suggestion.recommended_action;
+    if (!action) return [];
+
+    // If it's already an array, use it directly
+    if (Array.isArray(action)) {
+        return action.filter(step => step && typeof step === 'string' && step.trim());
+    }
+
+    // If it's a string, try to parse as JSON first (in case it's a JSON array string)
+    if (typeof action === 'string') {
+        try {
+            const parsed = JSON.parse(action);
+            if (Array.isArray(parsed)) {
+                return parsed.filter(step => step && typeof step === 'string' && step.trim());
+            }
+        } catch (e) {
+            // Not JSON, handle as plain string
+        }
+
+        // Try splitting by newlines
+        const lines = action.split(/\\n|\n/).filter(line => line.trim());
         if (lines.length > 1) return lines;
-        return [props.suggestion.recommended_action];
+
+        // Try splitting by numbered pattern "1. ... 2. ... 3. ..."
+        const numberedSteps = action.split(/(?=\d+\.\s)/).filter(s => s.trim());
+        if (numberedSteps.length > 1) {
+            return numberedSteps.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(s => s);
+        }
+
+        return [action];
     }
 
     return [];

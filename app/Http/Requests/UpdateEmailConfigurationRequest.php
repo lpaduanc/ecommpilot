@@ -24,7 +24,7 @@ class UpdateEmailConfigurationRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'provider' => ['sometimes', 'required', 'string', Rule::in(['smtp', 'mailgun', 'ses', 'postmark', 'resend'])],
+            'provider' => ['sometimes', 'required', 'string', Rule::in(['smtp', 'mailgun', 'ses', 'postmark', 'resend', 'mailjet'])],
             'is_active' => ['sometimes', 'boolean'],
             'settings' => ['sometimes', 'required', 'array'],
             'settings.from_address' => ['sometimes', 'required', 'email'],
@@ -49,6 +49,9 @@ class UpdateEmailConfigurationRequest extends FormRequest
 
             // Postmark specific
             'settings.token' => ['nullable', 'string'],
+
+            // Mailjet specific
+            'settings.secret_key' => ['nullable', 'string'],
         ];
     }
 
@@ -77,7 +80,7 @@ class UpdateEmailConfigurationRequest extends FormRequest
             $settings = $this->settings;
 
             // Remove masked values from settings
-            $sensitiveFields = ['password', 'api_key', 'secret', 'token', 'key'];
+            $sensitiveFields = ['password', 'api_key', 'secret', 'token', 'key', 'secret_key'];
             foreach ($sensitiveFields as $field) {
                 if (isset($settings[$field]) && $this->isMaskedValue($settings[$field])) {
                     unset($settings[$field]);

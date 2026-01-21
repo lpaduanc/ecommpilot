@@ -11,18 +11,26 @@ use Illuminate\Support\Facades\Log;
 class SyncAllStoresCommand extends Command
 {
     /**
+     * Window in minutes to distribute sync jobs (4 hours = 240 minutes).
+     * Jobs are spread across this window to avoid peak load.
+     */
+    private const DISTRIBUTION_WINDOW_MINUTES = 240;
+
+    /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'stores:sync {--store=* : Specific store IDs to sync}';
+    protected $signature = 'stores:sync
+        {--store=* : Specific store IDs to sync}
+        {--no-delay : Dispatch all jobs immediately without distribution}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sincroniza dados de todas as lojas conectadas';
+    protected $description = 'Sincroniza dados de todas as lojas conectadas com distribuição temporal';
 
     /**
      * Execute the console command.
@@ -31,12 +39,14 @@ class SyncAllStoresCommand extends Command
     {
         $this->info('Iniciando sincronização de lojas...');
 
-        // Se foi especificado --store, sincroniza apenas essas lojas
+        // Se foi especificado --store, sincroniza apenas essas lojas (sem delay)
         $specificStoreIds = $this->option('store');
 
         if (! empty($specificStoreIds)) {
             return $this->syncSpecificStores($specificStoreIds);
         }
+
+        $useDelay = ! $this->option('no-delay');
 
         // Busca todas as lojas que NÃO precisam de reconexão
         $stores = Store::query()
@@ -52,6 +62,10 @@ class SyncAllStoresCommand extends Command
 
         $this->info("Encontradas {$stores->count()} loja(s) para sincronizar.");
 
+        if ($useDelay) {
+            $this->info('Distribuindo jobs em janela de '.self::DISTRIBUTION_WINDOW_MINUTES.' minutos.');
+        }
+
         $queuedCount = 0;
         $skippedCount = 0;
 
@@ -64,28 +78,49 @@ class SyncAllStoresCommand extends Command
                 continue;
             }
 
-            // Dispatch do job de sincronização
-            SyncStoreDataJob::dispatch($store);
-            $queuedCount++;
+            // Calcular delay baseado no ID da loja para distribuir uniformemente
+            if ($useDelay) {
+                $delayMinutes = $this->calculateDelay($store->id);
+                SyncStoreDataJob::dispatch($store)->delay(now()->addMinutes($delayMinutes));
+                $this->line("✓ Loja '{$store->name}' (ID: {$store->id}) agendada com delay de {$delayMinutes} min.");
+            } else {
+                SyncStoreDataJob::dispatch($store);
+                $this->line("✓ Loja '{$store->name}' (ID: {$store->id}) enfileirada para sincronização.");
+            }
 
-            $this->line("✓ Loja '{$store->name}' (ID: {$store->id}) enfileirada para sincronização.");
+            $queuedCount++;
         }
 
         Log::info('Comando stores:sync executado', [
             'total_stores' => $stores->count(),
             'queued' => $queuedCount,
             'skipped' => $skippedCount,
+            'distribution_enabled' => $useDelay,
+            'window_minutes' => self::DISTRIBUTION_WINDOW_MINUTES,
         ]);
 
         $this->newLine();
         $this->info('Sincronização iniciada com sucesso!');
         $this->info("Lojas enfileiradas: {$queuedCount}");
 
+        if ($useDelay && $queuedCount > 0) {
+            $this->info('Jobs distribuídos entre 0 e '.self::DISTRIBUTION_WINDOW_MINUTES.' minutos.');
+        }
+
         if ($skippedCount > 0) {
             $this->warn("Lojas puladas (requerem reconexão): {$skippedCount}");
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Calculate delay in minutes for a store based on its ID.
+     * Uses modulo to distribute stores evenly across the time window.
+     */
+    private function calculateDelay(int $storeId): int
+    {
+        return $storeId % self::DISTRIBUTION_WINDOW_MINUTES;
     }
 
     /**

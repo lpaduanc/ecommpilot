@@ -335,6 +335,22 @@ export const useAnalysisStore = defineStore('analysis', () => {
         fetchPersistentSuggestions(1);
     }
 
+    async function resendAnalysisEmail(analysisId) {
+        try {
+            const response = await api.post(`/analysis/${analysisId}/resend-email`);
+
+            // Atualizar estado local
+            if (currentAnalysis.value?.id === analysisId) {
+                currentAnalysis.value.email_sent_at = new Date().toISOString();
+                currentAnalysis.value.email_error = null;
+            }
+
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    }
+
     /**
      * Set current analysis (for viewing historical analyses)
      */
@@ -385,6 +401,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
         getSuggestionsByCategory,
         startPolling,
         stopPolling,
+        resendAnalysisEmail,
 
         // Persistent suggestions actions
         fetchPersistentSuggestions,

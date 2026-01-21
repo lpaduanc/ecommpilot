@@ -4,17 +4,42 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\DashboardService;
+use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
     public function __construct(
-        private DashboardService $dashboardService
+        private DashboardService $dashboardService,
+        private PlanLimitService $planLimitService
     ) {}
+
+    /**
+     * Check if user has access to custom dashboards.
+     * Returns error response if access denied, null otherwise.
+     */
+    private function checkDashboardAccess(Request $request): ?JsonResponse
+    {
+        $user = $request->user();
+        $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
+
+        if (! $isLocalEnv && ! $this->planLimitService->canAccessCustomDashboards($user)) {
+            return response()->json([
+                'message' => 'Seu plano não inclui acesso aos dashboards avançados.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
+        return null;
+    }
 
     public function stats(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $user = $request->user();
         $store = $user->activeStore;
 
@@ -33,6 +58,10 @@ class DashboardController extends Controller
 
     public function revenueChart(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {
@@ -47,6 +76,10 @@ class DashboardController extends Controller
 
     public function ordersStatusChart(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {
@@ -61,6 +94,10 @@ class DashboardController extends Controller
 
     public function topProducts(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {
@@ -75,6 +112,10 @@ class DashboardController extends Controller
 
     public function paymentMethodsChart(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {
@@ -89,6 +130,10 @@ class DashboardController extends Controller
 
     public function categoriesChart(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {
@@ -103,6 +148,10 @@ class DashboardController extends Controller
 
     public function lowStock(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {
@@ -120,6 +169,10 @@ class DashboardController extends Controller
      */
     public function bulk(Request $request): JsonResponse
     {
+        if ($response = $this->checkDashboardAccess($request)) {
+            return $response;
+        }
+
         $store = $request->user()->activeStore;
 
         if (! $store) {

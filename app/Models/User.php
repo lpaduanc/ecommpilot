@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SubscriptionStatus;
 use App\Enums\UserRole;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -85,6 +86,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ActivityLog::class);
     }
 
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(User::class, 'parent_user_id');
@@ -129,5 +135,53 @@ class User extends Authenticatable implements MustVerifyEmail
     public function recordLogin(): void
     {
         $this->update(['last_login_at' => now()]);
+    }
+
+    // ========== Subscription/Plan Methods ==========
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * Retorna a assinatura ativa do usuário.
+     */
+    public function activeSubscription(): ?Subscription
+    {
+        return $this->subscriptions()
+            ->where(function ($query) {
+                $query->where('status', SubscriptionStatus::Active)
+                    ->orWhere(function ($q) {
+                        $q->where('status', SubscriptionStatus::Trial)
+                            ->where('trial_ends_at', '>', now());
+                    });
+            })
+            ->latest('starts_at')
+            ->first();
+    }
+
+    /**
+     * Retorna o plano atual do usuário.
+     */
+    public function currentPlan(): ?Plan
+    {
+        return $this->activeSubscription()?->plan;
+    }
+
+    /**
+     * Verifica se o usuário tem um plano ativo.
+     */
+    public function hasActivePlan(): bool
+    {
+        return $this->activeSubscription() !== null;
+    }
+
+    /**
+     * Verifica se o usuário está em período de trial.
+     */
+    public function isOnTrial(): bool
+    {
+        return $this->activeSubscription()?->isOnTrial() ?? false;
     }
 }

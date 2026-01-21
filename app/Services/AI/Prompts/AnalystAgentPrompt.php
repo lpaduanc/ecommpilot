@@ -2,550 +2,439 @@
 
 namespace App\Services\AI\Prompts;
 
-use App\Services\AI\ProductTableFormatter;
-
 class AnalystAgentPrompt
 {
+    /**
+     * ANALYST AGENT V4 - COM MELHORIAS
+     *
+     * Melhorias incluídas:
+     * [3] Contexto de sazonalidade
+     * [5] Override do Health Score (forçar classificação em casos extremos)
+     * [8] Anomalias vs histórico próprio da loja
+     */
+
     public static function get(array $data): string
     {
+        $storeName = $data['store_name'] ?? 'Loja';
+        $platform = $data['platform'] ?? 'nuvemshop';
+        $platformName = $data['platform_name'] ?? 'Nuvemshop';
         $niche = $data['niche'] ?? 'geral';
+        $subcategory = $data['subcategory'] ?? 'geral';
         $periodDays = $data['period_days'] ?? 15;
-        $orders = json_encode($data['orders_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-        $products = json_encode($data['products_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-        $inventory = json_encode($data['inventory_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-        $coupons = json_encode($data['coupons_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-        $nicheBenchmarks = json_encode($data['structured_benchmarks'] ?? $data['niche_benchmarks'] ?? $data['benchmarks'] ?? [], JSON_UNESCAPED_UNICODE);
+        $ticketMedio = $data['ticket_medio'] ?? 0;
+        $pedidosMes = $data['pedidos_mes'] ?? 0;
+        $faturamentoMes = $ticketMedio * $pedidosMes;
+
+        // Dados operacionais
+        $orders = json_encode($data['orders_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $products = json_encode($data['products_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $inventory = json_encode($data['inventory_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $coupons = json_encode($data['coupons_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $benchmarks = json_encode($data['structured_benchmarks'] ?? $data['niche_benchmarks'] ?? $data['benchmarks'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        // Histórico da própria loja [MELHORIA 8]
+        $historicalData = json_encode($data['historical_metrics'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        // Dados externos de mercado
+        $externalData = $data['external_data'] ?? [];
+        $trends = $externalData['dados_mercado']['google_trends'] ?? [];
+        $market = $externalData['dados_mercado']['precos_mercado'] ?? [];
+        $competitors = $externalData['concorrentes'] ?? [];
+
+        $tendencia = $trends['tendencia'] ?? 'nao_disponivel';
+        $interesseBusca = $trends['interesse_busca'] ?? 0;
+        $trendsSucesso = $trends['sucesso'] ?? false;
+
+        $precoMedioMercado = $market['faixa_preco']['media'] ?? 0;
+        $precoMinMercado = $market['faixa_preco']['min'] ?? 0;
+        $precoMaxMercado = $market['faixa_preco']['max'] ?? 0;
+        $marketSucesso = $market['sucesso'] ?? false;
+
+        // Calcular média dos concorrentes
+        $somaPrecosConc = 0;
+        $concorrentesSucesso = 0;
+        $concorrentesResumo = [];
+
+        foreach ($competitors as $c) {
+            if (!($c['sucesso'] ?? false)) continue;
+            $concorrentesSucesso++;
+            $precoMedio = $c['faixa_preco']['media'] ?? 0;
+            $somaPrecosConc += $precoMedio;
+            $concorrentesResumo[] = [
+                'nome' => $c['nome'] ?? 'Concorrente',
+                'preco_medio' => $precoMedio,
+                'diferenciais' => $c['diferenciais'] ?? []
+            ];
+        }
+        $mediaPrecosConcorrentes = $concorrentesSucesso > 0 ? round($somaPrecosConc / $concorrentesSucesso, 2) : 0;
+        $concorrentesJson = json_encode($concorrentesResumo, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        // Calcular posicionamento
+        $posVsMercado = 'nao_calculado';
+        $posVsConcorrentes = 'nao_calculado';
+
+        if ($precoMedioMercado > 0 && $ticketMedio > 0) {
+            $ratio = $ticketMedio / $precoMedioMercado;
+            if ($ratio < 0.85) $posVsMercado = 'abaixo';
+            elseif ($ratio > 1.15) $posVsMercado = 'acima';
+            else $posVsMercado = 'dentro';
+        }
+
+        if ($mediaPrecosConcorrentes > 0 && $ticketMedio > 0) {
+            $ratio = $ticketMedio / $mediaPrecosConcorrentes;
+            if ($ratio < 0.85) $posVsConcorrentes = 'abaixo';
+            elseif ($ratio > 1.15) $posVsConcorrentes = 'acima';
+            else $posVsConcorrentes = 'dentro';
+        }
+
+        // Contexto de sazonalidade [MELHORIA 3]
+        $mes = (int) date('n');
+        $sazonalidade = self::getSeasonalityImpact($mes);
 
         return <<<PROMPT
-Você é um analista de dados especializado em e-commerce brasileiro.
+# ANALYST AGENT — DIAGNÓSTICO COMPLETO DA LOJA
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-Todas as descrições, padrões e observações devem estar em português brasileiro.
+## SEU PAPEL
+Você é o médico da loja. Diagnosticar saúde do negócio, identificar problemas, encontrar oportunidades e preparar briefing para o Strategist.
 
-## Sua Tarefa
-Analise os dados da loja e calcule métricas críticas, identificando padrões e anomalias.
+---
 
-## REGRAS CRÍTICAS DE ANÁLISE
+## CONTEXTO DA LOJA
 
-### Sobre Dados Não Disponíveis
-- Se uma métrica NÃO estiver nos dados fornecidos, use `null` (não 0)
-- NÃO faça estimativas ou suposições
-- Indique explicitamente quando um dado está ausente
+| Campo | Valor |
+|-------|-------|
+| Nome | {$storeName} |
+| Plataforma | {$platformName} |
+| Nicho | {$niche} |
+| Subcategoria | {$subcategory} |
+| Ticket Médio | R$ {$ticketMedio} |
+| Pedidos/Mês | {$pedidosMes} |
+| Faturamento Estimado | R$ {$faturamentoMes}/mês |
+| Período Analisado | {$periodDays} dias |
 
-### Sobre Benchmarks
-- Use benchmarks DO NICHO ESPECÍFICO da loja
-- O nicho desta loja é: {$niche}
-- NÃO use benchmark geral de e-commerce para nichos específicos
+---
 
-## Dados de Pedidos (últimos {$periodDays} dias)
+## 📅 CONTEXTO SAZONAL [MELHORIA 3]
+
+{$sazonalidade}
+
+**IMPORTANTE:** Considere a sazonalidade ao avaliar métricas. Uma queda em janeiro pode ser normal (pós-festas).
+
+---
+
+## DADOS OPERACIONAIS
+
+### Pedidos (últimos {$periodDays} dias)
 ```json
 {$orders}
 ```
 
-## Dados de Produtos
+### Produtos
 ```json
 {$products}
 ```
 
-## Dados de Estoque
+### Estoque
 ```json
 {$inventory}
 ```
 
-## Dados de Cupons
+### Cupons
 ```json
 {$coupons}
 ```
 
-## Benchmarks do Nicho {$niche}
-```json
-{$nicheBenchmarks}
-```
-
-## CÁLCULO DO HEALTH SCORE (0-100)
-
-O score DEVE ser calculado assim:
-
-### Componentes do Score:
-
-1. **Ticket Médio vs Benchmark do Nicho (25 pontos)**
-   - 100% do benchmark ou mais = 25 pontos
-   - 80-99% do benchmark = 20 pontos
-   - 60-79% do benchmark = 15 pontos
-   - 40-59% do benchmark = 10 pontos
-   - Abaixo de 40% = 5 pontos
-
-2. **Disponibilidade de Estoque (25 pontos)**
-   - 0-10% produtos sem estoque = 25 pontos
-   - 11-20% sem estoque = 20 pontos
-   - 21-35% sem estoque = 15 pontos
-   - 36-50% sem estoque = 10 pontos
-   - Acima de 50% = 5 pontos
-
-3. **Taxa de Cancelamento (15 pontos)**
-   - 0-3% = 15 pontos
-   - 4-7% = 12 pontos
-   - 8-12% = 8 pontos
-   - 13-20% = 4 pontos
-   - Acima de 20% = 0 pontos
-
-4. **Saúde de Cupons (15 pontos)**
-   - Taxa de uso 20-50% com impacto < 15% no ticket = 15 pontos
-   - Taxa de uso 50-70% com impacto < 20% = 10 pontos
-   - Taxa de uso > 70% OU impacto > 20% = 5 pontos
-   - Taxa de uso > 80% E impacto > 25% = 0 pontos
-
-5. **Tendência de Vendas (20 pontos)**
-   - Crescendo (>5% vs período anterior) = 20 pontos
-   - Estável (-5% a +5%) = 15 pontos
-   - Queda leve (-5% a -15%) = 10 pontos
-   - Queda forte (< -15%) = 5 pontos
-
-### Classificação:
-- 76-100: excellent
-- 51-75: healthy
-- 26-50: attention
-- 0-25: critical
-
-**IMPORTANTE: O score NUNCA pode ser negativo. Mínimo é 0.**
-
-## Métricas a Calcular
-
-### 1. Vendas
-- total: número de pedidos pagos
-- daily_average: total / dias do período
-- trend: "growing" | "stable" | "falling" (baseado em comparação entre primeira e segunda metade do período)
-- trend_percentage: variação percentual
-
-### 2. Ticket Médio
-- value: receita total / pedidos pagos
-- benchmark: valor do benchmark DO NICHO (não geral)
-- percentage_difference: ((value - benchmark) / benchmark) * 100
-- benchmark_source: "Benchmark nicho {$niche}"
-
-### 3. Taxa de Conversão
-- rate: SE disponível nos dados, calcule. SE NÃO, use null
-- benchmark: benchmark do nicho
-- data_available: true | false
-
-### 4. Taxa de Cancelamento
-- rate: (pedidos voided / total pedidos) * 100
-- voided_count: número absoluto
-- main_reasons: SE disponível nos dados, liste. SE NÃO, array vazio
-
-### 5. Estoque
-- out_of_stock_count: produtos com estoque 0
-- out_of_stock_percentage: (out_of_stock / produtos ativos) * 100
-- low_stock_count: produtos com estoque crítico
-- excess_stock_count: produtos com excesso
-
-### 6. Cupons
-- usage_rate: % de pedidos com cupom
-- ticket_impact: impacto % no ticket médio
-- total_discount: valor total de descontos dados
-- dependency_level: "low" (<30%) | "medium" (30-60%) | "high" (60-80%) | "critical" (>80%)
-
-## Detecção de Anomalias
-
-Identifique anomalias APENAS se houver evidência clara nos dados:
-
-### Tipos de Anomalia:
-1. **Queda brusca de vendas**: dia com <50% da média do período
-2. **Estoque crítico**: >30% dos produtos ativos sem estoque
-3. **Ticket abaixo do nicho**: >20% abaixo do benchmark do nicho
-4. **Dependência de cupons**: >70% dos pedidos com cupom
-5. **Concentração de vendas**: top 3 produtos > 60% das vendas
-6. **Cancelamento elevado**: >8% de taxa de cancelamento
-
-### Para cada anomalia, forneça:
-- type: tipo da anomalia
-- description: descrição em português
-- severity: "high" | "medium" | "low"
-- data: dados que evidenciam a anomalia
-- impact_estimate: estimativa de impacto em R$ ou % (se calculável)
-
-## Formato de Saída
-```json
-{
-  "metrics": {
-    "sales": {
-      "total": 0,
-      "daily_average": 0,
-      "trend": "growing|stable|falling",
-      "trend_percentage": 0
-    },
-    "average_order_value": {
-      "value": 0,
-      "benchmark": 0,
-      "percentage_difference": 0,
-      "benchmark_source": "string"
-    },
-    "conversion": {
-      "rate": null,
-      "benchmark": 0,
-      "data_available": false
-    },
-    "cancellation": {
-      "rate": 0,
-      "voided_count": 0,
-      "main_reasons": []
-    },
-    "inventory": {
-      "out_of_stock_count": 0,
-      "out_of_stock_percentage": 0,
-      "low_stock_count": 0,
-      "excess_stock_count": 0
-    },
-    "coupons": {
-      "usage_rate": 0,
-      "ticket_impact": 0,
-      "total_discount": 0,
-      "dependency_level": "string"
-    }
-  },
-  "anomalies": [
-    {
-      "type": "string",
-      "description": "descrição em português",
-      "severity": "high|medium|low",
-      "data": {},
-      "impact_estimate": "string ou null"
-    }
-  ],
-  "identified_patterns": [
-    {
-      "type": "string",
-      "description": "descrição em português",
-      "opportunity": "oportunidade em português",
-      "data_support": "dados que suportam o padrão"
-    }
-  ],
-  "overall_health": {
-    "score": 0,
-    "score_breakdown": {
-      "ticket_medio": 0,
-      "disponibilidade_estoque": 0,
-      "taxa_cancelamento": 0,
-      "saude_cupons": 0,
-      "tendencia_vendas": 0
-    },
-    "classification": "critical|attention|healthy|excellent",
-    "main_points": ["ponto em português"]
-  },
-  "data_quality": {
-    "missing_metrics": ["lista de métricas não disponíveis"],
-    "recommendations": ["recomendações para melhorar coleta de dados"]
-  }
-}
-```
-
-## INSTRUÇÕES CRÍTICAS
-1. Retorne APENAS JSON válido
-2. Health Score: SEMPRE entre 0 e 100, NUNCA negativo
-3. Use benchmarks DO NICHO, não genéricos
-4. Se dado não disponível, use null (não 0)
-5. Anomalias devem ter evidência nos dados
-6. RESPONDA EM PORTUGUÊS BRASILEIRO
-PROMPT;
-    }
-
-    /**
-     * Get V2 prompt - otimizado com menos tokens e clarificação de status vs payment_status.
-     */
-    public static function getV2(array $data, bool $useMarkdownTables = true): string
-    {
-        // Dados de pedidos com informações de payment_status
-        $orders = $data['orders_summary'] ?? [];
-        $ordersJson = json_encode($orders, JSON_UNESCAPED_UNICODE);
-
-        // Usar tabelas Markdown para produtos se habilitado
-        $productsSection = '';
-        if ($useMarkdownTables) {
-            $bestSellers = $data['products_summary']['best_sellers'] ?? [];
-            $productsSection = ProductTableFormatter::formatTopSellers($bestSellers);
-        } else {
-            $productsJson = json_encode($data['products_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-            $productsSection = "```json\n{$productsJson}\n```";
-        }
-
-        // Inventário resumido
-        $inventorySection = '';
-        if ($useMarkdownTables) {
-            $inventorySection = ProductTableFormatter::formatInventorySummary($data['inventory_summary'] ?? []);
-        } else {
-            $inventoryJson = json_encode($data['inventory_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-            $inventorySection = "```json\n{$inventoryJson}\n```";
-        }
-
-        $coupons = json_encode($data['coupons_summary'] ?? [], JSON_UNESCAPED_UNICODE);
-        $benchmarks = json_encode($data['structured_benchmarks'] ?? $data['benchmarks'] ?? [], JSON_UNESCAPED_UNICODE);
-
-        return <<<PROMPT
-Você é um analista de dados especializado em e-commerce brasileiro.
-
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-TODAS as respostas, descrições, análises, anomalias, padrões e pontos principais DEVEM ser escritos em PORTUGUÊS BRASILEIRO. Não use inglês em nenhuma parte da resposta.
-
-## ⚠️ DIFERENÇA CRÍTICA: STATUS vs PAYMENT_STATUS
-
-**status** = Fluxo/Processamento do pedido
-- 'pending': Pedido recebido, aguardando processamento (NORMAL!)
-- 'processing': Em preparação/separação
-- 'shipped': Enviado
-- 'delivered': Entregue
-- 'cancelled': Cancelado pelo cliente
-
-**payment_status** = Confirmação de pagamento
-- 'pending': Pagamento NÃO confirmado ainda (ALERTA se >5%)
-- 'paid': Pagamento CONFIRMADO ✓ (Receita realizada)
-- 'refunded': Pagamento devolvido (perda de receita)
-- 'failed': Falha na transação
-
-## REGRA DE ANÁLISE
-- Pedidos com status='pending' E payment_status='paid' → NORMAL (em processamento)
-- Pedidos com status='pending' E payment_status='pending' → ALERTA (aguardando pagamento)
-- NÃO reporte "99% pedidos pendentes" como anomalia se payment_status='paid'
-- ANOMALIA REAL: payment_status='pending' em taxa >5%
-
-## Dados de Pedidos (últimos 15 dias)
-```json
-{$ordersJson}
-```
-
-## Top Produtos com Vendas
-{$productsSection}
-
-## Estoque
-{$inventorySection}
-
-## Dados de Cupons
-```json
-{$coupons}
-```
-
-## Benchmarks do Nicho
+### Benchmarks ({$subcategory})
 ```json
 {$benchmarks}
 ```
 
-## Métricas a Calcular
-1. **Vendas:** total, média diária, tendência
-2. **Ticket Médio:** valor vs benchmark
-3. **Taxa de Pagamento Confirmado:** % com payment_status='paid'
-4. **Taxa de Cancelamento:** % de pedidos cancelados
-5. **Estoque:** sem estoque, estoque crítico
-6. **Cupons:** taxa de uso, impacto no ticket
+---
 
-## Formato de Saída (JSON) - TUDO EM PORTUGUÊS
+## 📊 HISTÓRICO DA PRÓPRIA LOJA [MELHORIA 8]
+
+Use estes dados para detectar anomalias comparando com o passado da própria loja:
+
+```json
+{$historicalData}
+```
+
+**COMO USAR:**
+- Compare métricas atuais com média dos últimos 3 meses
+- Variação > 20% = ANOMALIA (positiva ou negativa)
+- Tendência de 3+ meses na mesma direção = PADRÃO
+
+---
+
+## DADOS DE MERCADO EM TEMPO REAL
+
+### Google Trends
+| Métrica | Valor |
+|---------|-------|
+| Coleta | {$trendsSucesso} |
+| Tendência | {$tendencia} |
+| Interesse | {$interesseBusca}/100 |
+
+### Preços de Mercado
+| Métrica | Valor |
+|---------|-------|
+| Coleta | {$marketSucesso} |
+| Faixa | R$ {$precoMinMercado} - R$ {$precoMaxMercado} |
+| Média | R$ {$precoMedioMercado} |
+
+### Concorrentes ({$concorrentesSucesso})
+```json
+{$concorrentesJson}
+```
+**Média concorrentes:** R$ {$mediaPrecosConcorrentes}
+
+### Posicionamento
+| Comparação | Posição |
+|------------|---------|
+| vs Mercado | {$posVsMercado} |
+| vs Concorrentes | {$posVsConcorrentes} |
+
+---
+
+## SUAS TAREFAS
+
+### 1. CALCULAR HEALTH SCORE (0-100)
+
+| Componente | Peso | Cálculo |
+|------------|------|---------|
+| Ticket vs Benchmark | 25pts | ≥100%=25, 80-99%=20, 60-79%=15, <60%=10 |
+| Disponibilidade Estoque | 25pts | 0-10% zerado=25, 11-20%=20, 21-35%=15, >35%=10 |
+| Taxa Cancelamento | 15pts | 0-3%=15, 4-7%=12, 8-12%=8, >12%=4 |
+| Saúde de Cupons | 15pts | uso<50% E impacto<15%=15, senão proporcional |
+| Tendência Vendas | 20pts | crescendo=20, estável=15, queda leve=10, queda forte=5 |
+
+### ⚠️ OVERRIDE DO HEALTH SCORE [MELHORIA 5]
+
+**REGRAS DE OVERRIDE (aplicar APÓS calcular score):**
+
+🔴 **FORÇAR CRÍTICO** (score máximo = 25):
+- Estoque zerado > 45% dos produtos ativos
+- Taxa cancelamento > 15%
+- Queda de vendas > 40% vs período anterior
+
+🟠 **LIMITAR A ATENÇÃO** (score máximo = 50):
+- Estoque zerado > 35%
+- Taxa cancelamento > 10%
+- Dependência de cupons > 85%
+
+**EXEMPLO:** Se score calculado = 65 mas estoque zerado = 48%, FORÇAR score = 25 (Crítico)
+
+**Classificação Final:**
+- 76-100 = Excelente 🟢
+- 51-75 = Saudável 🟡
+- 26-50 = Atenção 🟠
+- 0-25 = Crítico 🔴
+
+---
+
+### 2. IDENTIFICAR ALERTAS
+
+#### 🔴 CRÍTICO (ação imediata)
+- Estoque zerado > 40%
+- Cancelamento > 10%
+- Queda vendas > 30%
+- Preço > 30% acima mercado SEM diferenciação
+
+#### 🟡 ATENÇÃO (ação em 30 dias)
+- Estoque zerado 20-40%
+- Cancelamento 5-10%
+- Ticket > 20% abaixo benchmark
+- Cupons > 70% com impacto > 15%
+
+#### 🟢 MONITORAMENTO
+- Métricas dentro do esperado
+- Tendências a observar
+
+---
+
+### 3. DETECTAR ANOMALIAS VS HISTÓRICO [MELHORIA 8]
+
+Compare métricas atuais com histórico da própria loja:
+
+| Métrica | Se variação > 20% |
+|---------|-------------------|
+| Ticket médio | Anomalia de pricing |
+| Pedidos/dia | Anomalia de demanda |
+| Taxa cancelamento | Anomalia operacional |
+| Taxa conversão | Anomalia de conversão |
+| Uso de cupons | Anomalia de desconto |
+
+**IDENTIFICAR:**
+- Anomalias POSITIVAS (crescimento inesperado) → oportunidade
+- Anomalias NEGATIVAS (queda inesperada) → problema
+- Considerar SAZONALIDADE antes de classificar como anomalia
+
+---
+
+### 4. IDENTIFICAR 5 OPORTUNIDADES
+
+| Tipo | Quando Identificar |
+|------|-------------------|
+| price_optimization | Margem para ajuste baseado em mercado |
+| bundle_opportunity | Produtos complementares |
+| customer_retention | Recompra abaixo benchmark |
+| inventory_optimization | Desequilíbrio estoque/demanda |
+| growth_potential | Tendência alta + capacidade |
+
+---
+
+### 5. COMPARAÇÃO TRIPLA OBRIGATÓRIA
+
+```
+Ticket Loja: R$ {$ticketMedio}
+├── vs Benchmark: diferença X%
+├── vs Mercado: R$ {$precoMedioMercado} → diferença Y%
+└── vs Concorrentes: R$ {$mediaPrecosConcorrentes} → diferença Z%
+```
+
+---
+
+## FORMATO DE SAÍDA (JSON)
+
 ```json
 {
-  "metrics": {
-    "sales": {"total": 0, "daily_average": 0, "trend": "crescendo|estável|caindo", "previous_period_variation": 0},
-    "average_order_value": {"value": 0, "benchmark": 0, "percentage_difference": 0},
-    "payment_confirmation": {"rate": 0, "pending_count": 0},
-    "cancellation": {"rate": 0, "main_reasons": ["motivo em português"]},
-    "inventory": {"out_of_stock_products": 0, "critical_stock_products": 0, "stagnant_inventory_value": 0},
-    "coupons": {"usage_rate": 0, "ticket_impact": 0}
+  "resumo_executivo": "3-4 frases: saúde, problema principal, oportunidade principal",
+
+  "health_score": {
+    "score_calculado": 0,
+    "override_aplicado": true|false,
+    "motivo_override": "string ou null",
+    "score_final": 0,
+    "classificacao": "critico|atencao|saudavel|excelente",
+    "componentes": {
+      "ticket_vs_benchmark": {"pontos": 0, "max": 25, "detalhe": ""},
+      "disponibilidade_estoque": {"pontos": 0, "max": 25, "detalhe": ""},
+      "taxa_cancelamento": {"pontos": 0, "max": 15, "detalhe": ""},
+      "saude_cupons": {"pontos": 0, "max": 15, "detalhe": ""},
+      "tendencia_vendas": {"pontos": 0, "max": 20, "detalhe": ""}
+    }
   },
-  "anomalies": [{"type": "tipo_em_portugues", "description": "descrição em português", "severity": "alto|médio|baixo", "data": {}}],
-  "identified_patterns": [{"type": "tipo_em_portugues", "description": "descrição em português", "opportunity": "oportunidade em português"}],
-  "overall_health": {"score": 0, "classification": "crítico|atenção|saudável|excelente", "main_points": ["ponto em português"]}
+
+  "alertas": {
+    "criticos": [{"tipo": "", "titulo": "", "descricao": "", "impacto_estimado": ""}],
+    "atencao": [{"tipo": "", "titulo": "", "descricao": "", "prazo_sugerido": ""}],
+    "monitoramento": [{"tipo": "", "titulo": "", "motivo": ""}]
+  },
+
+  "anomalias_vs_historico": [
+    {
+      "metrica": "nome da métrica",
+      "valor_atual": 0,
+      "valor_historico": 0,
+      "variacao_percentual": 0,
+      "tipo": "positiva|negativa",
+      "severidade": "high|medium|low",
+      "consideracao_sazonal": "string explicando se sazonalidade explica",
+      "acao_sugerida": "string"
+    }
+  ],
+
+  "oportunidades": [
+    {
+      "tipo": "",
+      "titulo": "",
+      "descricao": "",
+      "base_dados": "",
+      "calculo_roi": {"formula": "", "resultado": ""},
+      "potencial_receita": "R$ X/mês"
+    }
+  ],
+
+  "posicionamento_mercado": {
+    "ticket_loja": {$ticketMedio},
+    "vs_benchmark": {"valor": 0, "diferenca_percentual": 0, "posicao": ""},
+    "vs_mercado": {"valor": {$precoMedioMercado}, "diferenca_percentual": 0, "posicao": ""},
+    "vs_concorrentes": {"valor": {$mediaPrecosConcorrentes}, "diferenca_percentual": 0, "posicao": ""},
+    "interpretacao": ""
+  },
+
+  "contexto_sazonal": {
+    "periodo_atual": "",
+    "impacto_nas_metricas": "",
+    "ajuste_recomendado": ""
+  },
+
+  "alertas_para_strategist": {
+    "prioridade_1": "",
+    "prioridade_2": "",
+    "prioridade_3": "",
+    "contexto_mercado": "",
+    "restricoes": [""],
+    "dados_chave": {
+      "ticket": {$ticketMedio},
+      "pedidos_mes": {$pedidosMes},
+      "faturamento_mes": {$faturamentoMes},
+      "tendencia_mercado": "{$tendencia}"
+    }
+  }
 }
 ```
 
-## INSTRUÇÕES CRÍTICAS
-1. NÃO reporte status='pending' como anomalia se payment_status='paid'
-2. Retorne APENAS JSON válido, sem texto adicional
-3. Descrições: máximo 200 caracteres
-4. Main points: máximo 150 caracteres cada
-5. **IDIOMA: PORTUGUÊS BRASILEIRO OBRIGATÓRIO** - TODAS as descrições, anomalias, padrões, pontos principais e observações DEVEM ser em português. NÃO use inglês.
+---
 
-## Exemplos de Valores em Português
-- trend: "crescendo", "estável", "caindo" (NÃO use "growing", "stable", "falling")
-- classification: "crítico", "atenção", "saudável", "excelente"
-- anomaly types: "queda_vendas", "estoque_critico", "cupons_excessivos"
-- main_points: "Vendas em crescimento de 15%", "Estoque crítico em 5 produtos"
+## INSTRUÇÕES FINAIS
+
+1. **Retorne APENAS JSON válido**
+2. **PORTUGUÊS BRASILEIRO**
+3. **Health Score: aplicar OVERRIDE se necessário**
+4. **Anomalias: comparar com histórico da loja**
+5. **Sazonalidade: considerar antes de classificar anomalias**
+6. **EXATAMENTE 5 oportunidades com ROI**
+
 PROMPT;
     }
 
     /**
-     * Retorna o template do prompt V1 com placeholders para log.
+     * Retorna impacto da sazonalidade no mês atual
      */
+    private static function getSeasonalityImpact(int $mes): string
+    {
+        $impactos = [
+            1 => "**Janeiro - Pós-Festas:** Queda natural de 20-30% nas vendas é ESPERADA. Não classificar como anomalia grave.",
+            2 => "**Fevereiro - Carnaval:** Vendas voláteis. Pico antes do feriado, queda durante.",
+            3 => "**Março - Normalização:** Retorno ao padrão normal. Bom mês para comparação.",
+            4 => "**Abril - Páscoa:** Possível leve alta em kits presenteáveis.",
+            5 => "**Maio - Dia das Mães:** ALTA TEMPORADA. Espere +30-50% nas vendas. Queda após = normal.",
+            6 => "**Junho - Inverno/Namorados:** Pico no início (Namorados), depois estabiliza.",
+            7 => "**Julho - Férias:** Vendas podem cair 10-15% (férias escolares).",
+            8 => "**Agosto - Dia dos Pais:** Leve alta em produtos masculinos. Mês de preparação para Q4.",
+            9 => "**Setembro - Dia do Cliente:** Possíveis promoções. Preparação para Black Friday.",
+            10 => "**Outubro - Pré-Black Friday:** Consumidores segurando compras. Queda pode ser estratégica.",
+            11 => "**Novembro - Black Friday:** MAIOR MÊS. Espere +50-100% nas vendas.",
+            12 => "**Dezembro - Natal:** ALTA TEMPORADA. +40-60% nas vendas até dia 20, queda após."
+        ];
+
+        return $impactos[$mes] ?? "Mês sem sazonalidade específica.";
+    }
+
     public static function getTemplate(): string
     {
         return <<<'TEMPLATE'
-Você é um analista de dados especializado em e-commerce brasileiro.
+# ANALYST AGENT — DIAGNÓSTICO COMPLETO
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-Todas as descrições, padrões e observações devem estar em português brasileiro.
+## PAPEL
+Diagnosticar saúde da loja, identificar problemas e oportunidades.
 
-## Sua Tarefa
-Analise os dados da loja e calcule métricas críticas, identificando padrões e anomalias.
+## ENTREGAS
+1. Health Score (0-100) COM OVERRIDE se necessário
+2. Alertas (críticos, atenção, monitoramento)
+3. 5 Oportunidades com ROI calculado
+4. Anomalias vs histórico da própria loja
+5. Posicionamento de mercado (tripla comparação)
+6. Briefing para Strategist
 
-## REGRAS CRÍTICAS DE ANÁLISE
+## REGRAS
+- Aplicar OVERRIDE do Health Score em casos extremos
+- Comparar com histórico da própria loja antes de classificar anomalias
+- Considerar sazonalidade
+- Comparação tripla obrigatória
 
-### Sobre Dados Não Disponíveis
-- Se uma métrica NÃO estiver nos dados fornecidos, use `null` (não 0)
-- NÃO faça estimativas ou suposições
-- Indique explicitamente quando um dado está ausente
-
-### Sobre Benchmarks
-- Use benchmarks DO NICHO ESPECÍFICO da loja
-- O nicho desta loja é: {{niche}}
-- NÃO use benchmark geral de e-commerce para nichos específicos
-
-## Dados de Pedidos (últimos {{period_days}} dias)
-```json
-{{orders_summary}}
-```
-
-## Dados de Produtos
-```json
-{{products_summary}}
-```
-
-## Dados de Estoque
-```json
-{{inventory_summary}}
-```
-
-## Dados de Cupons
-```json
-{{coupons_summary}}
-```
-
-## Benchmarks do Nicho {{niche}}
-```json
-{{niche_benchmarks}}
-```
-
-## CÁLCULO DO HEALTH SCORE (0-100)
-
-### Componentes do Score:
-1. **Ticket Médio vs Benchmark do Nicho (25 pontos)**
-2. **Disponibilidade de Estoque (25 pontos)**
-3. **Taxa de Cancelamento (15 pontos)**
-4. **Saúde de Cupons (15 pontos)**
-5. **Tendência de Vendas (20 pontos)**
-
-### Classificação:
-- 76-100: excellent
-- 51-75: healthy
-- 26-50: attention
-- 0-25: critical
-
-**IMPORTANTE: O score NUNCA pode ser negativo. Mínimo é 0.**
-
-## Formato de Saída
-```json
-{
-  "metrics": {
-    "sales": {"total": 0, "daily_average": 0, "trend": "growing|stable|falling", "trend_percentage": 0},
-    "average_order_value": {"value": 0, "benchmark": 0, "percentage_difference": 0, "benchmark_source": "string"},
-    "conversion": {"rate": null, "benchmark": 0, "data_available": false},
-    "cancellation": {"rate": 0, "voided_count": 0, "main_reasons": []},
-    "inventory": {"out_of_stock_count": 0, "out_of_stock_percentage": 0, "low_stock_count": 0, "excess_stock_count": 0},
-    "coupons": {"usage_rate": 0, "ticket_impact": 0, "total_discount": 0, "dependency_level": "string"}
-  },
-  "anomalies": [{"type": "string", "description": "descrição em português", "severity": "high|medium|low", "data": {}, "impact_estimate": "string ou null"}],
-  "identified_patterns": [{"type": "string", "description": "descrição em português", "opportunity": "oportunidade em português", "data_support": "dados que suportam o padrão"}],
-  "overall_health": {
-    "score": 0,
-    "score_breakdown": {"ticket_medio": 0, "disponibilidade_estoque": 0, "taxa_cancelamento": 0, "saude_cupons": 0, "tendencia_vendas": 0},
-    "classification": "critical|attention|healthy|excellent",
-    "main_points": ["ponto em português"]
-  },
-  "data_quality": {"missing_metrics": [], "recommendations": []}
-}
-```
-
-## INSTRUÇÕES CRÍTICAS
-1. Retorne APENAS JSON válido
-2. Health Score: SEMPRE entre 0 e 100, NUNCA negativo
-3. Use benchmarks DO NICHO, não genéricos
-4. Se dado não disponível, use null (não 0)
-5. Anomalias devem ter evidência nos dados
-6. RESPONDA EM PORTUGUÊS BRASILEIRO
-TEMPLATE;
-    }
-
-    /**
-     * Retorna o template do prompt V2 com placeholders para log.
-     */
-    public static function getTemplateV2(): string
-    {
-        return <<<'TEMPLATE'
-Você é um analista de dados especializado em e-commerce brasileiro.
-
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-TODAS as respostas, descrições, análises, anomalias, padrões e pontos principais DEVEM ser escritos em PORTUGUÊS BRASILEIRO.
-
-## ⚠️ DIFERENÇA CRÍTICA: STATUS vs PAYMENT_STATUS
-
-**status** = Fluxo/Processamento do pedido
-- 'pending': Pedido recebido, aguardando processamento (NORMAL!)
-- 'processing': Em preparação/separação
-- 'shipped': Enviado
-- 'delivered': Entregue
-- 'cancelled': Cancelado pelo cliente
-
-**payment_status** = Confirmação de pagamento
-- 'pending': Pagamento NÃO confirmado ainda (ALERTA se >5%)
-- 'paid': Pagamento CONFIRMADO ✓ (Receita realizada)
-- 'refunded': Pagamento devolvido (perda de receita)
-- 'failed': Falha na transação
-
-## REGRA DE ANÁLISE
-- Pedidos com status='pending' E payment_status='paid' → NORMAL (em processamento)
-- Pedidos com status='pending' E payment_status='pending' → ALERTA (aguardando pagamento)
-- NÃO reporte "99% pedidos pendentes" como anomalia se payment_status='paid'
-- ANOMALIA REAL: payment_status='pending' em taxa >5%
-
-## Dados de Pedidos (últimos 15 dias)
-```json
-{{orders_summary}}
-```
-
-## Top Produtos com Vendas
-{{products_section}}
-
-## Estoque
-{{inventory_section}}
-
-## Dados de Cupons
-```json
-{{coupons_summary}}
-```
-
-## Benchmarks do Nicho
-```json
-{{benchmarks}}
-```
-
-## Métricas a Calcular
-1. **Vendas:** total, média diária, tendência
-2. **Ticket Médio:** valor vs benchmark
-3. **Taxa de Pagamento Confirmado:** % com payment_status='paid'
-4. **Taxa de Cancelamento:** % de pedidos cancelados
-5. **Estoque:** sem estoque, estoque crítico
-6. **Cupons:** taxa de uso, impacto no ticket
-
-## Formato de Saída (JSON) - TUDO EM PORTUGUÊS
-```json
-{
-  "metrics": {...},
-  "anomalies": [...],
-  "identified_patterns": [...],
-  "overall_health": {...}
-}
-```
-
-## INSTRUÇÕES CRÍTICAS
-1. NÃO reporte status='pending' como anomalia se payment_status='paid'
-2. Retorne APENAS JSON válido, sem texto adicional
-3. Descrições: máximo 200 caracteres
-4. Main points: máximo 150 caracteres cada
-5. **IDIOMA: PORTUGUÊS BRASILEIRO OBRIGATÓRIO**
+PORTUGUÊS BRASILEIRO
 TEMPLATE;
     }
 }

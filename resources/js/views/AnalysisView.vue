@@ -7,6 +7,7 @@ import { useIntegrationStore } from '../stores/integrationStore';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
+import UpgradeBanner from '../components/common/UpgradeBanner.vue';
 import SuggestionCard from '../components/analysis/SuggestionCard.vue';
 import SuggestionDetailModal from '../components/analysis/SuggestionDetailModal.vue';
 import OpportunityDetailModal from '../components/analysis/OpportunityDetailModal.vue';
@@ -23,6 +24,7 @@ import {
     ChartBarIcon,
     CalendarIcon,
     ArrowLeftIcon,
+    EnvelopeIcon,
 } from '@heroicons/vue/24/outline';
 
 const analysisStore = useAnalysisStore();
@@ -32,6 +34,9 @@ const integrationStore = useIntegrationStore();
 
 const isStoreSyncing = computed(() => integrationStore.isActiveStoreSyncing);
 
+// Verifica acesso pelo plano
+const canAccessAnalysis = computed(() => authStore.canAccessAiAnalysis);
+
 const showCreditWarning = ref(false);
 const showRateLimitWarning = ref(false);
 const selectedSuggestion = ref(null);
@@ -40,6 +45,7 @@ const selectedOpportunity = ref(null);
 const showOpportunityDetail = ref(false);
 const countdownInterval = ref(null);
 const showChat = ref(false);
+const isResendingEmail = ref(false);
 
 // Análises anteriores
 const selectedHistoricalId = ref(null);
@@ -155,6 +161,18 @@ async function handleStatusChange({ suggestion, status }) {
     }
 }
 
+async function handleResendEmail() {
+    isResendingEmail.value = true;
+    try {
+        await analysisStore.resendAnalysisEmail(currentAnalysis.value.id);
+        notificationStore.success('E-mail reenviado com sucesso!');
+    } catch (error) {
+        notificationStore.error(error.response?.data?.message || 'Erro ao reenviar e-mail');
+    } finally {
+        isResendingEmail.value = false;
+    }
+}
+
 // Funções para análises anteriores
 function formatAnalysisDate(dateString) {
     if (!dateString) return '-';
@@ -236,6 +254,120 @@ onUnmounted(() => {
 
 <template>
     <div class="space-y-6">
+        <!-- Banner de Upgrade - Plano não inclui Análises IA -->
+        <UpgradeBanner
+            v-if="!canAccessAnalysis"
+            title="Recurso não disponível no seu plano"
+            description="Seu plano atual não inclui acesso às Análises IA. Faça upgrade para desbloquear análises inteligentes da sua loja com sugestões personalizadas."
+        />
+
+        <!-- Conteúdo normal - só mostra se tiver acesso -->
+        <template v-else>
+
+        <!-- Banner de Análise com Erro (status = failed) -->
+        <div
+            v-if="currentAnalysis?.status === 'failed' && currentAnalysis?.error_message"
+            class="bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-300 dark:border-rose-700 rounded-xl p-5"
+        >
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-800 flex items-center justify-center">
+                    <ExclamationTriangleIcon class="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-rose-800 dark:text-rose-200">
+                        Erro na Análise
+                    </h3>
+                    <p class="text-sm text-rose-600 dark:text-rose-300 mt-1">
+                        {{ currentAnalysis.error_message }}
+                    </p>
+                    <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
+                        Seus créditos foram reembolsados automaticamente. Você pode tentar novamente.
+                    </p>
+                    <BaseButton
+                        v-if="authStore.hasPermission('analysis.request') && canRequestAnalysis"
+                        variant="danger"
+                        size="md"
+                        @click="handleRequestAnalysis"
+                        class="mt-4"
+                    >
+                        <SparklesIcon class="w-5 h-5" />
+                        Tentar Novamente
+                    </BaseButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner de Análise em Processamento com Progresso -->
+        <div
+            v-if="pendingAnalysis && pendingAnalysis.status === 'processing'"
+            class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/30 dark:to-secondary-900/30 border-2 border-primary-200 dark:border-primary-800 rounded-xl p-5"
+        >
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center">
+                    <LoadingSpinner size="md" class="text-primary-600 dark:text-primary-400" />
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-primary-800 dark:text-primary-200">
+                        Análise em Andamento
+                    </h3>
+                    <p class="text-sm text-primary-600 dark:text-primary-300 mt-1">
+                        {{ pendingAnalysis.current_stage_name || 'Processando análise...' }}
+                    </p>
+
+                    <!-- Progress Bar -->
+                    <div class="mt-3 bg-primary-100 dark:bg-primary-900/50 rounded-full h-2 overflow-hidden">
+                        <div
+                            class="h-full bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full transition-all duration-500"
+                            :style="{ width: `${pendingAnalysis.progress_percentage || 10}%` }"
+                        ></div>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-2 text-xs text-primary-500 dark:text-primary-400">
+                        <span>Estágio {{ pendingAnalysis.current_stage || 0 }} de {{ pendingAnalysis.total_stages || 9 }}</span>
+                        <span>{{ pendingAnalysis.progress_percentage || 0 }}% concluído</span>
+                    </div>
+
+                    <p class="text-xs text-primary-400 dark:text-primary-500 mt-2">
+                        Tempo decorrido: {{ pendingAnalysisElapsed }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerta de E-mail não enviado - TOPO DA PÁGINA -->
+        <div
+            v-if="currentAnalysis?.status === 'completed' && currentAnalysis?.email_error && !currentAnalysis?.email_sent_at"
+            class="bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-300 dark:border-rose-700 rounded-xl p-5"
+        >
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-800 flex items-center justify-center">
+                    <ExclamationTriangleIcon class="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-rose-800 dark:text-rose-200">
+                        E-mail não enviado
+                    </h3>
+                    <p class="text-sm text-rose-600 dark:text-rose-300 mt-1">
+                        Não foi possível enviar o e-mail com os resultados desta análise.
+                        Clique no botão abaixo para tentar novamente.
+                    </p>
+                    <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
+                        Erro: {{ currentAnalysis.email_error }}
+                    </p>
+                    <BaseButton
+                        variant="danger"
+                        size="md"
+                        @click="handleResendEmail"
+                        :loading="isResendingEmail"
+                        class="mt-4"
+                    >
+                        <EnvelopeIcon class="w-5 h-5" />
+                        Reenviar E-mail da Análise
+                    </BaseButton>
+                </div>
+            </div>
+        </div>
+
         <!-- Compact Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -243,7 +375,15 @@ onUnmounted(() => {
                     <SparklesIcon class="w-5 h-5 text-white" />
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Análises IA</h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Análises IA</h1>
+                        <span
+                            v-if="currentAnalysis?.id"
+                            class="text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
+                        >
+                            #{{ currentAnalysis.id }}
+                        </span>
+                    </div>
                     <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
                             <BoltIcon class="w-3.5 h-3.5" />
@@ -322,10 +462,15 @@ onUnmounted(() => {
                         class="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse"
                     ></div>
 
-                    <!-- Date -->
-                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        <CalendarIcon class="w-3.5 h-3.5" />
-                        {{ formatAnalysisDate(analysis.created_at) }}
+                    <!-- Date and ID -->
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <CalendarIcon class="w-3.5 h-3.5" />
+                            {{ formatAnalysisDate(analysis.created_at) }}
+                        </div>
+                        <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
+                            #{{ analysis.id }}
+                        </span>
                     </div>
 
                     <!-- Health Score Mini -->
@@ -357,38 +502,6 @@ onUnmounted(() => {
                     <!-- Hover Effect -->
                     <div class="absolute inset-0 rounded-xl bg-gradient-to-t from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                 </button>
-            </div>
-        </div>
-
-        <!-- Analysis In Progress Banner -->
-        <div v-if="hasAnalysisInProgress" class="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary-500/10 via-secondary-500/10 to-accent-500/10 dark:from-primary-500/20 dark:via-secondary-500/20 dark:to-accent-500/20 border border-primary-200 dark:border-primary-800">
-            <div class="px-4 py-3">
-                <div class="flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="relative">
-                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
-                                <SparklesIcon class="w-5 h-5 text-white animate-pulse" />
-                            </div>
-                            <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent-400 border-2 border-white dark:border-gray-800 animate-ping"></div>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Analisando sua loja...</h3>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Nossa IA está processando os dados</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="px-3 py-1.5 rounded-lg bg-white/50 dark:bg-gray-800/50 text-xs font-medium text-gray-700 dark:text-gray-300">
-                            {{ pendingAnalysis?.status === 'processing' ? 'Processando' : 'Na fila' }}
-                        </div>
-                        <div class="flex items-center gap-1 text-xs text-gray-500">
-                            <ClockIcon class="w-3.5 h-3.5" />
-                            <span class="tabular-nums">{{ pendingAnalysisElapsed }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-3 h-1 bg-gray-200/50 dark:bg-gray-700/50 rounded-full overflow-hidden">
-                    <div class="h-full bg-gradient-to-r from-primary-500 via-secondary-500 to-accent-500 rounded-full animate-progress-indeterminate"></div>
-                </div>
             </div>
         </div>
 
@@ -634,6 +747,8 @@ onUnmounted(() => {
             @close="showOpportunityDetail = false"
             @ask-ai="handleOpportunityAskAI"
         />
+
+        </template>
     </div>
 </template>
 

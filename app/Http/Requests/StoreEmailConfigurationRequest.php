@@ -25,7 +25,7 @@ class StoreEmailConfigurationRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'identifier' => ['nullable', 'string', 'max:255', 'unique:email_configurations,identifier'],
-            'provider' => ['required', 'string', Rule::in(['smtp', 'mailgun', 'ses', 'postmark', 'resend'])],
+            'provider' => ['required', 'string', Rule::in(['smtp', 'mailgun', 'ses', 'postmark', 'resend', 'mailjet'])],
             'is_active' => ['boolean'],
             'settings' => ['required', 'array'],
             'settings.from_address' => ['required', 'email'],
@@ -40,7 +40,7 @@ class StoreEmailConfigurationRequest extends FormRequest
 
             // Mailgun specific
             'settings.domain' => ['required_if:provider,mailgun', 'nullable', 'string'],
-            'settings.api_key' => ['required_if:provider,mailgun,resend', 'nullable', 'string'],
+            'settings.api_key' => ['required_if:provider,mailgun,resend,mailjet', 'nullable', 'string'],
             'settings.api_url' => ['nullable', 'string'],
 
             // SES specific
@@ -50,6 +50,9 @@ class StoreEmailConfigurationRequest extends FormRequest
 
             // Postmark specific
             'settings.token' => ['required_if:provider,postmark', 'nullable', 'string'],
+
+            // Mailjet specific
+            'settings.secret_key' => ['required_if:provider,mailjet', 'nullable', 'string'],
         ];
     }
 

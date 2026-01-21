@@ -193,7 +193,12 @@ class NuvemshopService
     }
 
     /**
-     * Sync products from Nuvemshop.
+     * Chunk size for bulk upsert operations.
+     */
+    private const BULK_CHUNK_SIZE = 500;
+
+    /**
+     * Sync products from Nuvemshop using bulk upsert for performance.
      *
      * @param  Store  $store  The store to sync
      * @param  Carbon|null  $updatedSince  If provided, only sync products updated after this date
@@ -202,6 +207,8 @@ class NuvemshopService
     {
         $page = 1;
         $perPage = 200;
+        $allProducts = [];
+        $totalSynced = 0;
 
         do {
             $params = [
@@ -216,15 +223,33 @@ class NuvemshopService
             $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/products", $params);
 
             foreach ($response as $product) {
-                $this->upsertProduct($store, $product);
+                $allProducts[] = $this->prepareProductForBulkUpsert($store, $product);
+            }
+
+            // Process in chunks to avoid memory issues
+            if (count($allProducts) >= self::BULK_CHUNK_SIZE) {
+                $this->bulkUpsertProducts($allProducts);
+                $totalSynced += count($allProducts);
+                $allProducts = [];
             }
 
             $page++;
         } while (count($response) === $perPage);
+
+        // Process remaining products
+        if (! empty($allProducts)) {
+            $this->bulkUpsertProducts($allProducts);
+            $totalSynced += count($allProducts);
+        }
+
+        Log::info("Products sync completed for store {$store->id}", [
+            'total_synced' => $totalSynced,
+            'incremental' => $updatedSince !== null,
+        ]);
     }
 
     /**
-     * Sync orders from Nuvemshop.
+     * Sync orders from Nuvemshop using bulk upsert for performance.
      *
      * @param  Store  $store  The store to sync
      * @param  Carbon|null  $updatedSince  If provided, only sync orders updated after this date
@@ -233,6 +258,8 @@ class NuvemshopService
     {
         $page = 1;
         $perPage = 50; // Using smaller batch for stability with large stores
+        $allOrders = [];
+        $totalSynced = 0;
 
         do {
             $params = [
@@ -247,20 +274,38 @@ class NuvemshopService
             $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/orders", $params);
 
             foreach ($response as $order) {
-                $this->upsertOrder($store, $order);
+                $allOrders[] = $this->prepareOrderForBulkUpsert($store, $order);
+            }
+
+            // Process in chunks to avoid memory issues
+            if (count($allOrders) >= self::BULK_CHUNK_SIZE) {
+                $this->bulkUpsertOrders($allOrders);
+                $totalSynced += count($allOrders);
+                $allOrders = [];
             }
 
             $page++;
 
             // Log progress for large syncs
-            if ($page % 10 === 0) {
-                Log::info("Orders sync progress for store {$store->id}: page {$page}");
+            if ($page % 20 === 0) {
+                Log::info("Orders sync progress for store {$store->id}: page {$page}, synced {$totalSynced}");
             }
         } while (count($response) === $perPage);
+
+        // Process remaining orders
+        if (! empty($allOrders)) {
+            $this->bulkUpsertOrders($allOrders);
+            $totalSynced += count($allOrders);
+        }
+
+        Log::info("Orders sync completed for store {$store->id}", [
+            'total_synced' => $totalSynced,
+            'incremental' => $updatedSince !== null,
+        ]);
     }
 
     /**
-     * Sync customers from Nuvemshop.
+     * Sync customers from Nuvemshop using bulk upsert for performance.
      *
      * @param  Store  $store  The store to sync
      * @param  Carbon|null  $updatedSince  If provided, only sync customers updated after this date
@@ -269,6 +314,8 @@ class NuvemshopService
     {
         $page = 1;
         $perPage = 200;
+        $allCustomers = [];
+        $totalSynced = 0;
 
         do {
             $params = [
@@ -283,15 +330,33 @@ class NuvemshopService
             $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/customers", $params);
 
             foreach ($response as $customer) {
-                $this->upsertCustomer($store, $customer);
+                $allCustomers[] = $this->prepareCustomerForBulkUpsert($store, $customer);
+            }
+
+            // Process in chunks to avoid memory issues
+            if (count($allCustomers) >= self::BULK_CHUNK_SIZE) {
+                $this->bulkUpsertCustomers($allCustomers);
+                $totalSynced += count($allCustomers);
+                $allCustomers = [];
             }
 
             $page++;
         } while (count($response) === $perPage);
+
+        // Process remaining customers
+        if (! empty($allCustomers)) {
+            $this->bulkUpsertCustomers($allCustomers);
+            $totalSynced += count($allCustomers);
+        }
+
+        Log::info("Customers sync completed for store {$store->id}", [
+            'total_synced' => $totalSynced,
+            'incremental' => $updatedSince !== null,
+        ]);
     }
 
     /**
-     * Sync coupons from Nuvemshop.
+     * Sync coupons from Nuvemshop using bulk upsert for performance.
      *
      * @param  Store  $store  The store to sync
      * @param  Carbon|null  $updatedSince  If provided, only sync coupons updated after this date
@@ -300,6 +365,8 @@ class NuvemshopService
     {
         $page = 1;
         $perPage = 200;
+        $allCoupons = [];
+        $totalSynced = 0;
 
         do {
             $params = [
@@ -314,11 +381,29 @@ class NuvemshopService
             $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/coupons", $params);
 
             foreach ($response as $coupon) {
-                $this->upsertCoupon($store, $coupon);
+                $allCoupons[] = $this->prepareCouponForBulkUpsert($store, $coupon);
+            }
+
+            // Process in chunks to avoid memory issues
+            if (count($allCoupons) >= self::BULK_CHUNK_SIZE) {
+                $this->bulkUpsertCoupons($allCoupons);
+                $totalSynced += count($allCoupons);
+                $allCoupons = [];
             }
 
             $page++;
         } while (count($response) === $perPage);
+
+        // Process remaining coupons
+        if (! empty($allCoupons)) {
+            $this->bulkUpsertCoupons($allCoupons);
+            $totalSynced += count($allCoupons);
+        }
+
+        Log::info("Coupons sync completed for store {$store->id}", [
+            'total_synced' => $totalSynced,
+            'incremental' => $updatedSince !== null,
+        ]);
     }
 
     private function getStoreInfo(string $accessToken, string $storeId): array
@@ -502,84 +587,6 @@ class NuvemshopService
     }
 
     /**
-     * Insert or update a product using the product adapter.
-     *
-     * This method uses the ProductAdapter to transform external Nuvemshop data
-     * into the normalized structure required by SyncedProduct model.
-     *
-     * @param  Store  $store  The store the product belongs to
-     * @param  array  $data  Raw product data from Nuvemshop API
-     */
-    private function upsertProduct(Store $store, array $data): void
-    {
-        // Transform external data using the adapter
-        $productData = $this->productAdapter->transform($data);
-
-        // Update or create the product
-        SyncedProduct::updateOrCreate(
-            [
-                'store_id' => $store->id,
-                'external_id' => $productData['external_id'],
-            ],
-            array_merge(['store_id' => $store->id], $productData)
-        );
-
-        Log::debug('Product synced successfully', [
-            'store_id' => $store->id,
-            'product_id' => $productData['external_id'],
-            'product_name' => $productData['name'],
-        ]);
-    }
-
-    /**
-     * Insert or update an order using the order adapter.
-     *
-     * This method uses the OrderAdapter to transform external Nuvemshop data
-     * into the normalized structure required by SyncedOrder model.
-     *
-     * @param  Store  $store  The store the order belongs to
-     * @param  array  $data  Raw order data from Nuvemshop API
-     */
-    private function upsertOrder(Store $store, array $data): void
-    {
-        // Transform external data using the adapter
-        $orderData = $this->orderAdapter->transform($data);
-
-        // Update or create the order
-        SyncedOrder::updateOrCreate(
-            [
-                'store_id' => $store->id,
-                'external_id' => $orderData['external_id'],
-            ],
-            array_merge(['store_id' => $store->id], $orderData)
-        );
-
-        Log::debug('Order synced successfully', [
-            'store_id' => $store->id,
-            'order_id' => $orderData['external_id'],
-            'order_number' => $orderData['order_number'],
-        ]);
-    }
-
-    private function upsertCustomer(Store $store, array $data): void
-    {
-        SyncedCustomer::updateOrCreate(
-            [
-                'store_id' => $store->id,
-                'external_id' => $data['id'],
-            ],
-            [
-                'name' => $data['name'] ?? 'Desconhecido',
-                'email' => $data['email'] ?? null,
-                'phone' => $data['phone'] ?? null,
-                'total_orders' => $data['total_orders'] ?? 0,
-                'total_spent' => $data['total_spent'] ?? 0,
-                'external_created_at' => $this->parseDateTime($data['created_at'] ?? null),
-            ]
-        );
-    }
-
-    /**
      * Parse datetime string from Nuvemshop API.
      *
      * Nuvemshop returns dates in ISO 8601 format with UTC timezone (+0000).
@@ -599,32 +606,249 @@ class NuvemshopService
     }
 
     /**
-     * Insert or update a coupon using the coupon adapter.
-     *
-     * This method uses the CouponAdapter to transform external Nuvemshop data
-     * into the normalized structure required by SyncedCoupon model.
-     *
-     * @param  Store  $store  The store the coupon belongs to
-     * @param  array  $data  Raw coupon data from Nuvemshop API
+     * Convert Carbon datetime to database format string.
      */
-    private function upsertCoupon(Store $store, array $data): void
+    private function formatDateTimeForDb(?Carbon $datetime): ?string
     {
-        // Transform external data using the adapter
-        $couponData = $this->couponAdapter->transform($data);
+        return $datetime?->format('Y-m-d H:i:s');
+    }
 
-        // Update or create the coupon
-        SyncedCoupon::updateOrCreate(
-            [
-                'store_id' => $store->id,
-                'external_id' => $couponData['external_id'],
-            ],
-            array_merge(['store_id' => $store->id], $couponData)
-        );
+    // ==========================================
+    // BULK UPSERT METHODS - Products
+    // ==========================================
 
-        Log::debug('Coupon synced successfully', [
+    /**
+     * Prepare product data for bulk upsert.
+     */
+    private function prepareProductForBulkUpsert(Store $store, array $data): array
+    {
+        $productData = $this->productAdapter->transform($data);
+        $now = now()->format('Y-m-d H:i:s');
+
+        return [
             'store_id' => $store->id,
-            'coupon_id' => $couponData['external_id'],
-            'coupon_code' => $couponData['code'],
-        ]);
+            'external_id' => $productData['external_id'],
+            'name' => $productData['name'],
+            'description' => $productData['description'],
+            'price' => $productData['price'],
+            'compare_at_price' => $productData['compare_at_price'],
+            'stock_quantity' => $productData['stock_quantity'],
+            'sku' => $productData['sku'],
+            'images' => json_encode($productData['images']),
+            'categories' => json_encode($productData['categories']),
+            'variants' => json_encode($productData['variants']),
+            'is_active' => $productData['is_active'],
+            'external_created_at' => $this->formatDateTimeForDb($productData['external_created_at']),
+            'external_updated_at' => $this->formatDateTimeForDb($productData['external_updated_at']),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+
+    /**
+     * Bulk upsert products using database upsert for performance.
+     */
+    private function bulkUpsertProducts(array $products): void
+    {
+        if (empty($products)) {
+            return;
+        }
+
+        SyncedProduct::upsert(
+            $products,
+            uniqueBy: ['store_id', 'external_id'],
+            update: [
+                'name',
+                'description',
+                'price',
+                'compare_at_price',
+                'stock_quantity',
+                'sku',
+                'images',
+                'categories',
+                'variants',
+                'is_active',
+                'external_created_at',
+                'external_updated_at',
+                'updated_at',
+            ]
+        );
+    }
+
+    // ==========================================
+    // BULK UPSERT METHODS - Orders
+    // ==========================================
+
+    /**
+     * Prepare order data for bulk upsert.
+     */
+    private function prepareOrderForBulkUpsert(Store $store, array $data): array
+    {
+        $orderData = $this->orderAdapter->transform($data);
+        $now = now()->format('Y-m-d H:i:s');
+
+        return [
+            'store_id' => $store->id,
+            'external_id' => $orderData['external_id'],
+            'order_number' => $orderData['order_number'],
+            'status' => $orderData['status'],
+            'payment_status' => $orderData['payment_status'],
+            'shipping_status' => $orderData['shipping_status'],
+            'customer_name' => $orderData['customer_name'],
+            'customer_email' => $orderData['customer_email'],
+            'customer_phone' => $orderData['customer_phone'],
+            'subtotal' => $orderData['subtotal'],
+            'discount' => $orderData['discount'],
+            'shipping' => $orderData['shipping'],
+            'total' => $orderData['total'],
+            'payment_method' => $orderData['payment_method'],
+            'coupon' => $orderData['coupon'] ? json_encode($orderData['coupon']) : null,
+            'items' => json_encode($orderData['items']),
+            'shipping_address' => $orderData['shipping_address'] ? json_encode($orderData['shipping_address']) : null,
+            'external_created_at' => $this->formatDateTimeForDb($orderData['external_created_at']),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+
+    /**
+     * Bulk upsert orders using database upsert for performance.
+     */
+    private function bulkUpsertOrders(array $orders): void
+    {
+        if (empty($orders)) {
+            return;
+        }
+
+        SyncedOrder::upsert(
+            $orders,
+            uniqueBy: ['store_id', 'external_id'],
+            update: [
+                'order_number',
+                'status',
+                'payment_status',
+                'shipping_status',
+                'customer_name',
+                'customer_email',
+                'customer_phone',
+                'subtotal',
+                'discount',
+                'shipping',
+                'total',
+                'payment_method',
+                'coupon',
+                'items',
+                'shipping_address',
+                'external_created_at',
+                'updated_at',
+            ]
+        );
+    }
+
+    // ==========================================
+    // BULK UPSERT METHODS - Customers
+    // ==========================================
+
+    /**
+     * Prepare customer data for bulk upsert.
+     */
+    private function prepareCustomerForBulkUpsert(Store $store, array $data): array
+    {
+        $now = now()->format('Y-m-d H:i:s');
+
+        return [
+            'store_id' => $store->id,
+            'external_id' => (string) $data['id'],
+            'name' => $data['name'] ?? 'Desconhecido',
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'total_orders' => (int) ($data['total_orders'] ?? 0),
+            'total_spent' => (float) ($data['total_spent'] ?? 0),
+            'external_created_at' => $this->formatDateTimeForDb($this->parseDateTime($data['created_at'] ?? null)),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+
+    /**
+     * Bulk upsert customers using database upsert for performance.
+     */
+    private function bulkUpsertCustomers(array $customers): void
+    {
+        if (empty($customers)) {
+            return;
+        }
+
+        SyncedCustomer::upsert(
+            $customers,
+            uniqueBy: ['store_id', 'external_id'],
+            update: [
+                'name',
+                'email',
+                'phone',
+                'total_orders',
+                'total_spent',
+                'external_created_at',
+                'updated_at',
+            ]
+        );
+    }
+
+    // ==========================================
+    // BULK UPSERT METHODS - Coupons
+    // ==========================================
+
+    /**
+     * Prepare coupon data for bulk upsert.
+     */
+    private function prepareCouponForBulkUpsert(Store $store, array $data): array
+    {
+        $couponData = $this->couponAdapter->transform($data);
+        $now = now()->format('Y-m-d H:i:s');
+
+        return [
+            'store_id' => $store->id,
+            'external_id' => $couponData['external_id'],
+            'code' => $couponData['code'],
+            'type' => $couponData['type'],
+            'value' => $couponData['value'],
+            'valid' => $couponData['valid'],
+            'used' => $couponData['used'],
+            'max_uses' => $couponData['max_uses'],
+            'start_date' => $this->formatDateTimeForDb($couponData['start_date']),
+            'end_date' => $this->formatDateTimeForDb($couponData['end_date']),
+            'min_price' => $couponData['min_price'],
+            'categories' => json_encode($couponData['categories']),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+
+    /**
+     * Bulk upsert coupons using database upsert for performance.
+     */
+    private function bulkUpsertCoupons(array $coupons): void
+    {
+        if (empty($coupons)) {
+            return;
+        }
+
+        SyncedCoupon::upsert(
+            $coupons,
+            uniqueBy: ['store_id', 'external_id'],
+            update: [
+                'code',
+                'type',
+                'value',
+                'valid',
+                'used',
+                'max_uses',
+                'start_date',
+                'end_date',
+                'min_price',
+                'categories',
+                'updated_at',
+            ]
+        );
     }
 }

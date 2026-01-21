@@ -288,15 +288,15 @@ class EmbeddingService
     }
 
     /**
-     * Search for similar knowledge embeddings by category and niche.
+     * Search for similar knowledge embeddings by category, niche, and subcategory.
      */
-    public function searchKnowledge(array $embedding, string $category, ?string $niche = null, int $limit = 5): array
+    public function searchKnowledge(array $embedding, string $category, ?string $niche = null, ?string $subcategory = null, int $limit = 5): array
     {
         $embeddingStr = '['.implode(',', $embedding).']';
 
         $sql = "
             SELECT
-                id, title, content, category, niche, metadata,
+                id, title, content, category, niche, subcategory, metadata,
                 embedding <=> '{$embeddingStr}'::vector as distance
             FROM knowledge_embeddings
             WHERE category = ?
@@ -310,7 +310,19 @@ class EmbeddingService
             $params[] = 'general';
         }
 
-        $sql .= ' ORDER BY distance LIMIT ?';
+        if ($subcategory) {
+            // Match exact subcategory OR records without subcategory (general for the niche)
+            $sql .= ' AND (subcategory = ? OR subcategory IS NULL)';
+            $params[] = $subcategory;
+        }
+
+        // Order by: 1) exact subcategory match first (if filtering), 2) distance
+        if ($subcategory) {
+            $sql .= ' ORDER BY (CASE WHEN subcategory = ? THEN 0 ELSE 1 END), distance LIMIT ?';
+            $params[] = $subcategory;
+        } else {
+            $sql .= ' ORDER BY distance LIMIT ?';
+        }
         $params[] = $limit;
 
         return DB::select($sql, $params);

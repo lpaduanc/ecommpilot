@@ -2,7 +2,6 @@
 
 namespace App\Services\AI\Agents;
 
-use App\Models\SystemSetting;
 use App\Services\AI\AIManager;
 use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\AnalystAgentPrompt;
@@ -27,37 +26,22 @@ class AnalystAgentService
         Log::channel($this->logChannel)->info('    │ Analisando metricas, anomalias e padroes                     │');
         Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────────┘');
 
-        // Detectar versão do formato
-        $formatVersion = $data['format_version'] ?? SystemSetting::get('analysis.format_version', 'v1');
-        $useV2 = $formatVersion === 'v2';
-
         // Log das variáveis usadas (sem dados reais)
         Log::channel($this->logChannel)->info('    [ANALYST] Variaveis do contexto:', [
-            'format_version' => $formatVersion,
-            'use_v2' => $useV2,
             'orders_summary_keys' => array_keys($data['orders_summary'] ?? []),
             'products_summary_keys' => array_keys($data['products_summary'] ?? []),
             'inventory_summary_keys' => array_keys($data['inventory_summary'] ?? []),
             'coupons_summary_keys' => array_keys($data['coupons_summary'] ?? []),
             'benchmarks_count' => count($data['benchmarks'] ?? []),
+            'has_external_data' => isset($data['external_data']),
         ]);
 
-        // Log do template do prompt (sem dados do banco)
-        if ($useV2) {
-            Log::channel($this->logChannel)->info('    [ANALYST] PROMPT TEMPLATE (V2):');
-            Log::channel($this->logChannel)->info(AnalystAgentPrompt::getTemplateV2());
-        } else {
-            Log::channel($this->logChannel)->info('    [ANALYST] PROMPT TEMPLATE (V1):');
-            Log::channel($this->logChannel)->info(AnalystAgentPrompt::getTemplate());
-        }
+        // Log do template do prompt
+        Log::channel($this->logChannel)->info('    [ANALYST] PROMPT TEMPLATE:');
+        Log::channel($this->logChannel)->info(AnalystAgentPrompt::getTemplate());
 
-        // Escolher prompt baseado na versão
-        if ($useV2) {
-            $useMarkdownTables = (bool) SystemSetting::get('analysis.v2.use_markdown_tables', true);
-            $prompt = AnalystAgentPrompt::getV2($data, $useMarkdownTables);
-        } else {
-            $prompt = AnalystAgentPrompt::get($data);
-        }
+        // Gerar prompt V3
+        $prompt = AnalystAgentPrompt::get($data);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
             'temperature' => 0.2,
@@ -83,11 +67,6 @@ class AnalystAgentService
 
         $result = $this->parseResponse($response);
 
-        // Se v2, logar avisos de validação de limites (não bloqueia)
-        if ($useV2 && SystemSetting::get('analysis.v2.validate_field_lengths', true)) {
-            $this->logFieldLengthWarnings($result);
-        }
-
         $totalTime = round((microtime(true) - $startTime) * 1000, 2);
 
         Log::channel($this->logChannel)->info('    [ANALYST] Concluido', [
@@ -95,6 +74,7 @@ class AnalystAgentService
             'health_score' => $result['overall_health']['score'] ?? 'N/A',
             'anomalies_count' => count($result['anomalies'] ?? []),
             'patterns_count' => count($result['identified_patterns'] ?? []),
+            'oportunidades_count' => count($result['oportunidades'] ?? []),
             'total_time_ms' => $totalTime,
         ]);
 
@@ -119,7 +99,7 @@ class AnalystAgentService
 
         Log::channel($this->logChannel)->info('    [ANALYST] JSON extraido com sucesso', [
             'keys' => array_keys($json),
-            'health_score' => $json['overall_health']['score'] ?? 'N/A',
+            'health_score' => $json['health_score']['score'] ?? $json['overall_health']['score'] ?? 'N/A',
         ]);
 
         // Validate and normalize the structure
@@ -136,19 +116,35 @@ class AnalystAgentService
 
     /**
      * Normalize the analysis structure.
+     * Supports V3 format with Portuguese field names.
      */
     private function normalizeAnalysis(array $analysis): array
     {
         $default = $this->getDefaultAnalysis();
 
+        // Extract health score from V3 format (health_score object) or legacy (overall_health)
+        $healthV3 = $analysis['health_score'] ?? [];
+        $healthLegacy = $analysis['overall_health'] ?? [];
+
+        $overallHealth = [
+            'score' => $healthV3['score'] ?? $healthLegacy['score'] ?? $default['overall_health']['score'],
+            'classification' => $healthV3['classificacao'] ?? $healthLegacy['classification'] ?? $default['overall_health']['classification'],
+            'main_points' => [$analysis['resumo_executivo'] ?? ($healthLegacy['main_points'][0] ?? $default['overall_health']['main_points'][0])],
+        ];
+
         return [
-            'metrics' => array_merge($default['metrics'], $analysis['metrics'] ?? []),
+            'metrics' => array_merge($default['metrics'], $analysis['metricas_detalhadas'] ?? $analysis['metrics'] ?? []),
             'anomalies' => $analysis['anomalies'] ?? [],
             'identified_patterns' => $analysis['identified_patterns'] ?? [],
-            'overall_health' => array_merge(
-                $default['overall_health'],
-                $analysis['overall_health'] ?? []
-            ),
+            // V3 fields passthrough
+            'oportunidades' => $analysis['oportunidades'] ?? [],
+            'alertas' => $analysis['alertas'] ?? [],
+            'posicionamento_mercado' => $analysis['posicionamento_mercado'] ?? [],
+            'contexto_mercado' => $analysis['contexto_mercado'] ?? [],
+            'alertas_para_strategist' => $analysis['alertas_para_strategist'] ?? [],
+            'resumo_executivo' => $analysis['resumo_executivo'] ?? null,
+            'health_score' => $healthV3,
+            'overall_health' => $overallHealth,
         ];
     }
 
@@ -193,52 +189,8 @@ class AnalystAgentService
             'overall_health' => [
                 'score' => 50,
                 'classification' => 'attention',
-                'main_points' => ['Could not complete full analysis'],
+                'main_points' => ['Análise concluída com dados parciais'],
             ],
         ];
-    }
-
-    /**
-     * Log warnings for fields that exceed character limits (v2 only).
-     * Does not block - just logs for monitoring.
-     */
-    private function logFieldLengthWarnings(array $data): void
-    {
-        $warnings = [];
-
-        // Verificar main_points (limite 150 chars cada)
-        $mainPoints = $data['overall_health']['main_points'] ?? [];
-        foreach ($mainPoints as $i => $point) {
-            if (strlen($point) > 150) {
-                $warnings[] = "main_points[{$i}]: ".strlen($point).' chars (limite 150)';
-            }
-        }
-
-        // Verificar anomalias (descrição limite 200 chars)
-        foreach ($data['anomalies'] ?? [] as $i => $anomaly) {
-            $desc = $anomaly['description'] ?? '';
-            if (strlen($desc) > 200) {
-                $warnings[] = "anomaly[{$i}].description: ".strlen($desc).' chars (limite 200)';
-            }
-        }
-
-        // Verificar patterns (descrição e opportunity limite 200 chars)
-        foreach ($data['identified_patterns'] ?? [] as $i => $pattern) {
-            $desc = $pattern['description'] ?? '';
-            if (strlen($desc) > 200) {
-                $warnings[] = "pattern[{$i}].description: ".strlen($desc).' chars (limite 200)';
-            }
-            $opp = $pattern['opportunity'] ?? '';
-            if (strlen($opp) > 200) {
-                $warnings[] = "pattern[{$i}].opportunity: ".strlen($opp).' chars (limite 200)';
-            }
-        }
-
-        if (! empty($warnings)) {
-            Log::channel($this->logChannel)->warning('    [ANALYST] V2: Avisos de tamanho de campos', [
-                'warning_count' => count($warnings),
-                'warnings' => $warnings,
-            ]);
-        }
     }
 }

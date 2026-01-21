@@ -16,64 +16,74 @@ class KnowledgeBaseService
     ) {}
 
     /**
-     * Search for benchmarks relevant to a niche.
+     * Search for benchmarks relevant to a niche and subcategory.
      */
-    public function searchBenchmarks(string $niche): array
+    public function searchBenchmarks(string $niche, ?string $subcategory = null): array
     {
-        $query = "benchmarks e-commerce {$niche} Brazil metrics conversion";
+        $subcategoryContext = $subcategory ? " {$subcategory}" : '';
+        $query = "benchmarks e-commerce {$niche}{$subcategoryContext} Brazil metrics conversion";
 
-        return $this->search($query, KnowledgeEmbedding::CATEGORY_BENCHMARK, $niche);
+        return $this->search($query, KnowledgeEmbedding::CATEGORY_BENCHMARK, $niche, $subcategory);
     }
 
     /**
-     * Search for strategies relevant to a niche.
+     * Search for strategies relevant to a niche and subcategory.
      */
-    public function searchStrategies(string $niche): array
+    public function searchStrategies(string $niche, ?string $subcategory = null): array
     {
-        $query = "strategies increase sales {$niche} e-commerce";
+        $subcategoryContext = $subcategory ? " {$subcategory}" : '';
+        $query = "strategies increase sales {$niche}{$subcategoryContext} e-commerce";
 
-        return $this->search($query, KnowledgeEmbedding::CATEGORY_STRATEGY, $niche);
+        return $this->search($query, KnowledgeEmbedding::CATEGORY_STRATEGY, $niche, $subcategory);
     }
 
     /**
-     * Search for success cases in a niche.
+     * Search for success cases in a niche and subcategory.
      */
-    public function searchCases(string $niche): array
+    public function searchCases(string $niche, ?string $subcategory = null): array
     {
-        $query = "success cases e-commerce {$niche}";
+        $subcategoryContext = $subcategory ? " {$subcategory}" : '';
+        $query = "success cases e-commerce {$niche}{$subcategoryContext}";
 
-        return $this->search($query, KnowledgeEmbedding::CATEGORY_CASE, $niche);
+        return $this->search($query, KnowledgeEmbedding::CATEGORY_CASE, $niche, $subcategory);
     }
 
     /**
      * Search for seasonality information.
      */
-    public function searchSeasonality(): array
+    public function searchSeasonality(?string $niche = null, ?string $subcategory = null): array
     {
-        $query = 'e-commerce calendar dates promotions Brazil seasonality';
+        $context = '';
+        if ($niche) {
+            $context .= " {$niche}";
+        }
+        if ($subcategory) {
+            $context .= " {$subcategory}";
+        }
+        $query = "e-commerce calendar dates promotions Brazil seasonality{$context}";
 
-        return $this->search($query, KnowledgeEmbedding::CATEGORY_SEASONALITY, null);
+        return $this->search($query, KnowledgeEmbedding::CATEGORY_SEASONALITY, $niche, $subcategory);
     }
 
     /**
      * Generic search in knowledge base.
      */
-    public function search(string $query, string $category, ?string $niche = null, int $limit = 5): array
+    public function search(string $query, string $category, ?string $niche = null, ?string $subcategory = null, int $limit = 5): array
     {
         if (! $this->embeddingService->isConfigured()) {
             // Fallback to text search if embeddings not configured
-            return $this->textSearch($category, $niche, $limit);
+            return $this->textSearch($category, $niche, $subcategory, $limit);
         }
 
         // Check if there are any embeddings in the database
         if (! $this->hasEmbeddings($category)) {
-            return $this->textSearch($category, $niche, $limit);
+            return $this->textSearch($category, $niche, $subcategory, $limit);
         }
 
         // Use generateForQuery for search queries (optimized for retrieval)
         $embedding = $this->embeddingService->generateForQuery($query);
 
-        $results = $this->embeddingService->searchKnowledge($embedding, $category, $niche, $limit);
+        $results = $this->embeddingService->searchKnowledge($embedding, $category, $niche, $subcategory, $limit);
 
         return array_map(function ($item) {
             return [
@@ -81,6 +91,7 @@ class KnowledgeBaseService
                 'content' => $item->content,
                 'category' => $item->category,
                 'niche' => $item->niche,
+                'subcategory' => $item->subcategory ?? null,
                 'relevance' => 1 - $item->distance,
                 'metadata' => json_decode($item->metadata ?? '{}', true),
             ];
@@ -104,7 +115,7 @@ class KnowledgeBaseService
     /**
      * Fallback text search when embeddings not available.
      */
-    private function textSearch(string $category, ?string $niche = null, int $limit = 5): array
+    private function textSearch(string $category, ?string $niche = null, ?string $subcategory = null, int $limit = 5): array
     {
         $query = KnowledgeEmbedding::where('category', $category);
 
@@ -115,12 +126,22 @@ class KnowledgeBaseService
             });
         }
 
+        if ($subcategory) {
+            $query->where(function ($q) use ($subcategory) {
+                $q->where('subcategory', $subcategory)
+                    ->orWhereNull('subcategory');
+            });
+            // Prioritize exact subcategory matches
+            $query->orderByRaw('CASE WHEN subcategory = ? THEN 0 ELSE 1 END', [$subcategory]);
+        }
+
         return $query->limit($limit)->get()->map(function ($item) {
             return [
                 'title' => $item->title,
                 'content' => $item->content,
                 'category' => $item->category,
                 'niche' => $item->niche,
+                'subcategory' => $item->subcategory ?? null,
                 'relevance' => 1.0,
                 'metadata' => $item->metadata ?? [],
             ];
@@ -174,6 +195,7 @@ class KnowledgeBaseService
         $knowledge = new KnowledgeEmbedding([
             'category' => $data['category'],
             'niche' => $data['niche'] ?? 'general',
+            'subcategory' => $data['subcategory'] ?? null,
             'title' => $data['title'],
             'content' => $data['content'],
             'metadata' => $data['metadata'] ?? null,
@@ -366,6 +388,34 @@ class KnowledgeBaseService
             }
         }
 
+        // Fallback: Use config benchmarks if subcategory has no data from database
+        if ($subcategory && $subcategory !== 'geral' && ! isset($result['subcategory_data']['ticket_medio'])) {
+            $configBenchmarks = $this->getSubcategoryBenchmarksFromConfig($niche, $subcategory);
+            if ($configBenchmarks) {
+                $result['ticket_medio'] = $configBenchmarks['ticket_medio'];
+                $result['subcategory_data'] = $configBenchmarks;
+                $result['benchmark_source'] = 'config';
+
+                // Also use config conversion rates if available
+                if (isset($configBenchmarks['taxa_conversao'])) {
+                    $result['taxa_conversao'] = $configBenchmarks['taxa_conversao'];
+                }
+            }
+        }
+
+        // Final fallback: Use niche default from config if no subcategory data
+        if (! isset($result['benchmark_source']) && ! isset($result['subcategory_data'])) {
+            $nicheDefaults = config("benchmarks.{$niche}.default");
+            if ($nicheDefaults && isset($nicheDefaults['ticket_medio'])) {
+                $result['ticket_medio'] = $nicheDefaults['ticket_medio'];
+                $result['benchmark_source'] = 'config_niche_default';
+
+                if (isset($nicheDefaults['taxa_conversao'])) {
+                    $result['taxa_conversao'] = $nicheDefaults['taxa_conversao'];
+                }
+            }
+        }
+
         return $result;
     }
 
@@ -430,6 +480,18 @@ class KnowledgeBaseService
             'max' => 600,
             'media' => 350,
         ];
+    }
+
+    /**
+     * Get subcategory benchmarks from config file.
+     *
+     * @param  string  $niche  The niche (e.g., 'beauty')
+     * @param  string  $subcategory  The subcategory (e.g., 'haircare')
+     * @return array|null Benchmark data or null if not found
+     */
+    private function getSubcategoryBenchmarksFromConfig(string $niche, string $subcategory): ?array
+    {
+        return config("benchmarks.{$niche}.subcategories.{$subcategory}");
     }
 
     /**

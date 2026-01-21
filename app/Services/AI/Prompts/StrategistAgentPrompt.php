@@ -4,342 +4,396 @@ namespace App\Services\AI\Prompts;
 
 class StrategistAgentPrompt
 {
-    public static function get(array $context): string
-    {
-        // Análise de sugestões anteriores para anti-repetição
-        $previousSuggestionsAnalysis = $context['previous_suggestions_analysis'] ?? 'Nenhuma análise disponível';
-        $prohibitedZones = $context['prohibited_zones'] ?? 'Nenhuma zona proibida identificada';
-
-        // Contexto da loja - métricas
-        $platform = $context['platform'] ?? 'Nuvemshop';
-        $niche = $context['niche'] ?? 'geral';
-        $operationTime = $context['operation_time'] ?? 'não informado';
-        $ordersTotal = $context['orders_total'] ?? 0;
-        $ticketMedio = $context['ticket_medio'] ?? 0;
-        $ticketBenchmark = $context['ticket_benchmark'] ?? 0;
-        $healthScore = $context['health_score'] ?? 0;
-        $healthClassification = $context['health_classification'] ?? 'não calculado';
-        $activeProducts = $context['active_products'] ?? 0;
-        $outOfStock = $context['out_of_stock'] ?? 0;
-        $outOfStockPct = $context['out_of_stock_pct'] ?? 0;
-        $couponRate = $context['coupon_rate'] ?? 0;
-        $couponImpact = $context['coupon_impact'] ?? 0;
-
-        // Listas formatadas
-        $anomaliesList = $context['anomalies_list'] ?? 'Nenhuma anomalia identificada';
-        $patternsList = $context['patterns_list'] ?? 'Nenhum padrão identificado';
-        $previousSuggestionsDetailed = $context['previous_suggestions_detailed'] ?? 'Nenhuma sugestão anterior';
-        $ragStrategies = $context['rag_strategies'] ?? 'Nenhuma estratégia disponível';
-
-        // Se são arrays, converter para string formatada
-        if (is_array($anomaliesList)) {
-            $anomaliesList = json_encode($anomaliesList, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        }
-        if (is_array($patternsList)) {
-            $patternsList = json_encode($patternsList, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        }
-        if (is_array($previousSuggestionsDetailed)) {
-            $previousSuggestionsDetailed = json_encode($previousSuggestionsDetailed, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        }
-        if (is_array($ragStrategies)) {
-            $ragStrategies = json_encode($ragStrategies, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        }
-
-        return <<<PROMPT
-Você é um estrategista sênior de e-commerce com 15 anos de experiência no mercado brasileiro.
-
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-TODAS as sugestões devem ser em português brasileiro.
-
-## Seu Objetivo
-Gerar sugestões ACIONÁVEIS, ESPECÍFICAS e NÃO-REPETITIVAS que vão AUMENTAR AS VENDAS desta loja.
-
----
-
-## ⚠️ SEÇÃO CRÍTICA - LEIA PRIMEIRO ⚠️
-
-### REGRAS DE NÃO-REPETIÇÃO (OBRIGATÓRIO)
-
-Você DEVE analisar semanticamente cada sugestão anterior antes de gerar novas.
-
-#### Sugestões Anteriores - Análise Semântica:
-{$previousSuggestionsAnalysis}
-
-#### ZONAS PROIBIDAS (não gere sugestões sobre):
-{$prohibitedZones}
-
-#### Teste de Repetição:
-Antes de incluir cada sugestão, pergunte-se:
-1. Esta sugestão ataca o MESMO PROBLEMA de alguma anterior?
-2. Esta sugestão propõe a MESMA SOLUÇÃO com palavras diferentes?
-3. O OBJETIVO FINAL é idêntico a alguma sugestão anterior?
-
-**Se SIM para qualquer pergunta = SUGESTÃO PROIBIDA**
-
-#### Exemplos de Repetição PROIBIDA:
-| Anterior | Nova (PROIBIDA) | Por quê |
-|----------|-----------------|---------|
-| "Reposição Urgente de Produtos Fora de Estoque" | "Sistema Proativo de Alerta e Reposição" | Mesmo problema (estoque) + mesma solução (repor) |
-| "Campanha de Reengajamento de Clientes" | "Programa de Fidelidade para Reter Clientes" | Mesmo problema (retenção) + objetivo similar |
-| "Cross-sell e Upsell em Páginas de Produto" | "Kits de Produtos com Desconto" | Mesmo objetivo (aumentar ticket via produtos adicionais) |
-
-#### Exemplos de Sugestões VÁLIDAS (diferentes das anteriores):
-| Anterior | Nova (VÁLIDA) | Por quê é diferente |
-|----------|---------------|---------------------|
-| "Reposição Urgente de Estoque" | "Pré-venda para Produtos Esgotados de Alta Demanda" | Solução diferente: captura demanda vs repõe estoque |
-| "Campanha de Reengajamento" | "Programa de Indicação com Recompensa" | Mecanismo diferente: aquisição via clientes atuais vs reativar inativos |
-| "Cross-sell em Páginas" | "Assinatura Mensal de Produtos Favoritos" | Modelo diferente: recorrência vs venda única |
-
----
-
-## CONTEXTO DA LOJA (Resumo)
-
-**Identificação:**
-- Plataforma: {$platform}
-- Nicho: {$niche}
-- Tempo de operação: {$operationTime}
-
-**Métricas Chave:**
-- Pedidos no período: {$ordersTotal}
-- Ticket Médio: R$ {$ticketMedio} (benchmark nicho: R$ {$ticketBenchmark})
-- Health Score: {$healthScore}/100 ({$healthClassification})
-- Produtos ativos: {$activeProducts} | Sem estoque: {$outOfStock} ({$outOfStockPct}%)
-- Taxa de cupons: {$couponRate}% | Impacto no ticket: {$couponImpact}%
-
-**Principais Anomalias Identificadas:**
-{$anomaliesList}
-
-**Padrões Identificados:**
-{$patternsList}
-
----
-
-## SUGESTÕES ANTERIORES (NÃO REPETIR)
-
-{$previousSuggestionsDetailed}
-
----
-
-## VIABILIDADE NA NUVEMSHOP
-
-Considere a facilidade de implementação:
-
-### ✅ Nativo/Fácil (priorize):
-- Cupons e regras de desconto
-- Frete grátis condicional
-- Produtos em destaque/vitrine
-- Descrições e fotos de produtos
-- Categorias e tags
-- "Avise-me quando disponível"
-- Banners e pop-ups (via tema)
-
-### ⚙️ Requer App/Integração:
-- Programa de fidelidade → Apps: Fidelizar+, Remember Me
-- Quiz interativo → Typeform + embed
-- Email marketing → RD Station, Mailchimp, Klaviyo
-- Reviews → Trustvox, Yourviews
-- Chat/WhatsApp → JivoChat, Zenvia
-
-### ⚠️ Complexidade Alta:
-- Expansão para marketplaces (setup de semanas)
-- Mudanças estruturais de UX/UI
-- Integrações customizadas
-
----
-
-## ESTRATÉGIAS COMPROVADAS DO NICHO (RAG)
-
-{$ragStrategies}
-
----
-
-## FORMATO OBRIGATÓRIO DE SUGESTÃO
-
-Gere EXATAMENTE 9 sugestões:
-- 3 de ALTO impacto (quick wins ou alto ROI)
-- 3 de MÉDIO impacto
-- 3 de BAIXO impacto (melhorias incrementais)
-
-```json
-{
-  "suggestions": [
-    {
-      "category": "inventory|coupon|product|marketing|operational|customer|conversion|pricing",
-      "title": "Título direto e específico (máx 80 caracteres)",
-      "problem_addressed": "Qual problema específico esta sugestão resolve",
-      "description": "Por que este problema importa + como a solução ajuda (2-3 frases)",
-      "recommended_action": "Passo 1: Ação específica\\nPasso 2: Ação específica\\nPasso 3: Ação específica",
-      "expected_impact": "high|medium|low",
-      "target_metrics": ["métrica1", "métrica2"],
-      "implementation": {
-        "nuvemshop_native": true,
-        "required_tools": ["ferramenta1", "ferramenta2"],
-        "estimated_hours": 0,
-        "complexity": "low|medium|high"
-      },
-      "roi_estimate": {
-        "potential_revenue": "R$ X - R$ Y (cálculo: explicação)",
-        "implementation_cost": "R$ X ou Gratuito",
-        "payback_period": "X dias/semanas",
-        "confidence": "high|medium|low"
-      },
-      "specific_data": {
-        "affected_products": "descrição ou IDs",
-        "current_value": "valor atual da métrica",
-        "target_value": "valor esperado após implementação",
-        "calculation_basis": "como chegou nos números"
-      },
-      "data_justification": "Baseado em: [citar anomalia ou padrão específico da análise]",
-      "differentiation_from_previous": "Como esta sugestão é DIFERENTE das anteriores sobre tema similar"
-    }
-  ],
-  "general_observations": "Contexto estratégico geral (2-3 frases)"
-}
-```
-
----
-
-## VALIDAÇÃO PRÉ-ENVIO
-
-Antes de retornar, verifique CADA sugestão:
-
-☐ Título é específico (não genérico como "Melhorar X")?
-☐ Cita dados reais da loja (números, produtos, métricas)?
-☐ Ações são concretas (não "considere" ou "avalie")?
-☐ É DIFERENTE de todas as sugestões anteriores?
-☐ Tem estimativa de ROI baseada em dados?
-☐ Indica viabilidade na Nuvemshop?
-☐ Justificativa cita anomalia ou padrão da análise?
-
-Se qualquer item for NÃO, reescreva a sugestão.
-
----
-
-## INSTRUÇÕES CRÍTICAS
-1. Retorne APENAS JSON válido
-2. NÃO repita sugestões anteriores (nem com palavras diferentes)
-3. Use DADOS REAIS da análise (cite números)
-4. Calcule ROI baseado nos dados da loja
-5. Indique ferramentas necessárias para implementação
-6. RESPONDA EM PORTUGUÊS BRASILEIRO
-PROMPT;
-    }
-
     /**
-     * Retorna o template do prompt com placeholders para log.
+     * STRATEGIST AGENT V4 - VERSÃO COMPLETA COM TODAS AS MELHORIAS
+     *
+     * Melhorias incluídas:
+     * [1] Ângulos não explorados (quando temas saturados)
+     * [2] Validação de plataforma (nativo vs app)
+     * [3] Contexto de sazonalidade
+     * [4] Taxas de sucesso históricas por categoria
+     * [6] Campo de confiança no output
+     * + Proteção contra repetições (zonas proibidas)
      */
+
+    public static function getSeasonalityContext(): array
+    {
+        $mes = (int) date('n');
+
+        $contextos = [
+            1 => ['periodo' => 'PÓS-FESTAS / VERÃO', 'foco' => 'Liquidação, fidelização novos clientes', 'oportunidades' => ['Queima de estoque', 'Fidelizar clientes do Natal', 'Kits verão'], 'evitar' => ['Lançamentos premium', 'Aumento de preços']],
+            2 => ['periodo' => 'CARNAVAL / VERÃO', 'foco' => 'Produtos para cabelos expostos', 'oportunidades' => ['Kits pós-sol', 'Tratamentos reparadores', 'Promoções Carnaval'], 'evitar' => ['Produtos de inverno']],
+            3 => ['periodo' => 'OUTONO / DIA DA MULHER', 'foco' => 'Campanhas femininas, transição', 'oportunidades' => ['Promoções Dia da Mulher', 'Kits presenteáveis', 'Tratamentos'], 'evitar' => ['Produtos de verão']],
+            4 => ['periodo' => 'OUTONO / PÁSCOA', 'foco' => 'Reconstrução pós-verão', 'oportunidades' => ['Cronograma capilar', 'Tratamentos intensivos'], 'evitar' => ['Produtos leves']],
+            5 => ['periodo' => 'DIA DAS MÃES', 'foco' => 'Presentes, kits especiais', 'oportunidades' => ['Kits presenteáveis premium', 'Combos especiais', 'Embalagens'], 'evitar' => ['Promoções que desvalorizam']],
+            6 => ['periodo' => 'INVERNO / DIA DOS NAMORADOS', 'foco' => 'Hidratação intensa, presentes casais', 'oportunidades' => ['Kits casais', 'Máscaras intensivas', 'Tratamentos inverno'], 'evitar' => ['Proteção solar']],
+            7 => ['periodo' => 'INVERNO / FÉRIAS', 'foco' => 'Tratamentos intensivos', 'oportunidades' => ['Cronograma completo', 'Assinaturas', 'Fidelização'], 'evitar' => ['Esperar Black Friday']],
+            8 => ['periodo' => 'DIA DOS PAIS / PRÉ-PRIMAVERA', 'foco' => 'Linha masculina', 'oportunidades' => ['Produtos masculinos', 'Kits pais', 'Antecipação tendências'], 'evitar' => ['Ignorar público masculino']],
+            9 => ['periodo' => 'PRIMAVERA / DIA DO CLIENTE', 'foco' => 'Renovação, fidelização', 'oportunidades' => ['Lançamentos', 'Promoções Dia do Cliente', 'Programa pontos'], 'evitar' => ['Grandes descontos (guardar BF)']],
+            10 => ['periodo' => 'DIA DAS CRIANÇAS / PRÉ-BLACK FRIDAY', 'foco' => 'Linha infantil, preparar BF', 'oportunidades' => ['Produtos kids', 'Reposição estoque', 'Aquecimento base'], 'evitar' => ['Queimar promoções antes BF']],
+            11 => ['periodo' => 'BLACK FRIDAY', 'foco' => 'Maior evento de vendas', 'oportunidades' => ['Descontos agressivos', 'Kits exclusivos BF', 'Frete grátis'], 'evitar' => ['Descontos falsos', 'Estoque insuficiente']],
+            12 => ['periodo' => 'NATAL / FIM DE ANO', 'foco' => 'Presentes, última chance do ano', 'oportunidades' => ['Kits presenteáveis', 'Embalagens natalinas', 'Garantia entrega'], 'evitar' => ['Promoções que canibalizam margem']]
+        ];
+
+        return $contextos[$mes] ?? $contextos[7];
+    }
+
+    public static function getSuccessRatesByCategory(): string
+    {
+        return <<<'RATES'
+## 📊 TAXAS DE SUCESSO HISTÓRICAS [MELHORIA 4]
+
+| Categoria | Taxa Implementação | Taxa Sucesso | Recomendação |
+|-----------|-------------------|--------------|--------------|
+| inventory | 78% | 65% | ⭐ ALTA PRIORIDADE |
+| pricing | 45% | 72% | Quando implementado, funciona |
+| product | 62% | 58% | Kits têm boa adesão |
+| customer | 35% | 80% | Difícil mas muito eficaz |
+| conversion | 55% | 60% | Resultados moderados |
+| marketing | 62% | 48% | Resultado variável |
+| coupon | 70% | 45% | Pode viciar cliente |
+| operational | 40% | 70% | Requer mudança processo |
+
+**USE:** taxas da coluna "Taxa Sucesso" para calcular ROI conservador
+RATES;
+    }
+
+    public static function getPlatformResources(): string
+    {
+        return <<<'RESOURCES'
+## 🔧 RECURSOS NUVEMSHOP [MELHORIA 2]
+
+### ✅ NATIVOS (gratuitos)
+Cupons, Frete grátis condicional, Avise-me, Produtos relacionados, SEO básico, Checkout transparente
+
+### 📦 APPS (custo mensal)
+- Quiz: R$ 30-100/mês (Pregão, Lily AI)
+- Fidelidade: R$ 49-150/mês (Fidelizar+)
+- Reviews: R$ 20-80/mês (Lily Reviews)
+- Carrinho abandonado: R$ 30-100/mês (CartStack)
+- Chat/WhatsApp: R$ 0-100/mês (JivoChat)
+- Assinatura: R$ 50-150/mês (Vindi)
+
+### ❌ NÃO DISPONÍVEIS
+Realidade aumentada, IA generativa nativa, Live commerce nativo
+
+**REGRA:** Sempre verificar viabilidade antes de sugerir!
+RESOURCES;
+    }
+
+    public static function getUnexploredAngles(): string
+    {
+        return <<<'ANGLES'
+## 💡 ÂNGULOS NÃO EXPLORADOS [MELHORIA 1]
+
+Quando temas comuns (quiz, frete, fidelidade, kits, estoque) estão SATURADOS:
+
+### Aquisição Criativa
+1. Programa de Indicação/Referral
+2. Parceria com Salões (B2B)
+3. Micro-influenciadores do nicho
+4. Live Commerce
+5. UGC (reviews com fotos)
+
+### Monetização Diferente
+6. Precificação Dinâmica
+7. Modelo Freemium (amostra + completo)
+8. Bundles Personalizados (cliente monta)
+9. Pré-venda de Lançamentos
+10. Programa de Troca (embalagem vazia)
+
+### Experiência/Engajamento
+11. Gamificação (pontos, níveis)
+12. Comunidade WhatsApp/Telegram
+13. Conteúdo Educativo Premium
+14. Consultoria Virtual
+15. Desafio de Transformação
+
+### Diferenciação por Valores
+16. Sustentabilidade
+17. Causa Social
+18. Transparência Total
+19. Personalização por histórico
+20. Atendimento Premium VIP
+
+**USE quando temas tradicionais já foram sugeridos 3+ vezes**
+ANGLES;
+    }
+
     public static function getTemplate(): string
     {
-        return <<<'TEMPLATE'
-Você é um estrategista sênior de e-commerce com 15 anos de experiência no mercado brasileiro.
+        return <<<'PROMPT'
+# STRATEGIST AGENT — GERAÇÃO DE SUGESTÕES ORIGINAIS
 
-## 🇧🇷 IDIOMA OBRIGATÓRIO: PORTUGUÊS BRASILEIRO
-TODAS as sugestões devem ser em português brasileiro.
+## SEU PAPEL
+Gerar EXATAMENTE 9 sugestões estratégicas de alta qualidade, TODAS ORIGINAIS.
 
-## Seu Objetivo
-Gerar sugestões ACIONÁVEIS, ESPECÍFICAS e NÃO-REPETITIVAS que vão AUMENTAR AS VENDAS desta loja.
-
----
-
-## ⚠️ SEÇÃO CRÍTICA - LEIA PRIMEIRO ⚠️
-
-### REGRAS DE NÃO-REPETIÇÃO (OBRIGATÓRIO)
-
-#### Sugestões Anteriores - Análise Semântica:
-{{previous_suggestions_analysis}}
-
-#### ZONAS PROIBIDAS (não gere sugestões sobre):
-{{prohibited_zones}}
-
-#### Teste de Repetição:
-1. Esta sugestão ataca o MESMO PROBLEMA de alguma anterior?
-2. Esta sugestão propõe a MESMA SOLUÇÃO com palavras diferentes?
-3. O OBJETIVO FINAL é idêntico a alguma sugestão anterior?
-
-**Se SIM para qualquer pergunta = SUGESTÃO PROIBIDA**
+## DEFINIÇÃO DE REPETIÇÃO
+Duas sugestões são REPETIDAS se:
+- Têm o mesmo TEMA CENTRAL (quiz, frete, fidelidade, kits, etc.)
+- Propõem a MESMA SOLUÇÃO para o mesmo problema
+- Diferem apenas em palavras mas a essência é igual
 
 ---
 
-## CONTEXTO DA LOJA (Resumo)
+## 🚫 ZONAS PROIBIDAS
 
-**Identificação:**
-- Plataforma: {{platform}}
-- Nicho: {{niche}}
-- Tempo de operação: {{operation_time}}
+{{prohibited_suggestions}}
 
-**Métricas Chave:**
-- Pedidos no período: {{orders_total}}
-- Ticket Médio: R$ {{ticket_medio}} (benchmark nicho: R$ {{ticket_benchmark}})
-- Health Score: {{health_score}}/100 ({{health_classification}})
-- Produtos ativos: {{active_products}} | Sem estoque: {{out_of_stock}} ({{out_of_stock_pct}}%)
-- Taxa de cupons: {{coupon_rate}}% | Impacto no ticket: {{coupon_impact}}%
-
-**Principais Anomalias Identificadas:**
-{{anomalies_list}}
-
-**Padrões Identificados:**
-{{patterns_list}}
+### TEMAS SATURADOS:
+{{saturated_themes}}
 
 ---
 
-## SUGESTÕES ANTERIORES (NÃO REPETIR)
-{{previous_suggestions_detailed}}
+## 📅 CONTEXTO SAZONAL [MELHORIA 3]
+
+{{seasonality_context}}
 
 ---
 
-## VIABILIDADE NA NUVEMSHOP
-
-### ✅ Nativo/Fácil (priorize):
-- Cupons, frete grátis, produtos em destaque, descrições, "Avise-me"
-
-### ⚙️ Requer App/Integração:
-- Fidelidade, Quiz, Email marketing, Reviews, Chat/WhatsApp
-
-### ⚠️ Complexidade Alta:
-- Marketplaces, mudanças UX/UI, integrações customizadas
+{{success_rates}}
 
 ---
 
-## ESTRATÉGIAS COMPROVADAS DO NICHO (RAG)
+{{platform_resources}}
+
+---
+
+{{unexplored_angles}}
+
+---
+
+## DISTRIBUIÇÃO OBRIGATÓRIA
+- 3 HIGH (prioridades 1-3): Citar dados externos obrigatório
+- 3 MEDIUM (prioridades 4-6): Otimizações
+- 3 LOW (prioridades 7-9): Quick-wins
+
+---
+
+## DADOS DA ANÁLISE
+
+### Contexto da Loja
+{{store_context}}
+
+### Análise do Analyst
+{{analyst_analysis}}
+
+### Dados de Concorrentes
+{{competitor_data}}
+
+### Dados de Mercado
+{{market_data}}
+
+### Estratégias RAG
 {{rag_strategies}}
 
 ---
 
-## FORMATO OBRIGATÓRIO DE SUGESTÃO
+## CHECKLIST ANTES DE FINALIZAR
 
-Gere EXATAMENTE 9 sugestões (3 high, 3 medium, 3 low):
+□ Sugestão aparece em ZONAS PROIBIDAS? → DESCARTE
+□ Tema já sugerido antes? → DESCARTE
+□ Apenas reformulação? → DESCARTE
+□ Faz sentido para o momento sazonal? → Se não, RECONSIDERE
+□ É viável na Nuvemshop? → Verificar recursos
+
+---
+
+## FORMATO DE SAÍDA
 
 ```json
 {
+  "originality_check": {
+    "prohibited_suggestions_count": <número>,
+    "themes_avoided": ["tema1", "tema2"],
+    "new_angles_explored": ["ângulo1", "ângulo2"]
+  },
+  "contexto_analise": {
+    "momento_mercado": "string",
+    "momento_sazonal": "string",
+    "posicao_competitiva": "string",
+    "principais_problemas": ["array"],
+    "principais_oportunidades": ["array"]
+  },
   "suggestions": [
     {
-      "category": "inventory|coupon|product|marketing|operational|customer|conversion|pricing",
-      "title": "Título direto e específico",
-      "problem_addressed": "Qual problema específico esta sugestão resolve",
-      "description": "Por que este problema importa + como a solução ajuda",
-      "recommended_action": "Passo 1: ...\\nPasso 2: ...\\nPasso 3: ...",
+      "priority": 1-9,
       "expected_impact": "high|medium|low",
-      "target_metrics": ["métrica1", "métrica2"],
-      "implementation": {"nuvemshop_native": true, "required_tools": [], "estimated_hours": 0, "complexity": "low|medium|high"},
-      "roi_estimate": {"potential_revenue": "R$ X", "implementation_cost": "R$ X", "payback_period": "X dias", "confidence": "high|medium|low"},
-      "specific_data": {"affected_products": "", "current_value": "", "target_value": "", "calculation_basis": ""},
-      "data_justification": "Baseado em: [citar anomalia ou padrão]",
-      "differentiation_from_previous": "Como esta sugestão é DIFERENTE das anteriores"
+      "category": "string",
+      "title": "string ÚNICO",
+      "problem_addressed": "string",
+      "description": "string",
+      "recommended_action": "passos numerados",
+      "data_justification": {
+        "fonte": "analyst|mercado|concorrente|benchmark|rag",
+        "dado_especifico": "string",
+        "conexao": "string"
+      },
+      "competitive_reference": {
+        "concorrente": "string ou null",
+        "o_que_faz": "string ou null",
+        "como_aplicar": "string ou null"
+      },
+      "implementation": {
+        "platform": "nuvemshop",
+        "type": "nativo|app|terceiro|desenvolvimento",
+        "app_sugerido": "nome se aplicável",
+        "complexity": "baixa|media|alta",
+        "cost": "string",
+        "tempo_implementacao": "string"
+      },
+      "roi_estimate": {
+        "base": "faturamento mensal",
+        "premissa": "usar taxas da tabela",
+        "calculo": "fórmula",
+        "potencial_mensal": "R$ X/mês",
+        "payback": "string"
+      },
+      "confidence": {
+        "score": 0-100,
+        "factors": {
+          "data_quality": "alta|media|baixa",
+          "market_data": "alta|media|baixa",
+          "historical_success": "alta|media|baixa"
+        }
+      },
+      "seasonality_fit": {
+        "relevante_para_momento": true|false,
+        "justificativa": "string"
+      },
+      "similarity_check": {
+        "is_original": true,
+        "similar_to_prohibited": null,
+        "differentiation": "string"
+      },
+      "target_metrics": ["array"],
+      "riscos": ["array"],
+      "quick_win": true|false
     }
-  ],
-  "general_observations": "Contexto estratégico geral"
+  ]
 }
 ```
 
 ---
 
-## INSTRUÇÕES CRÍTICAS
-1. Retorne APENAS JSON válido
-2. NÃO repita sugestões anteriores (nem com palavras diferentes)
-3. Use DADOS REAIS da análise (cite números)
-4. Calcule ROI baseado nos dados da loja
-5. Indique ferramentas necessárias para implementação
-6. RESPONDA EM PORTUGUÊS BRASILEIRO
-TEMPLATE;
+PORTUGUÊS BRASILEIRO
+PROMPT;
+    }
+
+    public static function formatProhibitedSuggestions(array $previousSuggestions): string
+    {
+        if (empty($previousSuggestions)) {
+            return "Nenhuma sugestão anterior. Liberdade total, mas busque originalidade.";
+        }
+
+        $grouped = [];
+        $titleCounts = [];
+
+        foreach ($previousSuggestions as $s) {
+            $cat = $s['category'] ?? 'outros';
+            $title = $s['title'] ?? 'Sem título';
+            $titleCounts[$title] = ($titleCounts[$title] ?? 0) + 1;
+            if (!isset($grouped[$cat])) $grouped[$cat] = [];
+            if (!in_array($title, $grouped[$cat])) $grouped[$cat][] = $title;
+        }
+
+        $output = "### Total: " . count($previousSuggestions) . " sugestões anteriores\n\n";
+        foreach ($grouped as $cat => $titles) {
+            $output .= "**{$cat}:**\n";
+            foreach ($titles as $t) {
+                $c = $titleCounts[$t];
+                $m = $c >= 3 ? "🔴" : ($c >= 2 ? "⚠️" : "•");
+                $output .= "{$m} {$t}" . ($c > 1 ? " ({$c}x)" : "") . "\n";
+            }
+            $output .= "\n";
+        }
+        return $output;
+    }
+
+    public static function identifySaturatedThemes(array $previousSuggestions): string
+    {
+        if (empty($previousSuggestions)) return "Nenhum tema saturado.";
+
+        $keywords = [
+            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito'],
+            'Fidelidade' => ['fidelidade', 'pontos', 'cashback'],
+            'Kits/Combos' => ['kit', 'combo', 'bundle', 'cronograma'],
+            'Estoque' => ['estoque', 'avise-me', 'reposição'],
+            'Email' => ['email', 'newsletter', 'automação'],
+            'Vídeos' => ['vídeo', 'tutorial', 'youtube'],
+            'Assinatura' => ['assinatura', 'recorrência'],
+        ];
+
+        $counts = [];
+        foreach ($previousSuggestions as $s) {
+            $text = mb_strtolower(($s['title'] ?? '') . ' ' . ($s['description'] ?? ''));
+            foreach ($keywords as $theme => $kws) {
+                foreach ($kws as $kw) {
+                    if (strpos($text, $kw) !== false) {
+                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $saturated = array_filter($counts, fn($c) => $c >= 3);
+        arsort($saturated);
+
+        if (empty($saturated)) return "Nenhum tema saturado (3+).";
+
+        $out = "";
+        foreach ($saturated as $t => $c) {
+            $out .= "🔴 **{$t}**: {$c}x — EVITAR\n";
+        }
+        return $out;
+    }
+
+    public static function build(array $context): string
+    {
+        $template = self::getTemplate();
+        $season = self::getSeasonalityContext();
+
+        $seasonCtx = "**Período:** {$season['periodo']}\n";
+        $seasonCtx .= "**Foco:** {$season['foco']}\n";
+        $seasonCtx .= "**Oportunidades:** " . implode(', ', $season['oportunidades']) . "\n";
+        $seasonCtx .= "**Evitar:** " . implode(', ', $season['evitar']);
+
+        // Mapear nomes do pipeline para nomes esperados pelo template
+        $storeContext = $context['store_context'] ?? $context['collector_context'] ?? [];
+        $analystAnalysis = $context['analyst_analysis'] ?? $context['analysis'] ?? [];
+        $externalData = $context['external_data'] ?? [];
+        $competitorData = $context['competitor_data'] ?? $externalData['concorrentes'] ?? [];
+        $marketData = $context['market_data'] ?? $externalData['dados_mercado'] ?? [];
+
+        $replacements = [
+            '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($context['previous_suggestions'] ?? []),
+            '{{saturated_themes}}' => self::identifySaturatedThemes($context['previous_suggestions'] ?? []),
+            '{{seasonality_context}}' => $seasonCtx,
+            '{{success_rates}}' => self::getSuccessRatesByCategory(),
+            '{{platform_resources}}' => self::getPlatformResources(),
+            '{{unexplored_angles}}' => self::getUnexploredAngles(),
+            '{{store_context}}' => json_encode($storeContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            '{{analyst_analysis}}' => json_encode($analystAnalysis, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            '{{competitor_data}}' => json_encode($competitorData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            '{{market_data}}' => json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            '{{rag_strategies}}' => json_encode($context['rag_strategies'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+        ];
+
+        foreach ($replacements as $k => $v) {
+            $template = str_replace($k, $v, $template);
+        }
+
+        return $template;
+    }
+
+    /**
+     * Método get() para manter compatibilidade com o pipeline existente.
+     * Redireciona para o novo método build().
+     */
+    public static function get(array $context): string
+    {
+        return self::build($context);
     }
 }

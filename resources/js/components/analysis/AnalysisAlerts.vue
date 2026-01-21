@@ -15,6 +15,13 @@ const dismissedAlerts = ref([]);
 
 // Mapeamento para traduzir tipos de alerta que possam vir com underscore
 const alertTypeLabels = {
+    // Tipos V3 (AnalystAgentPrompt)
+    inventory_management: 'Gestão de Estoque',
+    sales_performance: 'Desempenho de Vendas',
+    pricing_strategy: 'Estratégia de Preços',
+    customer_behavior: 'Comportamento do Cliente',
+    order_management: 'Gestão de Pedidos',
+    // Tipos legados
     concentracao_vendas: 'Concentração de Vendas',
     estoque_critico: 'Estoque Crítico',
     queda_vendas_recente: 'Queda de Vendas Recente',
@@ -77,7 +84,11 @@ const alertConfig = {
 };
 
 function getConfig(type) {
-    return alertConfig[type] || alertConfig.info;
+    // Map info to warning for warm colors only
+    if (type === 'info') {
+        return alertConfig.warning;
+    }
+    return alertConfig[type] || alertConfig.warning;
 }
 
 function dismissAlert(index) {

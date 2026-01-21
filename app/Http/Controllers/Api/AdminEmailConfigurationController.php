@@ -23,10 +23,26 @@ class AdminEmailConfigurationController extends Controller
         $configurations = $this->emailConfigService->getAll();
 
         return response()->json([
-            'data' => $configurations->map(function ($config) {
+            'configs' => $configurations->map(function ($config) {
                 return $this->emailConfigService->getForDisplay($config->id);
             }),
+            'available_providers' => $this->getAvailableProviders(),
         ]);
+    }
+
+    /**
+     * Get available email providers.
+     */
+    private function getAvailableProviders(): array
+    {
+        return [
+            ['id' => 'smtp', 'name' => 'SMTP'],
+            ['id' => 'mailgun', 'name' => 'Mailgun'],
+            ['id' => 'ses', 'name' => 'Amazon SES'],
+            ['id' => 'postmark', 'name' => 'Postmark'],
+            ['id' => 'resend', 'name' => 'Resend'],
+            ['id' => 'mailjet', 'name' => 'Mailjet'],
+        ];
     }
 
     /**

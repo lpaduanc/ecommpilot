@@ -1,8 +1,10 @@
 <script setup>
 import { onMounted, computed } from 'vue';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { useAuthStore } from '../stores/authStore';
 import BaseCard from '../components/common/BaseCard.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
+import UpgradeBanner from '../components/common/UpgradeBanner.vue';
 import StatCard from '../components/dashboard/StatCard.vue';
 import RevenueChart from '../components/dashboard/RevenueChart.vue';
 import OrdersStatusChart from '../components/dashboard/OrdersStatusChart.vue';
@@ -22,10 +24,14 @@ import {
 } from '@heroicons/vue/24/outline';
 
 const dashboardStore = useDashboardStore();
+const authStore = useAuthStore();
 
 const stats = computed(() => dashboardStore.stats);
 const isLoading = computed(() => dashboardStore.isLoading);
 const hasStore = computed(() => dashboardStore.hasStore);
+
+// Verifica acesso pelo plano (authStore) ou se backend retornou 403 (dashboardStore)
+const upgradeRequired = computed(() => !authStore.canAccessCustomDashboards || dashboardStore.upgradeRequired);
 
 // Verifica se o período selecionado é de apenas 1 dia
 const isSingleDayPeriod = computed(() => {
@@ -103,13 +109,25 @@ async function handleFiltersChange() {
 }
 
 onMounted(() => {
-    dashboardStore.fetchAllData();
+    // Só busca dados se tiver acesso
+    if (authStore.canAccessCustomDashboards) {
+        dashboardStore.fetchAllData();
+    }
 });
 </script>
 
 <template>
-    <div class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8">
-        <!-- Hero Header with Gradient -->
+    <div class="space-y-6">
+        <!-- Banner de Upgrade - Plano não inclui Dashboard -->
+        <UpgradeBanner
+            v-if="upgradeRequired"
+            title="Recurso não disponível no seu plano"
+            description="Seu plano atual não inclui acesso ao Dashboard. Faça upgrade para desbloquear análises detalhadas, gráficos em tempo real e insights poderosos sobre sua loja."
+        />
+
+        <!-- Conteúdo normal - só mostra se tiver acesso -->
+        <div v-else class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8">
+            <!-- Hero Header with Gradient -->
         <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
             <!-- Background Elements -->
             <div class="absolute inset-0 overflow-hidden">
@@ -157,7 +175,7 @@ onMounted(() => {
             </div>
 
             <!-- Empty State - No Store Connected -->
-            <EmptyStoreState v-else-if="!hasStore" />
+            <EmptyStoreState v-if="!hasStore" />
 
             <!-- Dashboard Content -->
             <template v-else>
@@ -224,6 +242,7 @@ onMounted(() => {
                     </div>
                 </div>
             </template>
+        </div>
         </div>
     </div>
 </template>

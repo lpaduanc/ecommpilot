@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\SyncedOrder;
 use App\Services\BrazilLocationsService;
+use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -13,12 +14,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class OrderController extends Controller
 {
     public function __construct(
-        private BrazilLocationsService $locationsService
+        private BrazilLocationsService $locationsService,
+        private PlanLimitService $planLimitService
     ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $user = $request->user();
+        $store = $user->activeStore;
 
         if (! $store) {
             return response()->json([
@@ -28,9 +31,42 @@ class OrderController extends Controller
             ]);
         }
 
+        // Obter limite de pedidos do plano
+        $plan = $user->currentPlan();
+        $ordersLimit = $plan?->orders_limit ?? 0;
+        $isUnlimited = $plan?->isUnlimited('orders_limit') ?? false;
+
+        // Obter IDs dos pedidos permitidos (mais recentes do mês, limitados ao plano)
+        $allowedOrderIds = null;
+        $totalOrdersThisMonth = 0;
+        $limitReached = false;
+
+        if (! $isUnlimited && $ordersLimit > 0) {
+            // Contar total de pedidos do mês
+            $totalOrdersThisMonth = SyncedOrder::where('store_id', $store->id)
+                ->whereMonth('external_created_at', now()->month)
+                ->whereYear('external_created_at', now()->year)
+                ->count();
+
+            $limitReached = $totalOrdersThisMonth > $ordersLimit;
+
+            // Obter apenas os IDs dos pedidos mais recentes dentro do limite
+            $allowedOrderIds = SyncedOrder::where('store_id', $store->id)
+                ->whereMonth('external_created_at', now()->month)
+                ->whereYear('external_created_at', now()->year)
+                ->orderBy('external_created_at', 'desc')
+                ->limit($ordersLimit)
+                ->pluck('id');
+        }
+
         $query = SyncedOrder::where('store_id', $store->id)
             ->search($request->input('search'))
             ->orderBy('external_created_at', 'desc');
+
+        // Aplicar limite do plano (apenas pedidos do mês dentro do limite)
+        if ($allowedOrderIds !== null) {
+            $query->whereIn('id', $allowedOrderIds);
+        }
 
         if ($request->filled('status')) {
             $query->byStatus($request->input('status'));
@@ -66,17 +102,30 @@ class OrderController extends Controller
 
         $orders = $query->paginate($request->input('per_page', 10));
 
-        return response()->json([
+        $response = [
             'data' => OrderResource::collection($orders),
             'total' => $orders->total(),
             'last_page' => $orders->lastPage(),
             'current_page' => $orders->currentPage(),
-        ]);
+        ];
+
+        // Adicionar informações do limite se aplicável
+        if (! $isUnlimited) {
+            $response['limit_info'] = [
+                'orders_limit' => $ordersLimit,
+                'total_orders_this_month' => $totalOrdersThisMonth,
+                'limit_reached' => $limitReached,
+                'showing_limited' => $allowedOrderIds !== null,
+            ];
+        }
+
+        return response()->json($response);
     }
 
     public function filters(Request $request): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $user = $request->user();
+        $store = $user->activeStore;
 
         if (! $store) {
             return response()->json([
@@ -89,7 +138,26 @@ class OrderController extends Controller
             ]);
         }
 
-        $orders = SyncedOrder::where('store_id', $store->id)->get();
+        // Obter limite de pedidos do plano
+        $plan = $user->currentPlan();
+        $ordersLimit = $plan?->orders_limit ?? 0;
+        $isUnlimited = $plan?->isUnlimited('orders_limit') ?? false;
+
+        $query = SyncedOrder::where('store_id', $store->id);
+
+        // Aplicar limite do plano (apenas pedidos do mês dentro do limite)
+        if (! $isUnlimited && $ordersLimit > 0) {
+            $allowedOrderIds = SyncedOrder::where('store_id', $store->id)
+                ->whereMonth('external_created_at', now()->month)
+                ->whereYear('external_created_at', now()->year)
+                ->orderBy('external_created_at', 'desc')
+                ->limit($ordersLimit)
+                ->pluck('id');
+
+            $query->whereIn('id', $allowedOrderIds);
+        }
+
+        $orders = $query->get();
 
         $statuses = $orders
             ->pluck('status')
@@ -157,11 +225,33 @@ class OrderController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
-        $store = $request->user()->activeStore;
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        // Obter limite de pedidos do plano
+        $plan = $user->currentPlan();
+        $ordersLimit = $plan?->orders_limit ?? 0;
+        $isUnlimited = $plan?->isUnlimited('orders_limit') ?? false;
+
+        // Obter IDs dos pedidos permitidos
+        $allowedOrderIds = null;
+        if (! $isUnlimited && $ordersLimit > 0 && $store) {
+            $allowedOrderIds = SyncedOrder::where('store_id', $store->id)
+                ->whereMonth('external_created_at', now()->month)
+                ->whereYear('external_created_at', now()->year)
+                ->orderBy('external_created_at', 'desc')
+                ->limit($ordersLimit)
+                ->pluck('id');
+        }
 
         $query = SyncedOrder::where('store_id', $store?->id ?? 0)
             ->search($request->input('search'))
             ->orderBy('external_created_at', 'desc');
+
+        // Aplicar limite do plano
+        if ($allowedOrderIds !== null) {
+            $query->whereIn('id', $allowedOrderIds);
+        }
 
         if ($request->filled('status')) {
             $query->byStatus($request->input('status'));
@@ -251,7 +341,8 @@ class OrderController extends Controller
 
     public function show(Request $request, $id): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $user = $request->user();
+        $store = $user->activeStore;
 
         if (! $store) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
@@ -270,7 +361,8 @@ class OrderController extends Controller
 
     public function stats(Request $request): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $user = $request->user();
+        $store = $user->activeStore;
 
         if (! $store) {
             return response()->json([
@@ -282,7 +374,26 @@ class OrderController extends Controller
             ]);
         }
 
-        $orders = SyncedOrder::where('store_id', $store->id)->get();
+        // Obter limite de pedidos do plano
+        $plan = $user->currentPlan();
+        $ordersLimit = $plan?->orders_limit ?? 0;
+        $isUnlimited = $plan?->isUnlimited('orders_limit') ?? false;
+
+        $query = SyncedOrder::where('store_id', $store->id);
+
+        // Aplicar limite do plano (apenas pedidos do mês dentro do limite)
+        if (! $isUnlimited && $ordersLimit > 0) {
+            $allowedOrderIds = SyncedOrder::where('store_id', $store->id)
+                ->whereMonth('external_created_at', now()->month)
+                ->whereYear('external_created_at', now()->year)
+                ->orderBy('external_created_at', 'desc')
+                ->limit($ordersLimit)
+                ->pluck('id');
+
+            $query->whereIn('id', $allowedOrderIds);
+        }
+
+        $orders = $query->get();
 
         // Total de pedidos
         $totalOrders = $orders->count();

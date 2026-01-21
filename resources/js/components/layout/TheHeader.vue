@@ -2,8 +2,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/authStore';
+import { useSystemNotificationStore } from '../../stores/systemNotificationStore';
 import StoreSelector from './StoreSelector.vue';
 import ThemeToggle from '../common/ThemeToggle.vue';
+import NotificationDropdown from '../notifications/NotificationDropdown.vue';
 import {
     BellIcon,
     MagnifyingGlassIcon,
@@ -17,6 +19,7 @@ const emit = defineEmits(['toggle-mobile-sidebar']);
 
 const router = useRouter();
 const authStore = useAuthStore();
+const notificationStore = useSystemNotificationStore();
 
 const showUserMenu = ref(false);
 const showNotifications = ref(false);
@@ -35,24 +38,7 @@ const userInitials = computed(() => {
         .toUpperCase();
 });
 
-const notifications = ref([
-    {
-        id: 1,
-        title: 'Sincronização concluída',
-        message: 'Seus produtos foram atualizados com sucesso.',
-        time: '5 min atrás',
-        read: false,
-    },
-    {
-        id: 2,
-        title: 'Nova análise disponível',
-        message: 'Confira as novas sugestões de IA para sua loja.',
-        time: '1 hora atrás',
-        read: false,
-    },
-]);
-
-const unreadCount = computed(() => notifications.value.filter(n => !n.read).length);
+const unreadCount = computed(() => notificationStore.unreadCount);
 
 function toggleUserMenu() {
     showUserMenu.value = !showUserMenu.value;
@@ -62,6 +48,11 @@ function toggleUserMenu() {
 function toggleNotifications() {
     showNotifications.value = !showNotifications.value;
     showUserMenu.value = false;
+
+    // Fetch unread notifications when opening dropdown
+    if (showNotifications.value) {
+        notificationStore.fetchUnread();
+    }
 }
 
 function closeMenus() {
@@ -87,10 +78,6 @@ async function handleLogout() {
     router.push({ name: 'login' });
 }
 
-function markAllAsRead() {
-    notifications.value.forEach(n => n.read = true);
-}
-
 // Close menus on outside click
 function handleClickOutside(event) {
     const userMenuEl = document.getElementById('user-menu');
@@ -107,10 +94,19 @@ function handleClickOutside(event) {
 
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);
+
+    // Fetch unread notifications on mount
+    notificationStore.fetchUnread();
+
+    // Start polling for new notifications every minute
+    notificationStore.startPolling(60000);
 });
 
 onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside);
+
+    // Stop polling when component is destroyed
+    notificationStore.stopPolling();
 });
 </script>
 
@@ -182,41 +178,9 @@ onUnmounted(() => {
                     >
                         <div
                             v-if="showNotifications"
-                            class="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-gray-700 overflow-hidden"
+                            class="absolute right-0 mt-2"
                         >
-                            <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                <span class="font-semibold text-gray-900 dark:text-gray-100 dark:text-white">Notificações</span>
-                                <button
-                                    @click="markAllAsRead"
-                                    class="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
-                                >
-                                    Marcar como lidas
-                                </button>
-                            </div>
-                            <div class="max-h-80 overflow-y-auto">
-                                <div
-                                    v-for="notification in notifications"
-                                    :key="notification.id"
-                                    :class="[
-                                        'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700 cursor-pointer',
-                                        !notification.read ? 'bg-primary-50/50 dark:bg-primary-900/20' : ''
-                                    ]"
-                                >
-                                    <div class="flex items-start gap-3">
-                                        <div
-                                            :class="[
-                                                'w-2 h-2 rounded-full mt-2 flex-shrink-0',
-                                                !notification.read ? 'bg-primary-500' : 'bg-gray-300'
-                                            ]"
-                                        ></div>
-                                        <div>
-                                            <p class="font-medium text-gray-900 dark:text-gray-100 dark:text-white text-sm">{{ notification.title }}</p>
-                                            <p class="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{{ notification.message }}</p>
-                                            <p class="text-gray-400 dark:text-gray-500 dark:text-gray-400 text-xs mt-1">{{ notification.time }}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <NotificationDropdown />
                         </div>
                     </transition>
                 </div>

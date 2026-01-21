@@ -24,8 +24,37 @@ class AnalysisService
         $this->knowledgeBase = new EcommerceKnowledgeBase;
     }
 
+    /**
+     * Check if rate limit should be skipped (local/dev environment).
+     */
+    private function shouldSkipRateLimit(): bool
+    {
+        $isDebug = config('app.debug');
+        $env = config('app.env');
+        $isLocal = app()->isLocal();
+
+        // Debug log para verificar valores
+        Log::debug('Rate limit check', [
+            'app.debug' => $isDebug,
+            'app.env' => $env,
+            'isLocal' => $isLocal,
+        ]);
+
+        // Skip rate limit if debug mode is on and not production
+        if ($isDebug && $env !== 'production') {
+            return true;
+        }
+
+        return $isLocal || app()->environment('testing', 'dev', 'development');
+    }
+
     public function canRequestAnalysis(User $user, ?Store $store = null): bool
     {
+        // Skip rate limit in local/dev environment
+        if ($this->shouldSkipRateLimit()) {
+            return true;
+        }
+
         $storeId = $store?->id ?? $user->active_store_id;
 
         if (! $storeId) {
@@ -48,6 +77,11 @@ class AnalysisService
 
     public function getNextAvailableAt(User $user, ?Store $store = null): ?Carbon
     {
+        // No cooldown in local/dev environment
+        if ($this->shouldSkipRateLimit()) {
+            return null;
+        }
+
         $storeId = $store?->id ?? $user->active_store_id;
 
         if (! $storeId) {

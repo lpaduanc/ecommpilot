@@ -7,18 +7,22 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AnalysisResource;
 use App\Http\Resources\SuggestionResource;
 use App\Jobs\ProcessAnalysisJob;
+use App\Mail\AnalysisCompletedMail;
 use App\Models\ActivityLog;
 use App\Models\Analysis;
 use App\Models\Suggestion;
 use App\Services\AI\Memory\FeedbackLoopService;
 use App\Services\AnalysisService;
+use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AnalysisController extends Controller
 {
     public function __construct(
-        private AnalysisService $analysisService
+        private AnalysisService $analysisService,
+        private PlanLimitService $planLimitService
     ) {}
 
     public function current(Request $request): JsonResponse
@@ -35,6 +39,7 @@ class AnalysisController extends Controller
                 'pending_analysis' => null,
                 'next_available_at' => null,
                 'credits' => $user->ai_credits,
+                'plan_limits' => null,
             ]);
         }
 
@@ -49,6 +54,14 @@ class AnalysisController extends Controller
         // In local env, don't return next_available_at to allow unlimited requests
         $nextAvailableAt = $isLocalEnv ? null : $this->analysisService->getNextAvailableAt($user, $store);
 
+        // Get plan limits info
+        $plan = $user->currentPlan();
+        $planLimits = $plan ? [
+            'analysis_per_day' => $plan->analysis_per_day,
+            'remaining_today' => $this->planLimitService->getRemainingAnalysesToday($user, $store),
+            'used_today' => $this->planLimitService->getAnalysesUsedToday($user, $store),
+        ] : null;
+
         return response()->json([
             'analysis' => $analysis ? new AnalysisResource($analysis) : null,
             'pending_analysis' => $pendingAnalysis ? [
@@ -58,6 +71,7 @@ class AnalysisController extends Controller
             ] : null,
             'next_available_at' => $nextAvailableAt?->toISOString(),
             'credits' => $user->ai_credits,
+            'plan_limits' => $planLimits,
         ]);
     }
 
@@ -88,7 +102,28 @@ class AnalysisController extends Controller
         // Skip rate limit and credits check in local/dev environment
         $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
 
-        // Check rate limit (per store)
+        // Check plan access to AI Analysis (skip in local/dev environment)
+        if (! $isLocalEnv && ! $this->planLimitService->canAccessAnalysis($user)) {
+            return response()->json([
+                'message' => 'Seu plano não inclui acesso às Análises IA.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
+        // Check plan daily limit
+        if (! $isLocalEnv && ! $this->planLimitService->canRequestAnalysis($user, $store)) {
+            $plan = $user->currentPlan();
+            $remaining = $this->planLimitService->getRemainingAnalysesToday($user, $store);
+
+            return response()->json([
+                'message' => 'Você atingiu o limite de análises diárias do seu plano.',
+                'remaining_today' => $remaining,
+                'daily_limit' => $plan?->analysis_per_day ?? 0,
+                'upgrade_required' => true,
+            ], 429);
+        }
+
+        // Check rate limit (per store) - still applies within daily limit
         if (! $isLocalEnv && ! $this->analysisService->canRequestAnalysis($user, $store)) {
             $nextAvailableAt = $this->analysisService->getNextAvailableAt($user, $store);
 
@@ -109,6 +144,11 @@ class AnalysisController extends Controller
         // Deduct credit (skip in local env)
         if (! $isLocalEnv) {
             $user->deductCredits();
+        }
+
+        // Record analysis usage for plan limits
+        if (! $isLocalEnv) {
+            $this->planLimitService->recordAnalysisUsage($user, $store);
         }
 
         // Create analysis
@@ -134,6 +174,7 @@ class AnalysisController extends Controller
                 'created_at' => $analysis->created_at->toISOString(),
             ],
             'credits' => $user->fresh()->ai_credits,
+            'remaining_today' => $this->planLimitService->getRemainingAnalysesToday($user, $store),
         ]);
     }
 
@@ -301,6 +342,66 @@ class AnalysisController extends Controller
     }
 
     /**
+     * Submit feedback for a completed suggestion (V4 Feedback Loop).
+     */
+    public function submitFeedback(Request $request, int $suggestionId): JsonResponse
+    {
+        $request->validate([
+            'was_successful' => 'required|boolean',
+            'feedback' => 'nullable|string|max:1000',
+            'metrics_impact' => 'nullable|array',
+        ]);
+
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
+        }
+
+        $suggestion = Suggestion::where('id', $suggestionId)
+            ->where('store_id', $store->id)
+            ->first();
+
+        if (! $suggestion) {
+            return response()->json(['message' => 'Sugestão não encontrada.'], 404);
+        }
+
+        // Update suggestion with feedback
+        $suggestion->update([
+            'was_successful' => $request->was_successful,
+            'feedback' => $request->feedback,
+            'metrics_impact' => $request->metrics_impact,
+        ]);
+
+        // Process feedback for learning (using the trait from StoreAnalysisService)
+        try {
+            $analysisService = app(\App\Services\AI\Agents\StoreAnalysisService::class);
+            $analysisService->processSuggestionFeedback(
+                $suggestion,
+                $request->was_successful,
+                $request->metrics_impact
+            );
+        } catch (\Exception $e) {
+            Log::error('Erro ao processar feedback da sugestão', [
+                'suggestion_id' => $suggestionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        ActivityLog::log('suggestion.feedback_submitted', $suggestion, [
+            'was_successful' => $request->was_successful,
+            'has_feedback' => ! empty($request->feedback),
+            'has_metrics' => ! empty($request->metrics_impact),
+        ]);
+
+        return response()->json([
+            'message' => 'Feedback registrado com sucesso.',
+            'suggestion' => new SuggestionResource($suggestion),
+        ]);
+    }
+
+    /**
      * Get a single suggestion details.
      */
     public function showSuggestion(Request $request, int $suggestionId): JsonResponse
@@ -372,5 +473,111 @@ class AnalysisController extends Controller
 
         $feedbackLoop = app(FeedbackLoopService::class);
         $feedbackLoop->captureMetricsBefore($suggestion);
+    }
+
+    /**
+     * Resend completion email for an analysis.
+     */
+    public function resendEmail(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
+        }
+
+        // Buscar análise do usuário autenticado com status Completed
+        $analysis = Analysis::where('id', $id)
+            ->where('user_id', $user->id)
+            ->where('store_id', $store->id)
+            ->where('status', AnalysisStatus::Completed)
+            ->first();
+
+        if (! $analysis) {
+            return response()->json(['message' => 'Análise não encontrada ou ainda não foi concluída.'], 404);
+        }
+
+        // Verificar se usuário tem e-mail
+        if (empty($user->email)) {
+            return response()->json(['message' => 'Usuário sem e-mail cadastrado.'], 400);
+        }
+
+        try {
+            // Carregar relacionamentos necessários
+            $analysis->load(['store', 'persistentSuggestions']);
+
+            // Logar tentativa via Log::channel('mail')
+            Log::channel('mail')->info('Tentando reenviar email de conclusao de analise', [
+                'analysis_id' => $analysis->id,
+                'user_email' => $user->email,
+                'store_name' => $analysis->store->name ?? 'N/A',
+            ]);
+
+            // Usar mesmo método do job para consistência
+            $mailData = new AnalysisCompletedMail($analysis);
+            $htmlContent = \Illuminate\Support\Facades\View::make('emails.analysis-completed', [
+                'userName' => $mailData->userName,
+                'storeName' => $mailData->storeName,
+                'periodStart' => $mailData->periodStart,
+                'periodEnd' => $mailData->periodEnd,
+                'healthScore' => $mailData->healthScore,
+                'healthStatus' => $mailData->healthStatus,
+                'mainInsight' => $mailData->mainInsight,
+                'suggestions' => $mailData->suggestions,
+            ])->render();
+
+            // Enviar via EmailConfigurationService
+            $emailService = app(\App\Services\EmailConfigurationService::class);
+            $result = $emailService->sendHtmlEmail(
+                'ai-analysis',
+                $user->email,
+                $user->name ?? '',
+                "Análise de IA Concluída - {$mailData->storeName}",
+                $htmlContent
+            );
+
+            if (! $result['success']) {
+                throw new \RuntimeException($result['message']);
+            }
+
+            // Atualizar email_sent_at e limpar email_error
+            $analysis->update([
+                'email_sent_at' => now(),
+                'email_error' => null,
+            ]);
+
+            // Logar sucesso
+            Log::channel('mail')->info('Email de conclusao de analise reenviado com sucesso', [
+                'analysis_id' => $analysis->id,
+                'user_email' => $user->email,
+                'store_name' => $analysis->store->name ?? 'N/A',
+            ]);
+
+            // Criar ActivityLog
+            ActivityLog::log('email.analysis_resent', $analysis, [
+                'user_email' => $user->email,
+                'store_name' => $analysis->store->name ?? 'N/A',
+            ]);
+
+            return response()->json(['message' => 'E-mail reenviado com sucesso.']);
+        } catch (\Throwable $e) {
+            // Salvar email_error
+            $analysis->update([
+                'email_error' => $e->getMessage(),
+            ]);
+
+            // Logar erro
+            Log::channel('mail')->error('Falha ao reenviar email de conclusao de analise', [
+                'analysis_id' => $analysis->id,
+                'user_email' => $user->email,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao enviar e-mail: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

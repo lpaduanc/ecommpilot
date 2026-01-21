@@ -123,6 +123,7 @@ class AdminSettingsController extends Controller
             ],
             'gemini' => [
                 ['id' => 'gemini-2.5-flash', 'name' => 'Gemini 2.5 Flash', 'description' => 'Mais recente e recomendado'],
+                ['id' => 'gemini-2.5-flash-lite', 'name' => 'Gemini 2.5 Flash Lite', 'description' => 'Leve e eficiente, inferência rápida'],
                 ['id' => 'gemini-1.5-pro', 'name' => 'Gemini 1.5 Pro', 'description' => 'Melhor qualidade'],
                 ['id' => 'gemini-1.5-flash', 'name' => 'Gemini 1.5 Flash', 'description' => 'Mais rápido'],
                 ['id' => 'gemini-1.0-pro', 'name' => 'Gemini 1.0 Pro', 'description' => 'Versão estável'],

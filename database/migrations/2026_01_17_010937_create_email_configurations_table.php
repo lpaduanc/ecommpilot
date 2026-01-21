@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('identifier')->unique();
             $table->string('provider'); // smtp, mailgun, ses, postmark, resend
             $table->boolean('is_active')->default(true);
-            $table->json('settings'); // Provider-specific settings (encrypted)
+            $table->text('settings'); // Provider-specific settings (encrypted)
             $table->timestamps();
         });
     }

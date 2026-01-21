@@ -65,31 +65,37 @@ class AIManager
     }
 
     /**
-     * Send a chat completion using the default provider with automatic fallback.
+     * Send a chat completion using the default provider.
+     *
+     * IMPORTANT: Automatic fallback to other providers is DISABLED by default.
+     * Only the configured provider will be used unless explicitly enabled via
+     * 'enable_fallback' => true in options.
      */
     public function chat(array $messages, array $options = []): string
     {
         $providerName = $options['provider'] ?? null;
-        $disableFallback = $options['disable_fallback'] ?? false;
-        unset($options['provider'], $options['disable_fallback']);
+        // Fallback is DISABLED by default - only use configured provider
+        $enableFallback = $options['enable_fallback'] ?? false;
+        unset($options['provider'], $options['enable_fallback'], $options['disable_fallback']);
 
         $primaryProvider = $providerName ?? $this->defaultProvider;
-        $availableProviders = $this->getAvailableProviders();
 
-        // Try the primary provider first
+        // Try the primary provider
         try {
             return $this->provider($primaryProvider)->chat($messages, $options);
         } catch (\RuntimeException $e) {
-            // Check if fallback is disabled or if it's not a retryable error
-            if ($disableFallback || ! $this->isRetryableError($e)) {
+            // If fallback is not enabled, throw the error immediately
+            if (! $enableFallback || ! $this->isRetryableError($e)) {
                 throw $e;
             }
 
-            Log::warning("Primary AI provider [{$primaryProvider}] failed, attempting fallback", [
+            // Fallback is explicitly enabled - try other providers
+            Log::warning("Primary AI provider [{$primaryProvider}] failed, attempting fallback (explicitly enabled)", [
                 'error' => $e->getMessage(),
             ]);
 
-            // Try fallback providers
+            $availableProviders = $this->getAvailableProviders();
+
             foreach ($availableProviders as $fallbackProvider) {
                 if ($fallbackProvider === $primaryProvider) {
                     continue;

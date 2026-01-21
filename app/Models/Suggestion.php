@@ -21,6 +21,9 @@ class Suggestion extends Model
         'expected_impact',
         'priority',
         'status',
+        'was_successful',
+        'feedback',
+        'metrics_impact',
         'completed_at',
         'target_metrics',
         'specific_data',
@@ -29,10 +32,14 @@ class Suggestion extends Model
     ];
 
     protected $casts = [
+        'recommended_action' => 'array',
         'target_metrics' => 'array',
         'specific_data' => 'array',
+        'data_justification' => 'array',
+        'metrics_impact' => 'array',
         'completed_at' => 'datetime',
         'priority' => 'integer',
+        'was_successful' => 'boolean',
     ];
 
     /**

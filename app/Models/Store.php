@@ -35,6 +35,7 @@ class Store extends Model
         'monthly_revenue',
         'monthly_visits',
         'competitors',
+        'tracking_settings',
     ];
 
     protected $hidden = [
@@ -57,6 +58,7 @@ class Store extends Model
             'monthly_revenue' => 'decimal:2',
             'monthly_visits' => 'integer',
             'competitors' => 'array',
+            'tracking_settings' => 'array',
         ];
     }
 
@@ -159,5 +161,98 @@ class Store extends Model
     public function hasConfiguredNiche(): bool
     {
         return $this->niche !== null && $this->niche_subcategory !== null;
+    }
+
+    /**
+     * Retorna a estrutura padrão de tracking settings
+     */
+    public static function getDefaultTrackingSettings(): array
+    {
+        return [
+            'ga' => [
+                'enabled' => false,
+                'measurement_id' => '',
+            ],
+            'gtag' => [
+                'enabled' => false,
+                'tag_id' => '',
+            ],
+            'meta_pixel' => [
+                'enabled' => false,
+                'pixel_id' => '',
+            ],
+            'clarity' => [
+                'enabled' => false,
+                'project_id' => '',
+            ],
+            'hotjar' => [
+                'enabled' => false,
+                'site_id' => '',
+                'snippet_version' => 6,
+            ],
+        ];
+    }
+
+    /**
+     * Retorna as configurações de tracking da loja
+     */
+    public function getTrackingSettings(): array
+    {
+        $defaults = self::getDefaultTrackingSettings();
+        $settings = $this->tracking_settings ?? [];
+
+        return array_replace_recursive($defaults, $settings);
+    }
+
+    /**
+     * Atualiza uma configuração específica de tracking
+     */
+    public function updateTrackingSetting(string $provider, array $config): void
+    {
+        $settings = $this->getTrackingSettings();
+        $settings[$provider] = array_merge($settings[$provider] ?? [], $config);
+
+        $this->update(['tracking_settings' => $settings]);
+    }
+
+    /**
+     * Retorna configurações de tracking formatadas para o frontend
+     */
+    public function getTrackingConfigForFrontend(): array
+    {
+        $settings = $this->getTrackingSettings();
+
+        return [
+            'ga' => [
+                'enabled' => $settings['ga']['enabled'] ?? false,
+                'measurementId' => $settings['ga']['measurement_id'] ?? '',
+            ],
+            'metaPixel' => [
+                'enabled' => $settings['meta_pixel']['enabled'] ?? false,
+                'pixelId' => $settings['meta_pixel']['pixel_id'] ?? '',
+            ],
+            'clarity' => [
+                'enabled' => $settings['clarity']['enabled'] ?? false,
+                'projectId' => $settings['clarity']['project_id'] ?? '',
+            ],
+            'hotjar' => [
+                'enabled' => $settings['hotjar']['enabled'] ?? false,
+                'siteId' => $settings['hotjar']['site_id'] ?? '',
+                'snippetVersion' => $settings['hotjar']['snippet_version'] ?? 6,
+            ],
+        ];
+    }
+
+    /**
+     * Verifica se a loja tem algum tracking configurado
+     */
+    public function hasTrackingConfigured(): bool
+    {
+        $settings = $this->getTrackingSettings();
+
+        return ($settings['ga']['enabled'] ?? false)
+            || ($settings['meta_pixel']['enabled'] ?? false)
+            || ($settings['clarity']['enabled'] ?? false)
+            || ($settings['hotjar']['enabled'] ?? false);
     }
 }

@@ -3,9 +3,11 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/authStore';
 import { useSidebarStore } from '../../stores/sidebarStore';
+import { useSystemNotificationStore } from '../../stores/systemNotificationStore';
 import {
     ChartBarIcon,
     CubeIcon,
+    CubeTransparentIcon,
     CurrencyDollarIcon,
     SparklesIcon,
     ChatBubbleLeftRightIcon,
@@ -21,6 +23,9 @@ import {
     MegaphoneIcon,
     ChevronDownIcon,
     ChevronRightIcon,
+    BellIcon,
+    CreditCardIcon,
+    LockClosedIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -33,6 +38,7 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const sidebarStore = useSidebarStore();
+const notificationStore = useSystemNotificationStore();
 
 // Submenu states
 const isAIAssistantsOpen = ref(true); // Aberto por padrão
@@ -57,12 +63,14 @@ const menuItems = computed(() => [
                 label: 'Análises IA',
                 route: 'analysis',
                 permission: 'analysis.view',
+                locked: !authStore.canAccessAiAnalysis,
             },
             {
                 name: 'Assistente IA',
                 label: 'Assistente IA',
                 route: 'chat',
                 permission: 'chat.use',
+                locked: !authStore.canAccessAiChat,
             },
         ],
         separatorAfter: true,
@@ -73,6 +81,7 @@ const menuItems = computed(() => [
         icon: ChartBarIcon,
         route: 'dashboard',
         permission: 'dashboard.view',
+        locked: !authStore.canAccessCustomDashboards,
     },
     {
         name: 'Produtos',
@@ -104,11 +113,19 @@ const menuItems = computed(() => [
         ],
     },
     {
+        name: 'Notificações',
+        label: 'Notificações',
+        icon: BellIcon,
+        route: 'notifications',
+        badge: notificationStore.unreadCount,
+    },
+    {
         name: 'Integrações',
         label: 'Integrações',
         icon: LinkIcon,
         route: 'integrations',
         permission: 'integrations.manage',
+        locked: !authStore.canAccessExternalIntegrations,
     },
     {
         name: 'Configurações',
@@ -135,10 +152,31 @@ const adminMenuItems = computed(() => [
         permission: 'admin.access',
     },
     {
+        name: 'Planos',
+        label: 'Planos',
+        icon: CreditCardIcon,
+        route: 'admin-plans',
+        permission: 'admin.access',
+    },
+    {
         name: 'Config. Sistema',
         label: 'Config. Sistema',
         icon: WrenchScrewdriverIcon,
         route: 'admin-settings',
+        permission: 'admin.access',
+    },
+    {
+        name: 'Integrações',
+        label: 'Integrações',
+        icon: CubeTransparentIcon,
+        route: 'admin-integrations',
+        permission: 'admin.access',
+    },
+    {
+        name: 'Análises Geradas',
+        label: 'Análises Geradas',
+        icon: ChartBarIcon,
+        route: 'admin-analyses',
         permission: 'admin.access',
     },
 ]);
@@ -265,13 +303,19 @@ async function handleLogout() {
                                     @click="navigateTo(subitem.route)"
                                     :class="[
                                         'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm',
-                                        isActive(subitem.route)
-                                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                                        subitem.locked
+                                            ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                            : isActive(subitem.route)
+                                                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
+                                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                                     ]"
                                 >
-                                    <SparklesIcon v-if="item.highlight" class="w-4 h-4 text-primary-400" />
+                                    <SparklesIcon v-if="item.highlight && !subitem.locked" class="w-4 h-4 text-primary-400" />
+                                    <LockClosedIcon v-if="subitem.locked" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
                                     <span class="truncate">{{ subitem.label }}</span>
+                                    <span v-if="subitem.locked" class="ml-auto text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                                        PRO
+                                    </span>
                                 </button>
                             </div>
                         </Transition>
@@ -286,13 +330,28 @@ async function handleLogout() {
                         @click="navigateTo(item.route)"
                         :class="[
                             'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
-                            isActive(item.route)
-                                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                            item.locked
+                                ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                : isActive(item.route)
+                                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
+                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                         ]"
                     >
-                        <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                        <component v-if="!item.locked" :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                        <LockClosedIcon v-else class="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                         <span class="truncate">{{ item.label }}</span>
+                        <span
+                            v-if="item.locked"
+                            class="ml-auto text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                        >
+                            PRO
+                        </span>
+                        <span
+                            v-else-if="item.badge && item.badge > 0"
+                            class="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-danger-500 text-white"
+                        >
+                            {{ item.badge > 99 ? '99+' : item.badge }}
+                        </span>
                     </button>
                 </template>
 
@@ -417,13 +476,19 @@ async function handleLogout() {
                                 @click="navigateTo(subitem.route)"
                                 :class="[
                                     'w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm',
-                                    isActive(subitem.route)
-                                        ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                                    subitem.locked
+                                        ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        : isActive(subitem.route)
+                                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
+                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
                                 ]"
                             >
-                                <SparklesIcon v-if="item.highlight" class="w-4 h-4 text-primary-400" />
+                                <SparklesIcon v-if="item.highlight && !subitem.locked" class="w-4 h-4 text-primary-400" />
+                                <LockClosedIcon v-if="subitem.locked" class="w-4 h-4 text-gray-400 dark:text-gray-500" />
                                 <span class="truncate">{{ subitem.label }}</span>
+                                <span v-if="subitem.locked" class="ml-auto text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                                    PRO
+                                </span>
                             </button>
                         </div>
                     </Transition>
@@ -440,16 +505,35 @@ async function handleLogout() {
                     v-else
                     @click="navigateTo(item.route)"
                     :class="[
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium',
-                        isActive(item.route)
-                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
+                        'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium relative',
+                        item.locked
+                            ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            : isActive(item.route)
+                                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
                         sidebarStore.isCollapsed ? 'justify-center' : ''
                     ]"
                     :title="sidebarStore.isCollapsed ? item.label : ''"
                 >
-                    <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                    <component v-if="!item.locked" :is="item.icon" class="w-5 h-5 flex-shrink-0" />
+                    <LockClosedIcon v-else class="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                     <span v-if="!sidebarStore.isCollapsed" class="truncate">{{ item.label }}</span>
+                    <span
+                        v-if="item.locked && !sidebarStore.isCollapsed"
+                        class="ml-auto text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                    >
+                        PRO
+                    </span>
+                    <span
+                        v-else-if="item.badge && item.badge > 0 && !sidebarStore.isCollapsed"
+                        class="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-danger-500 text-white"
+                    >
+                        {{ item.badge > 99 ? '99+' : item.badge }}
+                    </span>
+                    <span
+                        v-if="item.badge && item.badge > 0 && sidebarStore.isCollapsed"
+                        class="absolute top-2 right-2 w-2 h-2 rounded-full bg-danger-500"
+                    ></span>
                 </button>
             </template>
 

@@ -15,9 +15,10 @@ Artisan::command('inspire', function () {
 |--------------------------------------------------------------------------
 */
 
-// Sync all connected stores every day at 3:00 AM (Brazil timezone)
+// Sync all connected stores every day at midnight (Brazil timezone)
+// Jobs are distributed across 4 hours (00:00 - 04:00) to avoid peak load
 Schedule::command('stores:sync')
-    ->dailyAt('03:00')
+    ->dailyAt('00:00')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->onSuccess(function () {
