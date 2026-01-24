@@ -43,7 +43,7 @@ cd ecommpilot
 
 ```bash
 # Copiar arquivo de ambiente para Docker
-cp .env.docker .env
+cp .env.docker.example .env
 ```
 
 Edite o arquivo `.env` e adicione suas API keys:
@@ -168,9 +168,10 @@ docker/
     ├── entrypoint.sh            # Inicialização do app
     └── horizon-entrypoint.sh    # Inicialização do Horizon
 
-docker-compose.yml    # Orquestração dos serviços
-.dockerignore         # Arquivos ignorados no build
-.env.docker           # Template de variáveis para Docker
+docker-compose.yml         # Orquestração dos serviços
+.dockerignore              # Arquivos ignorados no build
+.env.docker.example        # Template de variáveis para Docker
+.env.local.example         # Template para desenvolvimento local (Vite no Windows)
 ```
 
 ### Variáveis de Ambiente Docker
