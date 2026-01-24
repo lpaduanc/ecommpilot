@@ -29,11 +29,17 @@ export const useAnalysisStore = defineStore('analysis', () => {
     });
     
     const hasAnalysisInProgress = computed(() => {
-        return pendingAnalysis.value !== null;
+        // Don't count failed analyses as "in progress"
+        return pendingAnalysis.value !== null &&
+            pendingAnalysis.value.status !== 'failed';
+    });
+
+    const hasPendingError = computed(() => {
+        return pendingAnalysis.value?.status === 'failed';
     });
 
     const canRequestAnalysis = computed(() => {
-        // Can't request if there's already one in progress
+        // Can't request if there's already one in progress (but failed analyses allow retry)
         if (hasAnalysisInProgress.value) return false;
         if (!nextAvailableAt.value) return true;
         return new Date() >= new Date(nextAvailableAt.value);
@@ -316,6 +322,68 @@ export const useAnalysisStore = defineStore('analysis', () => {
         }
     }
 
+    /**
+     * Accept a suggestion - moves it to tracking page
+     */
+    async function acceptSuggestion(suggestionId) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/accept`);
+            const updatedData = response.data.suggestion;
+
+            // Update in currentAnalysis.suggestions
+            if (currentAnalysis.value?.suggestions) {
+                const index = currentAnalysis.value.suggestions.findIndex(s => s.id === suggestionId);
+                if (index !== -1) {
+                    currentAnalysis.value.suggestions.splice(index, 1, {
+                        ...currentAnalysis.value.suggestions[index],
+                        ...updatedData,
+                    });
+                }
+            }
+
+            // Refresh stats
+            await fetchSuggestionStats();
+
+            return { success: true, suggestion: updatedData };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao aceitar sugestão',
+            };
+        }
+    }
+
+    /**
+     * Reject a suggestion - keeps it on analysis page
+     */
+    async function rejectSuggestion(suggestionId) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/reject`);
+            const updatedData = response.data.suggestion;
+
+            // Update in currentAnalysis.suggestions
+            if (currentAnalysis.value?.suggestions) {
+                const index = currentAnalysis.value.suggestions.findIndex(s => s.id === suggestionId);
+                if (index !== -1) {
+                    currentAnalysis.value.suggestions.splice(index, 1, {
+                        ...currentAnalysis.value.suggestions[index],
+                        ...updatedData,
+                    });
+                }
+            }
+
+            // Refresh stats
+            await fetchSuggestionStats();
+
+            return { success: true, suggestion: updatedData };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao rejeitar sugestão',
+            };
+        }
+    }
+
     async function getSuggestionDetail(suggestionId) {
         try {
             const response = await api.get(`/suggestions/${suggestionId}`);
@@ -363,6 +431,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
         currentAnalysis,
         pendingAnalysis,
         hasAnalysisInProgress,
+        hasPendingError,
         analysisHistory,
         isLoading,
         isRequesting,
@@ -407,6 +476,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
         fetchPersistentSuggestions,
         fetchSuggestionStats,
         updateSuggestionStatus,
+        acceptSuggestion,
+        rejectSuggestion,
         getSuggestionDetail,
         setSuggestionsFilter,
         clearSuggestionsFilter,

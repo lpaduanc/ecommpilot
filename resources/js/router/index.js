@@ -101,6 +101,15 @@ const routes = [
         meta: { requiresAuth: true, permission: 'analysis.view' },
     },
     {
+        path: '/suggestions',
+        name: 'suggestions',
+        component: () => import(
+            /* webpackChunkName: "suggestions" */
+            '../views/SuggestionsView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'analysis.view' },
+    },
+    {
         path: '/chat',
         name: 'chat',
         component: () => import(

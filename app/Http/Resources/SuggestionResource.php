@@ -11,6 +11,7 @@ class SuggestionResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'analysis_id' => $this->analysis_id,
             'category' => $this->category,
             'title' => $this->title,
             'description' => $this->description,
@@ -23,6 +24,11 @@ class SuggestionResource extends JsonResource
             'specific_data' => $this->specific_data,
             'data_justification' => $this->data_justification,
             'is_done' => $this->status === 'completed',
+            'is_accepted' => $this->isOnTrackingPage(),
+            'is_rejected' => $this->isRejected(),
+            'is_on_analysis_page' => $this->isOnAnalysisPage(),
+            'is_on_tracking_page' => $this->isOnTrackingPage(),
+            'accepted_at' => $this->accepted_at?->toISOString(),
             'completed_at' => $this->completed_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

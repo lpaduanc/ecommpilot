@@ -223,9 +223,9 @@ return [
             'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 256,
+            'memory' => 512,
             'tries' => 3,
-            'timeout' => 900, // 15 minutos para lojas grandes
+            'timeout' => 0, // Sem limite - sync pode demorar o tempo que precisar
             'nice' => 0,
         ],
 
@@ -238,9 +238,9 @@ return [
             'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 512, // Análise AI consome mais memória
+            'memory' => 512,
             'tries' => 3,
-            'timeout' => 900, // 15 minutos para análise
+            'timeout' => 0, // Sem limite - análise AI pode demorar o tempo que precisar
             'nice' => 0,
         ],
     ],

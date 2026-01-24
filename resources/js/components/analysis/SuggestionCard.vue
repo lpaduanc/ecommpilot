@@ -7,13 +7,16 @@ import {
     ClockIcon,
     PlayIcon,
     XCircleIcon,
+    CheckIcon,
+    XMarkIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     suggestion: { type: Object, required: true },
+    showActions: { type: Boolean, default: true }, // Show accept/reject buttons
 });
 
-const emit = defineEmits(['view-detail', 'ask-ai', 'status-change']);
+const emit = defineEmits(['view-detail', 'ask-ai', 'status-change', 'accept', 'reject']);
 
 const categoryConfig = {
     marketing: { icon: '📣', label: 'Marketing', color: 'from-pink-500 to-rose-500', bg: 'bg-pink-50 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-400' },
@@ -32,46 +35,60 @@ const priorityConfig = {
     low: { label: 'Baixa', color: 'bg-success-500', ring: 'ring-success-500/30', glow: 'shadow-success-500/50' },
 };
 
-const statusConfig = {
-    pending: { label: 'Pendente', icon: ClockIcon, bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-300' },
-    in_progress: { label: 'Em Andamento', icon: PlayIcon, bg: 'bg-primary-100 dark:bg-primary-900/30', text: 'text-primary-700 dark:text-primary-400' },
-    completed: { label: 'Implementado', icon: CheckCircleIcon, bg: 'bg-success-100 dark:bg-success-900/30', text: 'text-success-700 dark:text-success-400' },
-    ignored: { label: 'Ignorada', icon: XCircleIcon, bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-500 dark:text-gray-400' },
-};
-
 const category = computed(() => categoryConfig[props.suggestion.category] || { icon: '💡', label: 'Geral', color: 'from-gray-500 to-gray-600', bg: 'bg-gray-50', text: 'text-gray-700' });
 const priority = computed(() => priorityConfig[props.suggestion.priority || props.suggestion.expected_impact] || priorityConfig.medium);
 
-// Support both legacy is_done and new status field
-const suggestionStatus = computed(() => {
-    if (props.suggestion.status) return props.suggestion.status;
-    return props.suggestion.is_done ? 'completed' : 'pending';
-});
-const statusInfo = computed(() => statusConfig[suggestionStatus.value] || statusConfig.pending);
-const isDone = computed(() => suggestionStatus.value === 'completed');
+// New status system
+const suggestionStatus = computed(() => props.suggestion.status || 'new');
+const isRejected = computed(() => ['rejected', 'ignored'].includes(suggestionStatus.value));
+const isAccepted = computed(() => suggestionStatus.value === 'accepted');
 const isInProgress = computed(() => suggestionStatus.value === 'in_progress');
-const isIgnored = computed(() => suggestionStatus.value === 'ignored');
+const isCompleted = computed(() => suggestionStatus.value === 'completed');
+const isOnAnalysisPage = computed(() => props.suggestion.is_on_analysis_page ?? ['new', 'pending', 'rejected', 'ignored'].includes(suggestionStatus.value));
+
+function handleAccept(e) {
+    e.stopPropagation();
+    emit('accept', props.suggestion);
+}
+
+function handleReject(e) {
+    e.stopPropagation();
+    emit('reject', props.suggestion);
+}
 </script>
 
 <template>
     <div
         :class="[
-            'group relative bg-white dark:bg-gray-800 rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden',
-            isDone
-                ? 'border-success-200 dark:border-success-800 bg-success-50/30 dark:bg-success-900/10'
-                : isInProgress
-                    ? 'border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-900/10'
-                    : isIgnored
-                        ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 opacity-60'
-                        : 'border-gray-100 dark:border-gray-700 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1'
+            'group relative bg-white dark:bg-gray-800 rounded-2xl border transition-all duration-300 overflow-hidden',
+            isRejected
+                ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 opacity-70'
+                : 'border-gray-100 dark:border-gray-700 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1'
         ]"
-        @click="emit('view-detail', suggestion)"
     >
-        <!-- Status Badge -->
-        <div v-if="suggestionStatus !== 'pending'" class="absolute top-3 right-3 z-10">
-            <div :class="['flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', statusInfo.bg, statusInfo.text]">
-                <component :is="statusInfo.icon" class="w-3.5 h-3.5" />
-                {{ statusInfo.label }}
+        <!-- Status Badges -->
+        <div v-if="isRejected" class="absolute top-3 right-3 z-10">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                <XCircleIcon class="w-3.5 h-3.5" />
+                Rejeitada
+            </div>
+        </div>
+        <div v-else-if="isAccepted" class="absolute top-3 right-3 z-10">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400">
+                <CheckCircleIcon class="w-3.5 h-3.5" />
+                Aceita
+            </div>
+        </div>
+        <div v-else-if="isInProgress" class="absolute top-3 right-3 z-10">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400">
+                <PlayIcon class="w-3.5 h-3.5" />
+                Em Andamento
+            </div>
+        </div>
+        <div v-else-if="isCompleted" class="absolute top-3 right-3 z-10">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400">
+                <CheckCircleIcon class="w-3.5 h-3.5" />
+                Concluída
             </div>
         </div>
 
@@ -80,12 +97,13 @@ const isIgnored = computed(() => suggestionStatus.value === 'ignored');
             :class="[
                 'absolute top-0 left-6 w-1 h-8 rounded-b-full transition-all duration-300',
                 priority.color,
-                !isDone && !isIgnored && 'group-hover:h-12 group-hover:shadow-lg',
+                !isRejected && 'group-hover:h-12 group-hover:shadow-lg',
                 priority.glow
             ]"
         ></div>
 
-        <div class="p-5">
+        <!-- Clickable area for details -->
+        <div class="p-5 cursor-pointer" @click="emit('view-detail', suggestion)">
             <!-- Header -->
             <div class="flex items-start gap-3 mb-4">
                 <div :class="['w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-transform duration-300 group-hover:scale-110', category.bg]">
@@ -97,7 +115,7 @@ const isIgnored = computed(() => suggestionStatus.value === 'ignored');
                     </span>
                     <h4 :class="[
                         'font-semibold text-gray-900 dark:text-gray-100 mt-1 line-clamp-2 transition-colors duration-200',
-                        !isDone && 'group-hover:text-primary-600'
+                        !isRejected && 'group-hover:text-primary-600'
                     ]">
                         {{ suggestion.title }}
                     </h4>
@@ -116,31 +134,31 @@ const isIgnored = computed(() => suggestionStatus.value === 'ignored');
                     Impacto {{ suggestion.expected_impact === 'high' ? 'Alto' : suggestion.expected_impact === 'medium' ? 'Médio' : suggestion.expected_impact === 'low' ? 'Baixo' : suggestion.expected_impact }}
                 </p>
             </div>
+        </div>
 
-            <!-- Footer -->
-            <div class="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-                <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
-                    <span v-if="suggestion.estimated_effort" class="flex items-center gap-1">
-                        {{ suggestion.estimated_effort === 'low' ? 'Fácil' : suggestion.estimated_effort === 'medium' ? 'Médio' : 'Complexo' }}
-                    </span>
-                    <span v-if="suggestion.estimated_time">
-                        {{ suggestion.estimated_time }}
-                    </span>
-                    <span v-if="suggestion.expected_impact && !suggestion.estimated_effort" class="capitalize">
-                        Impacto {{ suggestion.expected_impact === 'high' ? 'Alto' : suggestion.expected_impact === 'medium' ? 'Médio' : 'Baixo' }}
-                    </span>
-                </div>
-                <div
-                    :class="[
-                        'flex items-center gap-1.5 text-sm font-medium transition-all duration-200',
-                        isDone || isIgnored ? '' : 'text-primary-600 dark:text-primary-400 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
-                    ]"
+        <!-- Action Buttons (Accept/Reject) -->
+        <div v-if="showActions && isOnAnalysisPage" class="px-5 pb-4 pt-0">
+            <div class="flex items-center justify-start gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                    @click="handleAccept"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-success-500 hover:bg-success-600 text-white text-xs font-medium transition-colors"
                 >
-                    <template v-if="!isDone && !isIgnored">
-                        Ver detalhes
-                        <ArrowRightIcon class="w-4 h-4" />
-                    </template>
-                </div>
+                    <CheckIcon class="w-3.5 h-3.5" />
+                    Aceitar
+                </button>
+                <button
+                    @click="handleReject"
+                    :class="[
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                        isRejected
+                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-default'
+                            : 'bg-danger-500 hover:bg-danger-600 text-white'
+                    ]"
+                    :disabled="isRejected"
+                >
+                    <XMarkIcon class="w-3.5 h-3.5" />
+                    {{ isRejected ? 'Rejeitada' : 'Rejeitar' }}
+                </button>
             </div>
         </div>
 

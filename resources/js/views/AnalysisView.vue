@@ -161,6 +161,36 @@ async function handleStatusChange({ suggestion, status }) {
     }
 }
 
+async function handleAcceptSuggestion(suggestion) {
+    if (!suggestion?.id) return;
+
+    const result = await analysisStore.acceptSuggestion(suggestion.id);
+    if (result.success) {
+        notificationStore.success('Sugestão aceita! Acesse "Acompanhamento de Sugestões" para acompanhar.');
+        // Update selected suggestion if modal is open
+        if (selectedSuggestion.value?.id === suggestion.id) {
+            selectedSuggestion.value = result.suggestion;
+        }
+    } else {
+        notificationStore.error(result.message || 'Erro ao aceitar sugestão.');
+    }
+}
+
+async function handleRejectSuggestion(suggestion) {
+    if (!suggestion?.id) return;
+
+    const result = await analysisStore.rejectSuggestion(suggestion.id);
+    if (result.success) {
+        notificationStore.success('Sugestão rejeitada.');
+        // Update selected suggestion if modal is open
+        if (selectedSuggestion.value?.id === suggestion.id) {
+            selectedSuggestion.value = result.suggestion;
+        }
+    } else {
+        notificationStore.error(result.message || 'Erro ao rejeitar sugestão.');
+    }
+}
+
 async function handleResendEmail() {
     isResendingEmail.value = true;
     try {
@@ -299,7 +329,7 @@ onUnmounted(() => {
 
         <!-- Banner de Análise em Processamento com Progresso -->
         <div
-            v-if="pendingAnalysis && pendingAnalysis.status === 'processing'"
+            v-if="pendingAnalysis && (pendingAnalysis.status === 'processing' || pendingAnalysis.status === 'pending')"
             class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/30 dark:to-secondary-900/30 border-2 border-primary-200 dark:border-primary-800 rounded-xl p-5"
         >
             <div class="flex items-start gap-4">
@@ -330,6 +360,39 @@ onUnmounted(() => {
                     <p class="text-xs text-primary-400 dark:text-primary-500 mt-2">
                         Tempo decorrido: {{ pendingAnalysisElapsed }}
                     </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner de Análise com Erro (pendingAnalysis com status failed) -->
+        <div
+            v-if="pendingAnalysis && pendingAnalysis.status === 'failed'"
+            class="bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-300 dark:border-rose-700 rounded-xl p-5"
+        >
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-800 flex items-center justify-center">
+                    <ExclamationTriangleIcon class="w-6 h-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-rose-800 dark:text-rose-200">
+                        Erro na Análise
+                    </h3>
+                    <p class="text-sm text-rose-600 dark:text-rose-300 mt-1">
+                        {{ pendingAnalysis.error_message || 'Ocorreu um erro ao processar sua análise. Por favor, tente novamente.' }}
+                    </p>
+                    <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
+                        Seus créditos foram reembolsados automaticamente. Você pode tentar novamente.
+                    </p>
+                    <BaseButton
+                        v-if="authStore.hasPermission('analysis.request')"
+                        variant="danger"
+                        size="md"
+                        @click="handleRequestAnalysis"
+                        class="mt-4"
+                    >
+                        <SparklesIcon class="w-5 h-5" />
+                        Tentar Novamente
+                    </BaseButton>
                 </div>
             </div>
         </div>
@@ -548,6 +611,8 @@ onUnmounted(() => {
                                     :key="suggestion.id"
                                     :suggestion="suggestion"
                                     @view-detail="viewSuggestionDetail"
+                                    @accept="handleAcceptSuggestion"
+                                    @reject="handleRejectSuggestion"
                                 />
                             </div>
                         </div>
@@ -569,6 +634,8 @@ onUnmounted(() => {
                                     :key="suggestion.id"
                                     :suggestion="suggestion"
                                     @view-detail="viewSuggestionDetail"
+                                    @accept="handleAcceptSuggestion"
+                                    @reject="handleRejectSuggestion"
                                 />
                             </div>
                         </div>
@@ -590,6 +657,8 @@ onUnmounted(() => {
                                     :key="suggestion.id"
                                     :suggestion="suggestion"
                                     @view-detail="viewSuggestionDetail"
+                                    @accept="handleAcceptSuggestion"
+                                    @reject="handleRejectSuggestion"
                                 />
                             </div>
                         </div>
@@ -736,8 +805,11 @@ onUnmounted(() => {
         <SuggestionDetailModal
             :show="showSuggestionDetail"
             :suggestion="selectedSuggestion"
+            mode="analysis"
             @close="showSuggestionDetail = false"
             @status-change="handleStatusChange"
+            @accept="handleAcceptSuggestion"
+            @reject="handleRejectSuggestion"
         />
 
         <!-- Opportunity Detail Modal -->

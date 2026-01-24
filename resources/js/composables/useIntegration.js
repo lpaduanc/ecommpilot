@@ -102,13 +102,9 @@ export function useIntegration(options = {}) {
             // Update application state after successful connection
             await updateApplicationState(result.data);
 
-            // Clean URL and redirect if needed
+            // Redirect to dashboard after successful connection
             if (redirectAfterOAuth) {
-                // Remove query parameters from URL
-                router.replace({
-                    name: route.name,
-                    query: {},
-                });
+                router.push({ name: 'dashboard' });
             }
         } else {
             notificationStore.error(result.message);
@@ -122,18 +118,15 @@ export function useIntegration(options = {}) {
      */
     async function updateApplicationState(connectionData) {
         try {
-            // Refresh stores list
-            await integrationStore.fetchStores();
-
             // If there's a new store, set it as the active store
             if (connectionData.store && connectionData.store.id) {
                 const newStore = connectionData.store;
 
-                // Update user's active_store_id if needed
-                if (authStore.user && authStore.user.active_store_id !== newStore.id) {
-                    // Fetch updated user data which should include the new active_store_id
-                    await authStore.fetchUser();
-                }
+                // Fetch updated user data which should include the new active_store_id
+                await authStore.fetchUser();
+
+                // Refresh stores list with the new active store
+                await integrationStore.fetchStores();
 
                 // Refresh dashboard data with the new store
                 await dashboardStore.fetchAllData();

@@ -112,9 +112,23 @@ class AnalysisService
             return null;
         }
 
-        return Analysis::where('user_id', $user->id)
+        // First, check for pending or processing analyses
+        $pendingOrProcessing = Analysis::where('user_id', $user->id)
             ->where('store_id', $storeId)
             ->whereIn('status', [AnalysisStatus::Pending, AnalysisStatus::Processing])
+            ->latest()
+            ->first();
+
+        if ($pendingOrProcessing) {
+            return $pendingOrProcessing;
+        }
+
+        // If no pending/processing, check for recently failed analyses (last 10 minutes)
+        // This allows the frontend to show the error message
+        return Analysis::where('user_id', $user->id)
+            ->where('store_id', $storeId)
+            ->where('status', AnalysisStatus::Failed)
+            ->where('updated_at', '>=', now()->subMinutes(10))
             ->latest()
             ->first();
     }

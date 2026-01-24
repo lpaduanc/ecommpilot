@@ -20,6 +20,23 @@ class MailjetTransport extends AbstractTransport
 
     private array $retryDelays = [5, 15, 30];
 
+    /**
+     * Safe log to mail channel - silently ignores permission errors.
+     */
+    private function safeMailLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('mail')->{$level}($message, $context);
+        } catch (\Throwable) {
+            // Fallback to default log channel if mail channel fails
+            try {
+                Log::{$level}('[mail] '.$message, $context);
+            } catch (\Throwable) {
+                // Silently ignore
+            }
+        }
+    }
+
     public function __construct(
         string $apiKey,
         string $secretKey,
@@ -108,7 +125,7 @@ class MailjetTransport extends AbstractTransport
                 $response = $this->client->post(Resources::$Email, ['body' => $body]);
 
                 if ($response->success()) {
-                    Log::channel('mail')->info('Mailjet email sent successfully', [
+                    $this->safeMailLog('info', 'Mailjet email sent successfully', [
                         'to' => $body['Messages'][0]['To'][0]['Email'] ?? 'unknown',
                         'subject' => $body['Messages'][0]['Subject'] ?? 'unknown',
                     ]);
@@ -135,7 +152,7 @@ class MailjetTransport extends AbstractTransport
             } catch (\Exception $e) {
                 $lastException = $e;
 
-                Log::channel('mail')->warning('Mailjet send attempt failed', [
+                $this->safeMailLog('warning', 'Mailjet send attempt failed', [
                     'attempt' => $attempt + 1,
                     'error' => $e->getMessage(),
                 ]);
@@ -147,7 +164,7 @@ class MailjetTransport extends AbstractTransport
             }
         }
 
-        Log::channel('mail')->error('Mailjet send failed after all retries', [
+        $this->safeMailLog('error', 'Mailjet send failed after all retries', [
             'to' => $body['Messages'][0]['To'][0]['Email'] ?? 'unknown',
             'error' => $lastException?->getMessage(),
         ]);

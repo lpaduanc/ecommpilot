@@ -161,8 +161,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('suggestions')->middleware('can:analysis.view')->group(function () {
         Route::get('/', [AnalysisController::class, 'suggestions']);
         Route::get('/stats', [AnalysisController::class, 'suggestionStats']);
+        Route::get('/tracking', [AnalysisController::class, 'trackingSuggestions']); // Tracking page
         Route::get('/{id}', [AnalysisController::class, 'showSuggestion']);
         Route::patch('/{id}', [AnalysisController::class, 'updateSuggestion']);
+        Route::post('/{id}/accept', [AnalysisController::class, 'acceptSuggestion']);
+        Route::post('/{id}/reject', [AnalysisController::class, 'rejectSuggestion']);
         Route::post('/{id}/feedback', [AnalysisController::class, 'submitFeedback']); // V4: Feedback loop
     });
 

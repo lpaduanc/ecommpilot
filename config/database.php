@@ -87,7 +87,7 @@ return [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '5432'),
+            'port' => env('DB_PORT', '5434'),
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
@@ -96,6 +96,27 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            // Configurações de conexão robustas para jobs longos
+            'options' => extension_loaded('pdo_pgsql') ? [
+                // Timeout de conexão (30s)
+                \PDO::ATTR_TIMEOUT => env('DB_TIMEOUT', 30),
+                // Retry automático em erros
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                // Manter conexão persistente para workers
+                \PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),
+                // Statement timeout (10 minutos em ms) - queries longas são esperadas
+                \PDO::ATTR_EMULATE_PREPARES => false,
+            ] : [],
+            // Keepalive para evitar conexões stale em jobs longos
+            'connect_timeout' => env('DB_CONNECT_TIMEOUT', 30),
+            'statement_timeout' => env('DB_STATEMENT_TIMEOUT', 600000), // 10 min em ms
+            // Pool de conexões - mantém até N conexões idle
+            'pool' => [
+                'min' => env('DB_POOL_MIN', 2),
+                'max' => env('DB_POOL_MAX', 10),
+            ],
+            // Sticky write connection - mantém mesma conexão em transação
+            'sticky' => true,
         ],
 
         'pgsql_testing' => [

@@ -23,9 +23,9 @@ class SyncCouponsJob implements ShouldQueue
     public int $tries = 3;
 
     /**
-     * Timeout do job em segundos (3 minutos - cupons são mais rápidos)
+     * Timeout do job - 0 = sem limite
      */
-    public int $timeout = 180;
+    public int $timeout = 0;
 
     public function __construct(
         public Store $store,

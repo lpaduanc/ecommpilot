@@ -7,29 +7,29 @@ use App\Models\SystemSetting;
 class SettingsService
 {
     /**
-     * Get AI configuration settings.
+     * Get AI configuration settings from database only.
      */
     public function getAISettings(): array
     {
         return [
-            'provider' => SystemSetting::get('ai.provider', config('services.ai.default', 'openai')),
+            'provider' => SystemSetting::get('ai.provider') ?? 'gemini',
             'openai' => [
-                'api_key' => SystemSetting::get('ai.openai.api_key', config('openai.api_key', '')),
-                'model' => SystemSetting::get('ai.openai.model', config('services.ai.openai.model', 'gpt-4o')),
-                'temperature' => SystemSetting::get('ai.openai.temperature', config('services.ai.openai.temperature', 0.7)),
-                'max_tokens' => SystemSetting::get('ai.openai.max_tokens', config('services.ai.openai.max_tokens', 4000)),
+                'api_key' => SystemSetting::get('ai.openai.api_key') ?? '',
+                'model' => SystemSetting::get('ai.openai.model') ?? 'gpt-4o',
+                'temperature' => SystemSetting::get('ai.openai.temperature') ?? 0.7,
+                'max_tokens' => SystemSetting::get('ai.openai.max_tokens') ?? 8192,
             ],
             'gemini' => [
-                'api_key' => SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key', '')),
-                'model' => SystemSetting::get('ai.gemini.model', config('services.ai.gemini.model', 'gemini-1.5-pro')),
-                'temperature' => SystemSetting::get('ai.gemini.temperature', config('services.ai.gemini.temperature', 0.7)),
-                'max_tokens' => SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 4000)),
+                'api_key' => SystemSetting::get('ai.gemini.api_key') ?? '',
+                'model' => SystemSetting::get('ai.gemini.model') ?? 'gemini-2.5-flash',
+                'temperature' => SystemSetting::get('ai.gemini.temperature') ?? 0.7,
+                'max_tokens' => SystemSetting::get('ai.gemini.max_tokens') ?? 16384,
             ],
             'anthropic' => [
-                'api_key' => SystemSetting::get('ai.anthropic.api_key', config('services.anthropic.api_key', '')),
-                'model' => SystemSetting::get('ai.anthropic.model', config('services.anthropic.model', 'claude-sonnet-4-20250514')),
-                'temperature' => SystemSetting::get('ai.anthropic.temperature', config('services.anthropic.temperature', 0.7)),
-                'max_tokens' => SystemSetting::get('ai.anthropic.max_tokens', config('services.anthropic.max_tokens', 8192)),
+                'api_key' => SystemSetting::get('ai.anthropic.api_key') ?? '',
+                'model' => SystemSetting::get('ai.anthropic.model') ?? 'claude-sonnet-4-20250514',
+                'temperature' => SystemSetting::get('ai.anthropic.temperature') ?? 0.7,
+                'max_tokens' => SystemSetting::get('ai.anthropic.max_tokens') ?? 8192,
             ],
         ];
     }
@@ -46,10 +46,10 @@ class SettingsService
         $settings['gemini']['api_key'] = $this->maskApiKey($settings['gemini']['api_key']);
         $settings['anthropic']['api_key'] = $this->maskApiKey($settings['anthropic']['api_key']);
 
-        // Add configured status
-        $settings['openai']['is_configured'] = ! empty(SystemSetting::get('ai.openai.api_key', config('openai.api_key')));
-        $settings['gemini']['is_configured'] = ! empty(SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key')));
-        $settings['anthropic']['is_configured'] = ! empty(SystemSetting::get('ai.anthropic.api_key', config('services.anthropic.api_key')));
+        // Add configured status (database only)
+        $settings['openai']['is_configured'] = ! empty(SystemSetting::get('ai.openai.api_key'));
+        $settings['gemini']['is_configured'] = ! empty(SystemSetting::get('ai.gemini.api_key'));
+        $settings['anthropic']['is_configured'] = ! empty(SystemSetting::get('ai.anthropic.api_key'));
 
         return $settings;
     }

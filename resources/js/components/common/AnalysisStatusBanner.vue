@@ -20,9 +20,14 @@ const recentlyCompleted = computed(() => {
     return completedAt > fiveMinutesAgo;
 });
 
+// Check if pending analysis has error (recently failed)
+const hasPendingError = computed(() => {
+    return analysisStore.pendingAnalysis?.status === 'failed';
+});
+
 // Check if analysis has error
 const hasError = computed(() => {
-    return analysisStore.currentAnalysis?.status === 'failed';
+    return hasPendingError.value || analysisStore.currentAnalysis?.status === 'failed';
 });
 
 // Show banner conditions
@@ -32,6 +37,7 @@ const showBanner = computed(() => {
         return false;
     }
     return analysisStore.hasAnalysisInProgress ||
+        hasPendingError.value ||
         (recentlyCompleted.value && !dismissedCompletion.value);
 });
 
@@ -49,7 +55,10 @@ const bannerVariant = computed(() => {
 // Banner message
 const bannerMessage = computed(() => {
     if (hasError.value) {
-        return analysisStore.currentAnalysis?.error_message || 'Ocorreu um erro durante a análise. Tente novamente.';
+        // Prefer pending analysis error message if it exists
+        return analysisStore.pendingAnalysis?.error_message
+            || analysisStore.currentAnalysis?.error_message
+            || 'Ocorreu um erro durante a análise. Tente novamente.';
     }
     if (recentlyCompleted.value) {
         return 'Sua análise foi concluída! Clique para ver os insights e recomendações.';
@@ -66,20 +75,18 @@ const bannerIcon = computed(() => {
 
 // Action button label
 const actionLabel = computed(() => {
-    if (hasError.value) return 'Tentar Novamente';
+    if (hasError.value) return 'Ver Detalhes';
     if (recentlyCompleted.value) return 'Ver Análise';
     return 'Ver Progresso';
 });
 
 // Handle action button click
 async function handleAction() {
-    if (hasError.value) {
-        await analysisStore.requestNewAnalysis();
-    } else {
-        router.push({ name: 'analysis' });
-        if (recentlyCompleted.value) {
-            dismissedCompletion.value = true;
-        }
+    // Navigate to analysis page for both errors and success
+    // The analysis page has better context and retry button
+    router.push({ name: 'analysis' });
+    if (recentlyCompleted.value) {
+        dismissedCompletion.value = true;
     }
 }
 

@@ -43,9 +43,9 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
     public int $backoff = 60;
 
     /**
-     * Timeout do job em segundos (10 minutos)
+     * Timeout do job - 0 = sem limite
      */
-    public int $timeout = 600;
+    public int $timeout = 0;
 
     /**
      * Máximo de exceções antes de falhar permanentemente
@@ -104,9 +104,9 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
 
         // Determine if this is an incremental sync (not the first sync)
         // First sync: last_sync_at is null - fetch all data
-        // Subsequent syncs: fetch only data updated in the last 24 hours
+        // Subsequent syncs: fetch all data for products/coupons, but only last 24h for orders
         $isFirstSync = $this->store->last_sync_at === null;
-        $updatedSince = $isFirstSync ? null : Carbon::now()->subHours(24);
+        $ordersUpdatedSince = $isFirstSync ? null : Carbon::now()->subHours(24);
 
         try {
             // Notificar início da sincronização
@@ -120,17 +120,17 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                 'store_name' => $this->store->name,
                 'parallel_mode' => $this->parallelMode,
                 'is_first_sync' => $isFirstSync,
-                'updated_since' => $updatedSince?->toIso8601String(),
+                'orders_updated_since' => $ordersUpdatedSince?->toIso8601String(),
                 'attempt' => $this->attempts(),
                 'timestamp' => now()->toIso8601String(),
             ]);
 
             if ($this->parallelMode) {
                 // MODO PARALELO: Usa Job Batching para executar jobs simultaneamente
-                $this->executeParallelSync($updatedSince, $dashboardService, $productAnalyticsService, $notificationService, $startTime);
+                $this->executeParallelSync($ordersUpdatedSince, $dashboardService, $productAnalyticsService, $notificationService, $startTime);
             } else {
                 // MODO SEQUENCIAL: Executa jobs um após o outro (compatibilidade)
-                $this->executeSequentialSync($nuvemshopService, $updatedSince, $dashboardService, $productAnalyticsService, $notificationService, $startTime);
+                $this->executeSequentialSync($nuvemshopService, $ordersUpdatedSince, $dashboardService, $productAnalyticsService, $notificationService, $startTime);
             }
         } catch (\Exception $e) {
             $totalTime = round((microtime(true) - $startTime), 2);
@@ -167,9 +167,13 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
     /**
      * Executa sincronização em modo paralelo usando Job Batching.
      * Todos os jobs (produtos, pedidos, clientes, cupons) são executados simultaneamente.
+     *
+     * Estratégia de sync incremental:
+     * - Produtos e Cupons: sempre buscam TODOS os dados (null)
+     * - Pedidos: usam filtro de 24h em syncs subsequentes
      */
     private function executeParallelSync(
-        ?Carbon $updatedSince,
+        ?Carbon $ordersUpdatedSince,
         DashboardService $dashboardService,
         ProductAnalyticsService $productAnalyticsService,
         NotificationService $notificationService,
@@ -180,13 +184,14 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
 
         Log::channel($logChannel)->info('>>> [PARALLEL MODE] Iniciando batch de sincronizacao', [
             'store_id' => $store->id,
+            'orders_incremental' => $ordersUpdatedSince !== null,
         ]);
 
         $batch = Bus::batch([
-            new SyncProductsJob($store, $updatedSince),
-            new SyncOrdersJob($store, $updatedSince),
-            new SyncCustomersJob($store, $updatedSince),
-            new SyncCouponsJob($store, $updatedSince),
+            new SyncProductsJob($store, null), // Sempre busca todos os produtos
+            new SyncOrdersJob($store, $ordersUpdatedSince), // Usa filtro de 24h em syncs incrementais
+            // new SyncCustomersJob($store, null), // TODO: Temporarily disabled - causing sync issues
+            new SyncCouponsJob($store, null), // Sempre busca todos os cupons
         ])
             ->name("sync-store-{$store->id}")
             ->allowFailures()
@@ -256,10 +261,14 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
     /**
      * Executa sincronização em modo sequencial (compatibilidade com sistema antigo).
      * Jobs são executados um após o outro com sistema de checkpoints.
+     *
+     * Estratégia de sync incremental:
+     * - Produtos e Cupons: sempre buscam TODOS os dados (null)
+     * - Pedidos: usam filtro de 24h em syncs subsequentes
      */
     private function executeSequentialSync(
         NuvemshopService $nuvemshopService,
-        ?Carbon $updatedSince,
+        ?Carbon $ordersUpdatedSince,
         DashboardService $dashboardService,
         ProductAnalyticsService $productAnalyticsService,
         NotificationService $notificationService,
@@ -270,16 +279,17 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         Log::channel($this->logChannel)->info('>>> [SEQUENTIAL MODE] Usando modo sequencial com checkpoints', [
             'store_id' => $this->store->id,
             'checkpoint' => $checkpoint,
+            'orders_incremental' => $ordersUpdatedSince !== null,
         ]);
 
-        // Sync products (se ainda não foi feito)
+        // Sync products (se ainda não foi feito) - sempre busca TODOS
         if (! in_array('products', $checkpoint)) {
             $stepStart = microtime(true);
-            Log::channel($this->logChannel)->info('>>> Iniciando sync de PRODUTOS', [
+            Log::channel($this->logChannel)->info('>>> Iniciando sync de PRODUTOS (completo)', [
                 'store' => $this->store->name,
             ]);
 
-            $nuvemshopService->syncProducts($this->store, $updatedSince);
+            $nuvemshopService->syncProducts($this->store, null); // Sempre busca todos
             $this->saveCheckpoint('products');
 
             $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
@@ -293,14 +303,16 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
             ]);
         }
 
-        // Sync orders (se ainda não foi feito)
+        // Sync orders (se ainda não foi feito) - usa filtro de 24h em syncs incrementais
         if (! in_array('orders', $checkpoint)) {
             $stepStart = microtime(true);
             Log::channel($this->logChannel)->info('>>> Iniciando sync de PEDIDOS', [
                 'store' => $this->store->name,
+                'incremental' => $ordersUpdatedSince !== null,
+                'updated_since' => $ordersUpdatedSince?->toIso8601String(),
             ]);
 
-            $nuvemshopService->syncOrders($this->store, $updatedSince);
+            $nuvemshopService->syncOrders($this->store, $ordersUpdatedSince);
             $this->saveCheckpoint('orders');
 
             $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
@@ -314,35 +326,36 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
             ]);
         }
 
-        // Sync customers (se ainda não foi feito)
-        if (! in_array('customers', $checkpoint)) {
-            $stepStart = microtime(true);
-            Log::channel($this->logChannel)->info('>>> Iniciando sync de CLIENTES', [
-                'store' => $this->store->name,
-            ]);
+        // TODO: Temporarily disabled - causing sync issues
+        // Sync customers (se ainda não foi feito) - sempre busca TODOS
+        // if (! in_array('customers', $checkpoint)) {
+        //     $stepStart = microtime(true);
+        //     Log::channel($this->logChannel)->info('>>> Iniciando sync de CLIENTES (completo)', [
+        //         'store' => $this->store->name,
+        //     ]);
 
-            $nuvemshopService->syncCustomers($this->store, $updatedSince);
-            $this->saveCheckpoint('customers');
+        //     $nuvemshopService->syncCustomers($this->store, null); // Sempre busca todos
+        //     $this->saveCheckpoint('customers');
 
-            $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
-            Log::channel($this->logChannel)->info('<<< Sync de CLIENTES concluido', [
-                'store' => $this->store->name,
-                'time_ms' => $stepTime,
-            ]);
-        } else {
-            Log::channel($this->logChannel)->info('--- Sync de CLIENTES ignorado (checkpoint)', [
-                'store' => $this->store->name,
-            ]);
-        }
+        //     $stepTime = round((microtime(true) - $stepStart) * 1000, 2);
+        //     Log::channel($this->logChannel)->info('<<< Sync de CLIENTES concluido', [
+        //         'store' => $this->store->name,
+        //         'time_ms' => $stepTime,
+        //     ]);
+        // } else {
+        //     Log::channel($this->logChannel)->info('--- Sync de CLIENTES ignorado (checkpoint)', [
+        //         'store' => $this->store->name,
+        //     ]);
+        // }
 
-        // Sync coupons (se ainda não foi feito)
+        // Sync coupons (se ainda não foi feito) - sempre busca TODOS
         if (! in_array('coupons', $checkpoint)) {
             $stepStart = microtime(true);
-            Log::channel($this->logChannel)->info('>>> Iniciando sync de CUPONS', [
+            Log::channel($this->logChannel)->info('>>> Iniciando sync de CUPONS (completo)', [
                 'store' => $this->store->name,
             ]);
 
-            $nuvemshopService->syncCoupons($this->store, $updatedSince);
+            $nuvemshopService->syncCoupons($this->store, null); // Sempre busca todos
             $this->saveCheckpoint('coupons');
 
             $stepTime = round((microtime(true) - $stepStart) * 1000, 2);

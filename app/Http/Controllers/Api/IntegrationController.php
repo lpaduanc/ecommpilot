@@ -319,10 +319,9 @@ class IntegrationController extends Controller
                 }
             }
 
-            // Set as active store if user doesn't have one
-            if (! $user->active_store_id) {
-                $user->update(['active_store_id' => $store->id]);
-            }
+            // Set newly connected store as the active store
+            // This ensures the user is immediately switched to the dashboard of the new store
+            $user->update(['active_store_id' => $store->id]);
 
             // Start initial sync
             SyncStoreDataJob::dispatch($store);

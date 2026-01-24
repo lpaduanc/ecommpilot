@@ -13,6 +13,23 @@ use Mailjet\Resources;
 class EmailConfigurationService
 {
     /**
+     * Safe log to mail channel - silently ignores permission errors.
+     */
+    private function logMail(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('mail')->{$level}($message, $context);
+        } catch (\Throwable $e) {
+            // Fallback to default log channel if mail channel fails (e.g., permission issues)
+            try {
+                Log::{$level}('[mail] '.$message, $context);
+            } catch (\Throwable) {
+                // Silently ignore if even default logging fails
+            }
+        }
+    }
+
+    /**
      * Get all email configurations.
      */
     public function getAll(): \Illuminate\Database\Eloquent\Collection
@@ -154,7 +171,7 @@ class EmailConfigurationService
         }
 
         // Log tentativa de envio
-        Log::channel('mail')->info('Tentando enviar email via Mailjet', [
+        $this->logMail('info', 'Tentando enviar email via Mailjet', [
             'to' => $to,
             'from' => $fromAddress,
             'subject' => $subject,
@@ -186,7 +203,7 @@ class EmailConfigurationService
         ]);
 
         if ($response->success()) {
-            Log::channel('mail')->info('Email enviado com sucesso via Mailjet', [
+            $this->logMail('info', 'Email enviado com sucesso via Mailjet', [
                 'to' => $to,
                 'from' => $fromAddress,
                 'provider' => 'mailjet',
@@ -214,7 +231,7 @@ class EmailConfigurationService
             $errorMessage = $errorData['ErrorMessage'];
         }
 
-        Log::channel('mail')->error('Falha ao enviar email via Mailjet', [
+        $this->logMail('error', 'Falha ao enviar email via Mailjet', [
             'to' => $to,
             'from' => $fromAddress,
             'status' => $response->getStatus(),
@@ -240,7 +257,7 @@ class EmailConfigurationService
     private function sendViaSmtp(array $settings, string $to, string $fromAddress, string $fromName, string $subject, string $body): array
     {
         // Log tentativa de envio
-        Log::channel('mail')->info('Tentando enviar email via SMTP', [
+        $this->logMail('info', 'Tentando enviar email via SMTP', [
             'to' => $to,
             'from' => $fromAddress,
             'subject' => $subject,
@@ -273,7 +290,7 @@ class EmailConfigurationService
 
         $mailer->send($email);
 
-        Log::channel('mail')->info('Email enviado com sucesso via SMTP', [
+        $this->logMail('info', 'Email enviado com sucesso via SMTP', [
             'to' => $to,
             'from' => $fromAddress,
             'host' => $settings['host'] ?? 'localhost',
@@ -500,7 +517,7 @@ class EmailConfigurationService
                     ];
             }
         } catch (\Exception $e) {
-            Log::channel('mail')->error('Erro ao enviar e-mail HTML', [
+            $this->logMail('error', 'Erro ao enviar e-mail HTML', [
                 'identifier' => $identifier,
                 'to' => $toEmail,
                 'error' => $e->getMessage(),
@@ -529,7 +546,7 @@ class EmailConfigurationService
             ];
         }
 
-        Log::channel('mail')->info('Enviando email HTML via Mailjet', [
+        $this->logMail('info', 'Enviando email HTML via Mailjet', [
             'to' => $to,
             'from' => $fromAddress,
             'subject' => $subject,
@@ -565,7 +582,7 @@ class EmailConfigurationService
         ]);
 
         if ($response->success()) {
-            Log::channel('mail')->info('Email HTML enviado com sucesso via Mailjet', [
+            $this->logMail('info', 'Email HTML enviado com sucesso via Mailjet', [
                 'to' => $to,
                 'from' => $fromAddress,
                 'subject' => $subject,
@@ -587,7 +604,7 @@ class EmailConfigurationService
             $errorMessage = $errorData['ErrorMessage'];
         }
 
-        Log::channel('mail')->error('Falha ao enviar email HTML via Mailjet', [
+        $this->logMail('error', 'Falha ao enviar email HTML via Mailjet', [
             'to' => $to,
             'from' => $fromAddress,
             'status' => $response->getStatus(),
@@ -607,7 +624,7 @@ class EmailConfigurationService
      */
     private function sendHtmlViaSmtp(array $settings, string $to, string $toName, string $fromAddress, string $fromName, string $subject, string $htmlContent, ?string $textContent = null): array
     {
-        Log::channel('mail')->info('Enviando email HTML via SMTP', [
+        $this->logMail('info', 'Enviando email HTML via SMTP', [
             'to' => $to,
             'from' => $fromAddress,
             'subject' => $subject,
@@ -642,7 +659,7 @@ class EmailConfigurationService
 
         $mailer->send($email);
 
-        Log::channel('mail')->info('Email HTML enviado com sucesso via SMTP', [
+        $this->logMail('info', 'Email HTML enviado com sucesso via SMTP', [
             'to' => $to,
             'from' => $fromAddress,
             'subject' => $subject,

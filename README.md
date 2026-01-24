@@ -7,10 +7,316 @@ Plataforma de análises inteligentes com IA para e-commerce, integrando com Nuve
 - PHP 8.2+
 - Composer
 - Node.js 18+
-- MySQL 8.0+
-- Redis (opcional, para filas)
+- PostgreSQL 16+ (ou MySQL 8.0+)
+- Redis (para cache e filas)
 
-## 🚀 Instalação
+---
+
+## 🐳 Instalação com Docker (Recomendado)
+
+A forma mais fácil de rodar o projeto é usando Docker, que já vem com todos os serviços configurados.
+
+### Pré-requisitos
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado
+- Git
+
+### Serviços incluídos
+
+| Serviço | Descrição | Porta |
+|---------|-----------|-------|
+| **app** | PHP 8.2-FPM com Laravel | 9000 (interno) |
+| **nginx** | Servidor web | 8000 |
+| **postgres** | PostgreSQL 16 + pgvector (embeddings) | 5433 |
+| **redis** | Cache e filas | 6379 |
+| **node** | Vite dev server com HMR | 5173 |
+| **horizon** | Laravel Horizon (gerenciador de filas) | - |
+
+### 1. Clone o Repositório
+
+```bash
+git clone <repository-url> ecommpilot
+cd ecommpilot
+```
+
+### 2. Configurar Ambiente
+
+```bash
+# Copiar arquivo de ambiente para Docker
+cp .env.docker .env
+```
+
+Edite o arquivo `.env` e adicione suas API keys:
+
+```env
+# AI Provider (escolha um)
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sua-chave-aqui
+# ou
+OPENAI_API_KEY=sua-chave-aqui
+# ou
+GOOGLE_AI_API_KEY=sua-chave-aqui
+
+# Nuvemshop (se for usar integração)
+NUVEMSHOP_CLIENT_ID=seu-client-id
+NUVEMSHOP_CLIENT_SECRET=seu-client-secret
+```
+
+### 3. Build e Iniciar
+
+```bash
+# Build das imagens (primeira vez)
+docker-compose build
+
+# Iniciar backend (PHP, Nginx, PostgreSQL, Redis, Horizon)
+docker-compose up -d
+```
+
+### 4. Iniciar Frontend (Modo Híbrido - Recomendado para Windows)
+
+Para **melhor performance no Windows**, rode o Vite diretamente no Windows ao invés do container:
+
+```bash
+# Instalar dependências Node.js (no Windows)
+npm install
+
+# Rodar Vite dev server (no Windows)
+npm run dev
+```
+
+> **Por que modo híbrido?**
+> Docker no Windows usa WSL2, que é lento para file watching. Rodar o Vite nativo no Windows elimina esse gargalo, mantendo HMR rápido.
+
+**Alternativa: Rodar Vite no Docker** (mais lento no Windows)
+```bash
+docker-compose --profile frontend up -d
+```
+
+### 5. Configuração Inicial
+
+```bash
+# Gerar chave da aplicação (se não existir)
+docker-compose exec app php artisan key:generate
+
+# Rodar migrations e seeders
+docker-compose exec app php artisan migrate --seed
+```
+
+### 6. Acessar a Aplicação
+
+- **Aplicação:** http://localhost:8000
+- **Vite HMR:** http://localhost:5173 (se rodando no Windows)
+- **Horizon (filas):** http://localhost:8000/horizon
+
+### Comandos Docker Úteis
+
+```bash
+# Iniciar serviços
+docker-compose up -d
+
+# Parar serviços
+docker-compose down
+
+# Ver logs (todos os serviços)
+docker-compose logs -f
+
+# Ver logs de um serviço específico
+docker-compose logs -f app
+docker-compose logs -f horizon
+
+# Executar comandos artisan
+docker-compose exec app php artisan <comando>
+
+# Executar comandos composer
+docker-compose exec app composer <comando>
+
+# Executar comandos npm
+docker-compose exec node npm <comando>
+
+# Acessar shell do container PHP
+docker-compose exec app sh
+
+# Reiniciar um serviço
+docker-compose restart horizon
+
+# Rebuild após mudanças no Dockerfile
+docker-compose build --no-cache
+docker-compose up -d
+
+# Limpar tudo (cuidado: apaga dados do banco)
+docker-compose down -v
+```
+
+### Estrutura Docker
+
+```
+docker/
+├── php/
+│   ├── Dockerfile        # Imagem PHP 8.2-FPM com extensões
+│   ├── php.ini           # Configurações PHP
+│   └── www.conf          # Configurações PHP-FPM
+├── nginx/
+│   └── default.conf      # Configuração Nginx com proxy Vite
+├── postgres/
+│   ├── init/
+│   │   └── 01-create-testing-db.sql  # Cria DB de testes + extensões
+│   ├── postgresql.conf   # Configurações otimizadas para bulk operations
+│   ├── healthcheck.sh    # Health check robusto
+│   ├── debug-queries.sql # Queries úteis para debugging
+│   └── README.md         # Documentação completa do PostgreSQL
+└── scripts/
+    ├── entrypoint.sh            # Inicialização do app
+    └── horizon-entrypoint.sh    # Inicialização do Horizon
+
+docker-compose.yml    # Orquestração dos serviços
+.dockerignore         # Arquivos ignorados no build
+.env.docker           # Template de variáveis para Docker
+```
+
+### Variáveis de Ambiente Docker
+
+O arquivo `.env.docker` já vem configurado para Docker. As principais diferenças do ambiente local:
+
+| Variável | Valor Docker | Valor Local |
+|----------|--------------|-------------|
+| `DB_HOST` | `postgres` | `127.0.0.1` |
+| `DB_PORT` | `5432` | `5433` |
+| `REDIS_HOST` | `redis` | `127.0.0.1` |
+| `QUEUE_CONNECTION` | `redis` | `database` |
+| `CACHE_STORE` | `redis` | `file` |
+
+### Performance no Windows (WSL2)
+
+O Docker no Windows usa WSL2, que pode ser lento para operações de I/O com volumes montados. A configuração já inclui várias otimizações:
+
+#### Otimizações Aplicadas
+
+| Otimização | Descrição |
+|------------|-----------|
+| **Volumes nomeados** | `vendor` e `storage/framework` usam volumes Docker (dentro do WSL2) ao invés de bind mounts |
+| **OPcache habilitado** | PHP OPcache com revalidação automática - melhora performance sem quebrar hot reload |
+| **Gzip no Nginx** | Compressão de respostas para menor transferência |
+| **Cache de estáticos** | Arquivos estáticos servidos com cache headers |
+| **File watching otimizado** | Polling com intervalo de 2s e diretórios pesados ignorados |
+
+#### Melhores Práticas
+
+1. **Use modo híbrido**: Rode Vite no Windows (`npm run dev`) e backend no Docker
+2. **Não edite vendor/node_modules**: Eles estão em volumes Docker, edições locais não refletem
+3. **Use `docker-compose exec`**: Para rodar comandos dentro do container
+
+#### Performance Máxima (Opcional)
+
+Para **máxima performance**, mova o projeto para dentro do WSL2:
+
+```bash
+# No terminal WSL2 (Ubuntu)
+mkdir -p ~/projects
+cp -r /mnt/c/projects/ecommpilot ~/projects/
+cd ~/projects/ecommpilot
+docker-compose up -d
+```
+
+Depois, abra o VS Code com a extensão "Remote - WSL" apontando para `~/projects/ecommpilot`.
+
+### PostgreSQL Otimizado
+
+O PostgreSQL está configurado para suportar sincronizações pesadas (~100k pedidos) sem cair.
+
+**Configurações principais:**
+- `max_connections: 300` - Suporta múltiplos workers simultâneos
+- `shared_buffers: 512MB` / `work_mem: 32MB` - Otimizado para bulk operations
+- `statement_timeout: 10 minutos` - Jobs podem demorar
+- `autovacuum` agressivo - Limpa dead tuples rapidamente
+
+**Monitoramento:**
+```bash
+# Ver conexões ativas
+docker-compose exec postgres psql -U postgres -d laravel -c "
+SELECT count(*), state FROM pg_stat_activity GROUP BY state;
+"
+
+# Ver queries lentas (> 5s)
+docker-compose exec postgres psql -U postgres -d laravel -f /docker/postgres/debug-queries.sql
+```
+
+**Documentação completa:** Ver `docker/postgres/README.md` para troubleshooting e tuning avançado.
+
+### Troubleshooting Docker
+
+**PostgreSQL caindo durante sync:**
+```bash
+# 1. Ver logs
+docker-compose logs postgres | grep -i error
+
+# 2. Ver uso de memória
+docker stats ecommpilot-postgres
+
+# 3. Se OOM, aumente memória no docker-compose.yml
+# 4. Ou reduza configurações no docker/postgres/postgresql.conf
+```
+
+**Erro "could not translate host name postgres":**
+```bash
+# Container app tentando conectar antes do postgres estar pronto
+docker-compose restart app
+
+# Se persistir, verifique health check
+docker-compose ps
+```
+
+**Erro "No query results for model [Store]":**
+```bash
+# Conexão foi perdida durante job longo
+# O job já tem DB::reconnect() automático
+# Verifique logs para ver se postgres reiniciou
+docker-compose logs postgres
+```
+
+**Erro de permissão em arquivos:**
+```bash
+# No Windows/Mac isso geralmente não ocorre
+# No Linux, ajuste o USER_ID no docker-compose.yml
+USER_ID=$(id -u) GROUP_ID=$(id -g) docker-compose up -d
+```
+
+**Vite HMR não funciona (modo container):**
+```bash
+# Se estiver usando Vite no Docker
+docker-compose --profile frontend up -d
+docker-compose logs node
+```
+
+**Horizon não processa jobs:**
+```bash
+# Verifique os logs
+docker-compose logs horizon
+
+# Reinicie o Horizon
+docker-compose restart horizon
+```
+
+**Container app lento na primeira vez:**
+```bash
+# Primeira execução instala vendor (pode demorar)
+# Acompanhe o progresso:
+docker-compose logs -f app
+```
+
+**Resetar banco de dados:**
+```bash
+docker-compose exec app php artisan migrate:fresh --seed
+```
+
+**Resetar volumes (recomeçar do zero):**
+```bash
+docker-compose down -v
+docker-compose up -d
+```
+
+---
+
+## 🚀 Instalação Manual (Sem Docker)
 
 ### 1. Clone o Repositório
 
@@ -206,8 +512,21 @@ php artisan route:list
 
 ## 🌐 URLs da Aplicação
 
-- **Frontend:** http://localhost:8000
-- **API:** http://localhost:8000/api
+### Com Docker
+| Serviço | URL |
+|---------|-----|
+| Frontend | http://localhost:8000 |
+| API | http://localhost:8000/api |
+| Horizon | http://localhost:8000/horizon |
+| Vite HMR | http://localhost:5173 |
+| PostgreSQL | localhost:5433 |
+| Redis | localhost:6379 |
+
+### Sem Docker
+| Serviço | URL |
+|---------|-----|
+| Frontend | http://localhost:8000 |
+| API | http://localhost:8000/api |
 
 ## 📜 Licença
 

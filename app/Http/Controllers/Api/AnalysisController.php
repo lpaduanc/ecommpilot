@@ -25,6 +25,23 @@ class AnalysisController extends Controller
         private PlanLimitService $planLimitService
     ) {}
 
+    /**
+     * Safe log to mail channel - silently ignores permission errors.
+     */
+    private function safeMailLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('mail')->{$level}($message, $context);
+        } catch (\Throwable) {
+            // Fallback to default log channel if mail channel fails
+            try {
+                Log::{$level}('[mail] '.$message, $context);
+            } catch (\Throwable) {
+                // Silently ignore
+            }
+        }
+    }
+
     public function current(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -68,6 +85,11 @@ class AnalysisController extends Controller
                 'id' => $pendingAnalysis->id,
                 'status' => $pendingAnalysis->status->value,
                 'created_at' => $pendingAnalysis->created_at->toISOString(),
+                'current_stage' => $pendingAnalysis->current_stage ?? 0,
+                'total_stages' => $pendingAnalysis->total_stages ?? 9,
+                'progress_percentage' => $pendingAnalysis->getProgressPercentage(),
+                'current_stage_name' => $pendingAnalysis->getCurrentStageName(),
+                'error_message' => $pendingAnalysis->error_message,
             ] : null,
             'next_available_at' => $nextAvailableAt?->toISOString(),
             'credits' => $user->ai_credits,
@@ -95,6 +117,11 @@ class AnalysisController extends Controller
                     'id' => $pendingAnalysis->id,
                     'status' => $pendingAnalysis->status->value,
                     'created_at' => $pendingAnalysis->created_at->toISOString(),
+                    'current_stage' => $pendingAnalysis->current_stage ?? 0,
+                    'total_stages' => $pendingAnalysis->total_stages ?? 9,
+                    'progress_percentage' => $pendingAnalysis->getProgressPercentage(),
+                    'current_stage_name' => $pendingAnalysis->getCurrentStageName(),
+                    'error_message' => $pendingAnalysis->error_message,
                 ],
             ], 409);
         }
@@ -172,6 +199,11 @@ class AnalysisController extends Controller
                 'id' => $analysis->id,
                 'status' => $analysis->status->value,
                 'created_at' => $analysis->created_at->toISOString(),
+                'current_stage' => $analysis->current_stage ?? 0,
+                'total_stages' => $analysis->total_stages ?? 9,
+                'progress_percentage' => $analysis->getProgressPercentage(),
+                'current_stage_name' => $analysis->getCurrentStageName(),
+                'error_message' => $analysis->error_message,
             ],
             'credits' => $user->fresh()->ai_credits,
             'remaining_today' => $this->planLimitService->getRemainingAnalysesToday($user, $store),
@@ -297,7 +329,7 @@ class AnalysisController extends Controller
     public function updateSuggestion(Request $request, int $suggestionId): JsonResponse
     {
         $request->validate([
-            'status' => 'required|in:pending,in_progress,completed,ignored',
+            'status' => 'required|in:new,rejected,accepted,in_progress,completed,pending,ignored',
         ]);
 
         $user = $request->user();
@@ -318,8 +350,25 @@ class AnalysisController extends Controller
         $oldStatus = $suggestion->status;
         $newStatus = $request->status;
 
+        // Map legacy status to new status
+        if ($newStatus === 'pending') {
+            $newStatus = Suggestion::STATUS_NEW;
+        } elseif ($newStatus === 'ignored') {
+            $newStatus = Suggestion::STATUS_REJECTED;
+        }
+
         // Update status
         $suggestion->status = $newStatus;
+
+        // Handle accepted_at for accepted status
+        if ($newStatus === Suggestion::STATUS_ACCEPTED && ! $suggestion->accepted_at) {
+            $suggestion->accepted_at = now();
+        }
+
+        // Handle rejection - clear accepted_at
+        if ($newStatus === Suggestion::STATUS_REJECTED) {
+            $suggestion->accepted_at = null;
+        }
 
         if ($newStatus === Suggestion::STATUS_COMPLETED) {
             $suggestion->completed_at = now();
@@ -338,6 +387,139 @@ class AnalysisController extends Controller
         return response()->json([
             'message' => 'Status da sugestão atualizado.',
             'suggestion' => new SuggestionResource($suggestion),
+        ]);
+    }
+
+    /**
+     * Accept a suggestion - moves to tracking page.
+     */
+    public function acceptSuggestion(Request $request, int $suggestionId): JsonResponse
+    {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
+        }
+
+        $suggestion = Suggestion::where('id', $suggestionId)
+            ->where('store_id', $store->id)
+            ->first();
+
+        if (! $suggestion) {
+            return response()->json(['message' => 'Sugestão não encontrada.'], 404);
+        }
+
+        $oldStatus = $suggestion->status;
+        $suggestion->accept();
+
+        ActivityLog::log('suggestion.accepted', $suggestion, [
+            'old_status' => $oldStatus,
+        ]);
+
+        return response()->json([
+            'message' => 'Sugestão aceita e movida para acompanhamento.',
+            'suggestion' => new SuggestionResource($suggestion->fresh()),
+        ]);
+    }
+
+    /**
+     * Reject a suggestion - stays on analysis page.
+     */
+    public function rejectSuggestion(Request $request, int $suggestionId): JsonResponse
+    {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
+        }
+
+        $suggestion = Suggestion::where('id', $suggestionId)
+            ->where('store_id', $store->id)
+            ->first();
+
+        if (! $suggestion) {
+            return response()->json(['message' => 'Sugestão não encontrada.'], 404);
+        }
+
+        $oldStatus = $suggestion->status;
+        $suggestion->reject();
+
+        ActivityLog::log('suggestion.rejected', $suggestion, [
+            'old_status' => $oldStatus,
+        ]);
+
+        return response()->json([
+            'message' => 'Sugestão rejeitada.',
+            'suggestion' => new SuggestionResource($suggestion->fresh()),
+        ]);
+    }
+
+    /**
+     * List accepted suggestions for tracking page (grouped by analysis).
+     */
+    public function trackingSuggestions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['analyses' => [], 'total' => 0]);
+        }
+
+        $query = Suggestion::where('store_id', $store->id)
+            ->onTrackingPage()
+            ->with(['analysis' => function ($q) {
+                $q->select('id', 'created_at', 'period_start', 'period_end');
+            }]);
+
+        // Filter by status (only tracking statuses)
+        if ($request->has('status') && in_array($request->status, Suggestion::getTrackingPageStatuses())) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by category
+        if ($request->has('category') && in_array($request->category, Suggestion::getCategories())) {
+            $query->where('category', $request->category);
+        }
+
+        // Filter by impact
+        if ($request->has('impact') && in_array($request->impact, ['high', 'medium', 'low'])) {
+            $query->where('expected_impact', $request->impact);
+        }
+
+        $suggestions = $query->orderBy('analysis_id', 'desc')
+            ->orderBy('priority')
+            ->get();
+
+        // Group by analysis
+        $groupedByAnalysis = $suggestions->groupBy('analysis_id')->map(function ($analysisSuggestions) {
+            $analysis = $analysisSuggestions->first()->analysis;
+
+            return [
+                'analysis_id' => $analysis->id,
+                'analysis_date' => $analysis->created_at->toISOString(),
+                'period_start' => $analysis->period_start?->toISOString(),
+                'period_end' => $analysis->period_end?->toISOString(),
+                'suggestions' => SuggestionResource::collection($analysisSuggestions),
+                'stats' => [
+                    'total' => $analysisSuggestions->count(),
+                    'accepted' => $analysisSuggestions->where('status', Suggestion::STATUS_ACCEPTED)->count(),
+                    'in_progress' => $analysisSuggestions->where('status', Suggestion::STATUS_IN_PROGRESS)->count(),
+                    'completed' => $analysisSuggestions->where('status', Suggestion::STATUS_COMPLETED)->count(),
+                ],
+            ];
+        })->values();
+
+        return response()->json([
+            'analyses' => $groupedByAnalysis,
+            'total' => $suggestions->count(),
+            'stats' => [
+                'accepted' => $suggestions->where('status', Suggestion::STATUS_ACCEPTED)->count(),
+                'in_progress' => $suggestions->where('status', Suggestion::STATUS_IN_PROGRESS)->count(),
+                'completed' => $suggestions->where('status', Suggestion::STATUS_COMPLETED)->count(),
+            ],
         ]);
     }
 
@@ -439,13 +621,32 @@ class AnalysisController extends Controller
 
         $suggestions = Suggestion::where('store_id', $store->id)->get();
 
+        // Count by new status system
+        $newCount = $suggestions->whereIn('status', [Suggestion::STATUS_NEW, Suggestion::STATUS_PENDING])->count();
+        $rejectedCount = $suggestions->whereIn('status', [Suggestion::STATUS_REJECTED, Suggestion::STATUS_IGNORED])->count();
+        $acceptedCount = $suggestions->where('status', Suggestion::STATUS_ACCEPTED)->count();
+        $inProgressCount = $suggestions->where('status', Suggestion::STATUS_IN_PROGRESS)->count();
+        $completedCount = $suggestions->where('status', Suggestion::STATUS_COMPLETED)->count();
+
+        // Tracking page suggestions (accepted + in_progress + completed)
+        $trackingTotal = $acceptedCount + $inProgressCount + $completedCount;
+
         $stats = [
             'total' => $suggestions->count(),
             'by_status' => [
-                'pending' => $suggestions->where('status', 'pending')->count(),
-                'in_progress' => $suggestions->where('status', 'in_progress')->count(),
-                'completed' => $suggestions->where('status', 'completed')->count(),
-                'ignored' => $suggestions->where('status', 'ignored')->count(),
+                // New status names
+                'new' => $newCount,
+                'rejected' => $rejectedCount,
+                'accepted' => $acceptedCount,
+                'in_progress' => $inProgressCount,
+                'completed' => $completedCount,
+                // Legacy aliases for backward compatibility
+                'pending' => $newCount,
+                'ignored' => $rejectedCount,
+            ],
+            'by_page' => [
+                'analysis' => $newCount + $rejectedCount,
+                'tracking' => $trackingTotal,
             ],
             'by_impact' => [
                 'high' => $suggestions->where('expected_impact', 'high')->count(),
@@ -453,8 +654,11 @@ class AnalysisController extends Controller
                 'low' => $suggestions->where('expected_impact', 'low')->count(),
             ],
             'by_category' => $suggestions->groupBy('category')->map->count()->toArray(),
-            'completion_rate' => $suggestions->count() > 0
-                ? round(($suggestions->where('status', 'completed')->count() / $suggestions->count()) * 100, 1)
+            'completion_rate' => $trackingTotal > 0
+                ? round(($completedCount / $trackingTotal) * 100, 1)
+                : 0,
+            'acceptance_rate' => $suggestions->count() > 0
+                ? round(($trackingTotal / $suggestions->count()) * 100, 1)
                 : 0,
         ];
 
@@ -507,8 +711,8 @@ class AnalysisController extends Controller
             // Carregar relacionamentos necessários
             $analysis->load(['store', 'persistentSuggestions']);
 
-            // Logar tentativa via Log::channel('mail')
-            Log::channel('mail')->info('Tentando reenviar email de conclusao de analise', [
+            // Logar tentativa (safe log)
+            $this->safeMailLog('info', 'Tentando reenviar email de conclusao de analise', [
                 'analysis_id' => $analysis->id,
                 'user_email' => $user->email,
                 'store_name' => $analysis->store->name ?? 'N/A',
@@ -547,8 +751,8 @@ class AnalysisController extends Controller
                 'email_error' => null,
             ]);
 
-            // Logar sucesso
-            Log::channel('mail')->info('Email de conclusao de analise reenviado com sucesso', [
+            // Logar sucesso (safe log)
+            $this->safeMailLog('info', 'Email de conclusao de analise reenviado com sucesso', [
                 'analysis_id' => $analysis->id,
                 'user_email' => $user->email,
                 'store_name' => $analysis->store->name ?? 'N/A',
@@ -567,12 +771,11 @@ class AnalysisController extends Controller
                 'email_error' => $e->getMessage(),
             ]);
 
-            // Logar erro
-            Log::channel('mail')->error('Falha ao reenviar email de conclusao de analise', [
+            // Logar erro (safe log)
+            $this->safeMailLog('error', 'Falha ao reenviar email de conclusao de analise', [
                 'analysis_id' => $analysis->id,
                 'user_email' => $user->email,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([

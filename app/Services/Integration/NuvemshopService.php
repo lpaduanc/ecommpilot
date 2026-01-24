@@ -13,7 +13,10 @@ use App\Models\SyncedCustomer;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
 use Carbon\Carbon;
+use Illuminate\Bus\Batch;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -31,9 +34,26 @@ class NuvemshopService
     private string $authUrl = 'https://www.nuvemshop.com.br/apps/authorize';
 
     /**
-     * Número máximo de requisições por minuto por loja
+     * Número máximo de requisições por minuto por loja.
+     * Nuvemshop permite 60/min, usamos 50 para dar margem de segurança.
      */
-    private const RATE_LIMIT_PER_MINUTE = 60;
+    private const RATE_LIMIT_PER_MINUTE = 50;
+
+    /**
+     * Threshold de pedidos para usar sincronização paralela.
+     * Lojas com mais pedidos que este valor usarão chunks paralelos.
+     */
+    private const PARALLEL_SYNC_THRESHOLD = 5000;
+
+    /**
+     * Número de páginas por chunk na sincronização paralela.
+     */
+    private const PAGES_PER_CHUNK = 50;
+
+    /**
+     * Per page para sincronização de pedidos (usado em syncOrdersRange).
+     */
+    private const ORDERS_PER_PAGE = 200;
 
     /**
      * Product adapter for transforming Nuvemshop data to SyncedProduct structure.
@@ -257,7 +277,7 @@ class NuvemshopService
     public function syncOrders(Store $store, ?Carbon $updatedSince = null): void
     {
         $page = 1;
-        $perPage = 50; // Using smaller batch for stability with large stores
+        $perPage = 200; // Increased from 50 to 200 for better performance (75% less API calls)
         $allOrders = [];
         $totalSynced = 0;
 
@@ -302,6 +322,204 @@ class NuvemshopService
             'total_synced' => $totalSynced,
             'incremental' => $updatedSince !== null,
         ]);
+    }
+
+    /**
+     * Busca uma página específica de pedidos da API.
+     * Usado pelo SyncOrdersPageJob para paginação por jobs.
+     *
+     * @param  Store  $store  The store to fetch from
+     * @param  int  $page  Page number (1-indexed)
+     * @param  int  $perPage  Items per page
+     * @param  string|null  $updatedSince  ISO 8601 date for incremental sync
+     * @return array Raw orders data from API
+     */
+    public function fetchOrdersPage(Store $store, int $page, int $perPage = 200, ?string $updatedSince = null): array
+    {
+        $params = [
+            'page' => $page,
+            'per_page' => $perPage,
+        ];
+
+        if ($updatedSince) {
+            $params['updated_at_min'] = $updatedSince;
+        }
+
+        return $this->makeRequest($store, 'GET', "/{$store->external_store_id}/orders", $params);
+    }
+
+    /**
+     * Salva uma lista de pedidos no banco de dados.
+     * Usado pelo SyncOrdersPageJob para persistência.
+     *
+     * @param  Store  $store  The store
+     * @param  array  $orders  Raw orders data from API
+     */
+    public function saveOrders(Store $store, array $orders): void
+    {
+        if (empty($orders)) {
+            return;
+        }
+
+        $preparedOrders = [];
+        foreach ($orders as $order) {
+            $preparedOrders[] = $this->prepareOrderForBulkUpsert($store, $order);
+        }
+
+        $this->bulkUpsertOrders($preparedOrders);
+    }
+
+    /**
+     * Sincroniza um range específico de páginas de pedidos.
+     * Usado para processamento paralelo em lojas grandes.
+     *
+     * @param  Store  $store  The store to sync
+     * @param  int  $startPage  First page to sync (1-indexed)
+     * @param  int  $endPage  Last page to sync (inclusive)
+     * @param  string|null  $updatedSince  ISO 8601 date string for incremental sync
+     * @return int Number of orders synced
+     */
+    public function syncOrdersRange(Store $store, int $startPage, int $endPage, ?string $updatedSince = null): int
+    {
+        $allOrders = [];
+        $totalSynced = 0;
+
+        for ($page = $startPage; $page <= $endPage; $page++) {
+            $params = [
+                'page' => $page,
+                'per_page' => self::ORDERS_PER_PAGE,
+            ];
+
+            if ($updatedSince) {
+                $params['updated_at_min'] = $updatedSince;
+            }
+
+            try {
+                $response = $this->makeRequest($store, 'GET', "/{$store->external_store_id}/orders", $params);
+            } catch (\Exception $e) {
+                Log::error("Erro ao buscar página {$page} de pedidos", [
+                    'store_id' => $store->id,
+                    'start_page' => $startPage,
+                    'end_page' => $endPage,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            if (empty($response)) {
+                break; // Não há mais pedidos
+            }
+
+            foreach ($response as $order) {
+                $allOrders[] = $this->prepareOrderForBulkUpsert($store, $order);
+            }
+
+            // Process in chunks to avoid memory issues
+            if (count($allOrders) >= self::BULK_CHUNK_SIZE) {
+                $this->bulkUpsertOrders($allOrders);
+                $totalSynced += count($allOrders);
+                $allOrders = [];
+            }
+
+            // Se retornou menos que perPage, é a última página
+            if (count($response) < self::ORDERS_PER_PAGE) {
+                break;
+            }
+        }
+
+        // Process remaining orders
+        if (! empty($allOrders)) {
+            $this->bulkUpsertOrders($allOrders);
+            $totalSynced += count($allOrders);
+        }
+
+        Log::info("Orders range sync completed for store {$store->id}", [
+            'pages' => "{$startPage}-{$endPage}",
+            'total_synced' => $totalSynced,
+        ]);
+
+        return $totalSynced;
+    }
+
+    /**
+     * Dispara sincronização de pedidos em paralelo usando chunks.
+     * Divide o total de páginas em chunks e processa em workers separados.
+     *
+     * @param  Store  $store  The store to sync
+     * @param  string|null  $updatedSince  ISO 8601 date string for incremental sync
+     * @return Batch The batch instance for tracking progress
+     */
+    public function dispatchParallelOrdersSync(Store $store, ?string $updatedSince = null): Batch
+    {
+        // Estima total de páginas necessárias
+        $estimatedOrders = $this->getOrdersCount($store);
+        $totalPages = (int) ceil($estimatedOrders / self::ORDERS_PER_PAGE);
+
+        // Garante pelo menos 1 página
+        $totalPages = max($totalPages, 1);
+
+        // Cria jobs para cada chunk de páginas
+        $jobs = [];
+        for ($startPage = 1; $startPage <= $totalPages; $startPage += self::PAGES_PER_CHUNK) {
+            $endPage = min($startPage + self::PAGES_PER_CHUNK - 1, $totalPages);
+
+            $jobs[] = new SyncOrdersChunkJob(
+                $store,
+                $startPage,
+                $endPage,
+                $updatedSince
+            );
+        }
+
+        Log::info('Disparando sincronização paralela de pedidos', [
+            'store_id' => $store->id,
+            'estimated_orders' => $estimatedOrders,
+            'total_pages' => $totalPages,
+            'total_chunks' => count($jobs),
+            'pages_per_chunk' => self::PAGES_PER_CHUNK,
+        ]);
+
+        // Dispara batch com controle de concorrência
+        return Bus::batch($jobs)
+            ->name("sync-orders-parallel-store-{$store->id}")
+            ->allowFailures()
+            ->onQueue('sync')
+            ->dispatch();
+    }
+
+    /**
+     * Retorna o número estimado de pedidos de uma loja.
+     * Usa a contagem do banco de dados como referência.
+     *
+     * @param  Store  $store  The store to check
+     * @return int Estimated number of orders
+     */
+    public function getOrdersCount(Store $store): int
+    {
+        // Usa contagem do banco como estimativa
+        // Em sync inicial, retorna um valor alto para garantir cobertura
+        $dbCount = $store->orders()->count();
+
+        // Se não tem pedidos no banco, assume que pode ter muitos (sync inicial)
+        // Usa 100k como máximo seguro para não criar chunks demais
+        if ($dbCount === 0) {
+            return 100000;
+        }
+
+        // Adiciona margem de 10% para novos pedidos
+        return (int) ceil($dbCount * 1.1);
+    }
+
+    /**
+     * Verifica se a loja deve usar sincronização paralela baseado no número de pedidos.
+     *
+     * @param  Store  $store  The store to check
+     * @return bool True if parallel sync should be used
+     */
+    public function shouldUseParallelSync(Store $store): bool
+    {
+        return $this->getOrdersCount($store) > self::PARALLEL_SYNC_THRESHOLD;
     }
 
     /**
@@ -413,8 +631,9 @@ class NuvemshopService
             'Authentication' => 'bearer '.$accessToken,
             'User-Agent' => 'Ecomm Pilot (contato@softio.com.br)',
         ])
-            ->timeout(30)
-            ->retry(3, 100, function ($exception) {
+            ->connectTimeout(15)
+            ->timeout(60)
+            ->retry(3, 1000, function ($exception) {
                 return $this->shouldRetry($exception);
             })
             ->get("{$this->apiBaseUrl}/{$storeId}/store");
@@ -427,13 +646,14 @@ class NuvemshopService
      */
     private function makeRequest(Store $store, string $method, string $endpoint, array $params = []): array
     {
-        // Rate limiting por loja
+        // Rate limiting por loja (50 req/min para margem de segurança)
         $rateLimitKey = "nuvemshop_api:{$store->id}";
 
-        if (RateLimiter::tooManyAttempts($rateLimitKey, self::RATE_LIMIT_PER_MINUTE)) {
+        // Aguarda se atingiu rate limit
+        while (RateLimiter::tooManyAttempts($rateLimitKey, self::RATE_LIMIT_PER_MINUTE)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
-            Log::warning("Rate limit atingido para loja {$store->id}, aguardando {$seconds}s");
-            sleep(min($seconds, 60));
+            Log::channel('sync')->info("[RATE-LIMIT] Aguardando {$seconds}s para loja {$store->id} (limite: " . self::RATE_LIMIT_PER_MINUTE . "/min)");
+            sleep($seconds + 1); // Espera o tempo completo + 1s de buffer
         }
 
         RateLimiter::hit($rateLimitKey, 60);
@@ -445,6 +665,9 @@ class NuvemshopService
             $attempt++;
 
             try {
+                // Reconecta ao banco para evitar conexões stale em jobs longos
+                DB::reconnect();
+
                 // Refresh the store model to get the latest token
                 $store->refresh();
 
@@ -454,8 +677,9 @@ class NuvemshopService
                     'Authentication' => 'bearer '.$store->access_token,
                     'User-Agent' => 'Ecomm Pilot (contato@softio.com.br)',
                 ])
-                    ->timeout(30)
-                    ->retry(3, 100, function ($exception) {
+                    ->connectTimeout(15)
+                    ->timeout(60)
+                    ->retry(3, 1000, function ($exception) {
                         return $this->shouldRetry($exception);
                     }, throw: false)
                     ->{strtolower($method)}("{$this->apiBaseUrl}{$endpoint}", $params);
@@ -512,6 +736,12 @@ class NuvemshopService
      */
     private function shouldRetry(\Throwable $exception): bool
     {
+        // Retry em erros de conexão/timeout (cURL errors)
+        if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
+            Log::channel('sync')->info('[API] Retry após erro de conexão/timeout: ' . $exception->getMessage());
+            return true;
+        }
+
         if (! $exception instanceof RequestException) {
             return false;
         }
@@ -647,12 +877,23 @@ class NuvemshopService
 
     /**
      * Bulk upsert products using database upsert for performance.
+     *
+     * Deduplica produtos pelo par store_id+external_id antes do upsert
+     * para evitar erro "ON CONFLICT DO UPDATE cannot affect row a second time"
      */
     private function bulkUpsertProducts(array $products): void
     {
         if (empty($products)) {
             return;
         }
+
+        // Deduplica produtos pelo par store_id+external_id, mantendo o último
+        $uniqueProducts = [];
+        foreach ($products as $product) {
+            $key = $product['store_id'].'_'.$product['external_id'];
+            $uniqueProducts[$key] = $product;
+        }
+        $products = array_values($uniqueProducts);
 
         SyncedProduct::upsert(
             $products,
@@ -713,6 +954,9 @@ class NuvemshopService
 
     /**
      * Bulk upsert orders using database upsert for performance.
+     *
+     * Deduplica pedidos pelo par store_id+external_id antes do upsert
+     * para evitar erro "ON CONFLICT DO UPDATE cannot affect row a second time"
      */
     private function bulkUpsertOrders(array $orders): void
     {
@@ -720,29 +964,55 @@ class NuvemshopService
             return;
         }
 
-        SyncedOrder::upsert(
-            $orders,
-            uniqueBy: ['store_id', 'external_id'],
-            update: [
-                'order_number',
-                'status',
-                'payment_status',
-                'shipping_status',
-                'customer_name',
-                'customer_email',
-                'customer_phone',
-                'subtotal',
-                'discount',
-                'shipping',
-                'total',
-                'payment_method',
-                'coupon',
-                'items',
-                'shipping_address',
-                'external_created_at',
-                'updated_at',
-            ]
-        );
+        // Deduplica pedidos pelo par store_id+external_id, mantendo o último
+        $uniqueOrders = [];
+        foreach ($orders as $order) {
+            $key = $order['store_id'].'_'.$order['external_id'];
+            $uniqueOrders[$key] = $order;
+        }
+        $orders = array_values($uniqueOrders);
+
+        try {
+            SyncedOrder::upsert(
+                $orders,
+                uniqueBy: ['store_id', 'external_id'],
+                update: [
+                    'order_number',
+                    'status',
+                    'payment_status',
+                    'shipping_status',
+                    'customer_name',
+                    'customer_email',
+                    'customer_phone',
+                    'subtotal',
+                    'discount',
+                    'shipping',
+                    'total',
+                    'payment_method',
+                    'coupon',
+                    'items',
+                    'shipping_address',
+                    'external_created_at',
+                    'updated_at',
+                ]
+            );
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), 'ON CONFLICT DO UPDATE')) {
+                Log::channel('sync')->warning('Bulk upsert de pedidos falhou por duplicata, usando fallback individual', [
+                    'count' => count($orders),
+                    'error' => $e->getMessage(),
+                ]);
+
+                foreach ($orders as $order) {
+                    SyncedOrder::updateOrCreate(
+                        ['store_id' => $order['store_id'], 'external_id' => $order['external_id']],
+                        $order
+                    );
+                }
+            } else {
+                throw $e;
+            }
+        }
     }
 
     // ==========================================
@@ -772,12 +1042,23 @@ class NuvemshopService
 
     /**
      * Bulk upsert customers using database upsert for performance.
+     *
+     * Deduplica clientes pelo par store_id+external_id antes do upsert
+     * para evitar erro "ON CONFLICT DO UPDATE cannot affect row a second time"
      */
     private function bulkUpsertCustomers(array $customers): void
     {
         if (empty($customers)) {
             return;
         }
+
+        // Deduplica clientes pelo par store_id+external_id, mantendo o último
+        $uniqueCustomers = [];
+        foreach ($customers as $customer) {
+            $key = $customer['store_id'].'_'.$customer['external_id'];
+            $uniqueCustomers[$key] = $customer;
+        }
+        $customers = array_values($uniqueCustomers);
 
         SyncedCustomer::upsert(
             $customers,
@@ -826,12 +1107,23 @@ class NuvemshopService
 
     /**
      * Bulk upsert coupons using database upsert for performance.
+     *
+     * Deduplica cupons pelo par store_id+external_id antes do upsert
+     * para evitar erro "ON CONFLICT DO UPDATE cannot affect row a second time"
      */
     private function bulkUpsertCoupons(array $coupons): void
     {
         if (empty($coupons)) {
             return;
         }
+
+        // Deduplica cupons pelo par store_id+external_id, mantendo o último
+        $uniqueCoupons = [];
+        foreach ($coupons as $coupon) {
+            $key = $coupon['store_id'].'_'.$coupon['external_id'];
+            $uniqueCoupons[$key] = $coupon;
+        }
+        $coupons = array_values($uniqueCoupons);
 
         SyncedCoupon::upsert(
             $coupons,

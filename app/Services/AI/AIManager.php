@@ -4,6 +4,7 @@ namespace App\Services\AI;
 
 use App\Contracts\AIProviderInterface;
 use App\Models\SystemSetting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
@@ -17,19 +18,19 @@ class AIManager
         'anthropic' => AnthropicProvider::class,
     ];
 
-    private string $defaultProvider;
-
-    public function __construct()
-    {
-        $this->defaultProvider = $this->getDefaultProviderFromSettings();
-    }
-
     /**
-     * Get the default provider from database settings or config.
+     * Get the default provider from database settings only.
+     * This is called dynamically to always get the current setting,
+     * even when running as a singleton in queue workers.
      */
-    private function getDefaultProviderFromSettings(): string
+    public function getDefaultProvider(): string
     {
-        return SystemSetting::get('ai.provider', config('services.ai.default', 'gemini'));
+        // Always fetch fresh from database to respect configuration changes
+        // Clear the specific cache key to ensure we get the latest value
+        $cacheKey = 'system_setting:ai.provider';
+        Cache::forget($cacheKey);
+
+        return SystemSetting::get('ai.provider') ?? 'gemini';
     }
 
     /**
@@ -53,7 +54,7 @@ class AIManager
      */
     public function provider(?string $name = null): AIProviderInterface
     {
-        $name = $name ?? $this->defaultProvider;
+        $name = $name ?? $this->getDefaultProvider();
 
         $provider = $this->getProviderInstance($name);
 
@@ -78,7 +79,7 @@ class AIManager
         $enableFallback = $options['enable_fallback'] ?? false;
         unset($options['provider'], $options['enable_fallback'], $options['disable_fallback']);
 
-        $primaryProvider = $providerName ?? $this->defaultProvider;
+        $primaryProvider = $providerName ?? $this->getDefaultProvider();
 
         // Try the primary provider
         try {
@@ -171,13 +172,5 @@ class AIManager
         } catch (\Throwable) {
             return false;
         }
-    }
-
-    /**
-     * Get the default provider name.
-     */
-    public function getDefaultProvider(): string
-    {
-        return $this->defaultProvider;
     }
 }

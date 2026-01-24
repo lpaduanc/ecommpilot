@@ -11,40 +11,60 @@ use OpenAI\Laravel\Facades\OpenAI;
 
 class OpenAIProvider implements AIProviderInterface
 {
-    private string $defaultModel;
-
-    private float $defaultTemperature;
-
-    private int $defaultMaxTokens;
-
     private int $maxRetries = 3;
 
     private array $retryDelays = [5, 15, 30]; // seconds
 
-    public function __construct()
+    /**
+     * Get API key from database settings only.
+     */
+    private function getApiKey(): string
     {
-        // Try database settings first, then fall back to config
-        $this->defaultModel = SystemSetting::get('ai.openai.model', config('services.ai.openai.model', 'gpt-4o')) ?? 'gpt-4o';
-        $this->defaultTemperature = (float) (SystemSetting::get('ai.openai.temperature', config('services.ai.openai.temperature', 0.7)) ?? 0.7);
-        $this->defaultMaxTokens = (int) (SystemSetting::get('ai.openai.max_tokens', config('services.ai.openai.max_tokens', 8192)) ?? 8192);
+        return SystemSetting::get('ai.openai.api_key') ?? '';
+    }
+
+    /**
+     * Get model from database settings only.
+     */
+    private function getModel(): string
+    {
+        return SystemSetting::get('ai.openai.model') ?? 'gpt-4o';
+    }
+
+    /**
+     * Get temperature from database settings only.
+     */
+    private function getTemperature(): float
+    {
+        return (float) (SystemSetting::get('ai.openai.temperature') ?? 0.7);
+    }
+
+    /**
+     * Get max tokens from database settings only.
+     */
+    private function getMaxTokens(): int
+    {
+        return (int) (SystemSetting::get('ai.openai.max_tokens') ?? 8192);
     }
 
     public function chat(array $messages, array $options = []): string
     {
         $lastException = null;
-        $maxTokens = $options['max_tokens'] ?? $this->defaultMaxTokens;
+        $model = $options['model'] ?? $this->getModel();
+        $temperature = $options['temperature'] ?? $this->getTemperature();
+        $maxTokens = $options['max_tokens'] ?? $this->getMaxTokens();
 
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
                 Log::channel('ai')->info("        [OPENAI] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
-                    'model' => $options['model'] ?? $this->defaultModel,
+                    'model' => $model,
                     'max_tokens' => $maxTokens,
                 ]);
 
                 $response = OpenAI::chat()->create([
-                    'model' => $options['model'] ?? $this->defaultModel,
+                    'model' => $model,
                     'messages' => $messages,
-                    'temperature' => $options['temperature'] ?? $this->defaultTemperature,
+                    'temperature' => $temperature,
                     'max_tokens' => $maxTokens,
                 ]);
 
@@ -56,7 +76,7 @@ class OpenAIProvider implements AIProviderInterface
 
                 Log::channel('ai')->info('        [OPENAI] Requisicao concluida', [
                     'attempt' => $attempt,
-                    'model' => $options['model'] ?? $this->defaultModel,
+                    'model' => $model,
                     'finish_reason' => $finishReason,
                     'response_length' => strlen($response->choices[0]->message->content ?? ''),
                     'input_tokens' => $inputTokens,
@@ -123,6 +143,6 @@ class OpenAIProvider implements AIProviderInterface
 
     public function isConfigured(): bool
     {
-        return ! empty(config('openai.api_key'));
+        return ! empty($this->getApiKey());
     }
 }

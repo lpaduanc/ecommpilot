@@ -32,6 +32,23 @@ class ProcessAnalysisJob implements ShouldQueue
     private string $logChannel = 'analysis';
 
     /**
+     * Safe log to mail channel - silently ignores permission errors.
+     */
+    private function safeMailLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('mail')->{$level}($message, $context);
+        } catch (\Throwable) {
+            // Fallback to default log channel if mail channel fails
+            try {
+                Log::{$level}('[mail] '.$message, $context);
+            } catch (\Throwable) {
+                // Silently ignore
+            }
+        }
+    }
+
+    /**
      * Number of times to attempt the job.
      */
     public int $tries = 3;
@@ -42,9 +59,9 @@ class ProcessAnalysisJob implements ShouldQueue
     public array $backoff = [60, 120, 240];
 
     /**
-     * Maximum execution time in seconds (10 minutes for AI analysis).
+     * Timeout do job - 0 = sem limite
      */
-    public int $timeout = 600;
+    public int $timeout = 0;
 
     /**
      * Delete the job if its models no longer exist.
@@ -169,11 +186,24 @@ class ProcessAnalysisJob implements ShouldQueue
                 'error' => $e->getMessage(),
                 'exception_class' => get_class($e),
                 'attempt' => $this->attempts(),
+                'max_tries' => $this->tries,
                 'total_time_seconds' => $totalTime,
             ]);
 
             // Mark as failed immediately (don't wait for failed() method)
             $this->handleFailure($e, $notificationService);
+
+            // Check if this is a non-retryable error (connection issues, config errors)
+            if ($this->isNonRetryableError($e)) {
+                Log::channel($this->logChannel)->warning('>>> Erro nao-retry - deletando job da fila', [
+                    'analysis_id' => $this->analysis->id,
+                    'error_type' => get_class($e),
+                ]);
+                // Delete from queue - don't retry
+                $this->delete();
+
+                return;
+            }
 
             throw $e;
         }
@@ -227,7 +257,7 @@ class ProcessAnalysisJob implements ShouldQueue
      */
     private function shouldUseLitePipeline(): bool
     {
-        $defaultProvider = SystemSetting::get('ai.provider', config('services.ai.default', 'gemini'));
+        $defaultProvider = SystemSetting::get('ai.provider') ?? 'gemini';
 
         return $defaultProvider === 'anthropic';
     }
@@ -277,6 +307,40 @@ class ProcessAnalysisJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Check if the error is non-retryable (should fail immediately).
+     */
+    private function isNonRetryableError(\Throwable $exception): bool
+    {
+        $message = $exception->getMessage();
+        $className = get_class($exception);
+
+        // Database connection errors - no point retrying if DB is unreachable
+        if (str_contains($message, 'could not translate host name')
+            || str_contains($message, 'Connection refused')
+            || str_contains($message, 'No connection could be made')
+            || str_contains($message, 'SQLSTATE[08006]')
+            || str_contains($message, 'SQLSTATE[HY000]')) {
+            return true;
+        }
+
+        // API key/configuration errors - won't fix themselves
+        if (str_contains($message, 'invalid x-api-key')
+            || str_contains($message, 'invalid api key')
+            || str_contains($message, 'API key is not configured')
+            || str_contains($message, 'is not properly configured')) {
+            return true;
+        }
+
+        // Store/model not found - data issue
+        if (str_contains($message, 'Store not found')
+            || str_contains($className, 'ModelNotFoundException')) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -361,8 +425,8 @@ class ProcessAnalysisJob implements ShouldQueue
                 return;
             }
 
-            // Log tentativa de envio
-            Log::channel('mail')->info('Tentando enviar email de conclusao de analise', [
+            // Log tentativa de envio (safe log)
+            $this->safeMailLog('info', 'Tentando enviar email de conclusao de analise', [
                 'analysis_id' => $this->analysis->id,
                 'user_email' => $user->email,
                 'store_name' => $this->analysis->store->name ?? 'N/A',
@@ -406,7 +470,7 @@ class ProcessAnalysisJob implements ShouldQueue
             // Notificar envio de email bem-sucedido
             $notificationService->notifyEmailSent($user, 'analysis_completed', $user->email);
 
-            Log::channel('mail')->info('Email de conclusao de analise enviado com sucesso', [
+            $this->safeMailLog('info', 'Email de conclusao de analise enviado com sucesso', [
                 'analysis_id' => $this->analysis->id,
                 'user_email' => $user->email,
                 'store_name' => $this->analysis->store->name ?? 'N/A',
@@ -434,10 +498,9 @@ class ProcessAnalysisJob implements ShouldQueue
             }
 
             // Log error but don't fail the job - email is secondary
-            Log::channel('mail')->error('Falha ao enviar email de conclusao de analise', [
+            $this->safeMailLog('error', 'Falha ao enviar email de conclusao de analise', [
                 'analysis_id' => $this->analysis->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             Log::channel($this->logChannel)->warning('>>> Falha ao enviar email de conclusao', [

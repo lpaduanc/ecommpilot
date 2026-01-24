@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Docker environment files with secrets
+.env.docker
+.env.local
+
+# Claude settings with API tokens
+.claude/settings.local.json

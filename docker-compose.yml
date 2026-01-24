@@ -1,0 +1,249 @@
+# ==========================================================================
+# Docker Compose - EcommPilot Development Environment
+# ==========================================================================
+# Otimizado para Windows + WSL2
+#
+# DICA DE PERFORMANCE (Windows):
+# Para melhor performance, rode o Vite no Windows ao invés do container:
+#   1. Comente o serviço 'node' abaixo
+#   2. Rode 'npm run dev' diretamente no terminal Windows
+#   3. Acesse http://localhost:5173 para HMR
+# ==========================================================================
+
+services:
+  # ==========================================================================
+  # PHP-FPM Application Container
+  # ==========================================================================
+  app:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: ecommpilot-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      # Código fonte - :cached melhora leitura no Windows
+      - .:/var/www/html:cached
+      # Vendor em volume separado - MUITO mais rápido
+      - vendor-data:/var/www/html/vendor
+      # Scripts read-only
+      - ./docker/scripts/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    command: ["php-fpm"]
+    environment:
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_KEY=${APP_KEY:-}
+      - APP_URL=${APP_URL:-http://localhost:8000}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-laravel}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - REDIS_CLIENT=predis
+      - REDIS_DB=0
+      - REDIS_CACHE_DB=1
+      - REDIS_QUEUE_DB=2
+      - CACHE_STORE=redis
+      - QUEUE_CONNECTION=redis
+      - SESSION_DRIVER=database
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
+      - RUN_SEEDERS=${RUN_SEEDERS:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - NUVEMSHOP_CLIENT_ID=${NUVEMSHOP_CLIENT_ID:-}
+      - NUVEMSHOP_CLIENT_SECRET=${NUVEMSHOP_CLIENT_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecommpilot-network
+
+  # ==========================================================================
+  # Nginx Web Server
+  # ==========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: ecommpilot-nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:80"
+    volumes:
+      - .:/var/www/html:cached,ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - ecommpilot-network
+
+  # ==========================================================================
+  # PostgreSQL Database (com pgvector para embeddings)
+  # ==========================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ecommpilot-postgres
+    restart: unless-stopped
+    ports:
+      - "${DB_EXTERNAL_PORT:-5434}:5432"
+    environment:
+      - POSTGRES_DB=${DB_DATABASE:-laravel}
+      - POSTGRES_USER=${DB_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-root}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      # Performance tunning para bulk operations
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.utf8 --lc-ctype=en_US.utf8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    # Aplica configurações customizadas
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - ecommpilot-network
+    # Health check mais robusto e menos frequente
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-laravel} -q"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    # Recursos dedicados para evitar OOM
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # ==========================================================================
+  # Redis Cache & Queue
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: ecommpilot-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - ecommpilot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ==========================================================================
+  # Node.js / Vite Development Server
+  # ==========================================================================
+  # NOTA: Para melhor performance no Windows, considere rodar Vite localmente:
+  #   npm run dev
+  # E comente este serviço.
+  # ==========================================================================
+  node:
+    image: node:20-alpine
+    container_name: ecommpilot-node
+    restart: unless-stopped
+    working_dir: /var/www/html
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    volumes:
+      - .:/var/www/html:cached
+      - node-modules:/var/www/html/node_modules
+    environment:
+      - VITE_APP_NAME=${APP_NAME:-EcommPilot}
+      # Aumenta intervalo de polling para reduzir I/O
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=3000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    networks:
+      - ecommpilot-network
+    # Perfil opcional - use: docker-compose --profile frontend up -d
+    profiles:
+      - frontend
+
+  # ==========================================================================
+  # Laravel Horizon (Queue Monitor)
+  # ==========================================================================
+  horizon:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: ecommpilot-horizon
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html:cached
+      - vendor-data:/var/www/html/vendor
+      - ./docker/scripts/horizon-entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    environment:
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_KEY=${APP_KEY:-}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-laravel}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - REDIS_CLIENT=predis
+      - REDIS_DB=0
+      - REDIS_CACHE_DB=1
+      - REDIS_QUEUE_DB=2
+      - QUEUE_CONNECTION=redis
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+    depends_on:
+      app:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecommpilot-network
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  ecommpilot-network:
+    driver: bridge
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+# Volumes nomeados são MUITO mais rápidos que bind mounts no Windows
+# porque ficam dentro do WSL2 filesystem
+# ==========================================================================
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  node-modules:
+    driver: local
+  vendor-data:
+    driver: local

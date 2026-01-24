@@ -29,6 +29,7 @@ class Suggestion extends Model
         'specific_data',
         'data_justification',
         'embedding',
+        'accepted_at',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class Suggestion extends Model
         'data_justification' => 'array',
         'metrics_impact' => 'array',
         'completed_at' => 'datetime',
+        'accepted_at' => 'datetime',
         'priority' => 'integer',
         'was_successful' => 'boolean',
     ];
@@ -45,13 +47,22 @@ class Suggestion extends Model
     /**
      * Status constants
      */
-    public const STATUS_PENDING = 'pending';
+    // Status para Tela de Análise
+    public const STATUS_NEW = 'new';                 // Sugestão nova, ainda não interagida
 
-    public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_REJECTED = 'rejected';       // Rejeitada pelo cliente (permanece na tela de análise)
 
-    public const STATUS_COMPLETED = 'completed';
+    // Status para Página de Acompanhamento (após aceitar)
+    public const STATUS_ACCEPTED = 'accepted';       // Aceita, aguardando ação
 
-    public const STATUS_IGNORED = 'ignored';
+    public const STATUS_IN_PROGRESS = 'in_progress'; // Em andamento
+
+    public const STATUS_COMPLETED = 'completed';     // Concluída
+
+    // Legacy (mantido para compatibilidade)
+    public const STATUS_PENDING = 'pending';         // Alias para new
+
+    public const STATUS_IGNORED = 'ignored';         // Alias para rejected
 
     /**
      * Impact constants
@@ -106,6 +117,28 @@ class Suggestion extends Model
     }
 
     /**
+     * Accept suggestion - moves to tracking page.
+     */
+    public function accept(): void
+    {
+        $this->update([
+            'status' => self::STATUS_ACCEPTED,
+            'accepted_at' => now(),
+        ]);
+    }
+
+    /**
+     * Reject suggestion - stays on analysis page.
+     */
+    public function reject(): void
+    {
+        $this->update([
+            'status' => self::STATUS_REJECTED,
+            'accepted_at' => null,
+        ]);
+    }
+
+    /**
      * Mark suggestion as in progress.
      */
     public function markAsInProgress(): void
@@ -125,19 +158,43 @@ class Suggestion extends Model
     }
 
     /**
-     * Mark suggestion as ignored.
+     * Mark suggestion as ignored (legacy alias for reject).
      */
     public function markAsIgnored(): void
     {
-        $this->update(['status' => self::STATUS_IGNORED]);
+        $this->reject();
     }
 
     /**
-     * Check if suggestion is pending.
+     * Check if suggestion is new (not interacted).
+     */
+    public function isNew(): bool
+    {
+        return in_array($this->status, [self::STATUS_NEW, self::STATUS_PENDING]);
+    }
+
+    /**
+     * Check if suggestion is pending (alias for isNew).
      */
     public function isPending(): bool
     {
-        return $this->status === self::STATUS_PENDING;
+        return $this->isNew();
+    }
+
+    /**
+     * Check if suggestion is accepted.
+     */
+    public function isAccepted(): bool
+    {
+        return $this->status === self::STATUS_ACCEPTED;
+    }
+
+    /**
+     * Check if suggestion is rejected.
+     */
+    public function isRejected(): bool
+    {
+        return in_array($this->status, [self::STATUS_REJECTED, self::STATUS_IGNORED]);
     }
 
     /**
@@ -157,11 +214,36 @@ class Suggestion extends Model
     }
 
     /**
-     * Check if suggestion is ignored.
+     * Check if suggestion is ignored (alias for isRejected).
      */
     public function isIgnored(): bool
     {
-        return $this->status === self::STATUS_IGNORED;
+        return $this->isRejected();
+    }
+
+    /**
+     * Check if suggestion should appear on analysis page.
+     */
+    public function isOnAnalysisPage(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_NEW,
+            self::STATUS_PENDING,
+            self::STATUS_REJECTED,
+            self::STATUS_IGNORED,
+        ]);
+    }
+
+    /**
+     * Check if suggestion should appear on tracking page.
+     */
+    public function isOnTrackingPage(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_ACCEPTED,
+            self::STATUS_IN_PROGRESS,
+            self::STATUS_COMPLETED,
+        ]);
     }
 
     /**
@@ -173,11 +255,52 @@ class Suggestion extends Model
     }
 
     /**
-     * Scope for pending suggestions.
+     * Scope for new/pending suggestions (analysis page).
      */
     public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_PENDING);
+        return $query->whereIn('status', [self::STATUS_NEW, self::STATUS_PENDING]);
+    }
+
+    /**
+     * Scope for suggestions on analysis page.
+     */
+    public function scopeOnAnalysisPage($query)
+    {
+        return $query->whereIn('status', [
+            self::STATUS_NEW,
+            self::STATUS_PENDING,
+            self::STATUS_REJECTED,
+            self::STATUS_IGNORED,
+        ]);
+    }
+
+    /**
+     * Scope for suggestions on tracking page (accepted).
+     */
+    public function scopeOnTrackingPage($query)
+    {
+        return $query->whereIn('status', [
+            self::STATUS_ACCEPTED,
+            self::STATUS_IN_PROGRESS,
+            self::STATUS_COMPLETED,
+        ]);
+    }
+
+    /**
+     * Scope for accepted suggestions.
+     */
+    public function scopeAccepted($query)
+    {
+        return $query->where('status', self::STATUS_ACCEPTED);
+    }
+
+    /**
+     * Scope for in progress suggestions.
+     */
+    public function scopeInProgress($query)
+    {
+        return $query->where('status', self::STATUS_IN_PROGRESS);
     }
 
     /**
@@ -186,6 +309,14 @@ class Suggestion extends Model
     public function scopeCompleted($query)
     {
         return $query->where('status', self::STATUS_COMPLETED);
+    }
+
+    /**
+     * Scope for rejected suggestions.
+     */
+    public function scopeRejected($query)
+    {
+        return $query->whereIn('status', [self::STATUS_REJECTED, self::STATUS_IGNORED]);
     }
 
     /**
@@ -218,10 +349,36 @@ class Suggestion extends Model
     public static function getStatuses(): array
     {
         return [
-            self::STATUS_PENDING,
+            self::STATUS_NEW,
+            self::STATUS_REJECTED,
+            self::STATUS_ACCEPTED,
             self::STATUS_IN_PROGRESS,
             self::STATUS_COMPLETED,
+        ];
+    }
+
+    /**
+     * Get statuses for analysis page.
+     */
+    public static function getAnalysisPageStatuses(): array
+    {
+        return [
+            self::STATUS_NEW,
+            self::STATUS_PENDING,
+            self::STATUS_REJECTED,
             self::STATUS_IGNORED,
+        ];
+    }
+
+    /**
+     * Get statuses for tracking page.
+     */
+    public static function getTrackingPageStatuses(): array
+    {
+        return [
+            self::STATUS_ACCEPTED,
+            self::STATUS_IN_PROGRESS,
+            self::STATUS_COMPLETED,
         ];
     }
 

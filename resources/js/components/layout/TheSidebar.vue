@@ -26,6 +26,7 @@ import {
     BellIcon,
     CreditCardIcon,
     LockClosedIcon,
+    ClipboardDocumentListIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -82,6 +83,13 @@ const menuItems = computed(() => [
         route: 'dashboard',
         permission: 'dashboard.view',
         locked: !authStore.canAccessCustomDashboards,
+    },
+    {
+        name: 'Acompanhamento de Sugestões',
+        label: 'Acompanhamento',
+        icon: ClipboardDocumentListIcon,
+        route: 'suggestions',
+        permission: 'analysis.view',
     },
     {
         name: 'Produtos',

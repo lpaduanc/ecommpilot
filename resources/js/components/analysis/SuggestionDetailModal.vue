@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import BaseModal from '../common/BaseModal.vue';
 import {
     CheckCircleIcon,
@@ -12,16 +12,25 @@ import {
     PlayIcon,
     XCircleIcon,
     ChevronDownIcon,
+    CheckIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
     suggestion: { type: Object, default: null },
+    mode: { type: String, default: 'analysis' }, // 'analysis' or 'tracking'
 });
 
-const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change']);
+const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change', 'accept', 'reject']);
 
 const showStatusDropdown = ref(false);
+
+// Reset dropdown state when modal closes
+watch(() => props.show, (newVal) => {
+    if (!newVal) {
+        showStatusDropdown.value = false;
+    }
+});
 
 const categoryConfig = {
     marketing: { icon: '📣', label: 'Marketing', color: 'from-pink-500 to-rose-500', bg: 'bg-pink-100' },
@@ -46,12 +55,29 @@ const effortLabels = {
     high: 'Alto',
 };
 
-const statusOptions = [
-    { value: 'pending', label: 'Pendente', icon: ClockIcon, color: 'text-gray-600 dark:text-gray-400' },
-    { value: 'in_progress', label: 'Em Andamento', icon: PlayIcon, color: 'text-primary-600 dark:text-primary-400' },
-    { value: 'completed', label: 'Implementado', icon: CheckCircleIcon, color: 'text-success-600 dark:text-success-400' },
-    { value: 'ignored', label: 'Ignorar', icon: XCircleIcon, color: 'text-gray-500 dark:text-gray-400' },
-];
+// Status options for tracking page
+const trackingStatusOptions = computed(() => {
+    const baseOptions = [
+        { value: 'accepted', label: 'Aguardando', icon: ClockIcon, color: 'text-gray-600 dark:text-gray-400' },
+        { value: 'in_progress', label: 'Em Andamento', icon: PlayIcon, color: 'text-primary-600 dark:text-primary-400' },
+        { value: 'completed', label: 'Concluído', icon: CheckCircleIcon, color: 'text-success-600 dark:text-success-400' },
+    ];
+
+    // Add Accept/Reject option based on current status
+    if (isRejected.value) {
+        return [
+            { value: 'accept', label: 'Aceitar', icon: CheckIcon, color: 'text-success-600 dark:text-success-400' },
+            ...baseOptions,
+        ];
+    } else if (isOnTrackingPage.value) {
+        return [
+            ...baseOptions,
+            { value: 'rejected', label: 'Rejeitar', icon: XMarkIcon, color: 'text-gray-600 dark:text-gray-400' },
+        ];
+    }
+
+    return baseOptions;
+});
 
 const category = computed(() =>
     categoryConfig[props.suggestion?.category] || { icon: '💡', label: 'Geral', color: 'from-gray-500 to-gray-600', bg: 'bg-gray-100' }
@@ -103,21 +129,44 @@ const actionSteps = computed(() => {
     return [];
 });
 
-// Support both legacy is_done and new status field
-const currentStatus = computed(() => {
-    if (props.suggestion?.status) return props.suggestion.status;
-    return props.suggestion?.is_done ? 'completed' : 'pending';
-});
+// Status handling
+const currentStatus = computed(() => props.suggestion?.status || 'new');
+const isOnAnalysisPage = computed(() => props.suggestion?.is_on_analysis_page ?? ['new', 'pending', 'rejected', 'ignored'].includes(currentStatus.value));
+const isOnTrackingPage = computed(() => props.suggestion?.is_on_tracking_page ?? ['accepted', 'in_progress', 'completed'].includes(currentStatus.value));
+const isRejected = computed(() => ['rejected', 'ignored'].includes(currentStatus.value));
 
 const currentStatusOption = computed(() =>
-    statusOptions.find(o => o.value === currentStatus.value) || statusOptions[0]
+    trackingStatusOptions.value.find(o => o.value === currentStatus.value) || trackingStatusOptions.value[0]
 );
 
 function selectStatus(status) {
     showStatusDropdown.value = false;
+
+    // Handle special cases
+    if (status === 'accept') {
+        emit('accept', props.suggestion);
+        return;
+    }
+
+    if (status === 'rejected') {
+        emit('reject', props.suggestion);
+        return;
+    }
+
+    // Regular status change
     if (status !== currentStatus.value) {
         emit('status-change', { suggestion: props.suggestion, status });
     }
+}
+
+function handleAccept() {
+    emit('accept', props.suggestion);
+    emit('close');
+}
+
+function handleReject() {
+    emit('reject', props.suggestion);
+    emit('close');
 }
 </script>
 
@@ -251,42 +300,73 @@ function selectStatus(status) {
                     <!-- Footer -->
                     <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                            <!-- Status Dropdown -->
-                            <div class="relative">
-                                <button
-                                    @click="showStatusDropdown = !showStatusDropdown"
-                                    class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-medium transition-all hover:border-primary-300 dark:hover:border-primary-700"
-                                    :class="currentStatusOption.color"
-                                >
-                                    <component :is="currentStatusOption.icon" class="w-5 h-5" />
-                                    {{ currentStatusOption.label }}
-                                    <ChevronDownIcon class="w-4 h-4 ml-1" />
-                                </button>
-                                <Transition
-                                    enter-active-class="transition ease-out duration-100"
-                                    enter-from-class="transform opacity-0 scale-95"
-                                    enter-to-class="transform opacity-100 scale-100"
-                                    leave-active-class="transition ease-in duration-75"
-                                    leave-from-class="transform opacity-100 scale-100"
-                                    leave-to-class="transform opacity-0 scale-95"
-                                >
-                                    <div
-                                        v-if="showStatusDropdown"
-                                        class="absolute bottom-full mb-2 left-0 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-20"
+                            <!-- Analysis Page: Accept/Reject buttons -->
+                            <template v-if="isOnAnalysisPage">
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        @click="handleAccept"
+                                        class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-success-500 to-emerald-500 text-white font-semibold shadow-md hover:shadow-lg transition-all"
                                     >
+                                        <CheckIcon class="w-5 h-5" />
+                                        Aceitar
+                                    </button>
+                                    <button
+                                        @click="handleReject"
+                                        :class="[
+                                            'flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all',
+                                            isRejected
+                                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-default'
+                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                        ]"
+                                        :disabled="isRejected"
+                                    >
+                                        <XMarkIcon class="w-5 h-5" />
+                                        {{ isRejected ? 'Rejeitada' : 'Rejeitar' }}
+                                    </button>
+                                </div>
+                            </template>
+
+                            <!-- Tracking Page: Status Dropdown -->
+                            <template v-else-if="isOnTrackingPage">
+                                <div class="flex items-center gap-2">
+                                    <!-- Status Dropdown -->
+                                    <div class="relative">
                                         <button
-                                            v-for="option in statusOptions"
-                                            :key="option.value"
-                                            @click="selectStatus(option.value)"
-                                            class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                            :class="[option.color, option.value === currentStatus ? 'bg-gray-50 dark:bg-gray-700' : '']"
+                                            @click="showStatusDropdown = !showStatusDropdown"
+                                            class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-medium transition-all hover:border-primary-300 dark:hover:border-primary-700"
+                                            :class="currentStatusOption.color"
                                         >
-                                            <component :is="option.icon" class="w-5 h-5" />
-                                            {{ option.label }}
+                                            <component :is="currentStatusOption.icon" class="w-5 h-5" />
+                                            {{ currentStatusOption.label }}
+                                            <ChevronDownIcon class="w-4 h-4 ml-1" />
                                         </button>
+                                        <Transition
+                                            enter-active-class="transition ease-out duration-100"
+                                            enter-from-class="transform opacity-0 scale-95"
+                                            enter-to-class="transform opacity-100 scale-100"
+                                            leave-active-class="transition ease-in duration-75"
+                                            leave-from-class="transform opacity-100 scale-100"
+                                            leave-to-class="transform opacity-0 scale-95"
+                                        >
+                                            <div
+                                                v-if="showStatusDropdown"
+                                                class="absolute bottom-full mb-2 left-0 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-20"
+                                            >
+                                                <button
+                                                    v-for="option in trackingStatusOptions"
+                                                    :key="option.value"
+                                                    @click="selectStatus(option.value)"
+                                                    class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                    :class="[option.color, option.value === currentStatus ? 'bg-gray-50 dark:bg-gray-700' : '']"
+                                                >
+                                                    <component :is="option.icon" class="w-5 h-5" />
+                                                    {{ option.label }}
+                                                </button>
+                                            </div>
+                                        </Transition>
                                     </div>
-                                </Transition>
-                            </div>
+                                </div>
+                            </template>
 
                             <div class="flex items-center gap-3">
                                 <button

@@ -11,15 +11,7 @@ use RuntimeException;
 
 class AnthropicProvider implements AIProviderInterface
 {
-    private string $apiKey;
-
     private string $baseUrl = 'https://api.anthropic.com/v1/messages';
-
-    private string $defaultModel;
-
-    private float $defaultTemperature;
-
-    private int $defaultMaxTokens;
 
     private string $anthropicVersion = '2023-06-01';
 
@@ -30,12 +22,36 @@ class AnthropicProvider implements AIProviderInterface
 
     private string $logChannel = 'ai';
 
-    public function __construct()
+    /**
+     * Get API key from database settings only.
+     */
+    private function getApiKey(): string
     {
-        $this->apiKey = SystemSetting::get('ai.anthropic.api_key', config('services.anthropic.api_key')) ?? '';
-        $this->defaultModel = SystemSetting::get('ai.anthropic.model', config('services.anthropic.model', 'claude-sonnet-4-20250514')) ?? 'claude-sonnet-4-20250514';
-        $this->defaultTemperature = (float) (SystemSetting::get('ai.anthropic.temperature', config('services.anthropic.temperature', 0.7)) ?? 0.7);
-        $this->defaultMaxTokens = (int) (SystemSetting::get('ai.anthropic.max_tokens', config('services.anthropic.max_tokens', 8192)) ?? 8192);
+        return SystemSetting::get('ai.anthropic.api_key') ?? '';
+    }
+
+    /**
+     * Get model from database settings only.
+     */
+    private function getModel(): string
+    {
+        return SystemSetting::get('ai.anthropic.model') ?? 'claude-sonnet-4-20250514';
+    }
+
+    /**
+     * Get temperature from database settings only.
+     */
+    private function getTemperature(): float
+    {
+        return (float) (SystemSetting::get('ai.anthropic.temperature') ?? 0.7);
+    }
+
+    /**
+     * Get max tokens from database settings only.
+     */
+    private function getMaxTokens(): int
+    {
+        return (int) (SystemSetting::get('ai.anthropic.max_tokens') ?? 8192);
     }
 
     public function chat(array $messages, array $options = []): string
@@ -55,9 +71,14 @@ class AnthropicProvider implements AIProviderInterface
             }
         }
 
+        $apiKey = $this->getApiKey();
+        $model = $options['model'] ?? $this->getModel();
+        $maxTokens = $options['max_tokens'] ?? $this->getMaxTokens();
+        $temperature = $options['temperature'] ?? $this->getTemperature();
+
         $payload = [
-            'model' => $options['model'] ?? $this->defaultModel,
-            'max_tokens' => $options['max_tokens'] ?? $this->defaultMaxTokens,
+            'model' => $model,
+            'max_tokens' => $maxTokens,
             'messages' => $chatMessages,
         ];
 
@@ -65,9 +86,6 @@ class AnthropicProvider implements AIProviderInterface
         if ($systemMessage) {
             $payload['system'] = $systemMessage;
         }
-
-        // Add temperature if not using default
-        $temperature = $options['temperature'] ?? $this->defaultTemperature;
         if ($temperature !== 1.0) {
             $payload['temperature'] = $temperature;
         }
@@ -83,7 +101,7 @@ class AnthropicProvider implements AIProviderInterface
                 ]);
 
                 $response = Http::withHeaders([
-                    'x-api-key' => $this->apiKey,
+                    'x-api-key' => $apiKey,
                     'anthropic-version' => $this->anthropicVersion,
                     'Content-Type' => 'application/json',
                 ])->timeout(180)->connectTimeout(30)->post($this->baseUrl, $payload);
@@ -239,6 +257,6 @@ class AnthropicProvider implements AIProviderInterface
 
     public function isConfigured(): bool
     {
-        return ! empty($this->apiKey);
+        return ! empty($this->getApiKey());
     }
 }

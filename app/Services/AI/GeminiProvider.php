@@ -11,15 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 class GeminiProvider implements AIProviderInterface
 {
-    private string $apiKey;
-
     private string $baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-
-    private string $defaultModel;
-
-    private float $defaultTemperature;
-
-    private int $defaultMaxTokens;
 
     private int $maxRetries = 3;
 
@@ -27,20 +19,44 @@ class GeminiProvider implements AIProviderInterface
 
     private string $logChannel = 'ai';
 
-    public function __construct()
+    /**
+     * Get API key from database settings only.
+     */
+    private function getApiKey(): string
     {
-        // Try database settings first, then fall back to config
-        $this->apiKey = SystemSetting::get('ai.gemini.api_key', config('services.ai.gemini.api_key')) ?? '';
-        $this->defaultModel = SystemSetting::get('ai.gemini.model', config('services.ai.gemini.model', 'gemini-1.5-pro')) ?? 'gemini-1.5-pro';
-        $this->defaultTemperature = (float) (SystemSetting::get('ai.gemini.temperature', config('services.ai.gemini.temperature', 0.7)) ?? 0.7);
-        $this->defaultMaxTokens = (int) (SystemSetting::get('ai.gemini.max_tokens', config('services.ai.gemini.max_tokens', 16384)) ?? 16384);
+        return SystemSetting::get('ai.gemini.api_key') ?? '';
+    }
+
+    /**
+     * Get model from database settings only.
+     */
+    private function getModel(): string
+    {
+        return SystemSetting::get('ai.gemini.model') ?? 'gemini-2.5-flash';
+    }
+
+    /**
+     * Get temperature from database settings only.
+     */
+    private function getTemperature(): float
+    {
+        return (float) (SystemSetting::get('ai.gemini.temperature') ?? 0.7);
+    }
+
+    /**
+     * Get max tokens from database settings only.
+     */
+    private function getMaxTokens(): int
+    {
+        return (int) (SystemSetting::get('ai.gemini.max_tokens') ?? 16384);
     }
 
     public function chat(array $messages, array $options = []): string
     {
-        $model = $options['model'] ?? $this->defaultModel;
-        $temperature = $options['temperature'] ?? $this->defaultTemperature;
-        $maxTokens = $options['max_tokens'] ?? $this->defaultMaxTokens;
+        $apiKey = $this->getApiKey();
+        $model = $options['model'] ?? $this->getModel();
+        $temperature = $options['temperature'] ?? $this->getTemperature();
+        $maxTokens = $options['max_tokens'] ?? $this->getMaxTokens();
 
         // Convert OpenAI-style messages to Gemini format
         $contents = $this->convertMessagesToGeminiFormat($messages);
@@ -80,7 +96,7 @@ class GeminiProvider implements AIProviderInterface
                     ->connectTimeout(30) // 30 seconds to establish connection
                     ->withHeaders([
                         'Content-Type' => 'application/json',
-                    ])->post("{$this->baseUrl}/models/{$model}:generateContent?key={$this->apiKey}", $payload);
+                    ])->post("{$this->baseUrl}/models/{$model}:generateContent?key={$apiKey}", $payload);
 
                 if (! $response->successful()) {
                     $error = $response->json('error.message', 'Unknown Gemini API error');
@@ -214,7 +230,7 @@ class GeminiProvider implements AIProviderInterface
 
     public function isConfigured(): bool
     {
-        return ! empty($this->apiKey);
+        return ! empty($this->getApiKey());
     }
 
     /**
