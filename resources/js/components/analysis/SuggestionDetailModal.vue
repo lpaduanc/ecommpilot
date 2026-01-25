@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onUnmounted } from 'vue';
+import { useAuthStore } from '../../stores/authStore';
 import BaseModal from '../common/BaseModal.vue';
 import {
     CheckCircleIcon,
@@ -13,23 +14,37 @@ import {
     XCircleIcon,
     ChevronDownIcon,
     CheckIcon,
+    LockClosedIcon,
 } from '@heroicons/vue/24/outline';
+
+const authStore = useAuthStore();
 
 const props = defineProps({
     show: { type: Boolean, default: false },
     suggestion: { type: Object, default: null },
     mode: { type: String, default: 'analysis' }, // 'analysis' or 'tracking'
+    shiftLeft: { type: Boolean, default: false }, // Shift modal to left when chat panel is open
 });
 
 const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change', 'accept', 'reject']);
 
 const showStatusDropdown = ref(false);
 
-// Reset dropdown state when modal closes
+// Reset dropdown state and handle body scroll lock
 watch(() => props.show, (newVal) => {
-    if (!newVal) {
+    if (newVal) {
+        // Lock body scroll when modal opens
+        document.body.style.overflow = 'hidden';
+    } else {
+        // Restore body scroll and reset state when modal closes
+        document.body.style.overflow = '';
         showStatusDropdown.value = false;
     }
+}, { immediate: true });
+
+// Cleanup on unmount
+onUnmounted(() => {
+    document.body.style.overflow = '';
 });
 
 const categoryConfig = {
@@ -173,18 +188,20 @@ function handleReject() {
 <template>
     <Teleport to="body">
         <Transition name="modal">
-            <div 
-                v-if="show && suggestion" 
-                class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            <div
+                v-if="show && suggestion"
+                class="fixed inset-0 z-50 flex items-center p-4 transition-all duration-300 justify-center"
+                :style="shiftLeft ? 'width: 50vw;' : ''"
             >
                 <!-- Backdrop -->
-                <div 
-                    class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
-                    @click="emit('close')"
+                <div
+                    class="absolute bg-gray-900/60 backdrop-blur-sm transition-all duration-300"
+                    :class="shiftLeft ? 'inset-y-0 left-0' : 'inset-0'"
+                    :style="shiftLeft ? 'width: 50vw;' : ''"
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl">
+                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl" :class="shiftLeft ? 'max-w-lg' : ''">
                     <!-- Header with Gradient based on Priority -->
                     <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="priority.color">
                         <!-- Background Pattern -->
@@ -193,7 +210,7 @@ function handleReject() {
                         <!-- Close Button -->
                         <button
                             @click="emit('close')"
-                            class="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                            class="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer"
                         >
                             <XMarkIcon class="w-5 h-5 text-white" />
                         </button>
@@ -376,10 +393,20 @@ function handleReject() {
                                     Fechar
                                 </button>
                                 <button
-                                    @click="emit('ask-ai', suggestion)"
+                                    v-if="authStore.canDiscussSuggestion"
+                                    @click="$emit('ask-ai', suggestion)"
                                     class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all"
                                 >
                                     <ChatBubbleLeftRightIcon class="w-5 h-5" />
+                                    Discutir com IA
+                                </button>
+                                <button
+                                    v-else
+                                    disabled
+                                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium cursor-not-allowed"
+                                    title="Seu plano não inclui esta funcionalidade"
+                                >
+                                    <LockClosedIcon class="w-5 h-5" />
                                     Discutir com IA
                                 </button>
                             </div>

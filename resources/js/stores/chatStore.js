@@ -145,6 +145,35 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    /**
+     * Start a suggestion discussion with AI.
+     * @param {Object} suggestion - The suggestion object from analysis
+     * @returns {Promise<Object>} - Result of the operation
+     */
+    async function startSuggestionDiscussion(suggestion) {
+        // Reset local state for fresh conversation
+        resetLocalState();
+
+        // Build context object
+        const context = {
+            type: 'suggestion',
+            suggestion: {
+                id: suggestion.id,
+                title: suggestion.title,
+                category: suggestion.category,
+                description: suggestion.description,
+                recommended_action: suggestion.recommended_action || suggestion.action_steps,
+                expected_impact: suggestion.expected_impact || suggestion.priority,
+                priority: suggestion.priority,
+            }
+        };
+
+        // Send initial message to trigger AI response with 5 suggestions
+        const initialMessage = `Quero discutir esta sugestão: "${suggestion.title}"`;
+
+        return sendMessage(initialMessage, context);
+    }
+
     return {
         messages,
         isLoading,
@@ -160,6 +189,7 @@ export const useChatStore = defineStore('chat', () => {
         addWelcomeMessage,
         resetLocalState,
         resetAndClearBackend,
+        startSuggestionDiscussion,
     };
 });
 

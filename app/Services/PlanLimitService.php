@@ -105,6 +105,36 @@ class PlanLimitService
     }
 
     /**
+     * Verifica se o usuário pode discutir sugestões com IA.
+     */
+    public function canDiscussSuggestion(User $user): bool
+    {
+        // Admins sempre têm acesso
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $plan = $user->currentPlan();
+
+        return $plan?->has_suggestion_discussion ?? false;
+    }
+
+    /**
+     * Verifica se o histórico de discussões de sugestões deve ser persistido.
+     */
+    public function shouldPersistSuggestionHistory(User $user): bool
+    {
+        // Admins sempre persistem
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $plan = $user->currentPlan();
+
+        return $plan?->has_suggestion_history ?? false;
+    }
+
+    /**
      * Verifica se o usuário pode adicionar uma nova integração externa.
      */
     public function canAddExternalIntegration(User $user): bool
@@ -252,6 +282,8 @@ class PlanLimitService
             'data_retention_months' => $plan->data_retention_months,
             'has_ai_analysis' => $plan->has_ai_analysis,
             'has_ai_chat' => $plan->has_ai_chat,
+            'has_suggestion_discussion' => $plan->has_suggestion_discussion,
+            'has_suggestion_history' => $plan->has_suggestion_history,
             'has_custom_dashboards' => $plan->has_custom_dashboards,
             'has_external_integrations' => $plan->has_external_integrations,
             'external_integrations_limit' => $plan->external_integrations_limit,
@@ -273,6 +305,8 @@ class PlanLimitService
             'data_retention_months' => 0,
             'has_ai_analysis' => false,
             'has_ai_chat' => false,
+            'has_suggestion_discussion' => false,
+            'has_suggestion_history' => false,
             'has_custom_dashboards' => false,
             'has_external_integrations' => false,
             'external_integrations_limit' => 0,
@@ -365,6 +399,8 @@ class PlanLimitService
             'features' => [
                 'has_ai_analysis' => $plan->has_ai_analysis,
                 'has_ai_chat' => $plan->has_ai_chat,
+                'has_suggestion_discussion' => $plan->has_suggestion_discussion,
+                'has_suggestion_history' => $plan->has_suggestion_history,
                 'has_custom_dashboards' => $plan->has_custom_dashboards,
                 'has_external_integrations' => $plan->has_external_integrations,
             ],

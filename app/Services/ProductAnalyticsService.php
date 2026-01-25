@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\Store;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
@@ -137,7 +138,7 @@ class ProductAnalyticsService
                     jsonb_array_elements(items) as item
                 FROM synced_orders
                 WHERE store_id = ?
-                    AND payment_status = 'paid'
+                    AND payment_status = ?
                     AND external_created_at >= ?
                     AND deleted_at IS NULL
             )
@@ -154,7 +155,7 @@ class ProductAnalyticsService
                 ) as total_revenue
             FROM order_items
             GROUP BY item->>'product_id', item->>'name'
-        ", [$store->id, now()->subDays($periodDays)]);
+        ", [$store->id, PaymentStatus::Paid->value, now()->subDays($periodDays)]);
 
         // Map results to product IDs
         $metrics = [];

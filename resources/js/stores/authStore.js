@@ -35,7 +35,17 @@ export const useAuthStore = defineStore('auth', () => {
         if (isAdmin.value) return true;
         return planLimits.value?.has_external_integrations ?? false;
     });
-    
+
+    const canDiscussSuggestion = computed(() => {
+        if (isAdmin.value) return true;
+        return planLimits.value?.has_suggestion_discussion ?? false;
+    });
+
+    const hasSuggestionHistory = computed(() => {
+        if (isAdmin.value) return true;
+        return planLimits.value?.has_suggestion_history ?? false;
+    });
+
     function hasPermission(permission) {
         if (isAdmin.value) return true;
         return userPermissions.value.includes(permission);
@@ -221,6 +231,8 @@ export const useAuthStore = defineStore('auth', () => {
         canAccessAiChat,
         canAccessCustomDashboards,
         canAccessExternalIntegrations,
+        canDiscussSuggestion,
+        hasSuggestionHistory,
         hasPermission,
         hasAnyPermission,
         initialize,

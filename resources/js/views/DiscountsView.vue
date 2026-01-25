@@ -114,7 +114,6 @@ onUnmounted(() => {
 
 
 const searchQuery = ref('');
-const showFilters = ref(false);
 
 const stats = computed(() => discountStore.stats);
 const coupons = computed(() => discountStore.coupons);
@@ -411,20 +410,6 @@ onMounted(() => {
                             />
                         </div>
 
-                        <!-- Filter Toggle -->
-                        <button
-                            @click="showFilters = !showFilters"
-                            type="button"
-                            aria-label="Mostrar filtros"
-                            :class="[
-                                'px-6 py-3 rounded-xl backdrop-blur-sm border text-white font-medium transition-all focus:outline-none focus:ring-2 focus:ring-white/50',
-                                showFilters || hasActiveFilters
-                                    ? 'bg-primary-500/30 border-primary-400/50'
-                                    : 'bg-white/10 border-white/20 hover:bg-white/20'
-                            ]"
-                        >
-                            <FunnelIcon class="w-5 h-5" aria-hidden="true" />
-                        </button>
                     </div>
                 </div>
             </div>
@@ -458,7 +443,7 @@ onMounted(() => {
                 </div>
 
                 <!-- Filters Section -->
-                <BaseCard v-if="showFilters || hasActiveFilters" class="mb-6">
+                <BaseCard class="mb-6">
                     <div class="flex items-start gap-4">
                         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/50 dark:to-primary-800/50 flex items-center justify-center flex-shrink-0">
                             <FunnelIcon class="w-6 h-6 text-primary-600 dark:text-primary-400" />

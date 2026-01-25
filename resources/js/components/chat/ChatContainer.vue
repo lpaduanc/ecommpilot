@@ -8,9 +8,21 @@ import ChatInput from './ChatInput.vue';
 import LoadingSpinner from '../common/LoadingSpinner.vue';
 import { SparklesIcon, LightBulbIcon } from '@heroicons/vue/24/outline';
 
+const props = defineProps({
+    initialContext: {
+        type: Object,
+        default: null
+    },
+    showQuickSuggestions: {
+        type: Boolean,
+        default: true
+    }
+});
+
 const chatStore = useChatStore();
 const integrationStore = useIntegrationStore();
 const messagesContainer = ref(null);
+const hasProcessedContext = ref(false);
 
 const messages = computed(() => chatStore.messages);
 const isLoading = computed(() => chatStore.isLoading);
@@ -50,6 +62,24 @@ function scrollToBottom() {
 watch(messages, () => {
     scrollToBottom();
 }, { deep: true });
+
+// Watch for initial context (suggestion discussion)
+watch(() => props.initialContext, async (newContext) => {
+    if (newContext && newContext.type === 'suggestion' && newContext.suggestion && !hasProcessedContext.value) {
+        hasProcessedContext.value = true;
+
+        // Start suggestion discussion
+        await chatStore.startSuggestionDiscussion(newContext.suggestion);
+        scrollToBottom();
+    }
+}, { immediate: true });
+
+// Reset processed flag when context is cleared
+watch(() => props.initialContext, (newContext) => {
+    if (!newContext) {
+        hasProcessedContext.value = false;
+    }
+});
 
 onMounted(() => {
     scrollToBottom();
@@ -94,8 +124,8 @@ onMounted(() => {
                 </div>
             </div>
 
-            <!-- Quick Suggestions - Always Visible at Bottom -->
-            <div class="border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-900 px-4 sm:px-6 py-4">
+            <!-- Quick Suggestions - Only visible when showQuickSuggestions is true -->
+            <div v-if="showQuickSuggestions" class="border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-900 px-4 sm:px-6 py-4">
                 <div class="w-full">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-6 h-6 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">

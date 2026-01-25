@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\Store;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -92,7 +93,7 @@ class DiscountAnalyticsService
             // Single optimized query for order stats (filtered by period)
             $orderQuery = DB::table('synced_orders')
                 ->where('store_id', $store->id)
-                ->where('payment_status', 'paid')
+                ->where('payment_status', PaymentStatus::Paid->value)
                 ->whereNull('deleted_at');
 
             // Apply date filter
@@ -299,7 +300,7 @@ class DiscountAnalyticsService
         // Single query - if no results, we know there's no data
         $query = DB::table('synced_orders')
             ->where('store_id', $store->id)
-            ->where('payment_status', 'paid')
+            ->where('payment_status', PaymentStatus::Paid->value)
             ->whereNull('deleted_at')
             ->whereRaw("coupon->>'code' IS NOT NULL AND coupon->>'code' != ''")
             ->whereRaw("LOWER(coupon->>'code') = ANY(?)", ['{'.implode(',', $lowerCodes).'}']);
@@ -345,7 +346,7 @@ class DiscountAnalyticsService
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($store, $dates) {
             $query = DB::table('synced_orders')
                 ->where('store_id', $store->id)
-                ->where('payment_status', 'paid')
+                ->where('payment_status', PaymentStatus::Paid->value)
                 ->whereNull('deleted_at')
                 ->where('total', '>', 0);
 

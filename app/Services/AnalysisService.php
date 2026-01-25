@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AnalysisStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Analysis;
 use App\Models\Store;
 use App\Models\User;
@@ -189,7 +190,7 @@ class AnalysisService
         $products = $store->products()->active()->get();
         $customers = $store->customers()->get();
 
-        $paidOrders = $orders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+        $paidOrders = $orders->filter(fn ($o) => $o->payment_status === PaymentStatus::Paid);
         $totalRevenue = $paidOrders->sum('total');
         $averageTicket = $paidOrders->count() > 0 ? $totalRevenue / $paidOrders->count() : 0;
 
@@ -237,8 +238,8 @@ class AnalysisService
             ->whereBetween('external_created_at', [$prevStart, $prevEnd])
             ->get();
 
-        $currentPaid = $currentOrders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
-        $previousPaid = $previousOrders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+        $currentPaid = $currentOrders->filter(fn ($o) => $o->payment_status === PaymentStatus::Paid);
+        $previousPaid = $previousOrders->filter(fn ($o) => $o->payment_status === PaymentStatus::Paid);
 
         $currentRevenue = $currentPaid->sum('total');
         $previousRevenue = $previousPaid->sum('total');
@@ -272,7 +273,7 @@ class AnalysisService
      */
     private function getProductPerformance(Store $store, $orders): array
     {
-        $paidOrders = $orders->filter(fn ($o) => $o->payment_status?->value === 'paid' || $o->payment_status === 'paid');
+        $paidOrders = $orders->filter(fn ($o) => $o->payment_status === PaymentStatus::Paid);
 
         $productSales = [];
 
@@ -462,7 +463,7 @@ class AnalysisService
         $dayNames = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
 
         // Status do pagamento - ÚNICA fonte de verdade para status de pedidos
-        $byPaymentStatus = $orders->groupBy(fn ($o) => $o->payment_status?->value ?? $o->payment_status ?? 'unknown')
+        $byPaymentStatus = $orders->groupBy(fn ($o) => $o->payment_status?->value ?? 'unknown')
             ->map->count()
             ->toArray();
 
@@ -470,13 +471,13 @@ class AnalysisService
         $cancelledCount = $orders->filter(fn ($o) => $o->isCancelled())->count();
 
         // Reembolso baseado em payment_status
-        $refundedCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'refunded')->count();
+        $refundedCount = $orders->filter(fn ($o) => $o->payment_status === PaymentStatus::Refunded)->count();
 
         // Pagamentos pendentes (não confirmados) - MÉTRICA IMPORTANTE
-        $paymentPendingCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'pending')->count();
+        $paymentPendingCount = $orders->filter(fn ($o) => $o->payment_status === PaymentStatus::Pending)->count();
 
         // Pagamentos confirmados
-        $paymentConfirmedCount = $orders->filter(fn ($o) => ($o->payment_status?->value ?? $o->payment_status) === 'paid')->count();
+        $paymentConfirmedCount = $orders->filter(fn ($o) => $o->payment_status === PaymentStatus::Paid)->count();
 
         $ordersWithDiscount = $orders->filter(fn ($o) => ($o->discount ?? 0) > 0)->count();
 

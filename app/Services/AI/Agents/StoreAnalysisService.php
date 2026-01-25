@@ -2,6 +2,7 @@
 
 namespace App\Services\AI\Agents;
 
+use App\Enums\PaymentStatus;
 use App\Models\Analysis;
 use App\Models\Store;
 use App\Models\Suggestion;
@@ -802,7 +803,7 @@ class StoreAnalysisService
 
         // Total revenue (paid orders)
         $totalRevenue = $store->orders()
-            ->whereIn('payment_status', ['paid', 'pago'])
+            ->where('payment_status', PaymentStatus::Paid)
             ->sum('total');
 
         return [
@@ -1417,8 +1418,8 @@ class StoreAnalysisService
         $healthV3 = $analysisResult['health_score'] ?? [];
         $healthLegacy = $analysisResult['overall_health'] ?? [];
 
-        // Determine score (V3: health_score.score, Legacy: overall_health.score)
-        $score = $healthV3['score'] ?? $healthLegacy['score'] ?? 50;
+        // Determine score (V3: health_score.score_final after override, Legacy: overall_health.score)
+        $score = $healthV3['score_final'] ?? $healthV3['score'] ?? $healthLegacy['score'] ?? 50;
 
         // Determine status (V3: health_score.classificacao, Legacy: overall_health.classification)
         $status = $healthV3['classificacao'] ?? $healthLegacy['classification'] ?? 'attention';

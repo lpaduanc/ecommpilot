@@ -127,7 +127,8 @@ class AnalystAgentService
         $healthLegacy = $analysis['overall_health'] ?? [];
 
         $overallHealth = [
-            'score' => $healthV3['score'] ?? $healthLegacy['score'] ?? $default['overall_health']['score'],
+            // V3 format uses score_final (after override), fallback to score for legacy
+            'score' => $healthV3['score_final'] ?? $healthV3['score'] ?? $healthLegacy['score'] ?? $default['overall_health']['score'],
             'classification' => $healthV3['classificacao'] ?? $healthLegacy['classification'] ?? $default['overall_health']['classification'],
             'main_points' => [$analysis['resumo_executivo'] ?? ($healthLegacy['main_points'][0] ?? $default['overall_health']['main_points'][0])],
         ];

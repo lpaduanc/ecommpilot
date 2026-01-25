@@ -19,7 +19,6 @@ import {
     ArrowPathIcon,
     PencilIcon,
     LockClosedIcon,
-    CurrencyDollarIcon,
     XMarkIcon,
     CheckIcon,
     ExclamationTriangleIcon,
@@ -32,7 +31,6 @@ const clients = ref([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
 const statusFilter = ref('');
-const creditsFilter = ref('');
 const currentPage = ref(1);
 const totalPages = ref(1);
 const totalItems = ref(0);
@@ -42,7 +40,6 @@ const perPageOptions = [10, 20, 50, 100];
 // Modals
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
-const showAddCreditsModal = ref(false);
 const showResetPasswordModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedClient = ref(null);
@@ -54,7 +51,6 @@ const createForm = ref({
     email: '',
     phone: '',
     password: '',
-    ai_credits: 10,
     is_active: true,
 });
 const editForm = ref({
@@ -64,7 +60,6 @@ const editForm = ref({
     is_active: true,
     permissions: [],
 });
-const creditsForm = ref({ amount: 10, reason: '' });
 const passwordForm = ref({ password: '' });
 const availablePermissions = ref([]);
 
@@ -87,12 +82,6 @@ const statusOptions = [
     { value: 'inactive', label: 'Inativos' },
 ];
 
-const creditsOptions = [
-    { value: '', label: 'Todos os Créditos' },
-    { value: 'low', label: 'Créditos Baixos (<10)' },
-    { value: 'zero', label: 'Sem Créditos' },
-];
-
 async function fetchClients() {
     isLoading.value = true;
     try {
@@ -100,7 +89,6 @@ async function fetchClients() {
             params: {
                 search: searchQuery.value,
                 status: statusFilter.value,
-                credits_filter: creditsFilter.value,
                 page: currentPage.value,
                 per_page: perPage.value,
             },
@@ -155,7 +143,6 @@ function openCreateModal() {
         email: '',
         phone: '',
         password: '',
-        ai_credits: 10,
         is_active: true,
     };
     showCreateModal.value = true;
@@ -183,27 +170,6 @@ async function toggleStatus(client) {
         client.is_active = response.data.is_active;
     } catch (error) {
         notificationStore.error('Erro ao alterar status');
-    }
-}
-
-// Add Credits
-function openAddCreditsModal(client) {
-    selectedClient.value = client;
-    creditsForm.value = { amount: 10, reason: '' };
-    showAddCreditsModal.value = true;
-}
-
-async function submitAddCredits() {
-    isSubmitting.value = true;
-    try {
-        const response = await api.post(`/admin/clients/${selectedClient.value.id}/add-credits`, creditsForm.value);
-        notificationStore.success(response.data.message);
-        selectedClient.value.ai_credits = response.data.ai_credits;
-        showAddCreditsModal.value = false;
-    } catch (error) {
-        notificationStore.error(error.response?.data?.message || 'Erro ao adicionar créditos');
-    } finally {
-        isSubmitting.value = false;
     }
 }
 
@@ -384,7 +350,7 @@ onMounted(() => {
         </div>
 
         <!-- Filters -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:flex-wrap items-center gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap items-center gap-3 sm:gap-4">
             <div class="sm:col-span-2 lg:col-span-2 xl:flex-1 xl:min-w-[200px] xl:max-w-md">
                 <div class="relative">
                     <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -402,15 +368,6 @@ onMounted(() => {
                     {{ option.label }}
                 </option>
             </select>
-            <select v-model="creditsFilter" @change="handleSearch" class="input w-full xl:w-48">
-                <option v-for="option in creditsOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                </option>
-            </select>
-            <BaseButton variant="secondary" @click="handleSearch" class="w-full sm:w-auto">
-                <FunnelIcon class="w-4 h-4" />
-                Filtrar
-            </BaseButton>
         </div>
 
         <!-- Table -->
@@ -443,14 +400,10 @@ onMounted(() => {
                         </div>
 
                         <!-- Stats -->
-                        <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+                        <div class="grid grid-cols-1 gap-3 text-sm mb-3">
                             <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Lojas</p>
                                 <p class="font-semibold text-gray-900 dark:text-gray-100">{{ client.stores_count }}</p>
-                            </div>
-                            <div :class="['rounded-lg p-2.5', client.ai_credits === 0 ? 'bg-danger-50 dark:bg-danger-900/30' : client.ai_credits < 10 ? 'bg-warning-50 dark:bg-warning-900/30' : 'bg-success-50 dark:bg-success-900/30']">
-                                <p class="text-xs text-gray-500 dark:text-gray-400">Créditos IA</p>
-                                <p :class="['font-semibold', client.ai_credits === 0 ? 'text-danger-700 dark:text-danger-300' : client.ai_credits < 10 ? 'text-warning-700 dark:text-warning-300' : 'text-success-700 dark:text-success-300']">{{ client.ai_credits }}</p>
                             </div>
                         </div>
 
@@ -467,9 +420,6 @@ onMounted(() => {
                             </BaseButton>
                             <BaseButton variant="ghost" size="sm" @click="openEditModal(client)" title="Editar">
                                 <PencilIcon class="w-4 h-4 text-primary-500" />
-                            </BaseButton>
-                            <BaseButton variant="ghost" size="sm" @click="openAddCreditsModal(client)" title="Adicionar créditos">
-                                <CurrencyDollarIcon class="w-4 h-4 text-success-500" />
                             </BaseButton>
                             <BaseButton variant="ghost" size="sm" @click="openResetPasswordModal(client)" title="Redefinir senha">
                                 <LockClosedIcon class="w-4 h-4 text-warning-500" />
@@ -495,9 +445,6 @@ onMounted(() => {
                             </th>
                             <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                 Lojas
-                            </th>
-                            <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                Créditos IA
                             </th>
                             <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                 Status
@@ -539,17 +486,6 @@ onMounted(() => {
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <span
-                                    :class="[
-                                        'badge',
-                                        client.ai_credits === 0 ? 'badge-danger' :
-                                        client.ai_credits < 10 ? 'badge-warning' : 'badge-success'
-                                    ]"
-                                >
-                                    {{ client.ai_credits }} créditos
-                                </span>
-                            </td>
-                            <td class="px-6 py-4">
                                 <button
                                     @click="toggleStatus(client)"
                                     :class="[
@@ -574,9 +510,6 @@ onMounted(() => {
                                     </BaseButton>
                                     <BaseButton variant="ghost" size="sm" @click="openEditModal(client)" title="Editar">
                                         <PencilIcon class="w-4 h-4 text-primary-500" />
-                                    </BaseButton>
-                                    <BaseButton variant="ghost" size="sm" @click="openAddCreditsModal(client)" title="Adicionar créditos">
-                                        <CurrencyDollarIcon class="w-4 h-4 text-success-500" />
                                     </BaseButton>
                                     <BaseButton variant="ghost" size="sm" @click="openResetPasswordModal(client)" title="Redefinir senha">
                                         <LockClosedIcon class="w-4 h-4 text-warning-500" />
@@ -635,10 +568,9 @@ onMounted(() => {
                 <BaseInput v-model="createForm.email" type="email" label="E-mail *" placeholder="email@exemplo.com" required />
                 <BaseInput v-model="createForm.phone" label="Telefone" placeholder="(00) 00000-0000" />
                 <BaseInput v-model="createForm.password" type="password" label="Senha *" placeholder="Mínimo 8 caracteres" required />
-                <BaseInput v-model.number="createForm.ai_credits" type="number" label="Créditos IA" min="0" />
                 <label class="flex items-center gap-2">
                     <input type="checkbox" v-model="createForm.is_active" class="rounded border-gray-300 text-primary-600" />
-                    <span class="text-sm text-gray-700">Cliente ativo</span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Cliente ativo</span>
                 </label>
             </form>
             <template #footer>
@@ -649,32 +581,13 @@ onMounted(() => {
             </template>
         </BaseModal>
 
-        <!-- Add Credits Modal -->
-        <BaseModal :show="showAddCreditsModal" title="Adicionar Créditos" @close="showAddCreditsModal = false">
-            <div v-if="selectedClient" class="space-y-4">
-                <div class="p-4 bg-gray-50 rounded-xl">
-                    <p class="text-sm text-gray-500">Cliente</p>
-                    <p class="font-semibold text-gray-900">{{ selectedClient.name }}</p>
-                    <p class="text-sm text-gray-500 mt-1">Créditos atuais: {{ selectedClient.ai_credits }}</p>
-                </div>
-                <BaseInput v-model.number="creditsForm.amount" type="number" label="Quantidade de Créditos" min="1" max="10000" />
-                <BaseInput v-model="creditsForm.reason" label="Motivo (opcional)" placeholder="Ex: Bônus, Promoção..." />
-            </div>
-            <template #footer>
-                <div class="flex justify-end gap-3">
-                    <BaseButton variant="secondary" @click="showAddCreditsModal = false">Cancelar</BaseButton>
-                    <BaseButton @click="submitAddCredits" :loading="isSubmitting">Adicionar</BaseButton>
-                </div>
-            </template>
-        </BaseModal>
-
         <!-- Reset Password Modal -->
         <BaseModal :show="showResetPasswordModal" title="Redefinir Senha" @close="showResetPasswordModal = false">
             <div v-if="selectedClient" class="space-y-4">
-                <div class="p-4 bg-gray-50 rounded-xl">
-                    <p class="text-sm text-gray-500">Cliente</p>
-                    <p class="font-semibold text-gray-900">{{ selectedClient.name }}</p>
-                    <p class="text-sm text-gray-500">{{ selectedClient.email }}</p>
+                <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Cliente</p>
+                    <p class="font-semibold text-gray-900 dark:text-gray-100">{{ selectedClient.name }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ selectedClient.email }}</p>
                 </div>
                 <BaseInput v-model="passwordForm.password" type="password" label="Nova Senha" placeholder="Mínimo 8 caracteres" />
             </div>
@@ -691,7 +604,7 @@ onMounted(() => {
             <form @submit.prevent="submitEditClient" class="space-y-6">
                 <!-- Dados Básicos -->
                 <div class="space-y-4">
-                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Dados do Cliente</h3>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Dados do Cliente</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <BaseInput
                             v-model="editForm.name"
@@ -718,7 +631,7 @@ onMounted(() => {
                                 v-model="editForm.is_active"
                                 class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                             />
-                            <label for="edit-is-active" class="text-sm text-gray-700">Cliente ativo</label>
+                            <label for="edit-is-active" class="text-sm text-gray-700 dark:text-gray-300">Cliente ativo</label>
                         </div>
                     </div>
                 </div>
@@ -726,11 +639,11 @@ onMounted(() => {
                 <!-- Permissões -->
                 <div class="space-y-4">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Permissões</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Permissões</h3>
                         <button
                             type="button"
                             @click="toggleAllPermissions"
-                            class="text-sm text-primary-600 hover:text-primary-700"
+                            class="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
                         >
                             {{ editForm.permissions.length === availablePermissions.length ? 'Desmarcar todas' : 'Selecionar todas' }}
                         </button>
@@ -740,28 +653,28 @@ onMounted(() => {
                         <div
                             v-for="(perms, category) in permissionCategories"
                             :key="category"
-                            class="border border-gray-200 rounded-lg p-3"
+                            class="border border-gray-200 dark:border-gray-700 rounded-lg p-3"
                         >
                             <div class="flex items-center gap-2 mb-2">
                                 <input
                                     type="checkbox"
                                     :checked="isCategorySelected(category)"
                                     @change="toggleCategoryPermissions(category)"
-                                    class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                    class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                                 />
-                                <span class="text-sm font-medium text-gray-700">{{ category }}</span>
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ category }}</span>
                             </div>
                             <div class="space-y-1 ml-6">
                                 <label
                                     v-for="perm in perms"
                                     :key="perm"
-                                    class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                                    class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer"
                                 >
                                     <input
                                         type="checkbox"
                                         :value="perm"
                                         v-model="editForm.permissions"
-                                        class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                        class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                                     />
                                     {{ formatPermissionLabel(perm) }}
                                 </label>
@@ -771,7 +684,7 @@ onMounted(() => {
                 </div>
 
                 <!-- Actions -->
-                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                     <BaseButton type="button" variant="secondary" @click="showEditModal = false">
                         Cancelar
                     </BaseButton>
@@ -785,13 +698,13 @@ onMounted(() => {
         <!-- Delete Confirmation Modal -->
         <BaseModal :show="showDeleteModal" title="Excluir Cliente" @close="showDeleteModal = false">
             <div v-if="selectedClient" class="text-center">
-                <div class="w-16 h-16 rounded-full bg-danger-100 flex items-center justify-center mx-auto mb-4">
-                    <ExclamationTriangleIcon class="w-8 h-8 text-danger-600" />
+                <div class="w-16 h-16 rounded-full bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center mx-auto mb-4">
+                    <ExclamationTriangleIcon class="w-8 h-8 text-danger-600 dark:text-danger-400" />
                 </div>
-                <p class="text-gray-600 mb-2">
+                <p class="text-gray-600 dark:text-gray-400 mb-2">
                     Tem certeza que deseja excluir o cliente <strong>{{ selectedClient.name }}</strong>?
                 </p>
-                <p class="text-sm text-gray-500">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
                     Todos os dados, lojas, pedidos e histórico serão removidos permanentemente.
                 </p>
             </div>

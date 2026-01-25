@@ -41,6 +41,8 @@ const defaultForm = {
     data_retention_months: 12,
     has_ai_analysis: true,
     has_ai_chat: false,
+    has_suggestion_discussion: false,
+    has_suggestion_history: false,
     has_custom_dashboards: false,
     has_external_integrations: false,
     external_integrations_limit: 1,
@@ -313,6 +315,19 @@ onMounted(fetchPlans);
                     </div>
                     <div class="flex items-center gap-2">
                         <component
+                            :is="plan.has_suggestion_discussion ? CheckCircleIcon : XCircleIcon"
+                            :class="plan.has_suggestion_discussion ? 'text-success-500' : 'text-gray-300 dark:text-gray-600'"
+                            class="w-4 h-4 flex-shrink-0"
+                        />
+                        <span :class="plan.has_suggestion_discussion ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">
+                            Discutir Sugestões
+                            <template v-if="plan.has_suggestion_discussion && plan.has_suggestion_history">
+                                (com histórico)
+                            </template>
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <component
                             :is="plan.has_custom_dashboards ? CheckCircleIcon : XCircleIcon"
                             :class="plan.has_custom_dashboards ? 'text-success-500' : 'text-gray-300 dark:text-gray-600'"
                             class="w-4 h-4 flex-shrink-0"
@@ -526,6 +541,28 @@ onMounted(fetchPlans);
                         />
                         <span class="text-sm text-gray-700 dark:text-gray-300">
                             Assistente IA (Chat)
+                        </span>
+                    </label>
+
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            v-model="form.has_suggestion_discussion"
+                            class="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            Discutir Sugestões com IA
+                        </span>
+                    </label>
+
+                    <label v-if="form.has_suggestion_discussion" class="flex items-center gap-3 cursor-pointer ml-7">
+                        <input
+                            type="checkbox"
+                            v-model="form.has_suggestion_history"
+                            class="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            Persistir Histórico de Discussões
                         </span>
                     </label>
 

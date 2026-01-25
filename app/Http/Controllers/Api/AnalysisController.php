@@ -55,7 +55,6 @@ class AnalysisController extends Controller
                 'analysis' => null,
                 'pending_analysis' => null,
                 'next_available_at' => null,
-                'credits' => $user->ai_credits,
                 'plan_limits' => null,
             ]);
         }
@@ -92,7 +91,6 @@ class AnalysisController extends Controller
                 'error_message' => $pendingAnalysis->error_message,
             ] : null,
             'next_available_at' => $nextAvailableAt?->toISOString(),
-            'credits' => $user->ai_credits,
             'plan_limits' => $planLimits,
         ]);
     }
@@ -160,19 +158,6 @@ class AnalysisController extends Controller
             ], 429);
         }
 
-        // Check credits
-        if (! $isLocalEnv && ! $user->hasCredits()) {
-            return response()->json([
-                'message' => 'Créditos insuficientes.',
-                'credits' => $user->ai_credits,
-            ], 402);
-        }
-
-        // Deduct credit (skip in local env)
-        if (! $isLocalEnv) {
-            $user->deductCredits();
-        }
-
         // Record analysis usage for plan limits
         if (! $isLocalEnv) {
             $this->planLimitService->recordAnalysisUsage($user, $store);
@@ -205,7 +190,6 @@ class AnalysisController extends Controller
                 'current_stage_name' => $analysis->getCurrentStageName(),
                 'error_message' => $analysis->error_message,
             ],
-            'credits' => $user->fresh()->ai_credits,
             'remaining_today' => $this->planLimitService->getRemainingAnalysesToday($user, $store),
         ]);
     }

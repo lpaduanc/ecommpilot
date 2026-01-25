@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
@@ -32,7 +33,7 @@ class AdminController extends Controller
         })
             ->whereMonth('external_created_at', now()->month)
             ->whereYear('external_created_at', now()->year)
-            ->where('payment_status', 'paid')
+            ->where('payment_status', PaymentStatus::Paid)
             ->sum('total');
 
         // New clients this month
@@ -154,7 +155,7 @@ class AdminController extends Controller
 
         // Calculate revenue with a single query
         $totalRevenue = SyncedOrder::whereIn('store_id', $storeIds)
-            ->where('payment_status', 'paid')
+            ->where('payment_status', PaymentStatus::Paid)
             ->sum('total');
 
         return response()->json([

@@ -24,6 +24,8 @@ class PlanSeeder extends Seeder
                 'data_retention_months' => 12,
                 'has_ai_analysis' => true,
                 'has_ai_chat' => false,
+                'has_suggestion_discussion' => false,
+                'has_suggestion_history' => false,
                 'has_custom_dashboards' => false,
                 'has_external_integrations' => false,
                 'external_integrations_limit' => 0,
@@ -46,6 +48,8 @@ class PlanSeeder extends Seeder
                 'data_retention_months' => 48,
                 'has_ai_analysis' => true,
                 'has_ai_chat' => true,
+                'has_suggestion_discussion' => true,
+                'has_suggestion_history' => false,
                 'has_custom_dashboards' => false,
                 'has_external_integrations' => true,
                 'external_integrations_limit' => 3,
@@ -68,6 +72,8 @@ class PlanSeeder extends Seeder
                 'data_retention_months' => -1, // Ilimitado
                 'has_ai_analysis' => true,
                 'has_ai_chat' => true,
+                'has_suggestion_discussion' => true,
+                'has_suggestion_history' => true,
                 'has_custom_dashboards' => true,
                 'has_external_integrations' => true,
                 'external_integrations_limit' => -1, // Ilimitado

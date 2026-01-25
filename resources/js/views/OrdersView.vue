@@ -479,13 +479,6 @@ onUnmounted(() => {
                                 class="w-full pl-12 pr-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-white/60 focus:bg-white/20 focus:border-white/30 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-all"
                             />
                         </div>
-                        <button
-                            @click="handleSearch"
-                            type="button"
-                            class="px-6 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
-                        >
-                            <FunnelIcon class="w-5 h-5" />
-                        </button>
 
                         <!-- Period Selector -->
                         <div class="relative">

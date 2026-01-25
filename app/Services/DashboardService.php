@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\Store;
 use App\Models\SyncedOrder;
 use Carbon\Carbon;
@@ -144,7 +145,7 @@ class DashboardService
                     jsonb_array_elements(items::jsonb) AS item
                 FROM synced_orders
                 WHERE store_id = ?
-                    AND payment_status = 'paid'
+                    AND payment_status = ?
                     AND external_created_at BETWEEN ? AND ?
                     AND deleted_at IS NULL
                     AND items IS NOT NULL
@@ -168,6 +169,7 @@ class DashboardService
             LIMIT 10
         ", [
             $store->id,
+            PaymentStatus::Paid->value,
             $dateRange['start']->toDateTimeString(),
             $dateRange['end']->toDateTimeString(),
         ]);

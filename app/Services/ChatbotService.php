@@ -23,13 +23,16 @@ class ChatbotService
 
     public function getResponse(
         User $user,
-        ChatConversation $conversation,
+        ?ChatConversation $conversation,
         string $message,
         ?array $context = null
     ): string {
         $store = $user->activeStore;
         $latestAnalysis = $this->getLatestAnalysis($user);
-        $chatHistory = $this->getChatHistory($conversation);
+        $chatHistory = $conversation ? $this->getChatHistory($conversation) : [];
+
+        // Check if this is a suggestion discussion context
+        $isSuggestionContext = isset($context['type']) && $context['type'] === 'suggestion';
 
         // Detect if user requested a specific period
         $periodInfo = $this->detectRequestedPeriod($message);
@@ -42,7 +45,12 @@ class ChatbotService
             ? "\n\nNOTA IMPORTANTE: O período máximo de análise é de {self::MAX_PERIOD_DAYS} dias. Mostrando dados dos últimos {self::MAX_PERIOD_DAYS} dias."
             : '';
 
-        $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis, $storeData, $periodNotice);
+        // Build appropriate system prompt
+        if ($isSuggestionContext) {
+            $systemPrompt = $this->buildSuggestionDiscussionPrompt($store, $storeData, $context['suggestion']);
+        } else {
+            $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis, $storeData, $periodNotice);
+        }
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -56,8 +64,10 @@ class ChatbotService
             ];
         }
 
-        // Add context if provided
-        if ($context) {
+        // Format message based on context type
+        if ($isSuggestionContext) {
+            $message = $this->formatSuggestionUserMessage($context['suggestion'], $message);
+        } elseif ($context) {
             $contextStr = json_encode($context, JSON_UNESCAPED_UNICODE);
             $message = "Contexto adicional: {$contextStr}\n\nMensagem do usuário: {$message}";
         }
@@ -103,6 +113,112 @@ class ChatbotService
             'days' => $days,
             'exceeded_max' => $exceededMax,
         ];
+    }
+
+    /**
+     * Build a specialized prompt for suggestion discussion.
+     */
+    private function buildSuggestionDiscussionPrompt(?object $store, array $storeData, array $suggestion): string
+    {
+        $storeName = $store?->name ?? 'sua loja';
+        $storeDataJson = json_encode($storeData, JSON_UNESCAPED_UNICODE);
+
+        $categoryLabel = $this->getCategoryLabel($suggestion['category'] ?? 'geral');
+        $impactLabel = $this->getImpactLabel($suggestion['expected_impact'] ?? 'medium');
+        $recommendedAction = $this->formatRecommendedAction($suggestion['recommended_action'] ?? '');
+
+        return <<<PROMPT
+        Você é um assistente de marketing para e-commerce, especializado em ajudar lojistas a implementar sugestões de melhoria.
+        Você trabalha para a plataforma Ecommpilot.
+
+        CONTEXTO DA LOJA:
+        Loja: {$storeName}
+        Período de dados: {$storeData['period']['start']} a {$storeData['period']['end']}
+
+        DADOS DA LOJA:
+        {$storeDataJson}
+
+        SUGESTÃO EM DISCUSSÃO:
+        - Título: {$suggestion['title']}
+        - Categoria: {$categoryLabel}
+        - Impacto esperado: {$impactLabel}
+        - Descrição: {$suggestion['description']}
+        - Ação recomendada: {$recommendedAction}
+
+        INSTRUÇÃO ESPECIAL PARA PRIMEIRA RESPOSTA:
+        Na sua PRIMEIRA resposta, você DEVE:
+        1. Começar com: "Oi, já entendi essa sugestão feita pela análise. Com o que você precisa de ajuda? Aqui estão algumas sugestões de como podemos trabalhar com essa sugestão:"
+        2. Em seguida, listar EXATAMENTE 5 sugestões práticas e específicas de como o usuário pode trabalhar com essa sugestão
+        3. As sugestões devem ser baseadas na categoria "{$categoryLabel}" e no contexto específico da sugestão
+        4. Use formato de lista numerada (1. 2. 3. 4. 5.)
+        5. Cada sugestão deve ser uma frase curta e acionável
+
+        FORMATO DE RESPOSTA - USE MARKDOWN:
+        - Use **negrito** para destacar pontos importantes
+        - Use listas numeradas ou com bullet points
+        - Seja conciso e direto
+
+        REGRAS:
+        - SEMPRE responda em português brasileiro
+        - Seja prestativo, amigável e profissional
+        - Foque em ajudar o usuário a implementar a sugestão
+        - Ofereça passos práticos e acionáveis
+        - Se o usuário pedir detalhes específicos, use os dados da loja para contextualizar
+        - NÃO use emojis excessivamente
+        PROMPT;
+    }
+
+    /**
+     * Format the user message for suggestion discussion.
+     */
+    private function formatSuggestionUserMessage(array $suggestion, string $message): string
+    {
+        return "O usuário quer discutir a sugestão: \"{$suggestion['title']}\"\n\nMensagem do usuário: {$message}";
+    }
+
+    /**
+     * Get translated category label.
+     */
+    private function getCategoryLabel(string $category): string
+    {
+        $labels = [
+            'marketing' => 'Marketing',
+            'pricing' => 'Precificação',
+            'inventory' => 'Estoque',
+            'product' => 'Produtos',
+            'customer' => 'Clientes',
+            'conversion' => 'Conversão',
+            'coupon' => 'Cupons',
+            'operational' => 'Operacional',
+        ];
+
+        return $labels[$category] ?? ucfirst($category);
+    }
+
+    /**
+     * Get translated impact label.
+     */
+    private function getImpactLabel(string $impact): string
+    {
+        $labels = [
+            'high' => 'Alto',
+            'medium' => 'Médio',
+            'low' => 'Baixo',
+        ];
+
+        return $labels[$impact] ?? ucfirst($impact);
+    }
+
+    /**
+     * Format recommended action (can be string or array).
+     */
+    private function formatRecommendedAction(string|array $action): string
+    {
+        if (is_array($action)) {
+            return implode('; ', $action);
+        }
+
+        return $action;
     }
 
     private function buildSystemPrompt(?object $store, ?Analysis $analysis, array $storeData, string $periodNotice = ''): string
@@ -183,36 +299,11 @@ class ChatbotService
             $endDate = Carbon::now();
             $startDate = Carbon::now()->subDays($days);
 
-            \Log::info('ChatbotService: Fetching orders', [
-                'store_id' => $store->id,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString(),
-            ]);
-
-            // Get paid orders in period - check all payment statuses first
-            $allOrders = SyncedOrder::where('store_id', $store->id)
+            // Get paid orders in period using query scope
+            $orders = SyncedOrder::where('store_id', $store->id)
                 ->whereBetween('external_created_at', [$startDate, $endDate])
+                ->where('payment_status', PaymentStatus::Paid)
                 ->get();
-
-            \Log::info('ChatbotService: All orders in period', [
-                'total' => $allOrders->count(),
-                'by_status' => $allOrders->groupBy('payment_status')->map->count()->toArray(),
-            ]);
-
-            // Filter to paid orders (handle both enum and string comparisons)
-            $orders = $allOrders->filter(function ($order) {
-                $status = $order->payment_status;
-                if ($status instanceof PaymentStatus) {
-                    return $status === PaymentStatus::Paid;
-                }
-
-                return $status === 'paid' || $status === PaymentStatus::Paid->value;
-            });
-
-            \Log::info('ChatbotService: Paid orders after filter', [
-                'paid_count' => $orders->count(),
-                'total_revenue' => $orders->sum('total'),
-            ]);
 
             // Calculate daily stats (simplified to reduce tokens)
             $dailyStats = [];
@@ -265,13 +356,13 @@ class ChatbotService
             // Get products with low stock (top 5)
             $lowStockProducts = SyncedProduct::where('store_id', $store->id)
                 ->where('is_active', true)
-                ->whereNotNull('quantity')
-                ->where('quantity', '>', 0)
-                ->where('quantity', '<=', 5)
-                ->orderBy('quantity')
+                ->whereNotNull('stock_quantity')
+                ->where('stock_quantity', '>', 0)
+                ->where('stock_quantity', '<=', 5)
+                ->orderBy('stock_quantity')
                 ->limit(5)
-                ->get(['name', 'quantity'])
-                ->map(fn ($p) => ['n' => $p->name, 'e' => $p->quantity])
+                ->get(['name', 'stock_quantity'])
+                ->map(fn ($p) => ['n' => $p->name, 'e' => $p->stock_quantity])
                 ->toArray();
 
             // Get top customers (top 5, simplified)

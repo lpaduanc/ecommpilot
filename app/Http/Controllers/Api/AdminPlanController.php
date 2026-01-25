@@ -71,6 +71,8 @@ class AdminPlanController extends Controller
             'data_retention_months' => ['required', 'integer', 'min:-1'],
             'has_ai_analysis' => ['boolean'],
             'has_ai_chat' => ['boolean'],
+            'has_suggestion_discussion' => ['boolean'],
+            'has_suggestion_history' => ['boolean'],
             'has_custom_dashboards' => ['boolean'],
             'has_external_integrations' => ['boolean'],
             'external_integrations_limit' => ['nullable', 'integer', 'min:-1'],
@@ -106,6 +108,8 @@ class AdminPlanController extends Controller
             'data_retention_months' => ['sometimes', 'integer', 'min:-1'],
             'has_ai_analysis' => ['sometimes', 'boolean'],
             'has_ai_chat' => ['sometimes', 'boolean'],
+            'has_suggestion_discussion' => ['sometimes', 'boolean'],
+            'has_suggestion_history' => ['sometimes', 'boolean'],
             'has_custom_dashboards' => ['sometimes', 'boolean'],
             'has_external_integrations' => ['sometimes', 'boolean'],
             'external_integrations_limit' => ['nullable', 'integer', 'min:-1'],
@@ -118,6 +122,12 @@ class AdminPlanController extends Controller
         }
         if ($request->has('has_ai_chat')) {
             $validated['has_ai_chat'] = (bool) $request->input('has_ai_chat');
+        }
+        if ($request->has('has_suggestion_discussion')) {
+            $validated['has_suggestion_discussion'] = (bool) $request->input('has_suggestion_discussion');
+        }
+        if ($request->has('has_suggestion_history')) {
+            $validated['has_suggestion_history'] = (bool) $request->input('has_suggestion_history');
         }
         if ($request->has('has_custom_dashboards')) {
             $validated['has_custom_dashboards'] = (bool) $request->input('has_custom_dashboards');

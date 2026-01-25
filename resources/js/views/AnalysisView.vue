@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from 'vue';
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
 import { useAnalysisStore } from '../stores/analysisStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
@@ -11,6 +11,7 @@ import UpgradeBanner from '../components/common/UpgradeBanner.vue';
 import SuggestionCard from '../components/analysis/SuggestionCard.vue';
 import SuggestionDetailModal from '../components/analysis/SuggestionDetailModal.vue';
 import OpportunityDetailModal from '../components/analysis/OpportunityDetailModal.vue';
+import SuggestionChatPanel from '../components/analysis/SuggestionChatPanel.vue';
 import HealthScore from '../components/analysis/HealthScore.vue';
 import AnalysisAlerts from '../components/analysis/AnalysisAlerts.vue';
 import OpportunitiesPanel from '../components/analysis/OpportunitiesPanel.vue';
@@ -46,11 +47,17 @@ const showOpportunityDetail = ref(false);
 const countdownInterval = ref(null);
 const showChat = ref(false);
 const isResendingEmail = ref(false);
+const showChatPanel = ref(false);
+const chatPanelContext = ref(null);
 
 // Análises anteriores
 const selectedHistoricalId = ref(null);
 const isViewingHistorical = ref(false);
 const originalAnalysis = ref(null);
+
+// Estado para forçar atualização do cronômetro
+const elapsedSeconds = ref(0);
+const elapsedInterval = ref(null);
 
 const isLoading = computed(() => analysisStore.isLoading);
 const isRequesting = computed(() => analysisStore.isRequesting);
@@ -67,9 +74,10 @@ const credits = computed(() => analysisStore.credits);
 
 const pendingAnalysisElapsed = computed(() => {
     if (!pendingAnalysis.value?.created_at) return null;
+    // Usar elapsedSeconds.value para forçar reatividade
     const start = new Date(pendingAnalysis.value.created_at);
     const now = new Date();
-    const diff = Math.floor((now - start) / 1000);
+    const diff = Math.floor((now - start) / 1000) + (elapsedSeconds.value * 0); // Trick para reatividade
     const minutes = Math.floor(diff / 60);
     const seconds = diff % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -139,6 +147,33 @@ function handleOpportunityAskAI(opportunity) {
     showOpportunityDetail.value = false;
     showChat.value = true;
     // TODO: Pre-fill chat with opportunity context
+}
+
+function handleSuggestionAskAI(suggestion) {
+    // Check permission first
+    if (!authStore.canDiscussSuggestion) {
+        notificationStore.warning('Seu plano não inclui discussão de sugestões com IA. Faça upgrade para desbloquear.');
+        return;
+    }
+
+    // Don't close the detail modal - keep it open
+
+    // Set context for chat panel
+    chatPanelContext.value = {
+        type: 'suggestion',
+        suggestion: {
+            id: suggestion.id,
+            title: suggestion.title,
+            category: suggestion.category,
+            description: suggestion.description,
+            recommended_action: suggestion.recommended_action || suggestion.action_steps,
+            expected_impact: suggestion.expected_impact || suggestion.priority,
+            priority: suggestion.priority,
+        }
+    };
+
+    // Open chat panel (side by side with modal)
+    showChatPanel.value = true;
 }
 
 async function handleStatusChange({ suggestion, status }) {
@@ -268,16 +303,64 @@ function startCountdown() {
     }, 1000);
 }
 
+function startElapsedTimer() {
+    if (elapsedInterval.value) {
+        clearInterval(elapsedInterval.value);
+    }
+
+    elapsedInterval.value = setInterval(() => {
+        // Incrementa contador para forçar recálculo do computed
+        elapsedSeconds.value++;
+    }, 1000);
+}
+
+function stopElapsedTimer() {
+    if (elapsedInterval.value) {
+        clearInterval(elapsedInterval.value);
+        elapsedInterval.value = null;
+    }
+    elapsedSeconds.value = 0;
+}
+
+// Watch para iniciar/parar timer de elapsed quando análise muda de estado
+watch(hasAnalysisInProgress, (inProgress) => {
+    if (inProgress) {
+        startElapsedTimer();
+    } else {
+        stopElapsedTimer();
+    }
+});
+
+// Clear chat panel context when panel is closed
+watch(showChatPanel, (isOpen) => {
+    if (!isOpen) {
+        chatPanelContext.value = null;
+    }
+});
+
+// Close chat panel when suggestion modal is closed
+watch(showSuggestionDetail, (isOpen) => {
+    if (!isOpen) {
+        showChatPanel.value = false;
+    }
+});
+
 onMounted(() => {
     analysisStore.fetchCurrentAnalysis();
     analysisStore.fetchAnalysisHistory();
     startCountdown();
+
+    // Inicia timer se já houver análise em andamento
+    if (hasAnalysisInProgress.value) {
+        startElapsedTimer();
+    }
 });
 
 onUnmounted(() => {
     if (countdownInterval.value) {
         clearInterval(countdownInterval.value);
     }
+    stopElapsedTimer();
     analysisStore.stopPolling();
 });
 </script>
@@ -687,7 +770,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Chat Sidebar -->
+                <!-- Chat Sidebar (for general conversations) -->
                 <div
                     v-if="showChat"
                     class="w-80 xl:w-96 flex-shrink-0 hidden lg:block"
@@ -700,7 +783,7 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- Mobile Chat (fullscreen overlay) -->
+            <!-- Mobile Chat (fullscreen overlay for general conversations) -->
             <div
                 v-if="showChat"
                 class="lg:hidden fixed inset-0 z-50 bg-white dark:bg-gray-900"
@@ -805,11 +888,13 @@ onUnmounted(() => {
         <SuggestionDetailModal
             :show="showSuggestionDetail"
             :suggestion="selectedSuggestion"
+            :shift-left="showChatPanel"
             mode="analysis"
             @close="showSuggestionDetail = false"
             @status-change="handleStatusChange"
             @accept="handleAcceptSuggestion"
             @reject="handleRejectSuggestion"
+            @ask-ai="handleSuggestionAskAI"
         />
 
         <!-- Opportunity Detail Modal -->
@@ -818,6 +903,13 @@ onUnmounted(() => {
             :opportunity="selectedOpportunity"
             @close="showOpportunityDetail = false"
             @ask-ai="handleOpportunityAskAI"
+        />
+
+        <!-- Chat Panel (for suggestion discussions) - Opens side by side with modal -->
+        <SuggestionChatPanel
+            :show="showChatPanel"
+            :initial-context="chatPanelContext"
+            @close="showChatPanel = false"
         />
 
         </template>

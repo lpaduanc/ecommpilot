@@ -68,26 +68,49 @@ class ChatController extends Controller
             'message.max' => 'A mensagem é muito longa.',
         ]);
 
+        $context = $validated['context'] ?? null;
+        $isSuggestionContext = isset($context['type']) && $context['type'] === 'suggestion';
+
+        // Check permission for suggestion discussion
+        if (! $isLocalEnv && $isSuggestionContext && ! $this->planLimitService->canDiscussSuggestion($user)) {
+            return response()->json([
+                'message' => 'Seu plano não inclui discussão de sugestões com IA.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
+        // Determine if messages should be persisted
+        $shouldPersist = true;
+        if ($isSuggestionContext) {
+            $shouldPersist = $isLocalEnv || $this->planLimitService->shouldPersistSuggestionHistory($user);
+        }
+
         $store = $user->activeStore;
 
-        // Get or create conversation
-        $conversation = ChatConversation::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'status' => 'active',
-            ],
-            [
-                'store_id' => $store?->id,
-            ]
-        );
+        // Get or create conversation (only if persisting)
+        $conversation = null;
+        if ($shouldPersist) {
+            $conversation = ChatConversation::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'status' => 'active',
+                ],
+                [
+                    'store_id' => $store?->id,
+                ]
+            );
+        }
 
-        // Save user message
-        $userMessage = ChatMessage::create([
-            'conversation_id' => $conversation->id,
-            'role' => 'user',
-            'content' => $validated['message'],
-            'context' => $validated['context'] ?? null,
-        ]);
+        // Save user message (only if persisting)
+        $userMessage = null;
+        if ($shouldPersist && $conversation) {
+            $userMessage = ChatMessage::create([
+                'conversation_id' => $conversation->id,
+                'role' => 'user',
+                'content' => $validated['message'],
+                'context' => $context,
+            ]);
+        }
 
         // Get AI response
         try {
@@ -95,20 +118,24 @@ class ChatController extends Controller
                 $user,
                 $conversation,
                 $validated['message'],
-                $validated['context'] ?? null
+                $context
             );
 
-            // Save assistant message
-            $assistantMessage = ChatMessage::create([
-                'conversation_id' => $conversation->id,
-                'role' => 'assistant',
-                'content' => $response,
-            ]);
+            // Save assistant message (only if persisting)
+            $assistantMessage = null;
+            if ($shouldPersist && $conversation) {
+                $assistantMessage = ChatMessage::create([
+                    'conversation_id' => $conversation->id,
+                    'role' => 'assistant',
+                    'content' => $response,
+                ]);
+            }
 
             return response()->json([
-                'user_message_id' => $userMessage->id,
-                'assistant_message_id' => $assistantMessage->id,
+                'user_message_id' => $userMessage?->id ?? 'temp-'.uniqid(),
+                'assistant_message_id' => $assistantMessage?->id ?? 'temp-'.uniqid(),
                 'response' => $response,
+                'persisted' => $shouldPersist,
             ]);
         } catch (\Exception $e) {
             // Log the actual error for debugging
@@ -118,8 +145,8 @@ class ChatController extends Controller
                 'exception' => $e->getTraceAsString(),
             ]);
 
-            // Delete user message on failure
-            $userMessage->delete();
+            // Delete user message on failure (if it was persisted)
+            $userMessage?->delete();
 
             return response()->json([
                 'message' => 'Desculpe, não foi possível processar sua mensagem. Tente novamente.',

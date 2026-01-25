@@ -72,18 +72,19 @@ class StorePolicyTest extends TestCase
         $this->assertTrue($this->policy->delete($user, $store));
     }
 
-    public function test_user_with_credits_can_request_analysis(): void
+    public function test_user_can_request_analysis_for_own_store(): void
     {
-        $user = User::factory()->withCredits(10)->create();
+        $user = User::factory()->create();
         $store = Store::factory()->create(['user_id' => $user->id]);
 
         $this->assertTrue($this->policy->requestAnalysis($user, $store));
     }
 
-    public function test_user_without_credits_cannot_request_analysis(): void
+    public function test_user_cannot_request_analysis_for_other_users_store(): void
     {
-        $user = User::factory()->withoutCredits()->create();
-        $store = Store::factory()->create(['user_id' => $user->id]);
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $store = Store::factory()->create(['user_id' => $otherUser->id]);
 
         $this->assertFalse($this->policy->requestAnalysis($user, $store));
     }
