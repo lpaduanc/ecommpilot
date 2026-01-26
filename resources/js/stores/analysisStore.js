@@ -10,7 +10,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const isRequesting = ref(false);
     const error = ref(null);
     const nextAvailableAt = ref(null);
-    const credits = ref(0);
     const pollingInterval = ref(null);
 
     // Persistent suggestions state
@@ -105,7 +104,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
             currentAnalysis.value = response.data.analysis;
             pendingAnalysis.value = response.data.pending_analysis;
             nextAvailableAt.value = response.data.next_available_at;
-            credits.value = response.data.credits;
 
             // Start polling if there's a pending analysis
             if (pendingAnalysis.value) {
@@ -133,7 +131,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
                     currentAnalysis.value = response.data.analysis;
                     pendingAnalysis.value = null;
                     nextAvailableAt.value = response.data.next_available_at;
-                    credits.value = response.data.credits;
                     stopPolling();
                 } else {
                     pendingAnalysis.value = response.data.pending_analysis;
@@ -167,7 +164,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
         try {
             const response = await api.post('/analysis/request');
             pendingAnalysis.value = response.data.pending_analysis;
-            credits.value = response.data.credits;
 
             // Start polling to check when analysis completes
             startPolling();
@@ -437,7 +433,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
         isRequesting,
         error,
         nextAvailableAt,
-        credits,
         canRequestAnalysis,
         timeUntilNextAnalysis,
         suggestions,

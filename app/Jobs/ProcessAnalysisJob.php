@@ -291,16 +291,6 @@ class ProcessAnalysisJob implements ShouldQueue
 
             // Notify user about the failure
             $notificationService->notifyAnalysisFailed($this->analysis, $userMessage);
-
-            // Refund credits since analysis failed
-            if ($this->analysis->user) {
-                $this->analysis->user->addCredits($this->analysis->credits_used ?? 1);
-                Log::channel($this->logChannel)->info('>>> Creditos reembolsados ao usuario', [
-                    'analysis_id' => $this->analysis->id,
-                    'user_id' => $this->analysis->user_id,
-                    'credits_refunded' => $this->analysis->credits_used ?? 1,
-                ]);
-            }
         } catch (\Throwable $e) {
             Log::channel($this->logChannel)->error('!!! Erro ao tratar falha da analise', [
                 'analysis_id' => $this->analysis->id,

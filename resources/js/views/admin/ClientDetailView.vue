@@ -200,13 +200,6 @@ onMounted(() => {
                             </span>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <div class="flex items-center gap-2 text-lg">
-                            <SparklesIcon class="w-5 h-5 text-primary-500" />
-                            <span class="font-bold text-gray-900 dark:text-gray-100">{{ client.ai_credits }}</span>
-                            <span class="text-gray-500 dark:text-gray-400">créditos</span>
-                        </div>
-                    </div>
                 </div>
             </BaseCard>
 

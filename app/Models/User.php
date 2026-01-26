@@ -26,7 +26,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'is_active',
         'last_login_at',
         'must_change_password',
-        'ai_credits',
         'active_store_id',
         'notification_settings',
         'parent_user_id',
@@ -45,7 +44,6 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'is_active' => 'boolean',
             'must_change_password' => 'boolean',
-            'ai_credits' => 'integer',
             'notification_settings' => 'array',
             'role' => UserRole::class,
         ];
@@ -109,27 +107,6 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isClient(): bool
     {
         return $this->role === UserRole::Client;
-    }
-
-    public function hasCredits(int $amount = 1): bool
-    {
-        return $this->ai_credits >= $amount;
-    }
-
-    public function deductCredits(int $amount = 1): bool
-    {
-        if (! $this->hasCredits($amount)) {
-            return false;
-        }
-
-        $this->decrement('ai_credits', $amount);
-
-        return true;
-    }
-
-    public function addCredits(int $amount): void
-    {
-        $this->increment('ai_credits', $amount);
     }
 
     public function recordLogin(): void

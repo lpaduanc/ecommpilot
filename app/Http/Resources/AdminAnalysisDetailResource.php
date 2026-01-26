@@ -54,6 +54,11 @@ class AdminAnalysisDetailResource extends JsonResource
             'duration_seconds' => $this->completed_at && $this->created_at
                 ? $this->created_at->diffInSeconds($this->completed_at)
                 : null,
+            // Progress tracking
+            'current_stage' => $this->current_stage ?? 0,
+            'total_stages' => $this->total_stages ?? 9,
+            'progress_percentage' => $this->getProgressPercentage(),
+            'current_stage_name' => $this->getCurrentStageName(),
         ];
     }
 }

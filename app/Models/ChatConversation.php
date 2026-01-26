@@ -14,6 +14,7 @@ class ChatConversation extends Model
     protected $fillable = [
         'user_id',
         'store_id',
+        'suggestion_id',
         'status',
     ];
 
@@ -25,6 +26,11 @@ class ChatConversation extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class);
+    }
+
+    public function suggestion(): BelongsTo
+    {
+        return $this->belongsTo(Suggestion::class);
     }
 
     public function messages(): HasMany

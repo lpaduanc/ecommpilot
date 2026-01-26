@@ -49,9 +49,12 @@ class SystemSetting extends Model
      */
     public static function set(string $key, mixed $value, array $attributes = []): self
     {
+        $isSensitive = $attributes['is_sensitive'] ?? false;
+        $preparedValue = self::prepareValue($value, $isSensitive);
+
         $setting = self::updateOrCreate(
             ['key' => $key],
-            array_merge($attributes, ['value' => self::prepareValue($value, $attributes['is_sensitive'] ?? false)])
+            array_merge($attributes, ['value' => $preparedValue])
         );
 
         // Clear cache

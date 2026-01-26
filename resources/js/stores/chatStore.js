@@ -174,6 +174,56 @@ export const useChatStore = defineStore('chat', () => {
         return sendMessage(initialMessage, context);
     }
 
+    /**
+     * Load existing conversation for a suggestion or start a new one.
+     * @param {Object} suggestion - The suggestion object from analysis
+     * @returns {Promise<Object>} - Result with success, hasHistory, and optional message
+     */
+    async function loadSuggestionConversation(suggestion) {
+        isLoading.value = true;
+        error.value = null;
+
+        try {
+            // Try to fetch existing conversation for this suggestion
+            const response = await api.get(`/chat/conversation/suggestion/${suggestion.id}`);
+
+            if (response.data.exists) {
+                // Load existing conversation
+                messages.value = response.data.messages || [];
+                conversationId.value = response.data.conversation_id;
+                return { success: true, hasHistory: true };
+            } else {
+                // No existing conversation - start a new one
+                resetLocalState();
+
+                // Build context object
+                const context = {
+                    type: 'suggestion',
+                    suggestion: {
+                        id: suggestion.id,
+                        title: suggestion.title,
+                        category: suggestion.category,
+                        description: suggestion.description,
+                        recommended_action: suggestion.recommended_action || suggestion.action_steps,
+                        expected_impact: suggestion.expected_impact || suggestion.priority,
+                        priority: suggestion.priority,
+                    }
+                };
+
+                // Send initial message to trigger AI response
+                const initialMessage = `Quero discutir esta sugestão: "${suggestion.title}"`;
+                const result = await sendMessage(initialMessage, context);
+
+                return { success: result.success, hasHistory: false, message: result.message };
+            }
+        } catch (err) {
+            error.value = err.response?.data?.message || 'Erro ao carregar conversa';
+            return { success: false, hasHistory: false, message: error.value };
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
     return {
         messages,
         isLoading,
@@ -190,6 +240,7 @@ export const useChatStore = defineStore('chat', () => {
         resetLocalState,
         resetAndClearBackend,
         startSuggestionDiscussion,
+        loadSuggestionConversation,
     };
 });
 

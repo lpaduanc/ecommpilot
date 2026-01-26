@@ -68,8 +68,8 @@ watch(() => props.initialContext, async (newContext) => {
     if (newContext && newContext.type === 'suggestion' && newContext.suggestion && !hasProcessedContext.value) {
         hasProcessedContext.value = true;
 
-        // Start suggestion discussion
-        await chatStore.startSuggestionDiscussion(newContext.suggestion);
+        // Load existing conversation or start new one
+        await chatStore.loadSuggestionConversation(newContext.suggestion);
         scrollToBottom();
     }
 }, { immediate: true });

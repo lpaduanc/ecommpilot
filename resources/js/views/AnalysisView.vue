@@ -38,7 +38,6 @@ const isStoreSyncing = computed(() => integrationStore.isActiveStoreSyncing);
 // Verifica acesso pelo plano
 const canAccessAnalysis = computed(() => authStore.canAccessAiAnalysis);
 
-const showCreditWarning = ref(false);
 const showRateLimitWarning = ref(false);
 const selectedSuggestion = ref(null);
 const showSuggestionDetail = ref(false);
@@ -70,7 +69,6 @@ const alerts = computed(() => analysisStore.alerts);
 const opportunities = computed(() => analysisStore.opportunities);
 const canRequestAnalysis = computed(() => analysisStore.canRequestAnalysis);
 const timeUntilNext = computed(() => analysisStore.timeUntilNextAnalysis);
-const credits = computed(() => analysisStore.credits);
 
 const pendingAnalysisElapsed = computed(() => {
     if (!pendingAnalysis.value?.created_at) return null;
@@ -105,7 +103,7 @@ const recentAnalyses = computed(() => {
         .slice(0, 3);
 });
 
-function handleRequestAnalysis() {
+async function handleRequestAnalysis() {
     if (isStoreSyncing.value) {
         notificationStore.warning('Aguarde a sincronização da loja ser concluída antes de solicitar uma nova análise.');
         return;
@@ -118,11 +116,6 @@ function handleRequestAnalysis() {
         showRateLimitWarning.value = true;
         return;
     }
-    showCreditWarning.value = true;
-}
-
-async function confirmAnalysis() {
-    showCreditWarning.value = false;
 
     const result = await analysisStore.requestNewAnalysis();
 
@@ -394,7 +387,7 @@ onUnmounted(() => {
                         {{ currentAnalysis.error_message }}
                     </p>
                     <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
-                        Seus créditos foram reembolsados automaticamente. Você pode tentar novamente.
+                        Você pode tentar novamente.
                     </p>
                     <BaseButton
                         v-if="authStore.hasPermission('analysis.request') && canRequestAnalysis"
@@ -431,13 +424,13 @@ onUnmounted(() => {
                     <div class="mt-3 bg-primary-100 dark:bg-primary-900/50 rounded-full h-2 overflow-hidden">
                         <div
                             class="h-full bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full transition-all duration-500"
-                            :style="{ width: `${pendingAnalysis.progress_percentage || 10}%` }"
+                            :style="{ width: `${pendingAnalysis.progress_percentage ?? 0}%` }"
                         ></div>
                     </div>
 
                     <div class="flex items-center justify-between mt-2 text-xs text-primary-500 dark:text-primary-400">
-                        <span>Estágio {{ pendingAnalysis.current_stage || 0 }} de {{ pendingAnalysis.total_stages || 9 }}</span>
-                        <span>{{ pendingAnalysis.progress_percentage || 0 }}% concluído</span>
+                        <span>Estágio {{ pendingAnalysis.current_stage ?? 0 }} de {{ pendingAnalysis.total_stages ?? 9 }}</span>
+                        <span>{{ pendingAnalysis.progress_percentage ?? 0 }}% concluído</span>
                     </div>
 
                     <p class="text-xs text-primary-400 dark:text-primary-500 mt-2">
@@ -464,7 +457,7 @@ onUnmounted(() => {
                         {{ pendingAnalysis.error_message || 'Ocorreu um erro ao processar sua análise. Por favor, tente novamente.' }}
                     </p>
                     <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
-                        Seus créditos foram reembolsados automaticamente. Você pode tentar novamente.
+                        Você pode tentar novamente.
                     </p>
                     <BaseButton
                         v-if="authStore.hasPermission('analysis.request')"
@@ -538,10 +531,6 @@ onUnmounted(() => {
                         <span class="flex items-center gap-1">
                             <ChartBarIcon class="w-3.5 h-3.5" />
                             {{ completedSuggestions }} implementadas
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <RocketLaunchIcon class="w-3.5 h-3.5" />
-                            {{ credits }} créditos
                         </span>
                     </div>
                 </div>
@@ -807,52 +796,6 @@ onUnmounted(() => {
             </div>
         </template>
 
-        <!-- Credit Warning Modal -->
-        <BaseModal
-            :show="showCreditWarning"
-            @close="showCreditWarning = false"
-        >
-            <div class="text-center py-4">
-                <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-400 to-accent-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-accent-500/30">
-                    <ExclamationTriangleIcon class="w-10 h-10 text-white" />
-                </div>
-                <h3 class="text-xl font-display font-bold text-gray-900 mb-2">Consumo de Créditos</h3>
-                <p class="text-gray-500 mb-6">
-                    Esta análise irá consumir recursos de IA.
-                </p>
-                <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 mb-6 space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400">Você possui:</span>
-                        <span class="font-bold text-lg text-gray-900 dark:text-gray-100">{{ credits }} créditos</span>
-                    </div>
-                    <div class="h-px bg-gray-200"></div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400">Custo desta análise:</span>
-                        <span class="font-bold text-lg text-primary-600">1 crédito</span>
-                    </div>
-                </div>
-                <p class="text-sm text-gray-400 mb-6">
-                    Ao esgotar seus créditos, será necessário adquirir mais para continuar utilizando as análises de IA.
-                </p>
-                <div class="flex gap-3">
-                    <button
-                        @click="showCreditWarning = false"
-                        class="flex-1 px-6 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        @click="confirmAnalysis"
-                        :disabled="isRequesting"
-                        class="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all disabled:opacity-50"
-                    >
-                        <span v-if="!isRequesting">Confirmar Análise</span>
-                        <LoadingSpinner v-else size="sm" class="mx-auto" />
-                    </button>
-                </div>
-            </div>
-        </BaseModal>
-
         <!-- Rate Limit Warning Modal -->
         <BaseModal
             :show="showRateLimitWarning"
@@ -890,7 +833,7 @@ onUnmounted(() => {
             :suggestion="selectedSuggestion"
             :shift-left="showChatPanel"
             mode="analysis"
-            @close="showSuggestionDetail = false"
+            @close="showSuggestionDetail = false; showChatPanel = false"
             @status-change="handleStatusChange"
             @accept="handleAcceptSuggestion"
             @reject="handleRejectSuggestion"

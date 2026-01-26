@@ -19,7 +19,6 @@ export interface User {
   role: UserRole;
   permissions: string[];
   active_store_id: number | null;
-  ai_credits: number;
   must_change_password?: boolean;
   email_verified_at?: string | null;
   created_at?: string;

@@ -22,7 +22,6 @@ interface User {
   role: 'admin' | 'client';
   permissions: string[];
   active_store_id: number | null;
-  ai_credits: number;
   must_change_password?: boolean;
 }
 

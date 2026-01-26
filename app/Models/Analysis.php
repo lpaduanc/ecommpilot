@@ -106,7 +106,12 @@ class Analysis extends Model
 
     public function markAsProcessing(): void
     {
-        $this->update(['status' => AnalysisStatus::Processing]);
+        $this->update([
+            'status' => AnalysisStatus::Processing,
+            'current_stage' => 0,
+            'total_stages' => 9,
+            'last_progress_at' => now(),
+        ]);
     }
 
     public function markAsCompleted(array $data): void

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
+use App\Models\Suggestion;
 use App\Services\ChatbotService;
 use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class ChatController extends Controller
         $user = $request->user();
 
         $conversation = ChatConversation::where('user_id', $user->id)
+            ->whereNull('suggestion_id')
             ->active()
             ->with(['messages' => function ($query) {
                 $query->orderBy('created_at', 'asc');
@@ -36,6 +38,46 @@ class ChatController extends Controller
         }
 
         return response()->json([
+            'conversation_id' => $conversation->id,
+            'messages' => $conversation->messages->map(fn ($msg) => [
+                'id' => $msg->id,
+                'role' => $msg->role,
+                'content' => $msg->content,
+                'created_at' => $msg->created_at->toISOString(),
+            ]),
+        ]);
+    }
+
+    public function getSuggestionConversation(Request $request, int $suggestionId): JsonResponse
+    {
+        $user = $request->user();
+
+        // Validar que a sugestão pertence ao usuário
+        $suggestion = Suggestion::with('analysis')->find($suggestionId);
+
+        if (! $suggestion || $suggestion->analysis->user_id !== $user->id) {
+            return response()->json([
+                'message' => 'Sugestão não encontrada.',
+            ], 404);
+        }
+
+        // Buscar conversa específica para esta sugestão
+        $conversation = ChatConversation::where('user_id', $user->id)
+            ->where('suggestion_id', $suggestionId)
+            ->with(['messages' => function ($query) {
+                $query->orderBy('created_at', 'asc');
+            }])
+            ->first();
+
+        if (! $conversation) {
+            return response()->json([
+                'exists' => false,
+                'messages' => [],
+            ]);
+        }
+
+        return response()->json([
+            'exists' => true,
             'conversation_id' => $conversation->id,
             'messages' => $conversation->messages->map(fn ($msg) => [
                 'id' => $msg->id,
@@ -90,15 +132,54 @@ class ChatController extends Controller
         // Get or create conversation (only if persisting)
         $conversation = null;
         if ($shouldPersist) {
-            $conversation = ChatConversation::firstOrCreate(
-                [
-                    'user_id' => $user->id,
-                    'status' => 'active',
-                ],
-                [
-                    'store_id' => $store?->id,
-                ]
-            );
+            // Determina o suggestion_id baseado no contexto
+            $suggestionId = null;
+            if ($isSuggestionContext && isset($context['suggestion']['id'])) {
+                $suggestionId = $context['suggestion']['id'];
+
+                // Validar que a sugestão pertence ao usuário
+                $suggestion = Suggestion::with('analysis')->find($suggestionId);
+                if (! $suggestion || $suggestion->analysis->user_id !== $user->id) {
+                    return response()->json([
+                        'message' => 'Sugestão não encontrada.',
+                    ], 404);
+                }
+            }
+
+            // Cria ou busca conversa com ou sem suggestion_id
+            $conversationWhere = [
+                'user_id' => $user->id,
+                'status' => 'active',
+            ];
+
+            // Adiciona suggestion_id ao where se for chat de sugestão
+            if ($suggestionId !== null) {
+                $conversationWhere['suggestion_id'] = $suggestionId;
+            } else {
+                // Para chat geral, garante que não há suggestion_id
+                $conversation = ChatConversation::where($conversationWhere)
+                    ->whereNull('suggestion_id')
+                    ->first();
+
+                if (! $conversation) {
+                    $conversation = ChatConversation::create([
+                        'user_id' => $user->id,
+                        'store_id' => $store?->id,
+                        'suggestion_id' => null,
+                        'status' => 'active',
+                    ]);
+                }
+            }
+
+            // Para chat de sugestão, usa firstOrCreate normalmente
+            if ($suggestionId !== null && ! $conversation) {
+                $conversation = ChatConversation::firstOrCreate(
+                    $conversationWhere + ['suggestion_id' => $suggestionId],
+                    [
+                        'store_id' => $store?->id,
+                    ]
+                );
+            }
         }
 
         // Save user message (only if persisting)

@@ -147,7 +147,7 @@ class ChatbotService
 
         INSTRUÇÃO ESPECIAL PARA PRIMEIRA RESPOSTA:
         Na sua PRIMEIRA resposta, você DEVE:
-        1. Começar com: "Oi, já entendi essa sugestão feita pela análise. Com o que você precisa de ajuda? Aqui estão algumas sugestões de como podemos trabalhar com essa sugestão:"
+        1. Começar com: "Oi, Ecommpilot assistente aqui. Já entendi essa sugestão feita pela análise. Com o que você precisa de ajuda? Aqui estão algumas idéias de como podemos trabalhar com essa sugestão:"
         2. Em seguida, listar EXATAMENTE 5 sugestões práticas e específicas de como o usuário pode trabalhar com essa sugestão
         3. As sugestões devem ser baseadas na categoria "{$categoryLabel}" e no contexto específico da sugestão
         4. Use formato de lista numerada (1. 2. 3. 4. 5.)

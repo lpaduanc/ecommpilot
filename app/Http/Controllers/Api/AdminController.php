@@ -22,7 +22,6 @@ class AdminController extends Controller
         $totalClients = User::where('role', UserRole::Client)->count();
         $activeClients = User::where('role', UserRole::Client)->where('is_active', true)->count();
         $totalStores = Store::count();
-        $totalCreditsUsed = User::where('role', UserRole::Client)->sum('ai_credits');
 
         // Calculate MRR (mock calculation - in real app, this would come from subscription data)
         $mrr = $activeClients * 99.90;
@@ -47,7 +46,6 @@ class AdminController extends Controller
             'active_clients' => $activeClients,
             'inactive_clients' => $totalClients - $activeClients,
             'total_stores' => $totalStores,
-            'total_credits_available' => $totalCreditsUsed,
             'mrr' => $mrr,
             'clients_revenue' => $monthlyRevenue,
             'new_clients_this_month' => $newClientsThisMonth,
@@ -75,13 +73,6 @@ class AdminController extends Controller
             $query->where('is_active', $request->input('status') === 'active');
         }
 
-        // Filter by credits
-        if ($request->input('credits_filter') === 'low') {
-            $query->where('ai_credits', '<', 10);
-        } elseif ($request->input('credits_filter') === 'zero') {
-            $query->where('ai_credits', 0);
-        }
-
         // Filter by date range
         if ($request->input('date_from')) {
             $query->whereDate('created_at', '>=', $request->input('date_from'));
@@ -106,7 +97,6 @@ class AdminController extends Controller
                 'email' => $client->email,
                 'phone' => $client->phone,
                 'is_active' => $client->is_active,
-                'ai_credits' => $client->ai_credits,
                 'stores_count' => $client->stores->count(),
                 'stores' => $client->stores->map(fn ($s) => [
                     'id' => $s->id,
@@ -164,7 +154,6 @@ class AdminController extends Controller
             'email' => $client->email,
             'phone' => $client->phone,
             'is_active' => $client->is_active,
-            'ai_credits' => $client->ai_credits,
             'permissions' => $client->permissions->pluck('name'),
             'email_verified_at' => $client->email_verified_at?->toISOString(),
             'last_login_at' => $client->last_login_at?->toISOString(),
@@ -235,7 +224,6 @@ class AdminController extends Controller
             'email' => ['required', 'email', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:20'],
             'password' => ['required', 'string', 'min:8'],
-            'ai_credits' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['boolean'],
         ], [
             'name.required' => 'O nome é obrigatório.',
@@ -252,7 +240,6 @@ class AdminController extends Controller
             'phone' => $validated['phone'] ?? null,
             'password' => Hash::make($validated['password']),
             'role' => UserRole::Client,
-            'ai_credits' => $validated['ai_credits'] ?? 10,
             'is_active' => $validated['is_active'] ?? true,
             'email_verified_at' => now(),
         ]);
@@ -335,53 +322,6 @@ class AdminController extends Controller
         ]);
     }
 
-    public function addCredits(Request $request, int $id): JsonResponse
-    {
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
-
-        $validated = $request->validate([
-            'amount' => ['required', 'integer', 'min:1', 'max:10000'],
-            'reason' => ['nullable', 'string', 'max:255'],
-        ], [
-            'amount.required' => 'A quantidade é obrigatória.',
-            'amount.min' => 'A quantidade deve ser pelo menos 1.',
-        ]);
-
-        $client->addCredits($validated['amount']);
-
-        ActivityLog::log('admin.credits_added', $client, request()->user(), [
-            'amount' => $validated['amount'],
-            'reason' => $validated['reason'] ?? null,
-        ]);
-
-        return response()->json([
-            'message' => 'Créditos adicionados com sucesso.',
-            'ai_credits' => $client->ai_credits,
-        ]);
-    }
-
-    public function removeCredits(Request $request, int $id): JsonResponse
-    {
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
-
-        $validated = $request->validate([
-            'amount' => ['required', 'integer', 'min:1'],
-            'reason' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $amountToRemove = min($validated['amount'], $client->ai_credits);
-        $client->decrement('ai_credits', $amountToRemove);
-
-        ActivityLog::log('admin.credits_removed', $client, request()->user(), [
-            'amount' => $amountToRemove,
-            'reason' => $validated['reason'] ?? null,
-        ]);
-
-        return response()->json([
-            'message' => 'Créditos removidos com sucesso.',
-            'ai_credits' => $client->ai_credits,
-        ]);
-    }
 
     public function resetPassword(Request $request, int $id): JsonResponse
     {

@@ -176,6 +176,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::prefix('chat')->middleware('can:chat.use')->group(function () {
         Route::get('conversation', [ChatController::class, 'conversation']);
+        Route::get('conversation/suggestion/{suggestionId}', [ChatController::class, 'getSuggestionConversation']);
         // Rate limit: 20 mensagens por minuto por usuário
         Route::post('message', [ChatController::class, 'sendMessage'])->middleware('throttle:20,1');
         Route::delete('conversation', [ChatController::class, 'clearConversation']);
@@ -222,8 +223,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('clients/{id}', [AdminController::class, 'updateClient']);
         Route::delete('clients/{id}', [AdminController::class, 'deleteClient']);
         Route::post('clients/{id}/toggle-status', [AdminController::class, 'toggleClientStatus']);
-        Route::post('clients/{id}/add-credits', [AdminController::class, 'addCredits']);
-        Route::post('clients/{id}/remove-credits', [AdminController::class, 'removeCredits']);
         Route::post('clients/{id}/reset-password', [AdminController::class, 'resetPassword']);
         Route::post('clients/{id}/impersonate', [AdminController::class, 'impersonate']);
 

@@ -30,12 +30,8 @@ onUnmounted(() => {
         <Transition name="slide-panel">
             <div
                 v-if="show"
-                class="fixed inset-y-0 right-0 z-[60] flex items-center justify-end"
-                style="width: 50vw;"
+                class="fixed top-0 right-0 bottom-0 w-full lg:w-1/2 z-[60] pointer-events-auto"
             >
-                <!-- Panel Background with Shadow -->
-                <div class="absolute inset-0 bg-gradient-to-l from-gray-900/40 to-transparent pointer-events-none"></div>
-
                 <!-- Chat Panel -->
                 <div class="relative h-full w-full bg-white dark:bg-gray-800 shadow-2xl flex flex-col border-l border-gray-200 dark:border-gray-700">
                     <!-- Header -->
@@ -59,9 +55,11 @@ onUnmounted(() => {
                         </button>
                     </div>
 
-                    <!-- Chat Container (without suggestions) -->
-                    <div class="flex-1 overflow-hidden">
-                        <ChatContainer :initial-context="initialContext" :show-quick-suggestions="false" />
+                    <!-- Chat Container with same layout as ChatView -->
+                    <div class="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950">
+                        <div class="w-full h-full">
+                            <ChatContainer :initial-context="initialContext" :show-quick-suggestions="false" />
+                        </div>
                     </div>
                 </div>
             </div>

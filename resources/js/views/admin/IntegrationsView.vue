@@ -67,7 +67,8 @@ async function loadSettings() {
         const data = response.data.data;
 
         formData.enabled = data.enabled;
-        formData.serpapi_key = ''; // Don't show masked key in input
+        // Populate input with masked value from API
+        formData.serpapi_key = data.serpapi_key || '';
         formData.serpapi_key_configured = data.serpapi_key_configured;
         formData.trends.enabled = data.trends.enabled;
         formData.market.enabled = data.market.enabled;
@@ -77,9 +78,11 @@ async function loadSettings() {
 
         // Decodo settings
         formData.decodo.enabled = data.decodo?.enabled ?? false;
-        formData.decodo.username = ''; // Don't show masked username in input
+        // Populate input with masked value from API
+        formData.decodo.username = data.decodo?.username || '';
         formData.decodo.username_configured = data.decodo?.username_configured ?? false;
-        formData.decodo.password = ''; // Don't show password in input
+        // Show placeholder characters when password is configured
+        formData.decodo.password = data.decodo?.password_configured ? '••••••••' : '';
         formData.decodo.password_configured = data.decodo?.password_configured ?? false;
         formData.decodo.headless = data.decodo?.headless ?? 'html';
         formData.decodo.js_rendering = data.decodo?.js_rendering ?? false;
@@ -258,13 +261,18 @@ onMounted(() => {
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 SerpAPI Key
+                                <span v-if="formData.serpapi_key_configured" class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                                    <CheckCircleIcon class="h-3.5 w-3.5" />
+                                    Configurada
+                                </span>
                             </label>
                             <div class="flex items-center gap-3">
                                 <div class="relative flex-1">
                                     <input
                                         :type="showApiKey ? 'text' : 'password'"
                                         v-model="formData.serpapi_key"
-                                        :placeholder="formData.serpapi_key_configured ? '••••••••••••••••' : 'Cole sua chave da API aqui'"
+                                        placeholder="Cole sua chave da API aqui"
+                                        autocomplete="new-password"
                                         class="w-full px-4 py-2.5 pr-10 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20 text-sm"
                                     />
                                     <button
@@ -278,7 +286,7 @@ onMounted(() => {
                                 </div>
                                 <BaseButton
                                     @click="testConnection"
-                                    :disabled="isTesting"
+                                    :disabled="isTesting || (!formData.serpapi_key && !formData.serpapi_key_configured)"
                                     variant="secondary"
                                     size="sm"
                                 >
@@ -286,12 +294,8 @@ onMounted(() => {
                                     <span v-else>Testar</span>
                                 </BaseButton>
                             </div>
-                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                                <span>Obtenha sua chave em <a href="https://serpapi.com" target="_blank" class="text-primary-600 hover:underline">serpapi.com</a></span>
-                                <span v-if="formData.serpapi_key_configured" class="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
-                                    <CheckCircleIcon class="h-4 w-4" />
-                                    Configurada
-                                </span>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Obtenha sua chave em <a href="https://serpapi.com" target="_blank" class="text-primary-600 dark:text-primary-400 hover:underline">serpapi.com</a>
                             </p>
                         </div>
                     </div>
@@ -453,31 +457,37 @@ onMounted(() => {
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Username
+                                    <span v-if="formData.decodo.username_configured" class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                                        <CheckCircleIcon class="h-3.5 w-3.5" />
+                                        Configurado
+                                    </span>
                                 </label>
                                 <div class="relative">
                                     <input
                                         type="text"
                                         v-model="formData.decodo.username"
-                                        :placeholder="formData.decodo.username_configured ? '••••••••' : 'Seu usuário Decodo'"
+                                        placeholder="Seu usuário Decodo"
+                                        autocomplete="off"
                                         class="w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20 text-sm"
                                     />
                                 </div>
-                                <p v-if="formData.decodo.username_configured" class="mt-1.5 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                                    <CheckCircleIcon class="h-3.5 w-3.5" />
-                                    Configurado
-                                </p>
                             </div>
 
                             <!-- Password -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Password
+                                    <span v-if="formData.decodo.password_configured" class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                                        <CheckCircleIcon class="h-3.5 w-3.5" />
+                                        Configurado
+                                    </span>
                                 </label>
                                 <div class="relative">
                                     <input
                                         :type="showDecodoPassword ? 'text' : 'password'"
                                         v-model="formData.decodo.password"
-                                        :placeholder="formData.decodo.password_configured ? '••••••••' : 'Sua senha Decodo'"
+                                        placeholder="Sua senha Decodo"
+                                        autocomplete="new-password"
                                         class="w-full px-4 py-2.5 pr-10 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20 text-sm"
                                     />
                                     <button
@@ -489,10 +499,6 @@ onMounted(() => {
                                         <EyeSlashIcon v-else class="h-5 w-5" />
                                     </button>
                                 </div>
-                                <p v-if="formData.decodo.password_configured" class="mt-1.5 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                                    <CheckCircleIcon class="h-3.5 w-3.5" />
-                                    Configurado
-                                </p>
                             </div>
                         </div>
 

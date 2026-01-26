@@ -26,7 +26,6 @@ class AnalysisResource extends JsonResource
             'opportunities' => $this->opportunities ?? [],
             'period_start' => $this->period_start?->format('Y-m-d'),
             'period_end' => $this->period_end?->format('Y-m-d'),
-            'credits_used' => $this->credits_used,
             'completed_at' => $this->completed_at?->toISOString(),
             'created_at' => $this->created_at->toISOString(),
             'email_sent_at' => $this->email_sent_at?->toISOString(),

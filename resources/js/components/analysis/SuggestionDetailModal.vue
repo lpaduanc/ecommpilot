@@ -23,7 +23,7 @@ const props = defineProps({
     show: { type: Boolean, default: false },
     suggestion: { type: Object, default: null },
     mode: { type: String, default: 'analysis' }, // 'analysis' or 'tracking'
-    shiftLeft: { type: Boolean, default: false }, // Shift modal to left when chat panel is open
+    shiftLeft: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change', 'accept', 'reject']);
@@ -190,18 +190,18 @@ function handleReject() {
         <Transition name="modal">
             <div
                 v-if="show && suggestion"
-                class="fixed inset-0 z-50 flex items-center p-4 transition-all duration-300 justify-center"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300"
                 :style="shiftLeft ? 'width: 50vw;' : ''"
             >
                 <!-- Backdrop -->
                 <div
-                    class="absolute bg-gray-900/60 backdrop-blur-sm transition-all duration-300"
-                    :class="shiftLeft ? 'inset-y-0 left-0' : 'inset-0'"
+                    class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-all duration-300"
                     :style="shiftLeft ? 'width: 50vw;' : ''"
+                    @click="emit('close')"
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl" :class="shiftLeft ? 'max-w-lg' : ''">
+                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl z-10">
                     <!-- Header with Gradient based on Priority -->
                     <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="priority.color">
                         <!-- Background Pattern -->

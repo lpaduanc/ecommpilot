@@ -19,8 +19,6 @@ const statCards = [
     { key: 'active_clients', label: 'Clientes Ativos', icon: UsersIcon, color: 'success' },
     { key: 'new_this_month', label: 'Novos Este Mês', icon: ChartBarIcon, color: 'accent' },
     { key: 'total_revenue', label: 'Receita Total', icon: CreditCardIcon, color: 'success', isCurrency: true },
-    { key: 'ai_credits_used', label: 'Créditos IA Usados', icon: SparklesIcon, color: 'secondary' },
-    { key: 'ai_credits_available', label: 'Créditos IA Disponíveis', icon: SparklesIcon, color: 'primary' },
 ];
 
 async function fetchStats() {
@@ -35,8 +33,6 @@ async function fetchStats() {
             active_clients: 142,
             new_this_month: 23,
             total_revenue: 45890.50,
-            ai_credits_used: 1250,
-            ai_credits_available: 8750,
         };
     } finally {
         isLoading.value = false;

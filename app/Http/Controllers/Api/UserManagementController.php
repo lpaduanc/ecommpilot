@@ -95,7 +95,6 @@ class UserManagementController extends Controller
                 'is_active' => true,
                 'parent_user_id' => $parentUser->id,
                 'active_store_id' => $parentUser->active_store_id,
-                'ai_credits' => 0,
             ]);
 
             // Assign permissions

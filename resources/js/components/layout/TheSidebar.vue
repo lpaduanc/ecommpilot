@@ -85,8 +85,8 @@ const menuItems = computed(() => [
         locked: !authStore.canAccessCustomDashboards,
     },
     {
-        name: 'Acompanhamento de Sugestões',
-        label: 'Acompanhamento',
+        name: 'Sugestões',
+        label: 'Sugestões',
         icon: ClipboardDocumentListIcon,
         route: 'suggestions',
         permission: 'analysis.view',

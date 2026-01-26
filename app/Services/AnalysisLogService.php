@@ -80,6 +80,19 @@ class AnalysisLogService
                 'ai_provider' => $provider,
                 'token_usage' => $tokenUsage,
             ]);
+
+            // Update analysis current_stage to reflect progress
+            $analysis->update([
+                'current_stage' => $stage,
+                'total_stages' => 9, // Total stages in pipeline
+                'last_progress_at' => now(),
+            ]);
+
+            Log::info('Stage progress updated', [
+                'analysis_id' => $analysis->id,
+                'stage' => $stage,
+                'total_stages' => 9,
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to complete stage log', [
                 'analysis_id' => $analysis->id,
