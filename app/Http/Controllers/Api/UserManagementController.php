@@ -129,22 +129,36 @@ class UserManagementController extends Controller
 
     /**
      * Display the specified resource.
+     * SECURITY FIX: Separates admin and client logic to prevent IDOR.
      */
     public function show(Request $request, int $id): JsonResponse
     {
         $parentUser = $request->user();
 
-        $user = User::where(function ($q) use ($parentUser) {
-            $q->where('parent_user_id', $parentUser->id)
-                ->orWhere('id', $parentUser->id);
-        })
+        // Admin pode ver qualquer usuário
+        if ($parentUser->role === UserRole::Admin) {
+            $user = User::with('permissions')->find($id);
+
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Usuário não encontrado.',
+                ], 404);
+            }
+
+            return response()->json([
+                'user' => new UserManagementResource($user),
+            ]);
+        }
+
+        // Cliente só pode ver sub-usuários criados por ele (não outros clientes)
+        $user = User::where('parent_user_id', $parentUser->id)
             ->where('id', $id)
             ->with('permissions')
             ->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json([
-                'message' => 'Usuário não encontrado.',
+                'message' => 'Usuário não encontrado ou você não tem permissão para visualizá-lo.',
             ], 404);
         }
 

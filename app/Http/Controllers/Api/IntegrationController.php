@@ -152,12 +152,14 @@ class IntegrationController extends Controller
         }
 
         try {
-            // Log request data for debugging (not secrets)
-            Log::info('Attempting Nuvemshop token exchange', [
-                'client_id_set' => ! empty($clientId),
-                'client_secret_set' => ! empty($clientSecret),
-                'code_length' => strlen($code),
-            ]);
+            // Log request data for debugging (not secrets) - ONLY in local/dev
+            if (app()->isLocal() || app()->environment('development', 'testing')) {
+                Log::info('Attempting Nuvemshop token exchange', [
+                    'client_id_set' => ! empty($clientId),
+                    'client_secret_set' => ! empty($clientSecret),
+                    'code_length' => strlen($code),
+                ]);
+            }
 
             // Exchange code for access token
             // Nuvemshop API expects form-urlencoded data, not JSON
@@ -193,12 +195,14 @@ class IntegrationController extends Controller
 
             $data = $response->json();
 
-            // Log response for debugging
-            Log::info('Nuvemshop token response', [
-                'status' => $response->status(),
-                'has_access_token' => isset($data['access_token']),
-                'keys' => array_keys($data ?? []),
-            ]);
+            // Log response for debugging - ONLY in local/dev
+            if (app()->isLocal() || app()->environment('development', 'testing')) {
+                Log::info('Nuvemshop token response', [
+                    'status' => $response->status(),
+                    'has_access_token' => isset($data['access_token']),
+                    'keys' => array_keys($data ?? []),
+                ]);
+            }
 
             // Validate that we received the expected access_token
             if (! isset($data['access_token'])) {
@@ -266,6 +270,23 @@ class IntegrationController extends Controller
             $existingStore = Store::where('platform', Platform::Nuvemshop)
                 ->where('external_store_id', (string) ($data['user_id'] ?? ''))
                 ->first();
+
+            // SECURITY: Prevent store takeover - verify existing store belongs to current user
+            if ($existingStore && $existingStore->user_id !== $user->id) {
+                Log::warning('Store takeover attempt blocked', [
+                    'attacker_user_id' => $user->id,
+                    'attacker_email' => $user->email,
+                    'original_owner_id' => $existingStore->user_id,
+                    'external_store_id' => $data['user_id'] ?? '',
+                    'store_name' => $existingStore->name,
+                    'ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Esta loja já está vinculada a outra conta.',
+                ], 403);
+            }
 
             // Skip plan limits in local/dev environment
             $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');

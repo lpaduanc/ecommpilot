@@ -90,12 +90,7 @@ class NuvemshopService
 
     public function getAuthorizationUrl(int $userId, ?string $storeUrl = null): string
     {
-        // Encode userId and storeUrl in state parameter
-        $stateData = [
-            'user_id' => $userId,
-            'store_url' => $storeUrl,
-        ];
-        $state = base64_encode(json_encode($stateData));
+        $state = $this->encodeState($userId, $storeUrl);
 
         $params = http_build_query([
             'response_type' => 'code',
@@ -117,16 +112,74 @@ class NuvemshopService
     }
 
     /**
-     * Decode state parameter from OAuth callback.
+     * Encode state parameter with HMAC signature for OAuth security.
+     * Prevents CSRF attacks by signing state data with app key.
      */
-    public function decodeState(string $state): array
+    public function encodeState(int $userId, ?string $storeUrl): string
     {
-        $decoded = json_decode(base64_decode($state), true);
-
-        return [
-            'user_id' => $decoded['user_id'] ?? null,
-            'store_url' => $decoded['store_url'] ?? null,
+        $stateData = [
+            'user_id' => $userId,
+            'store_url' => $storeUrl,
+            'nonce' => bin2hex(random_bytes(16)),
+            'expires_at' => now()->addMinutes(10)->timestamp,
         ];
+        $payload = json_encode($stateData);
+        $signature = hash_hmac('sha256', $payload, config('app.key'));
+        return base64_encode($payload . '|' . $signature);
+    }
+
+    /**
+     * Decode state parameter from OAuth callback and validate HMAC signature.
+     * Returns null if signature is invalid or state has expired.
+     */
+    public function decodeState(string $state): ?array
+    {
+        try {
+            $decoded = base64_decode($state);
+            if (strpos($decoded, '|') === false) {
+                // Fallback para state antigo (sem assinatura) - rejeitar em produção
+                if (app()->isProduction()) {
+                    Log::warning('OAuth state without signature rejected in production');
+                    return null;
+                }
+                // Em dev/local, aceita formato antigo para compatibilidade
+                Log::warning('OAuth state without signature accepted in non-production environment');
+                $legacyData = json_decode($decoded, true);
+                return [
+                    'user_id' => $legacyData['user_id'] ?? null,
+                    'store_url' => $legacyData['store_url'] ?? null,
+                ];
+            }
+
+            [$payload, $signature] = explode('|', $decoded, 2);
+            $expectedSignature = hash_hmac('sha256', $payload, config('app.key'));
+
+            if (!hash_equals($expectedSignature, $signature)) {
+                Log::warning('OAuth state signature mismatch', [
+                    'ip' => request()->ip(),
+                ]);
+                return null;
+            }
+
+            $data = json_decode($payload, true);
+
+            // Verificar expiração
+            if (isset($data['expires_at']) && $data['expires_at'] < now()->timestamp) {
+                Log::warning('OAuth state expired', [
+                    'expired_at' => $data['expires_at'],
+                    'current_time' => now()->timestamp,
+                ]);
+                return null;
+            }
+
+            return [
+                'user_id' => $data['user_id'] ?? null,
+                'store_url' => $data['store_url'] ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to decode OAuth state', ['error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     public function handleCallback(string $code, int $userId, ?string $storeUrl = null): Store

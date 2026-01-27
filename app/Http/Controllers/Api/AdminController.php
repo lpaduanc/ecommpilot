@@ -348,17 +348,45 @@ class AdminController extends Controller
 
     public function impersonate(int $id): JsonResponse
     {
+        $admin = request()->user();
         $client = User::where('role', UserRole::Client)->findOrFail($id);
 
-        // Create a temporary token for the client
-        $token = $client->createToken('impersonation-token', ['*'], now()->addHour())->plainTextToken;
+        // SECURITY: Limit impersonation token to read-only operations
+        // Prevents admin from performing destructive actions as the client
+        $impersonationScopes = [
+            'view:dashboard',
+            'view:products',
+            'view:orders',
+            'view:customers',
+            'view:analysis',
+            'view:suggestions',
+            'use:chat',
+        ];
 
-        ActivityLog::log('admin.impersonated', $client);
+        // Create a temporary token for the client (1 hour expiration for security)
+        $token = $client->createToken(
+            'impersonation-token',
+            $impersonationScopes,
+            now()->addHour()
+        )->plainTextToken;
+
+        // Log with admin details for audit trail
+        ActivityLog::create([
+            'action' => 'admin.impersonated',
+            'description' => "Admin {$admin->email} (ID: {$admin->id}) impersonated client {$client->email} (ID: {$client->id})",
+            'user_id' => $admin->id,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'related_id' => $client->id,
+            'related_type' => User::class,
+        ]);
 
         return response()->json([
             'message' => 'Sessão de impersonação iniciada.',
             'token' => $token,
             'user' => $client,
+            'scopes' => $impersonationScopes,
+            'expires_at' => now()->addHour()->toISOString(),
         ]);
     }
 
