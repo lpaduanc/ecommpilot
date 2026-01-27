@@ -89,23 +89,19 @@ class NotificationController extends Controller
     /**
      * Marcar uma notificação como lida
      */
-    public function markAsRead(Request $request, string $id): JsonResponse
+    public function markAsRead(Request $request, Notification $notification): JsonResponse
     {
         $user = $request->user();
 
-        $notification = Notification::query()
-            ->forUser($user->id)
-            ->where('id', $id)
-            ->first();
-
-        if (! $notification) {
+        // Verify notification belongs to user
+        if ($notification->user_id !== $user->id) {
             return response()->json(['message' => 'Notificação não encontrada.'], 404);
         }
 
         $notification->markAsRead();
 
         Log::info('Notificação marcada como lida', [
-            'notification_id' => $id,
+            'notification_id' => $notification->id,
             'user_id' => $user->id,
         ]);
 
@@ -141,23 +137,19 @@ class NotificationController extends Controller
     /**
      * Deletar uma notificação
      */
-    public function destroy(Request $request, string $id): JsonResponse
+    public function destroy(Request $request, Notification $notification): JsonResponse
     {
         $user = $request->user();
 
-        $notification = Notification::query()
-            ->forUser($user->id)
-            ->where('id', $id)
-            ->first();
-
-        if (! $notification) {
+        // Verify notification belongs to user
+        if ($notification->user_id !== $user->id) {
             return response()->json(['message' => 'Notificação não encontrada.'], 404);
         }
 
         $notification->delete();
 
         Log::info('Notificação deletada', [
-            'notification_id' => $id,
+            'notification_id' => $notification->id,
             'user_id' => $user->id,
         ]);
 

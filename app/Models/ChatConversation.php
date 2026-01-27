@@ -11,7 +11,31 @@ class ChatConversation extends Model
 {
     use HasFactory;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'uuid' => 'string',
+        ];
+    }
+
     protected $fillable = [
+        'uuid',
         'user_id',
         'store_id',
         'suggestion_id',

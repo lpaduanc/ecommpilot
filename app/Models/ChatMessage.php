@@ -10,7 +10,24 @@ class ChatMessage extends Model
 {
     use HasFactory;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected $fillable = [
+        'uuid',
         'conversation_id',
         'role',
         'content',
@@ -20,6 +37,7 @@ class ChatMessage extends Model
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'context' => 'array',
         ];
     }

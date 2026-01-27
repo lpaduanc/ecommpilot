@@ -8,6 +8,7 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserManagementResource;
 use App\Models\User;
+use App\Traits\SafeILikeSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ use Spatie\Permission\Models\Permission;
 
 class UserManagementController extends Controller
 {
+    use SafeILikeSearch;
     /**
      * Display a listing of the resource.
      */
@@ -31,9 +33,12 @@ class UserManagementController extends Controller
 
         // Search functionality
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->whereRaw('name ILIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('email ILIKE ?', ["%{$search}%"]);
+            $sanitized = $this->sanitizeILikeInput($search);
+            $pattern = '%'.$sanitized.'%';
+
+            $query->where(function ($q) use ($pattern) {
+                $q->where('name', 'ILIKE', $pattern)
+                    ->orWhere('email', 'ILIKE', $pattern);
             });
         }
 
@@ -131,19 +136,13 @@ class UserManagementController extends Controller
      * Display the specified resource.
      * SECURITY FIX: Separates admin and client logic to prevent IDOR.
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, User $user): JsonResponse
     {
         $parentUser = $request->user();
 
         // Admin pode ver qualquer usuário
         if ($parentUser->role === UserRole::Admin) {
-            $user = User::with('permissions')->find($id);
-
-            if (!$user) {
-                return response()->json([
-                    'message' => 'Usuário não encontrado.',
-                ], 404);
-            }
+            $user->load('permissions');
 
             return response()->json([
                 'user' => new UserManagementResource($user),
@@ -151,16 +150,13 @@ class UserManagementController extends Controller
         }
 
         // Cliente só pode ver sub-usuários criados por ele (não outros clientes)
-        $user = User::where('parent_user_id', $parentUser->id)
-            ->where('id', $id)
-            ->with('permissions')
-            ->first();
-
-        if (!$user) {
+        if ($user->parent_user_id !== $parentUser->id) {
             return response()->json([
                 'message' => 'Usuário não encontrado ou você não tem permissão para visualizá-lo.',
             ], 404);
         }
+
+        $user->load('permissions');
 
         return response()->json([
             'user' => new UserManagementResource($user),
@@ -170,18 +166,12 @@ class UserManagementController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateUserRequest $request, int $id): JsonResponse
+    public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
         $parentUser = $request->user();
 
-        $user = User::where(function ($q) use ($parentUser) {
-            $q->where('parent_user_id', $parentUser->id)
-                ->orWhere('id', $parentUser->id);
-        })
-            ->where('id', $id)
-            ->first();
-
-        if (! $user) {
+        // Verify ownership
+        if ($user->parent_user_id !== $parentUser->id && $user->id !== $parentUser->id) {
             return response()->json([
                 'message' => 'Usuário não encontrado.',
             ], 404);
@@ -232,15 +222,12 @@ class UserManagementController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, User $user): JsonResponse
     {
         $parentUser = $request->user();
 
-        $user = User::where('parent_user_id', $parentUser->id)
-            ->where('id', $id)
-            ->first();
-
-        if (! $user) {
+        // Verify ownership
+        if ($user->parent_user_id !== $parentUser->id) {
             return response()->json([
                 'message' => 'Usuário não encontrado.',
             ], 404);

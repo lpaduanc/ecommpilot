@@ -5,6 +5,7 @@ import { useSystemNotificationStore } from '../../stores/systemNotificationStore
 import NotificationItem from './NotificationItem.vue';
 import LoadingSpinner from '../common/LoadingSpinner.vue';
 import { BellSlashIcon } from '@heroicons/vue/24/outline';
+import { logger } from '@/utils/logger';
 
 const router = useRouter();
 const notificationStore = useSystemNotificationStore();
@@ -19,7 +20,7 @@ async function handleMarkAsRead(notificationId) {
     try {
         await notificationStore.markAsRead(notificationId);
     } catch (error) {
-        console.error('Erro ao marcar notificação como lida:', error);
+        logger.error('Erro ao marcar notificação como lida:', error);
     }
 }
 
@@ -27,7 +28,7 @@ async function handleMarkAllAsRead() {
     try {
         await notificationStore.markAllAsRead();
     } catch (error) {
-        console.error('Erro ao marcar todas como lidas:', error);
+        logger.error('Erro ao marcar todas como lidas:', error);
     }
 }
 

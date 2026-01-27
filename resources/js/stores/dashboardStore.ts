@@ -13,6 +13,7 @@ import api, { createCancelableRequest } from '../services/api';
 import { handleApiCall, type Result } from '../utils/apiHelpers';
 import { dedupeRequest, buildCacheKey, clearRequestCache } from '../utils/requestCache';
 import { useNotificationStore } from './notificationStore';
+import { logger } from '../utils/logger';
 
 /**
  * Types for dashboard data
@@ -36,7 +37,7 @@ interface ChartDataPoint {
 }
 
 interface TopProduct {
-  id: number;
+  id: string;  // UUID
   name: string;
   sales: number;
   revenue: number;
@@ -54,7 +55,7 @@ interface PaymentMethodData {
 }
 
 interface LowStockProduct {
-  id: number;
+  id: string;  // UUID
   name: string;
   sku: string;
   stock_quantity: number;
@@ -168,7 +169,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } catch (err) {
       // Only log if not cancelled
       if (!api.isCancel?.(err)) {
-        console.error('Error fetching revenue chart:', err);
+        logger.error('Error fetching revenue chart:', err);
         revenueChart.value = [];
       }
     } finally {

@@ -8,7 +8,7 @@
  * Product image interface
  */
 export interface ProductImage {
-  id?: number;
+  id?: string;  // UUID
   url: string;
   alt?: string;
   position?: number;
@@ -18,7 +18,7 @@ export interface ProductImage {
  * Product variant interface
  */
 export interface ProductVariant {
-  id?: number;
+  id?: string;  // UUID
   sku: string;
   price: number;
   compare_at_price?: number | null;
@@ -31,8 +31,8 @@ export interface ProductVariant {
  * Synced Product interface
  */
 export interface SyncedProduct {
-  id: number;
-  store_id: number;
+  id: string;  // UUID
+  store_id: string;  // UUID
   product_id: string;
   name: string;
   description?: string | null;
@@ -67,7 +67,7 @@ export interface ProductFilter {
  * Low stock product interface
  */
 export interface LowStockProduct {
-  id: number;
+  id: string;  // UUID
   name: string;
   sku: string | null;
   stock_quantity: number;

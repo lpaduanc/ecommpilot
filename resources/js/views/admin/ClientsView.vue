@@ -233,8 +233,8 @@ async function fetchPermissions() {
     try {
         const response = await api.get('/admin/clients/permissions');
         availablePermissions.value = response.data.permissions;
-    } catch (error) {
-        console.error('Erro ao buscar permissões:', error);
+    } catch {
+        // Silently fail - permissions will remain empty
     }
 }
 

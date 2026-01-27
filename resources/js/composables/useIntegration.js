@@ -4,6 +4,7 @@ import { useIntegrationStore } from '../stores/integrationStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { logger } from '../utils/logger';
 
 /**
  * Composable for managing integrations and OAuth flows
@@ -132,7 +133,7 @@ export function useIntegration(options = {}) {
                 await dashboardStore.fetchAllData();
             }
         } catch (error) {
-            console.error('Error updating application state:', error);
+            logger.error('Error updating application state:', error);
             // Don't show error to user as the connection was successful
         }
     }

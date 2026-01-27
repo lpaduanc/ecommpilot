@@ -339,7 +339,7 @@ class OrderController extends Controller
         }, 200, $headers);
     }
 
-    public function show(Request $request, $id): JsonResponse
+    public function show(Request $request, SyncedOrder $order): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -348,11 +348,8 @@ class OrderController extends Controller
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
-        $order = SyncedOrder::where('store_id', $store->id)
-            ->where('id', $id)
-            ->first();
-
-        if (! $order) {
+        // Verify order belongs to active store
+        if ($order->store_id !== $store->id) {
             return response()->json(['message' => 'Pedido não encontrado.'], 404);
         }
 

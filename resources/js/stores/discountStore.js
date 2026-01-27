@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import api from '../services/api';
+import { logger } from '../utils/logger';
 
 export const useDiscountStore = defineStore('discount', {
     state: () => ({
@@ -118,7 +119,7 @@ export const useDiscountStore = defineStore('discount', {
                 // Update filter options
                 this.filters = response.data.filters;
             } catch (error) {
-                console.error('Error fetching discount data:', error);
+                logger.error('Error fetching discount data:', error);
                 this.error = 'Erro ao carregar dados de descontos';
                 this.coupons = [];
                 this.stats = null;
@@ -144,7 +145,7 @@ export const useDiscountStore = defineStore('discount', {
                 });
                 this.stats = response.data;
             } catch (error) {
-                console.error('Error fetching discount stats:', error);
+                logger.error('Error fetching discount stats:', error);
             } finally {
                 this.isLoadingStats = false;
             }
@@ -180,7 +181,7 @@ export const useDiscountStore = defineStore('discount', {
                 this.pageTotals = response.data.totals || null;
                 this.hasOrderData = response.data.has_order_data || false;
             } catch (error) {
-                console.error('Error fetching coupons:', error);
+                logger.error('Error fetching coupons:', error);
                 this.error = 'Erro ao carregar cupons de desconto';
                 this.coupons = [];
             } finally {

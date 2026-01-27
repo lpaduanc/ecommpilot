@@ -13,6 +13,7 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResp
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import { retryRequest } from '../utils/retryRequest';
+import { logger } from '../utils/logger';
 
 /**
  * Interface for retry configuration on axios requests
@@ -74,7 +75,7 @@ api.interceptors.request.use(
         try {
           await axios.get('/sanctum/csrf-cookie');
         } catch (error) {
-          console.warn('[API] Failed to fetch CSRF cookie:', error);
+          logger.warn('[API] Failed to fetch CSRF cookie:', error);
         }
       }
     }
@@ -98,7 +99,7 @@ api.interceptors.response.use(
     // If request was cancelled, don't show error
     if (axios.isCancel(error)) {
       if (import.meta.env.DEV) {
-        console.log('[API] Request cancelled:', error.message);
+        logger.log('[API] Request cancelled:', error.message);
       }
       return Promise.reject(error);
     }
@@ -111,7 +112,7 @@ api.interceptors.response.use(
       config._retry = true;
 
       if (import.meta.env.DEV) {
-        console.log('[API] Retrying request:', config.url);
+        logger.log('[API] Retrying request:', config.url);
       }
 
       return retryRequest(() => api.request(config), {
@@ -251,7 +252,7 @@ export function cancelAllRequests(message: string = 'All requests cancelled'): v
   cancelTokens.clear();
 
   if (import.meta.env.DEV) {
-    console.log('[API] Cancelled all pending requests');
+    logger.log('[API] Cancelled all pending requests');
   }
 }
 

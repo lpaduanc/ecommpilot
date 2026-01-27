@@ -13,8 +13,8 @@ export type MessageRole = 'user' | 'assistant' | 'system';
  * Chat message interface
  */
 export interface ChatMessage {
-  id: number;
-  conversation_id: number;
+  id: string;  // UUID
+  conversation_id: string;  // UUID
   role: MessageRole;
   content: string;
   created_at: string;
@@ -24,9 +24,9 @@ export interface ChatMessage {
  * Chat conversation interface
  */
 export interface ChatConversation {
-  id: number;
-  user_id: number;
-  store_id: number | null;
+  id: string;  // UUID
+  user_id: string;  // UUID
+  store_id: string | null;  // UUID
   title: string;
   last_message_at: string;
   created_at: string;
@@ -38,9 +38,9 @@ export interface ChatConversation {
  * New message payload
  */
 export interface NewMessagePayload {
-  conversation_id?: number;
+  conversation_id?: string;  // UUID
   content: string;
-  store_id?: number;
+  store_id?: string;  // UUID
 }
 
 /**
@@ -48,7 +48,7 @@ export interface NewMessagePayload {
  */
 export interface ChatFilter {
   search?: string;
-  store_id?: number;
+  store_id?: string;  // UUID
   start_date?: string;
   end_date?: string;
 }
@@ -67,5 +67,5 @@ export interface ChatStats {
  */
 export interface TypingState {
   isTyping: boolean;
-  userId?: number;
+  userId?: string;  // UUID
 }

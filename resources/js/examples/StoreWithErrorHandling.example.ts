@@ -20,7 +20,7 @@ import { useNotificationStore } from '../stores/notificationStore';
  * Types
  */
 interface Product {
-  id: number;
+  id: string;  // UUID
   name: string;
   price: number;
   stock: number;
@@ -170,7 +170,7 @@ export const useProductStore = defineStore('products', () => {
   /**
    * EXEMPLO 5: Fetch de produto único
    */
-  async function fetchProduct(id: number): Promise<Result<Product>> {
+  async function fetchProduct(id: string): Promise<Result<Product>> {
     const result = await handleApiCall<Product>(
       () => api.get(`/products/${id}`)
     );
@@ -186,7 +186,7 @@ export const useProductStore = defineStore('products', () => {
    * EXEMPLO 6: Update com optimistic update + rollback
    */
   async function updateProduct(
-    id: number,
+    id: string,
     data: Partial<Product>
   ): Promise<Result<Product>> {
     const notificationStore = useNotificationStore();
@@ -235,7 +235,7 @@ export const useProductStore = defineStore('products', () => {
   /**
    * EXEMPLO 7: Delete com confirmação
    */
-  async function deleteProduct(id: number): Promise<Result<void>> {
+  async function deleteProduct(id: string): Promise<Result<void>> {
     const notificationStore = useNotificationStore();
 
     const result = await handleApiCall<void>(
@@ -394,7 +394,7 @@ export const useProductStore = defineStore('products', () => {
 //   await productStore.searchProducts(query);
 // }
 //
-// async function handleUpdateProduct(id: number, data: Partial<Product>) {
+// async function handleUpdateProduct(id: string, data: Partial<Product>) {
 //   const result = await productStore.updateProduct(id, data);
 //
 //   if (result.success) {

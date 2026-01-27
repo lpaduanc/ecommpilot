@@ -38,10 +38,8 @@ class AdminPlanController extends Controller
     /**
      * Retorna um plano específico.
      */
-    public function show(int $id): JsonResponse
+    public function show(Plan $plan): JsonResponse
     {
-        $plan = Plan::findOrFail($id);
-
         $subscribersCount = Subscription::where('plan_id', $plan->id)
             ->whereIn('status', [SubscriptionStatus::Active, SubscriptionStatus::Trial])
             ->count();
@@ -90,9 +88,8 @@ class AdminPlanController extends Controller
     /**
      * Atualiza um plano existente.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, Plan $plan): JsonResponse
     {
-        $plan = Plan::findOrFail($id);
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -150,9 +147,8 @@ class AdminPlanController extends Controller
     /**
      * Remove um plano.
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Plan $plan): JsonResponse
     {
-        $plan = Plan::findOrFail($id);
 
         // Verificar se há assinaturas ativas
         $activeSubscriptions = $plan->subscriptions()
@@ -176,17 +172,16 @@ class AdminPlanController extends Controller
     /**
      * Atribui um plano a um cliente.
      */
-    public function assignToClient(Request $request, int $planId): JsonResponse
+    public function assignToClient(Request $request, Plan $plan): JsonResponse
     {
         $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
+            'user_uuid' => ['required', 'exists:users,uuid'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
             'trial_ends_at' => ['nullable', 'date'],
         ]);
 
-        $plan = Plan::findOrFail($planId);
-        $user = User::findOrFail($validated['user_id']);
+        $user = User::where('uuid', $validated['user_uuid'])->firstOrFail();
 
         // Cancelar assinatura ativa atual
         $user->subscriptions()
@@ -216,9 +211,8 @@ class AdminPlanController extends Controller
     /**
      * Remove o plano de um cliente.
      */
-    public function removeFromClient(Request $request, int $userId): JsonResponse
+    public function removeFromClient(Request $request, User $user): JsonResponse
     {
-        $user = User::findOrFail($userId);
 
         // Cancelar todas as assinaturas ativas
         $cancelled = $user->subscriptions()
@@ -242,10 +236,8 @@ class AdminPlanController extends Controller
     /**
      * Retorna uso do cliente vs limites do plano.
      */
-    public function clientUsage(int $userId): JsonResponse
+    public function clientUsage(User $user): JsonResponse
     {
-        $user = User::findOrFail($userId);
-
         $usage = $this->planLimitService->getUserUsage($user);
 
         return response()->json($usage);
@@ -254,10 +246,8 @@ class AdminPlanController extends Controller
     /**
      * Retorna a assinatura atual do cliente.
      */
-    public function clientSubscription(int $userId): JsonResponse
+    public function clientSubscription(User $user): JsonResponse
     {
-        $user = User::findOrFail($userId);
-
         $subscription = $user->activeSubscription();
 
         if (! $subscription) {
@@ -286,13 +276,15 @@ class AdminPlanController extends Controller
             }])
             ->withCount('stores');
 
-        // Filtrar por plano
-        if ($request->has('plan_id')) {
-            $planId = $request->input('plan_id');
-            $query->whereHas('subscriptions', function ($q) use ($planId) {
-                $q->where('plan_id', $planId)
-                    ->whereIn('status', [SubscriptionStatus::Active, SubscriptionStatus::Trial]);
-            });
+        // Filtrar por plano (usando slug para segurança)
+        if ($request->has('plan_slug')) {
+            $plan = Plan::where('slug', $request->input('plan_slug'))->first();
+            if ($plan) {
+                $query->whereHas('subscriptions', function ($q) use ($plan) {
+                    $q->where('plan_id', $plan->id)
+                        ->whereIn('status', [SubscriptionStatus::Active, SubscriptionStatus::Trial]);
+                });
+            }
         }
 
         // Filtrar por sem plano

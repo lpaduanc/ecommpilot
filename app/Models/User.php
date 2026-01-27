@@ -17,18 +17,43 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected $fillable = [
+        'uuid',
         'name',
         'email',
         'password',
         'phone',
-        'role',
+        // 'role', // REMOVIDO: Role não deve ser mass assignable (privilege escalation risk)
         'is_active',
         'last_login_at',
         'must_change_password',
         'active_store_id',
         'notification_settings',
         'parent_user_id',
+    ];
+
+    /**
+     * Campos protegidos contra mass assignment.
+     * Role deve ser definido explicitamente apenas por admins.
+     */
+    protected $guarded = [
+        'role',
     ];
 
     protected $hidden = [
@@ -39,6 +64,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { logger } from '../utils/logger';
 
 export const useThemeStore = defineStore('theme', () => {
     // Get stored theme or default
@@ -40,7 +41,7 @@ export const useThemeStore = defineStore('theme', () => {
     // Set theme and persist to localStorage
     function setTheme(newTheme) {
         if (!['light', 'dark', 'system'].includes(newTheme)) {
-            console.warn(`Invalid theme: ${newTheme}`);
+            logger.warn(`Invalid theme: ${newTheme}`);
             return;
         }
 

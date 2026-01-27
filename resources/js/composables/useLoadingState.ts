@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { logger } from '../utils/logger';
 
 /**
  * Composable para gerenciar estados de loading e erro
@@ -36,7 +37,7 @@ export function useLoadingState() {
 
       // Log do erro para debugging (apenas em desenvolvimento)
       if (import.meta.env.DEV) {
-        console.error('[useLoadingState] Error:', err);
+        logger.error('[useLoadingState] Error:', err);
       }
 
       // Retorna undefined em caso de erro

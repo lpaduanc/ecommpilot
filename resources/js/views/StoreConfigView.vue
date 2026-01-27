@@ -83,8 +83,7 @@ async function loadNiches() {
     try {
         const response = await api.get('/niches');
         niches.value = response.data.data;
-    } catch (error) {
-        console.error('Error loading niches:', error);
+    } catch {
         notificationStore.error('Erro ao carregar lista de nichos');
     }
 }
@@ -109,8 +108,7 @@ async function loadConfig() {
         form.monthly_revenue = data.monthly_revenue;
         form.monthly_visits = data.monthly_visits;
         form.competitors = data.competitors || [];
-    } catch (error) {
-        console.error('Error loading config:', error);
+    } catch {
         notificationStore.error('Erro ao carregar configurações da loja');
     } finally {
         isLoading.value = false;
@@ -145,8 +143,6 @@ async function saveConfig() {
         await api.put(`/stores/${storeId.value}/config`, form);
         notificationStore.success('Configurações salvas com sucesso!');
     } catch (error) {
-        console.error('Error saving config:', error);
-
         if (error.response?.data?.errors) {
             Object.keys(error.response.data.errors).forEach(key => {
                 if (errors[key] !== undefined) {

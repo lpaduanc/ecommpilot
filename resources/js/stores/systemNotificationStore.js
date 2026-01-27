@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../services/api';
+import { logger } from '../utils/logger';
 
 export const useSystemNotificationStore = defineStore('systemNotification', () => {
     const notifications = ref([]);
@@ -86,7 +87,7 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
             const response = await api.get('/notifications/unread');
             unreadNotifications.value = response.data.data || [];
         } catch (err) {
-            console.error('Erro ao carregar notificações não lidas:', err);
+            logger.error('Erro ao carregar notificações não lidas:', err);
         }
     }
 

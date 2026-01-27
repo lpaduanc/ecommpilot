@@ -132,6 +132,22 @@ Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mer
 
 ---
 
+## 📊 COMO ANALISAR OS DADOS RICOS DE CONCORRENTES
+
+**ATENÇÃO:** Concorrentes marcados com ✅ DADOS RICOS têm informações detalhadas do Decodo.
+
+Use os dados ricos para identificar:
+
+1. **Categorias Foco** (📁): Quais categorias têm mais menções? Ex: "kits (193x)" indica alta demanda.
+2. **Produtos Destaque** (🛍️): Produtos específicos e preços para benchmarking.
+3. **Promoções Ativas** (🏷️): Descontos percentuais, cupons, frete grátis - mostra agressividade.
+4. **Avaliações** (⭐): Notas altas (4.5+) indicam boa reputação.
+5. **Tamanho do Catálogo** (📦): Número de produtos estimado.
+
+**IMPORTANTE:** Inclua estes dados na seção "competitive_analysis.por_concorrente" do seu output.
+
+---
+
 ## SUA TAREFA
 
 Produza relatório JSON com:
@@ -184,9 +200,31 @@ Produza relatório JSON com:
   },
   "competitive_analysis": {
     "total_concorrentes": {$totalConcorrentes},
-    "por_concorrente": [],
+    "concorrentes_com_dados_ricos": 0,
+    "por_concorrente": [
+      {
+        "nome": "string",
+        "tem_dados_ricos": true,
+        "preco_medio": 0,
+        "faixa_preco": {"min": 0, "max": 0},
+        "categorias_foco": ["categoria1 (Nx)", "categoria2 (Nx)"],
+        "produtos_destaque": ["produto1 (R$ X)", "produto2 (R$ Y)"],
+        "promocoes_ativas": "string (ex: Descontos até 40% | Black Friday)",
+        "avaliacao": "4.9/5 (1000 avaliações)" ou null,
+        "catalogo_estimado": 0,
+        "diferenciais": ["array"]
+      }
+    ],
+    "insights_competitivos": {
+      "categorias_mais_populares": ["categoria1 (Nx)", "categoria2 (Nx)"],
+      "produtos_mais_vendidos": ["produto1", "produto2"],
+      "maior_desconto_encontrado": "string (ex: 40%)",
+      "promocoes_especiais": ["Black Friday", "etc"],
+      "melhor_avaliacao": "5.0/5",
+      "faixa_preco_mercado": {"min": 0, "max": 0, "media": 0}
+    },
     "diferenciais_que_loja_nao_tem": [],
-    "oportunidades": []
+    "oportunidades_baseadas_em_dados_ricos": []
   },
   "identified_gaps": [],
   "data_not_available": [],
@@ -290,14 +328,94 @@ PROMPT;
     private static function formatCompetitors(array $competitors): string
     {
         $output = "";
+        $competitorsWithRichData = 0;
+
         foreach ($competitors as $c) {
             if (!($c['sucesso'] ?? false)) continue;
             $nome = $c['nome'] ?? 'Concorrente';
             $preco = $c['faixa_preco']['media'] ?? 0;
+            $precoMin = $c['faixa_preco']['min'] ?? 0;
+            $precoMax = $c['faixa_preco']['max'] ?? 0;
             $difs = implode(', ', $c['diferenciais'] ?? []) ?: 'nenhum';
-            $output .= "- **{$nome}**: R$ {$preco} | Diferenciais: {$difs}\n";
+
+            // Check if has rich data
+            $dadosRicos = $c['dados_ricos'] ?? [];
+            $hasRichData = !empty($dadosRicos['categorias']) ||
+                           !empty($dadosRicos['promocoes']) ||
+                           !empty($dadosRicos['produtos']);
+
+            if ($hasRichData) $competitorsWithRichData++;
+
+            $richDataBadge = $hasRichData ? "✅ DADOS RICOS" : "⚠️";
+
+            $output .= "- **{$nome}** {$richDataBadge}: R$ {$preco} (min: R$ {$precoMin}, max: R$ {$precoMax}) | Diferenciais: {$difs}\n";
+
+            // Categorias populares (DADOS RICOS)
+            if (!empty($dadosRicos['categorias'])) {
+                $topCats = array_slice($dadosRicos['categorias'], 0, 5);
+                $catsStr = implode(', ', array_map(fn($cat) => "{$cat['nome']} ({$cat['mencoes']}x)", $topCats));
+                $output .= "  → 📁 **Categorias Foco**: {$catsStr}\n";
+            }
+
+            // Produtos específicos (DADOS RICOS)
+            if (!empty($dadosRicos['produtos'])) {
+                $topProds = array_slice($dadosRicos['produtos'], 0, 3);
+                $prodsStr = implode(', ', array_map(fn($p) => "{$p['nome']} (R$ {$p['preco']})", $topProds));
+                $output .= "  → 🛍️ **Produtos Destaque**: {$prodsStr}\n";
+            }
+
+            // Promoções ativas (DADOS RICOS)
+            if (!empty($dadosRicos['promocoes'])) {
+                $promos = self::summarizePromotions($dadosRicos['promocoes']);
+                $output .= "  → 🏷️ **Promoções**: {$promos}\n";
+            }
+
+            // Avaliações (DADOS RICOS)
+            if (!empty($dadosRicos['avaliacoes']['nota_media'])) {
+                $nota = $dadosRicos['avaliacoes']['nota_media'];
+                $total = $dadosRicos['avaliacoes']['total_avaliacoes'] ?? 'N/A';
+                $output .= "  → ⭐ **Avaliações**: {$nota}/5 ({$total} avaliações)\n";
+            }
+
+            // Quantidade de produtos
+            $produtosEst = $c['produtos_estimados'] ?? 0;
+            if ($produtosEst > 0) {
+                $output .= "  → 📦 **Catálogo**: ~{$produtosEst} produtos\n";
+            }
         }
+
+        $totalCompetitors = count(array_filter($competitors, fn($c) => $c['sucesso'] ?? false));
+        if ($competitorsWithRichData > 0) {
+            $output = "**{$competitorsWithRichData}/{$totalCompetitors} concorrentes com DADOS RICOS (Decodo)**\n\n" . $output;
+        }
+
         return $output ?: 'Nenhum concorrente analisado.';
+    }
+
+    private static function summarizePromotions(array $promocoes): string
+    {
+        $descontos = [];
+        $especiais = [];
+
+        foreach ($promocoes as $promo) {
+            if (($promo['tipo'] ?? '') === 'desconto_percentual') {
+                $descontos[] = $promo['valor'] ?? '';
+            } elseif (($promo['tipo'] ?? '') === 'promocao_especial') {
+                $especiais[] = $promo['descricao'] ?? '';
+            }
+        }
+
+        $parts = [];
+        if (!empty($descontos)) {
+            $descontosUnicos = array_unique($descontos);
+            rsort($descontosUnicos); // Maiores primeiro
+            $parts[] = "Descontos até " . $descontosUnicos[0];
+        }
+        if (!empty($especiais)) {
+            $parts[] = implode(', ', array_unique($especiais));
+        }
+
+        return implode(' | ', $parts) ?: 'Nenhuma identificada';
     }
 
     private static function calculateAverageCompetitorPrice(array $competitors): float

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../services/api';
+import { logger } from '../utils/logger';
 
 export const useAnalysisStore = defineStore('analysis', () => {
     const currentAnalysis = ref(null);
@@ -118,12 +119,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
         }
     }
 
+    let pollingErrorCount = 0;
+    const MAX_POLLING_ERRORS = 5;
+
     function startPolling() {
         if (pollingInterval.value) return;
 
         pollingInterval.value = setInterval(async () => {
             try {
                 const response = await api.get('/analysis/current');
+                pollingErrorCount = 0; // Reset on success
 
                 // Check if analysis completed
                 if (!response.data.pending_analysis && pendingAnalysis.value) {
@@ -135,8 +140,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
                 } else {
                     pendingAnalysis.value = response.data.pending_analysis;
                 }
-            } catch {
-                // Silently ignore polling errors
+            } catch (err) {
+                pollingErrorCount++;
+                if (pollingErrorCount >= MAX_POLLING_ERRORS) {
+                    // Stop polling after too many consecutive errors
+                    if (import.meta.env.DEV) {
+                        logger.error('Polling failed too many times, stopping');
+                    }
+                    stopPolling();
+                    error.value = 'Erro ao verificar status da análise. Recarregue a página.';
+                }
             }
         }, 5000); // Poll every 5 seconds
     }

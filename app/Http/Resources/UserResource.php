@@ -13,7 +13,7 @@ class UserResource extends JsonResource
         $planLimitService = app(PlanLimitService::class);
 
         return [
-            'id' => $this->id,
+            'id' => $this->uuid,
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,

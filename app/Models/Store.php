@@ -14,7 +14,24 @@ class Store extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected $fillable = [
+        'uuid',
         'user_id',
         'platform',
         'external_store_id',
@@ -46,6 +63,7 @@ class Store extends Model
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'platform' => Platform::class,
             'sync_status' => SyncStatus::class,
             'last_sync_at' => 'datetime',

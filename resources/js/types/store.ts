@@ -18,8 +18,8 @@ export type SyncStatus = 'Pending' | 'Syncing' | 'Completed' | 'Failed';
  * Store interface
  */
 export interface Store {
-  id: number;
-  user_id: number;
+  id: string;  // UUID
+  user_id: string;  // UUID
   platform: Platform;
   store_id: string;
   store_name: string;

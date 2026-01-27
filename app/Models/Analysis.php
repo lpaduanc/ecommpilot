@@ -13,7 +13,24 @@ class Analysis extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected $fillable = [
+        'uuid',
         'user_id',
         'store_id',
         'status',
@@ -42,6 +59,7 @@ class Analysis extends Model
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'status' => AnalysisStatus::class,
             'summary' => 'array',
             'suggestions' => 'array',

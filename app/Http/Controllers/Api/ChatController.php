@@ -48,22 +48,30 @@ class ChatController extends Controller
         ]);
     }
 
-    public function getSuggestionConversation(Request $request, int $suggestionId): JsonResponse
+    public function getSuggestionConversation(Request $request, Suggestion $suggestion): JsonResponse
     {
         $user = $request->user();
+        $store = $user->activeStore;
 
-        // Validar que a sugestão pertence ao usuário
-        $suggestion = Suggestion::with('analysis')->find($suggestionId);
+        if (! $store) {
+            return response()->json([
+                'message' => 'Nenhuma loja ativa.',
+            ], 400);
+        }
 
-        if (! $suggestion || $suggestion->analysis->user_id !== $user->id) {
+        // Validar que a sugestão pertence ao usuário e sua loja ativa (evita IDOR)
+        if ($suggestion->store_id !== $store->id) {
             return response()->json([
                 'message' => 'Sugestão não encontrada.',
             ], 404);
         }
 
+        // Load analysis relationship
+        $suggestion->load('analysis');
+
         // Buscar conversa específica para esta sugestão
         $conversation = ChatConversation::where('user_id', $user->id)
-            ->where('suggestion_id', $suggestionId)
+            ->where('suggestion_id', $suggestion->id)
             ->with(['messages' => function ($query) {
                 $query->orderBy('created_at', 'asc');
             }])
@@ -137,12 +145,17 @@ class ChatController extends Controller
             if ($isSuggestionContext && isset($context['suggestion']['id'])) {
                 $suggestionId = $context['suggestion']['id'];
 
-                // Validar que a sugestão pertence ao usuário
-                $suggestion = Suggestion::with('analysis')->find($suggestionId);
-                if (! $suggestion || $suggestion->analysis->user_id !== $user->id) {
-                    return response()->json([
-                        'message' => 'Sugestão não encontrada.',
-                    ], 404);
+                // Validar que a sugestão pertence à loja ativa do usuário (evita IDOR)
+                if ($store) {
+                    $suggestion = Suggestion::where('id', $suggestionId)
+                        ->where('store_id', $store->id)
+                        ->first();
+
+                    if (! $suggestion) {
+                        return response()->json([
+                            'message' => 'Sugestão não encontrada.',
+                        ], 404);
+                    }
                 }
             }
 
@@ -219,11 +232,18 @@ class ChatController extends Controller
                 'persisted' => $shouldPersist,
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_' . uniqid();
+
             // Log the actual error for debugging
-            \Log::error('Chat error: '.$e->getMessage(), [
+            \Log::error('Chat error', [
+                'error_id' => $errorId,
                 'user_id' => $user->id,
                 'message' => $validated['message'],
-                'exception' => $e->getTraceAsString(),
+                'exception_message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                // Stack trace apenas em ambiente local
+                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             // Delete user message on failure (if it was persisted)
@@ -231,6 +251,7 @@ class ChatController extends Controller
 
             return response()->json([
                 'message' => 'Desculpe, não foi possível processar sua mensagem. Tente novamente.',
+                'error_id' => $errorId,
             ], 500);
         }
     }

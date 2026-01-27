@@ -9,6 +9,7 @@ use App\Models\ActivityLog;
 use App\Models\Store;
 use App\Models\SyncedOrder;
 use App\Models\User;
+use App\Traits\SafeILikeSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
+    use SafeILikeSearch;
     public function dashboardStats(): JsonResponse
     {
         $totalClients = User::where('role', UserRole::Client)->count();
@@ -61,10 +63,13 @@ class AdminController extends Controller
 
         // Search
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->whereRaw('name ILIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('email ILIKE ?', ["%{$search}%"])
-                    ->orWhereRaw('phone ILIKE ?', ["%{$search}%"]);
+            $sanitized = $this->sanitizeILikeInput($search);
+            $pattern = '%'.$sanitized.'%';
+
+            $query->where(function ($q) use ($pattern) {
+                $q->where('name', 'ILIKE', $pattern)
+                    ->orWhere('email', 'ILIKE', $pattern)
+                    ->orWhere('phone', 'ILIKE', $pattern);
             });
         }
 
@@ -81,9 +86,19 @@ class AdminController extends Controller
             $query->whereDate('created_at', '<=', $request->input('date_to'));
         }
 
-        // Sort
+        // Sort - SECURITY: Whitelist to prevent SQL injection
+        $allowedSortFields = ['name', 'email', 'created_at', 'last_login_at', 'is_active'];
         $sortField = $request->input('sort_by', 'created_at');
         $sortDir = $request->input('sort_dir', 'desc');
+
+        // Validate sort field against whitelist
+        if (!in_array($sortField, $allowedSortFields, true)) {
+            $sortField = 'created_at';
+        }
+
+        // Validate sort direction
+        $sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
         $query->orderBy($sortField, $sortDir);
 
         $perPage = $request->input('per_page', 10);
@@ -112,12 +127,16 @@ class AdminController extends Controller
         return response()->json($clients);
     }
 
-    public function clientDetail(int $id): JsonResponse
+    public function clientDetail(User $user): JsonResponse
     {
-        // Load client with permissions only, use withCount for stats
-        $client = User::where('role', UserRole::Client)
-            ->with(['permissions'])
-            ->findOrFail($id);
+        // Verify it's a client
+        if ($user->role !== UserRole::Client) {
+            abort(404);
+        }
+
+        // Load client with permissions
+        $client = $user;
+        $client->load('permissions');
 
         // Load stores with counts (not full relations to avoid memory issues)
         $stores = Store::where('user_id', $client->id)
@@ -268,9 +287,14 @@ class AdminController extends Controller
         ], 201);
     }
 
-    public function updateClient(Request $request, int $id): JsonResponse
+    public function updateClient(Request $request, User $user): JsonResponse
     {
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
+        // Verify it's a client
+        if ($user->role !== UserRole::Client) {
+            abort(404);
+        }
+
+        $client = $user;
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -307,9 +331,14 @@ class AdminController extends Controller
         ]);
     }
 
-    public function toggleClientStatus(int $id): JsonResponse
+    public function toggleClientStatus(User $user): JsonResponse
     {
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
+        // Verify it's a client
+        if ($user->role !== UserRole::Client) {
+            abort(404);
+        }
+
+        $client = $user;
 
         $client->update(['is_active' => ! $client->is_active]);
 
@@ -323,33 +352,58 @@ class AdminController extends Controller
     }
 
 
-    public function resetPassword(Request $request, int $id): JsonResponse
+    public function resetPassword(Request $request, User $user): JsonResponse
     {
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
+        $admin = $request->user();
+
+        // Verify it's a client
+        if ($user->role !== UserRole::Client) {
+            abort(404);
+        }
+
+        $client = $user;
 
         $validated = $request->validate([
             'password' => ['required', 'string', 'min:8'],
+            'admin_password' => ['required', 'string'],
         ], [
             'password.required' => 'A nova senha é obrigatória.',
             'password.min' => 'A senha deve ter pelo menos 8 caracteres.',
+            'admin_password.required' => 'Confirme sua senha de administrador.',
         ]);
+
+        // SECURITY: Verify admin password as confirmation for critical action
+        if (!Hash::check($validated['admin_password'], $admin->password)) {
+            return response()->json([
+                'message' => 'Senha de administrador incorreta.',
+            ], 403);
+        }
 
         $client->update([
             'password' => Hash::make($validated['password']),
             'must_change_password' => true,
         ]);
 
+        // SECURITY: Invalidate all client sessions after password reset
+        $client->tokens()->delete();
+
         ActivityLog::log('admin.password_reset', $client);
 
         return response()->json([
-            'message' => 'Senha redefinida com sucesso.',
+            'message' => 'Senha redefinida com sucesso. O cliente deverá trocar a senha no próximo login.',
         ]);
     }
 
-    public function impersonate(int $id): JsonResponse
+    public function impersonate(User $user): JsonResponse
     {
         $admin = request()->user();
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
+
+        // Verify it's a client
+        if ($user->role !== UserRole::Client) {
+            abort(404);
+        }
+
+        $client = $user;
 
         // SECURITY: Limit impersonation token to read-only operations
         // Prevents admin from performing destructive actions as the client
@@ -390,9 +444,14 @@ class AdminController extends Controller
         ]);
     }
 
-    public function deleteClient(int $id): JsonResponse
+    public function deleteClient(User $user): JsonResponse
     {
-        $client = User::where('role', UserRole::Client)->findOrFail($id);
+        // Verify it's a client
+        if ($user->role !== UserRole::Client) {
+            abort(404);
+        }
+
+        $client = $user;
 
         // Delete related data
         DB::transaction(function () use ($client) {

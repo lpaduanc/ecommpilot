@@ -13,12 +13,12 @@ export type UserRole = 'admin' | 'client';
  * Complete User interface representing authenticated user data
  */
 export interface User {
-  id: number;
+  id: string;  // UUID
   name: string;
   email: string;
   role: UserRole;
   permissions: string[];
-  active_store_id: number | null;
+  active_store_id: string | null;  // UUID
   must_change_password?: boolean;
   email_verified_at?: string | null;
   created_at?: string;

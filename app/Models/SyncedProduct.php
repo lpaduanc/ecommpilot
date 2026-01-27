@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\SafeILikeSearch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,9 +10,26 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SyncedProduct extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SafeILikeSearch, SoftDeletes;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 
     protected $fillable = [
+        'uuid',
         'store_id',
         'external_id',
         'name',
@@ -32,6 +50,7 @@ class SyncedProduct extends Model
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'price' => 'decimal:2',
             'cost' => 'decimal:2',
             'compare_at_price' => 'decimal:2',
@@ -130,9 +149,12 @@ class SyncedProduct extends Model
             return $query;
         }
 
-        return $query->where(function ($q) use ($search) {
-            $q->whereRaw('name ILIKE ?', ["%{$search}%"])
-                ->orWhereRaw('sku ILIKE ?', ["%{$search}%"]);
+        $sanitized = $this->sanitizeILikeInput($search);
+        $pattern = '%'.$sanitized.'%';
+
+        return $query->where(function ($q) use ($pattern) {
+            $q->where('name', 'ILIKE', $pattern)
+                ->orWhere('sku', 'ILIKE', $pattern);
         });
     }
 }

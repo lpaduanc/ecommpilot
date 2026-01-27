@@ -18,23 +18,36 @@ trait SuggestionDeduplicationTrait
             ->limit($limit)
             ->get();
 
-        return $suggestions->map(function ($suggestion) {
-            return [
-                'id' => $suggestion->id,
-                'title' => $suggestion->title,
-                'category' => $suggestion->category,
-                'expected_impact' => $suggestion->expected_impact,
-                'description' => Str::limit($suggestion->description ?? '', 200),
-                'status' => $suggestion->status ?? 'pending',
-                'was_successful' => $suggestion->was_successful ?? null,
-                'created_at' => $suggestion->created_at->format('Y-m-d'),
-                'analysis_id' => $suggestion->analysis_id,
-            ];
-        })->toArray();
+        // Separar por status para tratamento diferenciado
+        $accepted = $suggestions->filter(fn($s) => in_array($s->status, ['accepted', 'in_progress', 'completed']));
+        $rejected = $suggestions->filter(fn($s) => in_array($s->status, ['rejected', 'ignored']));
+        $pending = $suggestions->filter(fn($s) => in_array($s->status, ['new', 'pending']) || is_null($s->status));
+
+        return [
+            'all' => $suggestions->map(fn($s) => $this->formatSuggestionForHistory($s))->toArray(),
+            'accepted_titles' => $accepted->pluck('title')->toArray(),
+            'rejected_titles' => $rejected->pluck('title')->toArray(),
+            'pending' => $pending->map(fn($s) => $this->formatSuggestionForHistory($s))->toArray(),
+        ];
+    }
+
+    protected function formatSuggestionForHistory($suggestion): array
+    {
+        return [
+            'id' => $suggestion->id,
+            'title' => $suggestion->title,
+            'category' => $suggestion->category,
+            'expected_impact' => $suggestion->expected_impact,
+            'description' => Str::limit($suggestion->description ?? '', 200),
+            'status' => $suggestion->status ?? 'pending',
+            'was_successful' => $suggestion->was_successful ?? null,
+            'created_at' => $suggestion->created_at->format('Y-m-d'),
+            'analysis_id' => $suggestion->analysis_id,
+        ];
     }
 
     /**
-     * Identifica temas saturados (sugeridos 3+ vezes)
+     * Identifica temas saturados (sugeridos 2+ vezes)
      */
     protected function identifySaturatedThemes(array $suggestions): array
     {
@@ -49,6 +62,12 @@ trait SuggestionDeduplicationTrait
             'assinatura' => ['assinatura', 'recorrência', 'subscription', 'clube'],
             'cupom' => ['cupom', 'desconto', 'promoção'],
             'checkout' => ['checkout', 'carrinho', 'conversão', 'abandono'],
+            'whatsapp' => ['whatsapp', 'telegram', 'chat', 'mensagem'],
+            'reviews' => ['review', 'ugc', 'avaliação', 'depoimento', 'fotos', 'vídeos', 'antes e depois'],
+            'pos_compra' => ['pós-compra', 'pos-compra', 'cancelamento', 'follow-up', 'acompanhamento'],
+            'influenciadores' => ['influenciador', 'micro-influenciador', 'embaixador', 'embaixadora', 'parceria'],
+            'gamificacao' => ['gamificação', 'gamificacao', 'pontos', 'desafio', 'milhas', 'níveis'],
+            'conteudo' => ['conteúdo', 'conteudo', 'hub', 'guia', 'educativo', 'tutorial'],
         ];
 
         $counts = [];
@@ -65,7 +84,7 @@ trait SuggestionDeduplicationTrait
             }
         }
 
-        $saturated = array_filter($counts, fn($count) => $count >= 3);
+        $saturated = array_filter($counts, fn($count) => $count >= 2);
         arsort($saturated);
 
         return $saturated;

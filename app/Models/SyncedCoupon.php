@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\SafeILikeSearch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,9 +10,26 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SyncedCoupon extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SafeILikeSearch, SoftDeletes;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 
     protected $fillable = [
+        'uuid',
         'store_id',
         'external_id',
         'code',
@@ -29,6 +47,7 @@ class SyncedCoupon extends Model
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'value' => 'decimal:2',
             'valid' => 'boolean',
             'used' => 'integer',
@@ -112,8 +131,11 @@ class SyncedCoupon extends Model
             return $query;
         }
 
-        return $query->where(function ($q) use ($search) {
-            $q->whereRaw('code ILIKE ?', ["%{$search}%"]);
+        $sanitized = $this->sanitizeILikeInput($search);
+        $pattern = '%'.$sanitized.'%';
+
+        return $query->where(function ($q) use ($pattern) {
+            $q->where('code', 'ILIKE', $pattern);
         });
     }
 }

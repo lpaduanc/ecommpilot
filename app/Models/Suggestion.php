@@ -11,7 +11,24 @@ class Suggestion extends Model
 {
     use HasFactory;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     protected $fillable = [
+        'uuid',
         'analysis_id',
         'store_id',
         'category',
@@ -33,6 +50,7 @@ class Suggestion extends Model
     ];
 
     protected $casts = [
+        'uuid' => 'string',
         'recommended_action' => 'array',
         'target_metrics' => 'array',
         'specific_data' => 'array',

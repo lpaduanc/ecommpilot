@@ -81,6 +81,31 @@ Realidade aumentada, IA generativa nativa, Live commerce nativo
 RESOURCES;
     }
 
+    public static function formatAcceptedAndRejected(array $accepted, array $rejected): string
+    {
+        $output = "";
+
+        if (!empty($accepted)) {
+            $output .= "### ✅ SUGESTÕES ACEITAS (JÁ SERÃO IMPLEMENTADAS)\n";
+            $output .= "O cliente aceitou estas sugestões. NÃO sugira nada similar:\n";
+            foreach ($accepted as $title) {
+                $output .= "• {$title}\n";
+            }
+            $output .= "\n";
+        }
+
+        if (!empty($rejected)) {
+            $output .= "### ❌ SUGESTÕES REJEITADAS (CLIENTE NÃO GOSTOU)\n";
+            $output .= "O cliente rejeitou estas sugestões. EVITE o mesmo tema/abordagem:\n";
+            foreach ($rejected as $title) {
+                $output .= "• {$title}\n";
+            }
+            $output .= "\n";
+        }
+
+        return $output ?: "Nenhuma sugestão aceita ou rejeitada anteriormente.\n";
+    }
+
     public static function getUnexploredAngles(): string
     {
         return <<<'ANGLES'
@@ -145,6 +170,42 @@ Duas sugestões são REPETIDAS se:
 
 ---
 
+## 🔄 SUGESTÕES ACEITAS E REJEITADAS
+
+{{accepted_rejected}}
+
+## ⚠️ EXEMPLOS DE REPETIÇÃO (PROIBIDO)
+
+Duas sugestões são REPETIDAS mesmo com títulos diferentes se:
+
+**Exemplo 1 - WhatsApp:**
+- "Canal de WhatsApp para atendimento"
+- "Consultoria via WhatsApp"
+- "Suporte exclusivo no WhatsApp"
+→ TODAS SÃO O MESMO TEMA. Só pode ter UMA.
+
+**Exemplo 2 - Reviews/UGC:**
+- "Programa de reviews com fotos"
+- "Incentivo a UGC visual"
+- "Campanha de depoimentos autênticos"
+→ TODAS SÃO O MESMO TEMA. Só pode ter UMA.
+
+**Exemplo 3 - Kits/Bundles:**
+- "Kits de tratamento personalizáveis"
+- "Bundles dinâmicos por perfil"
+- "Combos temáticos de verão"
+→ TODAS SÃO O MESMO TEMA. Só pode ter UMA.
+
+**Exemplo 4 - Fidelidade:**
+- "Programa de fidelidade com pontos"
+- "Gamificação com recompensas"
+- "Clube VIP exclusivo"
+→ TODAS SÃO O MESMO TEMA. Só pode ter UMA.
+
+**SE O TEMA JÁ EXISTE NAS ZONAS PROIBIDAS OU NAS REJEITADAS, ESCOLHA OUTRO TEMA!**
+
+---
+
 ## 📅 CONTEXTO SAZONAL [MELHORIA 3]
 
 {{seasonality_context}}
@@ -164,9 +225,30 @@ Duas sugestões são REPETIDAS se:
 ---
 
 ## DISTRIBUIÇÃO OBRIGATÓRIA
-- 3 HIGH (prioridades 1-3): Citar dados externos obrigatório
-- 3 MEDIUM (prioridades 4-6): Otimizações
+- 3 HIGH (prioridades 1-3): **OBRIGATÓRIO** citar dados de concorrentes ou mercado
+- 3 MEDIUM (prioridades 4-6): Otimizações baseadas na análise
 - 3 LOW (prioridades 7-9): Quick-wins
+
+### ⚠️ REGRA OBRIGATÓRIA PARA SUGESTÕES HIGH (PRIORIDADES 1-3)
+
+Sugestões de prioridade 1-3 **DEVEM OBRIGATORIAMENTE** incluir:
+
+1. **Referência a DADOS RICOS dos concorrentes:**
+   - Categorias foco: Ex: "Concorrente X tem 193 menções em 'kits'"
+   - Produtos destaque: Ex: "Concorrente vende Produto Y por R$ Z"
+   - Promoções ativas: Ex: "Concorrente oferece 40% de desconto"
+   - Avaliações: Ex: "Concorrente tem 4.9/5 com 1000 avaliações"
+
+2. **OU referência a dados de mercado:**
+   - Google Trends: tendência, interesse de busca
+   - Preços médios do Google Shopping
+
+3. **Preencher TODOS os campos do `competitive_reference.dados_usados`:**
+   - Se usou categoria: preencher `categoria_popular`
+   - Se usou promoção: preencher `promocao_ativa`
+   - Se usou diferencial: preencher `diferencial`
+
+**VALIDAÇÃO:** Se não conseguir referenciar dados específicos, a sugestão NÃO pode ser HIGH.
 
 ---
 
@@ -180,6 +262,26 @@ Duas sugestões são REPETIDAS se:
 
 ### Dados de Concorrentes
 {{competitor_data}}
+
+### 🎯 COMO USAR DADOS DE CONCORRENTES
+
+**OBRIGATÓRIO para sugestões HIGH:** Referencie dados específicos dos concorrentes:
+
+1. **Categorias populares** (campo `dados_ricos.categorias`):
+   - Se concorrente tem "kits: 193 menções" → sugira estratégia de kits
+   - Se tem "cabelos: 261 menções" → identifique subcategorias fortes
+
+2. **Promoções ativas** (campo `dados_ricos.promocoes`):
+   - Se concorrente oferece "40% de desconto" → compare com estratégia da loja
+   - Se tem "Black Friday" ativa → sugira contra-estratégia
+
+3. **Faixa de preços** (campo `faixa_preco`):
+   - Compare min/max/média para posicionamento
+   - Identifique oportunidades de precificação
+
+4. **Diferenciais únicos**:
+   - Liste o que concorrentes têm que a loja não tem
+   - Priorize implementação dos mais impactantes
 
 ### Dados de Mercado
 {{market_data}}
@@ -196,6 +298,8 @@ Duas sugestões são REPETIDAS se:
 □ Apenas reformulação? → DESCARTE
 □ Faz sentido para o momento sazonal? → Se não, RECONSIDERE
 □ É viável na Nuvemshop? → Verificar recursos
+□ Sugestões HIGH (1-3) citam dados de concorrentes? → OBRIGATÓRIO
+□ Campo `competitive_reference.dados_usados` está preenchido? → Para HIGH, é OBRIGATÓRIO
 
 ---
 
@@ -232,7 +336,12 @@ Duas sugestões são REPETIDAS se:
       "competitive_reference": {
         "concorrente": "string ou null",
         "o_que_faz": "string ou null",
-        "como_aplicar": "string ou null"
+        "como_aplicar": "string ou null",
+        "dados_usados": {
+          "categoria_popular": "string ou null (ex: kits - 193 menções)",
+          "promocao_ativa": "string ou null (ex: 40% desconto)",
+          "diferencial": "string ou null"
+        }
       },
       "implementation": {
         "platform": "nuvemshop",
@@ -338,16 +447,157 @@ PROMPT;
             }
         }
 
-        $saturated = array_filter($counts, fn($c) => $c >= 3);
+        $saturated = array_filter($counts, fn($c) => $c >= 2);
         arsort($saturated);
 
-        if (empty($saturated)) return "Nenhum tema saturado (3+).";
+        if (empty($saturated)) return "Nenhum tema saturado (2+).";
 
         $out = "";
         foreach ($saturated as $t => $c) {
             $out .= "🔴 **{$t}**: {$c}x — EVITAR\n";
         }
         return $out;
+    }
+
+    /**
+     * Extrai insights resumidos dos dados ricos de concorrentes para facilitar uso pela AI.
+     */
+    public static function extractCompetitorInsights(array $competitors): string
+    {
+        if (empty($competitors)) {
+            return "Nenhum dado de concorrente disponível.";
+        }
+
+        $output = "## 📊 RESUMO DE INSIGHTS COMPETITIVOS (DADOS RICOS DO DECODO)\n\n";
+        $output .= "**IMPORTANTE:** Use estes dados detalhados para criar sugestões HIGH PRIORITY (1-3).\n\n";
+
+        $allCategories = [];
+        $allPromotions = [];
+        $allProducts = [];
+        $maxDiscount = 0;
+        $specialPromos = [];
+        $totalCompetitorsWithRichData = 0;
+
+        foreach ($competitors as $c) {
+            if (!($c['sucesso'] ?? false)) continue;
+
+            $nome = $c['nome'] ?? 'Concorrente';
+            $dadosRicos = $c['dados_ricos'] ?? [];
+
+            // Check if this competitor has rich data
+            $hasRichData = !empty($dadosRicos['categorias']) ||
+                           !empty($dadosRicos['promocoes']) ||
+                           !empty($dadosRicos['produtos']);
+
+            if ($hasRichData) {
+                $totalCompetitorsWithRichData++;
+            }
+
+            $output .= "### {$nome}" . ($hasRichData ? " ✅ (Dados Ricos Disponíveis)" : " ⚠️ (Dados Limitados)") . "\n";
+
+            // Categorias com dados ricos
+            if (!empty($dadosRicos['categorias'])) {
+                $topCats = array_slice($dadosRicos['categorias'], 0, 5);
+                $output .= "**Categorias Populares:**\n";
+                foreach ($topCats as $cat) {
+                    $output .= "  - 📁 **{$cat['nome']}**: {$cat['mencoes']} menções → " .
+                               "*Concorrente foca fortemente nesta categoria*\n";
+                    $allCategories[$cat['nome']] = ($allCategories[$cat['nome']] ?? 0) + $cat['mencoes'];
+                }
+            }
+
+            // Produtos específicos encontrados
+            if (!empty($dadosRicos['produtos'])) {
+                $topProducts = array_slice($dadosRicos['produtos'], 0, 3);
+                $output .= "**Produtos Destaque:**\n";
+                foreach ($topProducts as $prod) {
+                    $output .= "  - 🛍️ {$prod['nome']}: R$ {$prod['preco']}\n";
+                    $allProducts[] = $prod;
+                }
+            }
+
+            // Promoções ativas com detalhes
+            if (!empty($dadosRicos['promocoes'])) {
+                $output .= "**Promoções Ativas:**\n";
+                $descontos = [];
+                foreach ($dadosRicos['promocoes'] as $promo) {
+                    if (($promo['tipo'] ?? '') === 'desconto_percentual') {
+                        $valor = (int) filter_var($promo['valor'] ?? '0', FILTER_SANITIZE_NUMBER_INT);
+                        $descontos[] = $promo['valor'];
+                        if ($valor > $maxDiscount) $maxDiscount = $valor;
+                        $output .= "  - 🏷️ Desconto de {$promo['valor']}\n";
+                    } elseif (($promo['tipo'] ?? '') === 'promocao_especial') {
+                        $desc = $promo['descricao'] ?? '';
+                        $specialPromos[] = $desc;
+                        $output .= "  - 🎉 {$desc}\n";
+                    } elseif (($promo['tipo'] ?? '') === 'frete_gratis') {
+                        $output .= "  - 📦 {$promo['descricao']}\n";
+                    } elseif (($promo['tipo'] ?? '') === 'cupom') {
+                        $output .= "  - 🎫 Cupom: {$promo['codigo']}\n";
+                    }
+                }
+            }
+
+            // Avaliações
+            if (!empty($dadosRicos['avaliacoes']['nota_media'])) {
+                $nota = $dadosRicos['avaliacoes']['nota_media'];
+                $total = $dadosRicos['avaliacoes']['total_avaliacoes'] ?? 'N/A';
+                $output .= "**Avaliações:** ⭐ {$nota}/5 ({$total} avaliações)\n";
+            }
+
+            // Preços
+            $faixa = $c['faixa_preco'] ?? [];
+            if (!empty($faixa)) {
+                $output .= "**Precificação:** R$ {$faixa['min']} - R$ {$faixa['max']} (média: R$ {$faixa['media']})\n";
+            }
+
+            $output .= "\n";
+        }
+
+        // Resumo consolidado OBRIGATÓRIO para sugestões HIGH
+        $output .= "---\n\n";
+        $output .= "### 🎯 ANÁLISE CONSOLIDADA - USE PARA SUGESTÕES HIGH PRIORITY\n\n";
+        $output .= "**{$totalCompetitorsWithRichData} de " . count($competitors) . " concorrentes têm dados ricos disponíveis.**\n\n";
+
+        if (!empty($allCategories)) {
+            arsort($allCategories);
+            $output .= "**Categorias mais fortes no mercado:**\n";
+            $count = 0;
+            foreach ($allCategories as $cat => $mentions) {
+                if ($count++ >= 5) break;
+                $output .= "  {$count}. **{$cat}**: {$mentions} menções totais → *Alta demanda do mercado*\n";
+            }
+            $output .= "\n";
+        }
+
+        if ($maxDiscount > 0) {
+            $output .= "**Estratégia de Descontos:**\n";
+            $output .= "  - Maior desconto encontrado: **{$maxDiscount}%**\n";
+            $output .= "  - 💡 *Sugestão: Considere contra-estratégia ou posicionamento premium*\n\n";
+        }
+
+        if (!empty($specialPromos)) {
+            $output .= "**Promoções Especiais Ativas:**\n";
+            foreach (array_unique($specialPromos) as $promo) {
+                $output .= "  - {$promo}\n";
+            }
+            $output .= "\n";
+        }
+
+        if (!empty($allProducts)) {
+            $avgPrice = array_sum(array_column($allProducts, 'preco')) / count($allProducts);
+            $output .= "**Produtos Analisados:** " . count($allProducts) . " produtos\n";
+            $output .= "  - Preço médio dos destaques: R$ " . number_format($avgPrice, 2, ',', '.') . "\n\n";
+        }
+
+        if ($totalCompetitorsWithRichData > 0) {
+            $output .= "**⚠️ OBRIGATÓRIO:** Todas as sugestões HIGH PRIORITY (1-3) devem referenciar dados específicos acima.\n";
+            $output .= "Exemplos: 'Concorrente X oferece Y', 'Categoria Z tem N menções', 'Desconto de X% encontrado'.\n";
+        } else {
+            $output .= "**⚠️ AVISO:** Dados ricos limitados. Use dados básicos de faixa de preços e diferenciais.\n";
+        }
+
+        return $output;
     }
 
     public static function build(array $context): string
@@ -367,16 +617,26 @@ PROMPT;
         $competitorData = $context['competitor_data'] ?? $externalData['concorrentes'] ?? [];
         $marketData = $context['market_data'] ?? $externalData['dados_mercado'] ?? [];
 
+        // Suportar tanto o formato antigo (array simples) quanto o novo (array estruturado)
+        $previousSuggestions = $context['previous_suggestions'] ?? [];
+        $allSuggestions = isset($previousSuggestions['all']) ? $previousSuggestions['all'] : $previousSuggestions;
+        $acceptedTitles = $previousSuggestions['accepted_titles'] ?? [];
+        $rejectedTitles = $previousSuggestions['rejected_titles'] ?? [];
+
+        // Extrair insights dos concorrentes
+        $competitorInsights = self::extractCompetitorInsights($competitorData);
+
         $replacements = [
-            '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($context['previous_suggestions'] ?? []),
-            '{{saturated_themes}}' => self::identifySaturatedThemes($context['previous_suggestions'] ?? []),
+            '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($allSuggestions),
+            '{{saturated_themes}}' => self::identifySaturatedThemes($allSuggestions),
+            '{{accepted_rejected}}' => self::formatAcceptedAndRejected($acceptedTitles, $rejectedTitles),
             '{{seasonality_context}}' => $seasonCtx,
             '{{success_rates}}' => self::getSuccessRatesByCategory(),
             '{{platform_resources}}' => self::getPlatformResources(),
             '{{unexplored_angles}}' => self::getUnexploredAngles(),
             '{{store_context}}' => json_encode($storeContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             '{{analyst_analysis}}' => json_encode($analystAnalysis, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            '{{competitor_data}}' => json_encode($competitorData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            '{{competitor_data}}' => $competitorInsights . "\n\n### Dados Completos\n" . json_encode($competitorData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             '{{market_data}}' => json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             '{{rag_strategies}}' => json_encode($context['rag_strategies'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
         ];

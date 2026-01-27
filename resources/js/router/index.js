@@ -298,6 +298,8 @@ router.beforeEach(async (to, from, next) => {
 
     // Check permission
     if (requiredPermission && !authStore.hasPermission(requiredPermission)) {
+        // SECURITY: This is client-side authorization for UI/UX only.
+        // Backend MUST validate permissions on every API request.
         return next({ name: 'dashboard' });
     }
 

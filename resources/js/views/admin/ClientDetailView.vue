@@ -44,9 +44,8 @@ async function fetchClient() {
         const response = await api.get(`/admin/clients/${route.params.id}`);
         client.value = response.data;
         await fetchSubscription();
-    } catch (error) {
+    } catch {
         notificationStore.error('Erro ao carregar dados do cliente');
-        console.error('Error fetching client:', error);
     } finally {
         isLoading.value = false;
     }
@@ -70,9 +69,8 @@ async function fetchPlans() {
     try {
         const response = await api.get('/admin/plans');
         availablePlans.value = response.data.plans.filter(plan => plan.is_active);
-    } catch (error) {
+    } catch {
         notificationStore.error('Erro ao carregar planos disponíveis');
-        console.error('Error fetching plans:', error);
     } finally {
         isLoadingPlans.value = false;
     }
@@ -103,7 +101,6 @@ async function assignPlan() {
     } catch (error) {
         const message = error.response?.data?.message || 'Erro ao atribuir plano';
         notificationStore.error(message);
-        console.error('Error assigning plan:', error);
     } finally {
         isSubmitting.value = false;
     }
@@ -128,7 +125,6 @@ async function removePlan() {
     } catch (error) {
         const message = error.response?.data?.message || 'Erro ao remover plano';
         notificationStore.error(message);
-        console.error('Error removing plan:', error);
     } finally {
         isSubmitting.value = false;
     }

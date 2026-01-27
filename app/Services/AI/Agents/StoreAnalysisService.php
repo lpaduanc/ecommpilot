@@ -261,23 +261,25 @@ class StoreAnalysisService
             $previousAnalyses = $this->history->getPreviousAnalyses($store->id, 5);
             // V4: Usar método detalhado da trait para melhor deduplicação
             $previousSuggestions = $this->getPreviousSuggestionsDetailed($store->id, 50);
-            $saturatedThemes = $this->identifySaturatedThemes($previousSuggestions);
+            $saturatedThemes = $this->identifySaturatedThemes($previousSuggestions['all']);
 
             Log::channel($this->logChannel)->info('<<< Contexto historico carregado (V4)', [
                 'previous_analyses_count' => count($previousAnalyses),
-                'previous_suggestions_count' => count($previousSuggestions),
+                'previous_suggestions_count' => count($previousSuggestions['all']),
+                'accepted_count' => count($previousSuggestions['accepted_titles']),
+                'rejected_count' => count($previousSuggestions['rejected_titles']),
                 'saturated_themes' => $saturatedThemes,
             ]);
 
             Log::channel($this->logChannel)->info('<<< Contexto historico carregado', [
                 'previous_analyses_count' => count($previousAnalyses),
-                'previous_suggestions_count' => count($previousSuggestions),
+                'previous_suggestions_count' => count($previousSuggestions['all']),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
 
             $this->logService->completeStage($analysis, 2, [
                 'previous_analyses_count' => count($previousAnalyses),
-                'previous_suggestions_count' => count($previousSuggestions),
+                'previous_suggestions_count' => count($previousSuggestions['all']),
             ]);
         } catch (\Exception $e) {
             $this->logService->failStage($analysis, 2, $e->getMessage());
@@ -337,10 +339,22 @@ class StoreAnalysisService
                 $topProductNames
             );
 
+            // Log dados ricos dos concorrentes para debugging
+            $concorrentesComDadosRicos = 0;
+            foreach ($externalMarketData['concorrentes'] ?? [] as $concorrente) {
+                if (!empty($concorrente['dados_ricos']['categorias']) ||
+                    !empty($concorrente['dados_ricos']['promocoes']) ||
+                    !empty($concorrente['dados_ricos']['produtos'])) {
+                    $concorrentesComDadosRicos++;
+                }
+            }
+
             Log::channel($this->logChannel)->info('<<< Dados externos coletados', [
                 'trends_sucesso' => $externalMarketData['dados_mercado']['google_trends']['sucesso'] ?? false,
                 'market_sucesso' => $externalMarketData['dados_mercado']['precos_mercado']['sucesso'] ?? false,
                 'tem_concorrentes' => $externalMarketData['tem_concorrentes'] ?? false,
+                'concorrentes_com_dados_ricos' => $concorrentesComDadosRicos,
+                'total_concorrentes' => count($externalMarketData['concorrentes'] ?? []),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
 
@@ -683,7 +697,7 @@ class StoreAnalysisService
         // V4: Validação final de unicidade antes de salvar
         // =====================================================
         $beforeValidation = count($finalSuggestions);
-        $finalSuggestions = $this->validateSuggestionUniqueness($finalSuggestions, $previousSuggestions);
+        $finalSuggestions = $this->validateSuggestionUniqueness($finalSuggestions, $previousSuggestions['all']);
 
         // Logar estatísticas de deduplicação
         $this->logDeduplicationStats($analysis->id, [

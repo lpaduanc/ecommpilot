@@ -13,13 +13,13 @@ class AdminAnalysisResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->uuid,
             'user' => [
-                'id' => $this->user?->id,
+                'id' => $this->user?->uuid,
                 'name' => $this->user?->name,
             ],
             'store' => [
-                'id' => $this->store?->id,
+                'id' => $this->store?->uuid,
                 'name' => $this->store?->name,
             ],
             'status' => $this->status->value,

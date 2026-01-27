@@ -14,7 +14,7 @@ class Plan extends Model
         'name',
         'slug',
         'description',
-        'price',
+        // 'price', // REMOVIDO: Price não deve ser mass assignable (manipulação de preços)
         'is_active',
         'sort_order',
         'orders_limit',
@@ -32,6 +32,14 @@ class Plan extends Model
         'features',
     ];
 
+    /**
+     * Campos protegidos contra mass assignment.
+     * Price deve ser definido explicitamente apenas por admins.
+     */
+    protected $guarded = [
+        'price',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -45,6 +53,14 @@ class Plan extends Model
             'has_external_integrations' => 'boolean',
             'features' => 'array',
         ];
+    }
+
+    /**
+     * Use slug as route key for security (avoid exposing numeric IDs).
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
     }
 
     public function subscriptions(): HasMany

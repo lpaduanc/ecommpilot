@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { SparklesIcon, UserIcon, HandThumbUpIcon, HandThumbDownIcon, ClipboardDocumentIcon, CheckIcon } from '@heroicons/vue/24/outline';
+import { logger } from '@/utils/logger';
 
 const props = defineProps({
     message: { type: Object, required: true },
@@ -18,12 +20,18 @@ marked.setOptions({
     gfm: true,
 });
 
-// Parse markdown content for assistant messages
+// Parse markdown content for assistant messages and sanitize HTML
 const parsedContent = computed(() => {
     if (isUser.value || isWelcome.value) {
         return props.message.content;
     }
-    return marked.parse(props.message.content);
+    const html = marked.parse(props.message.content);
+    // Sanitize HTML to prevent XSS attacks
+    return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'b', 'i', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+        ALLOWED_ATTR: ['href', 'target', 'rel'],
+        ALLOW_DATA_ATTR: false,
+    });
 });
 
 const formattedTime = computed(() => {
@@ -40,7 +48,7 @@ async function copyMessage() {
         copied.value = true;
         setTimeout(() => copied.value = false, 2000);
     } catch (err) {
-        console.error('Failed to copy:', err);
+        logger.error('Failed to copy:', err);
     }
 }
 </script>

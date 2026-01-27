@@ -23,10 +23,12 @@ Guia para Claude Code ao trabalhar neste repositório.
 
 ### Stack do Projeto
 
-- **Backend:** PHP 8.2+ / Laravel 12
-- **Frontend:** Vue 3 Composition API, Pinia, Tailwind CSS v4
-- **Build:** Vite, npm
-- **AI:** OpenAI, Google Gemini
+- **Backend:** PHP 8.2+ / Laravel 12 / PostgreSQL
+- **Frontend:** Vue 3 Composition API + TypeScript, Pinia 3, Tailwind CSS v4
+- **Build:** Vite 7, npm
+- **AI:** OpenAI, Google Gemini, Anthropic Claude
+- **Auth:** Laravel Sanctum, Spatie Permission
+- **Queue:** Laravel Horizon (database/redis)
 
 ## Comandos
 
@@ -56,36 +58,76 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 ### Backend (`app/`)
 
 **Services Layer** (`app/Services/`)
-- `AI/AIManager` - Strategy pattern para providers (OpenAI, Gemini)
-- `AI/Agents/StoreAnalysisService` - Orquestra pipeline de análise
+- `AI/AIManager` - Strategy pattern para providers (OpenAI, Gemini, Anthropic)
+- `AI/Agents/StoreAnalysisService` - Orquestra pipeline de análise com stage-based progress
+- `AI/Agents/LiteStoreAnalysisService` - Versão simplificada para análises rápidas
 - `AI/Agents/*AgentService` - Collector, Analyst, Strategist, Critic
-- `Integration/NuvemshopService` - API Nuvemshop e sync
+- `AI/Memory/` - HistoryService, HistorySummaryService, FeedbackLoopService
+- `AI/RAG/KnowledgeBaseService` - Base de conhecimento com embeddings
+- `AI/Prompts/` - 7 prompts (incluindo Lite variants e SimilarityCheckPrompt)
+- `Analysis/` - Traits: SuggestionDeduplicationTrait, FeedbackLoopTrait, HistoricalMetricsTrait
+- `Integration/NuvemshopService` - API Nuvemshop + adapters (Product, Order, Coupon)
+- `ExternalData/` - CompetitorAnalysisService, MarketDataService, GoogleTrendsService
 
 **Jobs** (`app/Jobs/`)
-- `SyncStoreDataJob` - Sync de produtos, pedidos, clientes
 - `ProcessAnalysisJob` - Análise AI assíncrona (timeout: 600s, tries: 3)
+- `Sync/SyncStoreDataJob` - Coordena todos os syncs
+- `Sync/SyncProductsJob`, `SyncOrdersJob`, `SyncCustomersJob`, `SyncCouponsJob`
+- `Sync/SyncBrazilLocationsJob` - Localizações brasileiras
 
-**Models Principais**
-- `User` - Multi-store (`active_store_id`), `ai_credits`
-- `Store` - Lojas conectadas, `sync_status`
-- `SyncedProduct`, `SyncedOrder`, `SyncedCustomer` - Dados sincronizados
-- `Analysis` - Análises com `persistentSuggestions()` relationship
-- `Suggestion` - Sugestões persistentes com status e prioridade
+**Models** (23 modelos em `app/Models/`)
+- **Auth:** `User` (multi-store, roles via Spatie), `Subscription`, `Plan`
+- **Store:** `Store`, `SyncedProduct`, `SyncedOrder`, `SyncedCustomer`, `SyncedCoupon`
+- **Analysis:** `Analysis` (stage-based), `Suggestion`, `SuggestionResult`, `AnalysisExecutionLog`, `AnalysisUsage`
+- **Chat:** `ChatConversation`, `ChatMessage`
+- **Sistema:** `Notification`, `ActivityLog`, `SystemSetting`, `EmailConfiguration`
+- **ML/RAG:** `KnowledgeEmbedding`, `CategoryStats`, `SuccessCase`, `FailureCase`
 
-**Enums** - `SyncStatus`, `AnalysisStatus`, `OrderStatus`, `PaymentStatus`, `Platform`, `UserRole`
+**DTOs** (`app/DTOs/`) - `StoreDataDTO`, `StoreInfoDTO`, `MetricsDTO`
+
+**Contracts** (`app/Contracts/`) - 7 interfaces para serviços e adapters
+
+**Enums** - `SyncStatus`, `AnalysisStatus`, `OrderStatus`, `PaymentStatus`, `Platform`, `UserRole`, `NotificationType`, `SubscriptionStatus`
 
 ### Frontend (`resources/js/`)
 
-**Stores Pinia** (`stores/`)
+**Stores Pinia** (`stores/`) - 14 stores
 - `authStore` - Auth, permissões, `hasPermission()`
 - `dashboardStore` - Stats, filtros, loja ativa
 - `analysisStore` - Análise AI, sugestões por prioridade
+- `chatStore` - Estado do chat com IA
+- `discountStore` - Cupons e descontos
+- `integrationStore` - Integrações (Nuvemshop)
+- `notificationStore`, `systemNotificationStore` - Notificações
+- `userManagementStore`, `adminAnalysesStore` - Admin
+- `sidebarStore`, `themeStore` - UI state
 
-**Components** (`components/`)
-- `common/` - BaseButton, BaseCard, BaseInput, BaseModal, LoadingSpinner
+**Components** (`components/`) - 47 componentes em 8 pastas
+- `common/` - BaseButton, BaseCard, BaseInput, BaseModal, LoadingSpinner, ConfirmDialog
 - `layout/` - TheSidebar, TheHeader, StoreSelector
+- `dashboard/` - StatCard, RevenueChart, OrdersStatusChart, TopProductsChart, DashboardFilters
+- `analysis/` - SuggestionCard, SuggestionDetailModal, HealthScore, OpportunitiesPanel
+- `chat/` - ChatContainer, ChatInput, ChatMessage, ChatModal
+- `admin/` - AnalysisDetailModal
+- `notifications/` - NotificationDropdown, NotificationItem
+- `shared/ui/` - LoadingState, ErrorBoundary, OptimizedImage
 
-**Views** - Dashboard, Products, Orders, Analysis, Chat, Settings
+**Composables** (`composables/`) - 12 composables
+- `useFormatters` - Formatação de dados (moeda, datas)
+- `useValidation` - Validação de formulários
+- `useLoadingState` - Estados de loading
+- `useConfirmDialog` - Dialogs de confirmação
+- `useSanitize` - Sanitização HTML (XSS)
+- `useAsyncComponent` - Carregamento lazy
+- `useKeyboard`, `useScroll` - Eventos DOM
+
+**Types** (`types/`) - 11 arquivos TypeScript
+- `analysis.ts`, `api.ts`, `chat.ts`, `customer.ts`, `dashboard.ts`
+- `notification.ts`, `order.ts`, `product.ts`, `store.ts`, `user.ts`
+
+**Views** (`views/`) - 25 views
+- **Principal:** Dashboard, Analysis, Chat, Suggestions, Products, Orders, Discounts, Settings
+- **Admin:** AdminDashboard, Analyses, Clients, Users, Plans, Settings, Integrations
 
 ## Módulo de Análise AI
 
@@ -166,6 +208,9 @@ Todos os prompts (`app/Services/AI/Prompts/`) geram respostas em português bras
 - `AnalystAgentPrompt` - Métricas e anomalias
 - `StrategistAgentPrompt` - 9 sugestões (3 high, 3 medium, 3 low)
 - `CriticAgentPrompt` - Validação e melhoria
+- `LiteAnalystAgentPrompt` - Versão simplificada do Analyst
+- `LiteStrategistAgentPrompt` - Versão simplificada do Strategist
+- `SimilarityCheckPrompt` - Detecção de sugestões similares
 
 ### JsonExtractor
 
@@ -200,8 +245,51 @@ $suggestions = $this->persistentSuggestions()
 'recommended_action' // Passos para implementar
 'expected_impact'    // high|medium|low
 'priority'           // Ordem numérica (1, 2, 3...)
-'status'             // pending|in_progress|completed|ignored
+'status'             // new|accepted|in_progress|completed|rejected
+'was_successful'     // Feedback se a sugestão funcionou
 ```
+
+### Sistema de Deduplicação
+
+O `SuggestionDeduplicationTrait` evita sugestões repetidas:
+- Identifica temas saturados (sugeridos 2+ vezes)
+- Valida unicidade via similaridade de título (threshold: 75%)
+- Usa `similar_text()` e `levenshtein()` para comparação
+- Temas monitorados: quiz, frete_gratis, fidelidade, kits, estoque, email, etc.
+
+### Stage-Based Progress
+
+O `StoreAnalysisService` usa progresso por estágios:
+```php
+private const MAX_STAGE_RETRIES = 3;
+private const STAGE_RETRY_DELAYS = [30, 60, 120];  // segundos
+
+// Estágios: collector → analyst → strategist → critic → saving
+```
+
+## API Controllers
+
+**Controllers** (`app/Http/Controllers/Api/`) - 21 controllers
+
+**Auth & Admin:**
+- `AuthController` - Login, register, logout, reset password
+- `AdminController` - Dashboard admin
+- `UserManagementController` - CRUD de usuários
+
+**Core:**
+- `DashboardController` - Stats e métricas
+- `AnalysisController` - CRUD de análises AI
+- `ChatController` - Chat com IA
+- `ProductController`, `OrderController`, `DiscountController` - Dados sync
+
+**Admin Específico:**
+- `AdminAnalysesController`, `AdminPlanController`, `AdminSettingsController`
+- `AdminEmailConfigurationController`, `AdminIntegrationsController`
+
+**Integração:**
+- `IntegrationController` - Connect/disconnect Nuvemshop
+- `StoreConfigController`, `StoreSettingsController`
+- `NotificationController`, `LocationController`
 
 ## Integração Nuvemshop
 
@@ -232,11 +320,26 @@ class="border-gray-200 dark:border-gray-700"
 ## Variáveis de Ambiente
 
 ```
-OPENAI_API_KEY
-GOOGLE_AI_API_KEY
-NUVEMSHOP_CLIENT_ID
-NUVEMSHOP_CLIENT_SECRET
+# AI Providers
+AI_PROVIDER=anthropic          # openai|gemini|anthropic
+OPENAI_API_KEY=
+GOOGLE_AI_API_KEY=
+ANTHROPIC_API_KEY=
+
+# Integração Nuvemshop
+NUVEMSHOP_CLIENT_ID=
+NUVEMSHOP_CLIENT_SECRET=
+
+# Database & Queue
+DB_CONNECTION=pgsql
+DB_HOST=postgres
+DB_PORT=5434
 QUEUE_CONNECTION=database
+CACHE_STORE=database
+
+# Redis (opcional, para cache avançada)
+REDIS_HOST=redis
+REDIS_PORT=6379
 ```
 
 ## Credenciais Padrão

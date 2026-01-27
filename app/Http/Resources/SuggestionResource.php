@@ -10,8 +10,8 @@ class SuggestionResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'analysis_id' => $this->analysis_id,
+            'id' => $this->uuid,
+            'analysis_id' => $this->analysis?->uuid,
             'category' => $this->category,
             'title' => $this->title,
             'description' => $this->description,

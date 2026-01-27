@@ -6,6 +6,7 @@
  */
 
 import type { ApiResponse, ApiError, Result } from '../types/api';
+import { logger } from './logger';
 
 /**
  * Re-export types for convenience
@@ -55,7 +56,7 @@ export async function handleApiCall<T>(
 
     // Log error in development mode
     if (import.meta.env.DEV) {
-      console.error('[API Error]', {
+      logger.error('[API Error]', {
         message: apiError.message,
         status: apiError.status,
         errors: apiError.errors,

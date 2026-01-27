@@ -11,17 +11,18 @@ import { ref, computed } from 'vue';
 import api from '../services/api';
 import { handleApiCall, type Result, type ApiError } from '../utils/apiHelpers';
 import { clearAllRequestCache } from '../utils/requestCache';
+import { logger } from '../utils/logger';
 
 /**
  * Types
  */
 interface User {
-  id: number;
+  id: string;  // UUID
   name: string;
   email: string;
   role: 'admin' | 'client';
   permissions: string[];
-  active_store_id: number | null;
+  active_store_id: string | null;  // UUID
   must_change_password?: boolean;
 }
 
@@ -284,7 +285,7 @@ export const useAuthStore = defineStore('auth', () => {
       await api.post('/auth/logout');
     } catch (error) {
       // Ignore errors - logout locally anyway
-      console.error('Error during server logout:', error);
+      logger.error('Error during server logout:', error);
     } finally {
       logout();
     }

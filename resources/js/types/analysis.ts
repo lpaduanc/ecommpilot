@@ -18,7 +18,7 @@ export type SuggestionPriority = 'high' | 'medium' | 'low';
  * Suggestion interface
  */
 export interface Suggestion {
-  id: number;
+  id: string;  // UUID
   title: string;
   description: string;
   priority: SuggestionPriority;
@@ -29,7 +29,7 @@ export interface Suggestion {
  * Alert interface
  */
 export interface Alert {
-  id: number;
+  id: string;  // UUID
   title: string;
   description: string;
   severity: 'critical' | 'warning' | 'info';
@@ -39,7 +39,7 @@ export interface Alert {
  * Opportunity interface
  */
 export interface Opportunity {
-  id: number;
+  id: string;  // UUID
   title: string;
   description: string;
   potential_impact: string;
@@ -50,9 +50,9 @@ export interface Opportunity {
  * Analysis interface
  */
 export interface Analysis {
-  id: number;
-  user_id: number;
-  store_id: number;
+  id: string;  // UUID
+  user_id: string;  // UUID
+  store_id: string;  // UUID
   status: AnalysisStatus;
   health_score: number;
   suggestions: Suggestion[];
@@ -67,7 +67,7 @@ export interface Analysis {
  * Analysis request payload
  */
 export interface AnalysisRequest {
-  store_id?: number;
+  store_id?: string;  // UUID
   focus_areas?: string[];
 }
 

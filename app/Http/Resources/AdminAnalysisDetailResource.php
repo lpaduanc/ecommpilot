@@ -16,14 +16,14 @@ class AdminAnalysisDetailResource extends JsonResource
         $logService = app(AnalysisLogService::class);
 
         return [
-            'id' => $this->id,
+            'id' => $this->uuid,
             'user' => [
-                'id' => $this->user?->id,
+                'id' => $this->user?->uuid,
                 'name' => $this->user?->name,
                 'email' => $this->user?->email,
             ],
             'store' => [
-                'id' => $this->store?->id,
+                'id' => $this->store?->uuid,
                 'name' => $this->store?->name,
                 'platform' => $this->store?->platform?->value,
                 'platform_label' => $this->store?->platform?->label(),
@@ -34,7 +34,7 @@ class AdminAnalysisDetailResource extends JsonResource
             'alerts' => $this->alerts,
             'opportunities' => $this->opportunities,
             'suggestions' => $this->persistentSuggestions->map(fn ($s) => [
-                'id' => $s->id,
+                'id' => $s->uuid,
                 'category' => $s->category,
                 'title' => $s->title,
                 'description' => $s->description,

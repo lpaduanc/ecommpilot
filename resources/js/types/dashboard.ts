@@ -52,7 +52,7 @@ export interface CategoryData {
  * Top product interface
  */
 export interface TopProduct {
-  id: number;
+  id: string;  // UUID
   name: string;
   sku: string | null;
   sales_count: number;
@@ -72,7 +72,7 @@ export interface DashboardFilters {
   date_range: DateRange;
   start_date?: string;
   end_date?: string;
-  store_id?: number;
+  store_id?: string;  // UUID
 }
 
 /**

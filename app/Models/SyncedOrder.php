@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Traits\SafeILikeSearch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,9 +12,26 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SyncedOrder extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SafeILikeSearch, SoftDeletes;
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 
     protected $fillable = [
+        'uuid',
         'store_id',
         'external_id',
         'order_number',
@@ -37,6 +55,7 @@ class SyncedOrder extends Model
     protected function casts(): array
     {
         return [
+            'uuid' => 'string',
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'subtotal' => 'decimal:2',
@@ -96,10 +115,13 @@ class SyncedOrder extends Model
             return $query;
         }
 
-        return $query->where(function ($q) use ($search) {
-            $q->whereRaw('order_number ILIKE ?', ["%{$search}%"])
-                ->orWhereRaw('customer_name ILIKE ?', ["%{$search}%"])
-                ->orWhereRaw('customer_email ILIKE ?', ["%{$search}%"]);
+        $sanitized = $this->sanitizeILikeInput($search);
+        $pattern = '%'.$sanitized.'%';
+
+        return $query->where(function ($q) use ($pattern) {
+            $q->where('order_number', 'ILIKE', $pattern)
+                ->orWhere('customer_name', 'ILIKE', $pattern)
+                ->orWhere('customer_email', 'ILIKE', $pattern);
         });
     }
 

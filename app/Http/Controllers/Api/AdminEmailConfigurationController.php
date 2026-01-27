@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmailConfigurationRequest;
 use App\Http\Requests\UpdateEmailConfigurationRequest;
+use App\Models\EmailConfiguration;
 use App\Services\EmailConfigurationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,19 +69,11 @@ class AdminEmailConfigurationController extends Controller
     /**
      * Display the specified email configuration.
      */
-    public function show(int $id): JsonResponse
+    public function show(EmailConfiguration $emailConfiguration): JsonResponse
     {
         try {
-            $configuration = $this->emailConfigService->getById($id);
-
-            if (! $configuration) {
-                return response()->json([
-                    'message' => 'Configuração não encontrada.',
-                ], 404);
-            }
-
             return response()->json([
-                'data' => $this->emailConfigService->getForDisplay($id),
+                'data' => $this->emailConfigService->getForDisplay($emailConfiguration->id),
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -93,10 +86,10 @@ class AdminEmailConfigurationController extends Controller
     /**
      * Update the specified email configuration.
      */
-    public function update(UpdateEmailConfigurationRequest $request, int $id): JsonResponse
+    public function update(UpdateEmailConfigurationRequest $request, EmailConfiguration $emailConfiguration): JsonResponse
     {
         try {
-            $configuration = $this->emailConfigService->update($id, $request->validated());
+            $configuration = $this->emailConfigService->update($emailConfiguration->id, $request->validated());
 
             return response()->json([
                 'message' => 'Configuração de e-mail atualizada com sucesso.',
@@ -113,10 +106,10 @@ class AdminEmailConfigurationController extends Controller
     /**
      * Remove the specified email configuration.
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(EmailConfiguration $emailConfiguration): JsonResponse
     {
         try {
-            $this->emailConfigService->delete($id);
+            $this->emailConfigService->delete($emailConfiguration->id);
 
             return response()->json([
                 'message' => 'Configuração de e-mail excluída com sucesso.',
@@ -132,7 +125,7 @@ class AdminEmailConfigurationController extends Controller
     /**
      * Test email sending with a configuration.
      */
-    public function test(Request $request, int $id): JsonResponse
+    public function test(Request $request, EmailConfiguration $emailConfiguration): JsonResponse
     {
         $request->validate([
             'test_email' => ['required', 'email'],
@@ -142,7 +135,7 @@ class AdminEmailConfigurationController extends Controller
         ]);
 
         try {
-            $result = $this->emailConfigService->test($id, $request->test_email);
+            $result = $this->emailConfigService->test($emailConfiguration->id, $request->test_email);
 
             return response()->json($result, $result['success'] ? 200 : 400);
         } catch (\Exception $e) {

@@ -5,6 +5,8 @@
  * exponential backoff and configurable retry conditions.
  */
 
+import { logger } from './logger';
+
 /**
  * Retry options configuration
  */
@@ -95,7 +97,7 @@ export async function retryRequest<T>(
       // If this was the last attempt or shouldn't retry, throw the error
       if (attempt >= config.maxRetries || !shouldRetry) {
         if (import.meta.env.DEV) {
-          console.error(
+          logger.error(
             `[Retry Request] Failed after ${attempt} attempts:`,
             error.message
           );
@@ -109,7 +111,7 @@ export async function retryRequest<T>(
         : config.delay;
 
       if (import.meta.env.DEV) {
-        console.warn(
+        logger.warn(
           `[Retry Request] Attempt ${attempt + 1}/${config.maxRetries} failed. ` +
             `Retrying in ${waitTime}ms...`,
           { status, message: error.message }

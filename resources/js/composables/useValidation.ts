@@ -1,6 +1,11 @@
 /**
  * Composable para validação de dados
  *
+ * SECURITY NOTICE:
+ * These validations are for UX/UI purposes only to provide immediate feedback.
+ * Backend MUST independently validate ALL inputs before processing.
+ * Client-side validations can be bypassed via browser DevTools or API tools.
+ *
  * Fornece funções reutilizáveis para validação de email, CPF e outros dados comuns
  *
  * @example

@@ -17,7 +17,7 @@ class AnalysisResource extends JsonResource
         $formattedSuggestions = SuggestionResource::collection($suggestions)->resolve();
 
         return [
-            'id' => $this->id,
+            'id' => $this->uuid,
             'status' => $this->status?->value,
             'error_message' => $this->error_message,
             'summary' => $this->summary,

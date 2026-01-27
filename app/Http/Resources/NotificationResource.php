@@ -13,7 +13,7 @@ class NotificationResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->uuid,
             'type' => $this->type->value,
             'type_label' => $this->type->label(),
             'icon' => $this->type->icon(),
@@ -24,7 +24,7 @@ class NotificationResource extends JsonResource
             'is_read' => $this->isRead(),
             'created_at' => $this->created_at->toIso8601String(),
             'store' => $this->when($this->store, [
-                'id' => $this->store?->id,
+                'id' => $this->store?->uuid,
                 'name' => $this->store?->name,
             ]),
         ];

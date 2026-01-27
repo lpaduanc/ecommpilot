@@ -213,7 +213,7 @@ class AnalysisController extends Controller
         return response()->json(AnalysisResource::collection($analyses));
     }
 
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, Analysis $analysis): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -222,19 +222,15 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $analysis = Analysis::where('id', $id)
-            ->where('user_id', $user->id)
-            ->where('store_id', $store->id)
-            ->first();
-
-        if (! $analysis) {
+        // Verify analysis ownership
+        if ($analysis->user_id !== $user->id || $analysis->store_id !== $store->id) {
             return response()->json(['message' => 'Análise não encontrada.'], 404);
         }
 
         return response()->json(new AnalysisResource($analysis));
     }
 
-    public function markSuggestionDone(Request $request, int $analysisId, string $suggestionId): JsonResponse
+    public function markSuggestionDone(Request $request, Analysis $analysis, string $suggestionId): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -243,12 +239,8 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $analysis = Analysis::where('id', $analysisId)
-            ->where('user_id', $user->id)
-            ->where('store_id', $store->id)
-            ->first();
-
-        if (! $analysis) {
+        // Verify analysis ownership
+        if ($analysis->user_id !== $user->id || $analysis->store_id !== $store->id) {
             return response()->json(['message' => 'Análise não encontrada.'], 404);
         }
 
@@ -310,7 +302,7 @@ class AnalysisController extends Controller
     /**
      * Update a suggestion status.
      */
-    public function updateSuggestion(Request $request, int $suggestionId): JsonResponse
+    public function updateSuggestion(Request $request, Suggestion $suggestion): JsonResponse
     {
         $request->validate([
             'status' => 'required|in:new,rejected,accepted,in_progress,completed,pending,ignored',
@@ -323,11 +315,8 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $suggestion = Suggestion::where('id', $suggestionId)
-            ->where('store_id', $store->id)
-            ->first();
-
-        if (! $suggestion) {
+        // Verify suggestion ownership
+        if ($suggestion->store_id !== $store->id) {
             return response()->json(['message' => 'Sugestão não encontrada.'], 404);
         }
 
@@ -377,7 +366,7 @@ class AnalysisController extends Controller
     /**
      * Accept a suggestion - moves to tracking page.
      */
-    public function acceptSuggestion(Request $request, int $suggestionId): JsonResponse
+    public function acceptSuggestion(Request $request, Suggestion $suggestion): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -386,11 +375,8 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $suggestion = Suggestion::where('id', $suggestionId)
-            ->where('store_id', $store->id)
-            ->first();
-
-        if (! $suggestion) {
+        // Verify suggestion ownership
+        if ($suggestion->store_id !== $store->id) {
             return response()->json(['message' => 'Sugestão não encontrada.'], 404);
         }
 
@@ -410,7 +396,7 @@ class AnalysisController extends Controller
     /**
      * Reject a suggestion - stays on analysis page.
      */
-    public function rejectSuggestion(Request $request, int $suggestionId): JsonResponse
+    public function rejectSuggestion(Request $request, Suggestion $suggestion): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -419,11 +405,8 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $suggestion = Suggestion::where('id', $suggestionId)
-            ->where('store_id', $store->id)
-            ->first();
-
-        if (! $suggestion) {
+        // Verify suggestion ownership
+        if ($suggestion->store_id !== $store->id) {
             return response()->json(['message' => 'Sugestão não encontrada.'], 404);
         }
 
@@ -510,7 +493,7 @@ class AnalysisController extends Controller
     /**
      * Submit feedback for a completed suggestion (V4 Feedback Loop).
      */
-    public function submitFeedback(Request $request, int $suggestionId): JsonResponse
+    public function submitFeedback(Request $request, Suggestion $suggestion): JsonResponse
     {
         $request->validate([
             'was_successful' => 'required|boolean',
@@ -525,11 +508,8 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $suggestion = Suggestion::where('id', $suggestionId)
-            ->where('store_id', $store->id)
-            ->first();
-
-        if (! $suggestion) {
+        // Verify suggestion ownership
+        if ($suggestion->store_id !== $store->id) {
             return response()->json(['message' => 'Sugestão não encontrada.'], 404);
         }
 
@@ -550,7 +530,7 @@ class AnalysisController extends Controller
             );
         } catch (\Exception $e) {
             Log::error('Erro ao processar feedback da sugestão', [
-                'suggestion_id' => $suggestionId,
+                'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
             ]);
         }
@@ -570,7 +550,7 @@ class AnalysisController extends Controller
     /**
      * Get a single suggestion details.
      */
-    public function showSuggestion(Request $request, int $suggestionId): JsonResponse
+    public function showSuggestion(Request $request, Suggestion $suggestion): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -579,14 +559,13 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        $suggestion = Suggestion::where('id', $suggestionId)
-            ->where('store_id', $store->id)
-            ->with('result')
-            ->first();
-
-        if (! $suggestion) {
+        // Verify suggestion ownership
+        if ($suggestion->store_id !== $store->id) {
             return response()->json(['message' => 'Sugestão não encontrada.'], 404);
         }
+
+        // Load result relationship
+        $suggestion->load('result');
 
         return response()->json(['suggestion' => new SuggestionResource($suggestion)]);
     }
@@ -666,7 +645,7 @@ class AnalysisController extends Controller
     /**
      * Resend completion email for an analysis.
      */
-    public function resendEmail(Request $request, int $id): JsonResponse
+    public function resendEmail(Request $request, Analysis $analysis): JsonResponse
     {
         $user = $request->user();
         $store = $user->activeStore;
@@ -675,14 +654,12 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
-        // Buscar análise do usuário autenticado com status Completed
-        $analysis = Analysis::where('id', $id)
-            ->where('user_id', $user->id)
-            ->where('store_id', $store->id)
-            ->where('status', AnalysisStatus::Completed)
-            ->first();
+        // Verify analysis ownership and status
+        if ($analysis->user_id !== $user->id || $analysis->store_id !== $store->id) {
+            return response()->json(['message' => 'Análise não encontrada ou ainda não foi concluída.'], 404);
+        }
 
-        if (! $analysis) {
+        if ($analysis->status !== AnalysisStatus::Completed) {
             return response()->json(['message' => 'Análise não encontrada ou ainda não foi concluída.'], 404);
         }
 

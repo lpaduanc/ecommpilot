@@ -5,6 +5,27 @@
 
     RewriteEngine On
 
+    # Security Headers
+    <IfModule mod_headers.c>
+        # Prevent clickjacking
+        Header always set X-Frame-Options "SAMEORIGIN"
+
+        # Prevent MIME type sniffing
+        Header always set X-Content-Type-Options "nosniff"
+
+        # Enable XSS Protection
+        Header always set X-XSS-Protection "1; mode=block"
+
+        # Referrer Policy
+        Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Permissions Policy
+        Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+        # Content Security Policy (ajuste conforme necessário)
+        Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'self';"
+    </IfModule>
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

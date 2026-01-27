@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue';
 import { XCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline';
+import { logger } from '@/utils/logger';
 
 /**
  * ErrorBoundary Component
@@ -56,7 +57,7 @@ onErrorCaptured((err: unknown, instance, info: string) => {
   errorInfo.value = info;
 
   // Log para desenvolvimento e monitoramento
-  console.error('[ErrorBoundary] Erro capturado:', {
+  logger.error('[ErrorBoundary] Erro capturado:', {
     error: errorObject,
     info,
     component: instance?.$options.name || 'Unknown Component',
@@ -68,7 +69,7 @@ onErrorCaptured((err: unknown, instance, info: string) => {
     try {
       props.onError(errorObject, info);
     } catch (callbackError) {
-      console.error('[ErrorBoundary] Erro no callback onError:', callbackError);
+      logger.error('[ErrorBoundary] Erro no callback onError:', callbackError);
     }
   }
 

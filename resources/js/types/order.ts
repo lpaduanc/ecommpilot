@@ -35,8 +35,8 @@ export type PaymentMethod =
  * Order item interface
  */
 export interface OrderItem {
-  id?: number;
-  order_id?: number;
+  id?: string;  // UUID
+  order_id?: string;  // UUID
   product_id: string;
   product_name: string;
   sku?: string | null;
@@ -63,8 +63,8 @@ export interface ShippingAddress {
  * Synced Order interface
  */
 export interface SyncedOrder {
-  id: number;
-  store_id: number;
+  id: string;  // UUID
+  store_id: string;  // UUID
   order_id: string;
   order_number: string;
   customer_name: string;

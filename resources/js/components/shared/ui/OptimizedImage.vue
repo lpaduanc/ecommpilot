@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { PhotoIcon } from '@heroicons/vue/24/outline';
+import { logger } from '@/utils/logger';
 
 /**
  * Props for OptimizedImage component
@@ -121,12 +122,12 @@ const onError = (event: Event) => {
     if (target.src === props.fallback || hasError.value) {
         isLoading.value = false;
         hasError.value = true;
-        console.warn('[OptimizedImage] Failed to load image and fallback:', props.src);
+        logger.warn('[OptimizedImage] Failed to load image and fallback:', props.src);
         return;
     }
 
     // Try loading fallback image
-    console.warn('[OptimizedImage] Failed to load image, trying fallback:', props.src);
+    logger.warn('[OptimizedImage] Failed to load image, trying fallback:', props.src);
     hasError.value = true;
     isLoading.value = false;
 };

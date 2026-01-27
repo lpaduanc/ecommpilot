@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../services/api';
+import { logger } from '../utils/logger';
 
 export const useAdminAnalysesStore = defineStore('adminAnalyses', () => {
     const analyses = ref([]);
@@ -94,7 +95,7 @@ export const useAdminAnalysesStore = defineStore('adminAnalyses', () => {
             const response = await api.get('/admin/analyses/stats', { params });
             stats.value = response.data;
         } catch (err) {
-            console.error('Error fetching stats:', err);
+            logger.error('Error fetching stats:', err);
             stats.value = null;
         } finally {
             isLoadingStats.value = false;

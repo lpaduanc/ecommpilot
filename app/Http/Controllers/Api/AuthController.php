@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -131,16 +132,19 @@ class AuthController extends Controller
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $status = Password::sendResetLink($request->only('email'));
+        // SECURITY: Send reset link silently to prevent email enumeration
+        // Always return success message regardless of whether email exists
+        Password::sendResetLink($request->only('email'));
 
-        if ($status !== Password::RESET_LINK_SENT) {
-            throw ValidationException::withMessages([
-                'email' => ['Não foi possível enviar o link de redefinição.'],
-            ]);
-        }
+        // Log for internal monitoring (not exposed to user)
+        Log::info('Password reset attempted', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+        ]);
 
+        // Return generic message to prevent email enumeration attack
         return response()->json([
-            'message' => 'Link de redefinição enviado para seu e-mail.',
+            'message' => 'Se o e-mail estiver cadastrado, você receberá um link de redefinição.',
         ]);
     }
 

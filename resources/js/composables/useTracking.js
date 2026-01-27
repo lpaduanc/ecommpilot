@@ -16,6 +16,7 @@
 
 import { ref, reactive } from 'vue'
 import api from '@/services/api'
+import { logger } from '@/utils/logger'
 
 // Configuração padrão
 const defaultConfig = {
@@ -68,7 +69,7 @@ async function loadConfig() {
             isConfigLoaded.value = true
         }
     } catch (error) {
-        console.warn('Não foi possível carregar configurações de tracking:', error.message)
+        logger.warn('Não foi possível carregar configurações de tracking:', error.message)
     } finally {
         isLoading.value = false
     }

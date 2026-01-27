@@ -84,9 +84,9 @@ const totalSuggestions = computed(() => stats.value?.accepted + stats.value?.in_
 const hasFilters = computed(() => statusFilter.value || categoryFilter.value || impactFilter.value);
 
 function getAnalysisBorderGradient(analysis) {
-    const acceptedSuggestions = analysis.suggestions.filter(s => s.status === 'accepted');
+    const suggestions = analysis.suggestions;
 
-    if (acceptedSuggestions.length === 0) {
+    if (suggestions.length === 0) {
         return null;
     }
 
@@ -94,7 +94,7 @@ function getAnalysisBorderGradient(analysis) {
     const presentColors = [];
 
     priorityOrder.forEach(priority => {
-        const hasThisPriority = acceptedSuggestions.some(s => (s.expected_impact || 'medium') === priority);
+        const hasThisPriority = suggestions.some(s => (s.expected_impact || 'medium') === priority);
         if (hasThisPriority) {
             const rgb = priorityConfig[priority].rgb;
             presentColors.push(`rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`);

@@ -1,5 +1,6 @@
 import { defineAsyncComponent, Component } from 'vue';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
+import { logger } from '@/utils/logger';
 
 /**
  * Configuration options for async component loading
@@ -105,21 +106,21 @@ export function useAsyncComponent(
         onError: onError || ((error, retry, fail, attempts) => {
             // Log error to console in development
             if (import.meta.env.DEV) {
-                console.error('[useAsyncComponent] Failed to load component:', error);
-                console.log(`Attempts: ${attempts}`);
+                logger.error('[useAsyncComponent] Failed to load component:', error);
+                logger.log(`Attempts: ${attempts}`);
             }
 
             // Retry up to 3 times with exponential backoff
             if (attempts < 3) {
                 const retryDelay = Math.min(1000 * Math.pow(2, attempts), 5000);
-                console.log(`[useAsyncComponent] Retrying in ${retryDelay}ms...`);
+                logger.log(`[useAsyncComponent] Retrying in ${retryDelay}ms...`);
 
                 setTimeout(() => {
                     retry();
                 }, retryDelay);
             } else {
                 // After 3 attempts, show error component
-                console.error('[useAsyncComponent] Max retry attempts reached. Showing error component.');
+                logger.error('[useAsyncComponent] Max retry attempts reached. Showing error component.');
                 fail();
             }
         }),

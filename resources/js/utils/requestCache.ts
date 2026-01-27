@@ -8,6 +8,8 @@
  * rapidly, we deduplicate requests to avoid unnecessary network traffic.
  */
 
+import { logger } from './logger';
+
 /**
  * Map to store pending requests by key
  */
@@ -58,13 +60,13 @@ export function dedupeRequest<T>(
   // If request is already pending, return the existing promise
   if (pendingRequests.has(key)) {
     if (import.meta.env.DEV) {
-      console.log(`[Request Cache] Returning cached request for key: ${key}`);
+      logger.log(`[Request Cache] Returning cached request for key: ${key}`);
     }
     return pendingRequests.get(key)!;
   }
 
   if (import.meta.env.DEV) {
-    console.log(`[Request Cache] Creating new request for key: ${key}`);
+    logger.log(`[Request Cache] Creating new request for key: ${key}`);
   }
 
   // Create new promise and cache it
@@ -75,7 +77,7 @@ export function dedupeRequest<T>(
         if (pendingRequests.get(key) === promise) {
           pendingRequests.delete(key);
           if (import.meta.env.DEV) {
-            console.log(`[Request Cache] Expired cache for key: ${key}`);
+            logger.log(`[Request Cache] Expired cache for key: ${key}`);
           }
         }
       }, ttl);
@@ -85,7 +87,7 @@ export function dedupeRequest<T>(
       // Error: remove from cache immediately so it can be retried
       pendingRequests.delete(key);
       if (import.meta.env.DEV) {
-        console.log(`[Request Cache] Error, removing cache for key: ${key}`);
+        logger.log(`[Request Cache] Error, removing cache for key: ${key}`);
       }
       throw error;
     });
@@ -102,7 +104,7 @@ export function dedupeRequest<T>(
  * @example
  * ```typescript
  * // Clear cache when data is mutated
- * async function updateProduct(id: number, data: ProductData) {
+ * async function updateProduct(id: string, data: ProductData) {
  *   await api.put(`/products/${id}`, data);
  *   clearRequestCache(`products-${id}`);
  *   clearRequestCache('products-list');
@@ -112,7 +114,7 @@ export function dedupeRequest<T>(
 export function clearRequestCache(key: string): void {
   const deleted = pendingRequests.delete(key);
   if (import.meta.env.DEV && deleted) {
-    console.log(`[Request Cache] Manually cleared cache for key: ${key}`);
+    logger.log(`[Request Cache] Manually cleared cache for key: ${key}`);
   }
 }
 
@@ -133,7 +135,7 @@ export function clearAllRequestCache(): void {
   const count = pendingRequests.size;
   pendingRequests.clear();
   if (import.meta.env.DEV && count > 0) {
-    console.log(`[Request Cache] Cleared all ${count} cached requests`);
+    logger.log(`[Request Cache] Cleared all ${count} cached requests`);
   }
 }
 

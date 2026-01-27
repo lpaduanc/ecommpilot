@@ -10,7 +10,7 @@ class StoreResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->uuid,
             'platform' => $this->platform?->value,
             'name' => $this->name,
             'domain' => $this->domain,

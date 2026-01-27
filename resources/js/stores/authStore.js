@@ -16,6 +16,9 @@ export const useAuthStore = defineStore('auth', () => {
     const planLimits = computed(() => user.value?.plan_limits || null);
 
     // Plan feature checks
+    // SECURITY: These checks are for UI/UX only (hide/show features).
+    // Backend MUST validate ALL plan permissions before executing actions.
+    // Client-side checks can be bypassed via DevTools.
     const canAccessAiAnalysis = computed(() => {
         if (isAdmin.value) return true;
         return planLimits.value?.has_ai_analysis ?? false;

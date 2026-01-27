@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../services/api';
+import { logger } from '../utils/logger';
 
 /**
  * Integration Store
@@ -46,9 +47,10 @@ export const useIntegrationStore = defineStore('integration', () => {
     // Active store ID
     const activeStoreId = ref(null);
 
-    // Active store computed
+    // Active store computed (activeStoreId is UUID)
     const activeStore = computed(() => {
         if (!activeStoreId.value || stores.value.length === 0) return null;
+        // Both activeStoreId and s.id are UUIDs
         return stores.value.find(s => s.id === activeStoreId.value);
     });
 
@@ -95,7 +97,7 @@ export const useIntegrationStore = defineStore('integration', () => {
     async function connectPlatform(platformId, storeDomain = null) {
         if (platformId === 'nuvemshop') {
             if (!storeDomain) {
-                console.error('Store domain is required for Nuvemshop connection');
+                logger.error('Store domain is required for Nuvemshop connection');
                 return { success: false, message: 'URL da loja é obrigatória' };
             }
 
@@ -115,7 +117,7 @@ export const useIntegrationStore = defineStore('integration', () => {
                 return { success: false, message: 'URL de redirecionamento não recebida' };
             } catch (error) {
                 const errorMessage = error.response?.data?.message || 'Erro ao conectar com a loja';
-                console.error('Error connecting to Nuvemshop:', errorMessage);
+                logger.error('Error connecting to Nuvemshop:', errorMessage);
                 return { success: false, message: errorMessage };
             }
         } else {
@@ -169,14 +171,14 @@ export const useIntegrationStore = defineStore('integration', () => {
     }
 
     /**
-     * Sync store data
+     * Sync store data (expects UUID)
      */
     async function syncStore(storeId) {
         isSyncing.value = true;
         try {
             const response = await api.post(`/integrations/stores/${storeId}/sync`);
 
-            // Update the store in the list immediately
+            // Update the store in the list immediately (compare by UUID)
             const storeIndex = stores.value.findIndex(s => s.id === storeId);
             if (storeIndex !== -1) {
                 stores.value[storeIndex] = {
@@ -204,13 +206,13 @@ export const useIntegrationStore = defineStore('integration', () => {
     }
 
     /**
-     * Disconnect store
+     * Disconnect store (expects UUID)
      */
     async function disconnectStore(storeId) {
         try {
             await api.delete(`/integrations/stores/${storeId}`);
 
-            // Remove from stores list
+            // Remove from stores list (compare by UUID)
             stores.value = stores.value.filter(s => s.id !== storeId);
 
             // Clear current store if it was the one disconnected
@@ -295,11 +297,13 @@ export const useIntegrationStore = defineStore('integration', () => {
 
     /**
      * Fetch sync status for active store (lightweight endpoint for polling)
+     * Note: store_id returned is UUID
      */
     async function fetchSyncStatus() {
         try {
             const response = await api.get('/integrations/sync-status');
             if (response.data.has_store && response.data.store_id) {
+                // Compare by UUID (store_id is UUID from backend)
                 const idx = stores.value.findIndex(s => s.id === response.data.store_id);
                 if (idx !== -1) {
                     stores.value[idx] = {

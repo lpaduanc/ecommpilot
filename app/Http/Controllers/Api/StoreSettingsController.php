@@ -215,13 +215,20 @@ class StoreSettingsController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_' . uniqid();
+
             Log::error('Exception during Nuvemshop token exchange', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                // Stack trace apenas em ambiente local
+                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             return response()->json([
                 'message' => 'Erro ao processar a autenticação.',
+                'error_id' => $errorId,
                 'error' => config('app.debug') ? $e->getMessage() : 'internal_error',
             ], 500);
         }

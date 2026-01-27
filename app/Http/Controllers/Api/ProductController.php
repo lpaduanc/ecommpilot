@@ -109,7 +109,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, SyncedProduct $product): JsonResponse
     {
         $store = $request->user()->activeStore;
 
@@ -117,18 +117,15 @@ class ProductController extends Controller
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
-        $product = SyncedProduct::where('store_id', $store->id)
-            ->where('id', $id)
-            ->first();
-
-        if (! $product) {
+        // Verify product belongs to active store
+        if ($product->store_id !== $store->id) {
             return response()->json(['message' => 'Produto não encontrado.'], 404);
         }
 
         return response()->json(new ProductResource($product));
     }
 
-    public function performance(Request $request, int $id): JsonResponse
+    public function performance(Request $request, SyncedProduct $product): JsonResponse
     {
         $store = $request->user()->activeStore;
 
@@ -136,11 +133,8 @@ class ProductController extends Controller
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
-        $product = SyncedProduct::where('store_id', $store->id)
-            ->where('id', $id)
-            ->first();
-
-        if (! $product) {
+        // Verify product belongs to active store
+        if ($product->store_id !== $store->id) {
             return response()->json(['message' => 'Produto não encontrado.'], 404);
         }
 

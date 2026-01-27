@@ -36,8 +36,8 @@ Route::prefix('auth')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('user', [AuthController::class, 'user']);
-        Route::put('profile', [AuthController::class, 'updateProfile']);
-        Route::put('password', [AuthController::class, 'updatePassword']);
+        Route::put('profile', [AuthController::class, 'updateProfile'])->middleware('throttle:10,1');
+        Route::put('password', [AuthController::class, 'updatePassword'])->middleware('throttle:5,1');
         Route::post('logout', [AuthController::class, 'logout']);
     });
 });
@@ -71,8 +71,8 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::prefix('products')->middleware('can:products.view')->group(function () {
         Route::get('/', [ProductController::class, 'index']);
-        Route::get('/{id}', [ProductController::class, 'show']);
-        Route::get('/{id}/performance', [ProductController::class, 'performance']);
+        Route::get('/{product}', [ProductController::class, 'show']);
+        Route::get('/{product}/performance', [ProductController::class, 'performance']);
     });
 
     /*
@@ -85,7 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/filters', [OrderController::class, 'filters']);
         Route::get('/export', [OrderController::class, 'export']);
         Route::get('/stats', [OrderController::class, 'stats']);
-        Route::get('/{id}', [OrderController::class, 'show']);
+        Route::get('/{order}', [OrderController::class, 'show']);
     });
 
     /*
@@ -120,14 +120,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('stores', [IntegrationController::class, 'stores']);
         Route::get('my-stores', [IntegrationController::class, 'myStores']);
         Route::get('sync-status', [IntegrationController::class, 'syncStatus']);
-        Route::post('select-store/{storeId}', [IntegrationController::class, 'selectStore']);
+        Route::post('select-store/{store}', [IntegrationController::class, 'selectStore']);
 
         // Gerenciamento de integrações - requer permissão
         Route::middleware('can:integrations.manage')->group(function () {
             Route::get('nuvemshop/connect', [IntegrationController::class, 'connectNuvemshop']);
             Route::post('nuvemshop/authorize', [IntegrationController::class, 'authorizeNuvemshop']);
-            Route::post('stores/{storeId}/sync', [IntegrationController::class, 'sync']);
-            Route::delete('stores/{storeId}', [IntegrationController::class, 'disconnect']);
+            Route::post('stores/{store}/sync', [IntegrationController::class, 'sync']);
+            Route::delete('stores/{store}', [IntegrationController::class, 'disconnect']);
         });
     });
 
@@ -141,15 +141,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('can:analysis.view')->group(function () {
             Route::get('current', [AnalysisController::class, 'current']);
             Route::get('history', [AnalysisController::class, 'history']);
-            Route::get('{id}', [AnalysisController::class, 'show']);
-            Route::post('{id}/resend-email', [AnalysisController::class, 'resendEmail']);
+            Route::get('{analysis}', [AnalysisController::class, 'show']);
+            Route::post('{analysis}/resend-email', [AnalysisController::class, 'resendEmail']);
         });
 
         // Solicitar nova análise - requer permissão específica
         Route::post('request', [AnalysisController::class, 'request'])->middleware('can:analysis.request');
 
         // Marcar sugestão como feita (legacy) - requer permissão de visualização
-        Route::post('{analysisId}/suggestions/{suggestionId}/done', [AnalysisController::class, 'markSuggestionDone'])
+        Route::post('{analysis}/suggestions/{suggestion}/done', [AnalysisController::class, 'markSuggestionDone'])
             ->middleware('can:analysis.view');
     });
 
@@ -162,11 +162,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [AnalysisController::class, 'suggestions']);
         Route::get('/stats', [AnalysisController::class, 'suggestionStats']);
         Route::get('/tracking', [AnalysisController::class, 'trackingSuggestions']); // Tracking page
-        Route::get('/{id}', [AnalysisController::class, 'showSuggestion']);
-        Route::patch('/{id}', [AnalysisController::class, 'updateSuggestion']);
-        Route::post('/{id}/accept', [AnalysisController::class, 'acceptSuggestion']);
-        Route::post('/{id}/reject', [AnalysisController::class, 'rejectSuggestion']);
-        Route::post('/{id}/feedback', [AnalysisController::class, 'submitFeedback']); // V4: Feedback loop
+        Route::get('/{suggestion}', [AnalysisController::class, 'showSuggestion']);
+        Route::patch('/{suggestion}', [AnalysisController::class, 'updateSuggestion']);
+        Route::post('/{suggestion}/accept', [AnalysisController::class, 'acceptSuggestion']);
+        Route::post('/{suggestion}/reject', [AnalysisController::class, 'rejectSuggestion']);
+        Route::post('/{suggestion}/feedback', [AnalysisController::class, 'submitFeedback']); // V4: Feedback loop
     });
 
     /*
@@ -176,7 +176,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::prefix('chat')->middleware('can:chat.use')->group(function () {
         Route::get('conversation', [ChatController::class, 'conversation']);
-        Route::get('conversation/suggestion/{suggestionId}', [ChatController::class, 'getSuggestionConversation']);
+        Route::get('conversation/suggestion/{suggestion}', [ChatController::class, 'getSuggestionConversation']);
         // Rate limit: 20 mensagens por minuto por usuário
         Route::post('message', [ChatController::class, 'sendMessage'])->middleware('throttle:20,1');
         Route::delete('conversation', [ChatController::class, 'clearConversation']);
@@ -190,9 +190,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('notifications')->group(function () {
         Route::get('/', [NotificationController::class, 'index']);
         Route::get('/unread', [NotificationController::class, 'unread']);
-        Route::post('/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead']);
         Route::post('/read-all', [NotificationController::class, 'markAllAsRead']);
-        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+        Route::delete('/{notification}', [NotificationController::class, 'destroy']);
     });
 
     /*
@@ -204,9 +204,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [UserManagementController::class, 'index']);
         Route::get('/permissions', [UserManagementController::class, 'permissions']);
         Route::post('/', [UserManagementController::class, 'store'])->middleware('can:users.create');
-        Route::get('/{id}', [UserManagementController::class, 'show']);
-        Route::put('/{id}', [UserManagementController::class, 'update'])->middleware('can:users.edit');
-        Route::delete('/{id}', [UserManagementController::class, 'destroy'])->middleware('can:users.delete');
+        Route::get('/{user}', [UserManagementController::class, 'show']);
+        Route::put('/{user}', [UserManagementController::class, 'update'])->middleware('can:users.edit');
+        Route::delete('/{user}', [UserManagementController::class, 'destroy'])->middleware('can:users.delete');
     });
 
     /*
@@ -219,12 +219,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('clients', [AdminController::class, 'clients']);
         Route::post('clients', [AdminController::class, 'createClient']);
         Route::get('clients/permissions', [AdminController::class, 'clientPermissions']);
-        Route::get('clients/{id}', [AdminController::class, 'clientDetail']);
-        Route::put('clients/{id}', [AdminController::class, 'updateClient']);
-        Route::delete('clients/{id}', [AdminController::class, 'deleteClient']);
-        Route::post('clients/{id}/toggle-status', [AdminController::class, 'toggleClientStatus']);
-        Route::post('clients/{id}/reset-password', [AdminController::class, 'resetPassword']);
-        Route::post('clients/{id}/impersonate', [AdminController::class, 'impersonate']);
+        Route::get('clients/{user}', [AdminController::class, 'clientDetail']);
+        Route::put('clients/{user}', [AdminController::class, 'updateClient']);
+        Route::delete('clients/{user}', [AdminController::class, 'deleteClient']);
+        Route::post('clients/{user}/toggle-status', [AdminController::class, 'toggleClientStatus']);
+        Route::post('clients/{user}/reset-password', [AdminController::class, 'resetPassword'])->middleware('throttle:5,1');
+        Route::post('clients/{user}/impersonate', [AdminController::class, 'impersonate'])->middleware('throttle:10,1');
 
         // Admin Settings
         Route::prefix('settings')->group(function () {
@@ -240,10 +240,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::prefix('email')->group(function () {
                 Route::get('/', [AdminEmailConfigurationController::class, 'index']);
                 Route::post('/', [AdminEmailConfigurationController::class, 'store']);
-                Route::get('/{id}', [AdminEmailConfigurationController::class, 'show']);
-                Route::put('/{id}', [AdminEmailConfigurationController::class, 'update']);
-                Route::delete('/{id}', [AdminEmailConfigurationController::class, 'destroy']);
-                Route::post('/{id}/test', [AdminEmailConfigurationController::class, 'test']);
+                Route::get('/{emailConfiguration}', [AdminEmailConfigurationController::class, 'show']);
+                Route::put('/{emailConfiguration}', [AdminEmailConfigurationController::class, 'update']);
+                Route::delete('/{emailConfiguration}', [AdminEmailConfigurationController::class, 'destroy']);
+                Route::post('/{emailConfiguration}/test', [AdminEmailConfigurationController::class, 'test']);
             });
 
             // Store/Nuvemshop Settings
@@ -267,16 +267,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('plans')->group(function () {
             Route::get('/', [AdminPlanController::class, 'index']);
             Route::post('/', [AdminPlanController::class, 'store']);
-            Route::get('/{id}', [AdminPlanController::class, 'show']);
-            Route::put('/{id}', [AdminPlanController::class, 'update']);
-            Route::delete('/{id}', [AdminPlanController::class, 'destroy']);
-            Route::post('/{id}/assign', [AdminPlanController::class, 'assignToClient']);
+            Route::get('/{plan}', [AdminPlanController::class, 'show']);
+            Route::put('/{plan}', [AdminPlanController::class, 'update']);
+            Route::delete('/{plan}', [AdminPlanController::class, 'destroy']);
+            Route::post('/{plan}/assign', [AdminPlanController::class, 'assignToClient']);
         });
 
         // Client Plan Management
-        Route::get('clients/{id}/usage', [AdminPlanController::class, 'clientUsage']);
-        Route::get('clients/{id}/subscription', [AdminPlanController::class, 'clientSubscription']);
-        Route::delete('clients/{id}/subscription', [AdminPlanController::class, 'removeFromClient']);
+        Route::get('clients/{user}/usage', [AdminPlanController::class, 'clientUsage']);
+        Route::get('clients/{user}/subscription', [AdminPlanController::class, 'clientSubscription']);
+        Route::delete('clients/{user}/subscription', [AdminPlanController::class, 'removeFromClient']);
         Route::get('clients-with-plans', [AdminPlanController::class, 'clientsWithPlans']);
 
         // Integrations (External Data Services)

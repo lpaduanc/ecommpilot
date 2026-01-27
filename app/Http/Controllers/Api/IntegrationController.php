@@ -84,12 +84,57 @@ class IntegrationController extends Controller
 
     /**
      * Validate if the URL is a valid store URL format.
-     * Accepts any valid domain - Nuvemshop will validate if it's a real store.
+     * SECURITY: Prevent SSRF by whitelisting allowed domains and blocking internal IPs.
      */
     private function isValidNuvemshopUrl(string $url): bool
     {
-        // Accept any non-empty URL - Nuvemshop will validate if it's a real store
-        return ! empty($url) && strlen($url) >= 3;
+        if (empty($url) || strlen($url) < 3 || strlen($url) > 255) {
+            return false;
+        }
+
+        // Whitelist of valid Nuvemshop domains
+        $allowedDomains = [
+            '.lojavirtualnuvem.com.br',
+            '.nuvemshop.com.br',
+            '.tiendanube.com',
+            '.mitiendanube.com',
+        ];
+
+        // Normalize URL
+        $normalizedUrl = strtolower(trim($url));
+
+        // Check if URL ends with allowed domain
+        foreach ($allowedDomains as $domain) {
+            if (str_ends_with($normalizedUrl, $domain)) {
+                return true;
+            }
+        }
+
+        // Allow custom domains ONLY if valid hostname and NOT internal IP
+        // This prevents SSRF attacks to localhost, private networks, etc.
+        $blockedPatterns = [
+            '/^localhost/i',
+            '/^127\./',           // 127.0.0.0/8 loopback
+            '/^10\./',            // 10.0.0.0/8 private
+            '/^172\.(1[6-9]|2[0-9]|3[0-1])\./',  // 172.16.0.0/12 private
+            '/^192\.168\./',      // 192.168.0.0/16 private
+            '/^0\./',             // 0.0.0.0/8 reserved
+            '/^\[/',              // IPv6
+            '/^::/',              // IPv6 localhost
+        ];
+
+        foreach ($blockedPatterns as $pattern) {
+            if (preg_match($pattern, $normalizedUrl)) {
+                return false;
+            }
+        }
+
+        // Validate as hostname
+        if (filter_var($normalizedUrl, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+            return true;
+        }
+
+        return false;
     }
 
     public function callbackNuvemshop(Request $request): RedirectResponse
@@ -120,12 +165,18 @@ class IntegrationController extends Controller
 
             return redirect('/integrations?success=connected');
         } catch (\Exception $e) {
+            $errorId = 'err_' . uniqid();
+
             Log::error('Nuvemshop callback error', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                // Stack trace apenas em ambiente local
+                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
-            return redirect('/integrations?error='.urlencode($e->getMessage()));
+            return redirect('/integrations?error=callback_failed&error_id=' . $errorId);
         }
     }
 
@@ -366,24 +417,28 @@ class IntegrationController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_' . uniqid();
+
             Log::error('Exception during Nuvemshop authorization', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                // Stack trace apenas em ambiente local
+                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             return response()->json([
                 'message' => 'Erro ao processar a autorização. Tente novamente.',
+                'error_id' => $errorId,
             ], 500);
         }
     }
 
-    public function sync(Request $request, int $storeId): JsonResponse
+    public function sync(Request $request, Store $store): JsonResponse
     {
-        $store = Store::where('id', $storeId)
-            ->where('user_id', $request->user()->id)
-            ->first();
-
-        if (! $store) {
+        // Verify store ownership
+        if ($store->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -410,13 +465,10 @@ class IntegrationController extends Controller
         ]);
     }
 
-    public function disconnect(Request $request, int $storeId): JsonResponse
+    public function disconnect(Request $request, Store $store): JsonResponse
     {
-        $store = Store::where('id', $storeId)
-            ->where('user_id', $request->user()->id)
-            ->first();
-
-        if (! $store) {
+        // Verify store ownership
+        if ($store->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 
@@ -435,13 +487,13 @@ class IntegrationController extends Controller
 
         // Update user's active store if this was the active one
         $user = $request->user();
-        if ($user->active_store_id === $storeId) {
+        if ($user->active_store_id === $store->id) {
             $newActiveStore = $user->stores()->first();
             $user->update(['active_store_id' => $newActiveStore?->id]);
         }
 
         Log::info('Store disconnected and deleted', [
-            'store_id' => $storeId,
+            'store_id' => $store->id,
             'store_name' => $storeName,
             'user_id' => $user->id,
         ]);
@@ -455,23 +507,25 @@ class IntegrationController extends Controller
     {
         $user = $request->user();
         $stores = $user->stores()
-            ->select('id', 'name', 'platform', 'domain', 'sync_status', 'last_sync_at')
+            ->select('id', 'uuid', 'name', 'platform', 'domain', 'email', 'sync_status', 'last_sync_at')
             ->orderBy('name')
             ->get();
 
-        $activeStoreId = $user->activeStore?->id;
+        // active_store_id in users table is numeric ID, but we return UUID for frontend
+        $activeStoreUuid = $user->activeStore?->uuid;
 
         return response()->json([
             'stores' => $stores->map(fn ($s) => [
-                'id' => $s->id,
+                'id' => $s->uuid,
                 'name' => $s->name,
                 'platform' => $s->platform,
                 'domain' => $s->domain,
+                'email' => $s->email,
                 'sync_status' => $s->sync_status,
                 'last_sync_at' => $s->last_sync_at?->toISOString(),
-                'is_active' => $s->id === $activeStoreId,
+                'is_active' => $s->uuid === $activeStoreUuid,
             ]),
-            'active_store_id' => $activeStoreId,
+            'active_store_id' => $activeStoreUuid,
         ]);
     }
 
@@ -490,7 +544,7 @@ class IntegrationController extends Controller
 
         return response()->json([
             'has_store' => true,
-            'store_id' => $activeStore->id,
+            'store_id' => $activeStore->uuid,
             'store_name' => $activeStore->name,
             'sync_status' => $activeStore->sync_status->value,
             'is_syncing' => $activeStore->isSyncing(),
@@ -498,15 +552,12 @@ class IntegrationController extends Controller
         ]);
     }
 
-    public function selectStore(Request $request, int $storeId): JsonResponse
+    public function selectStore(Request $request, Store $store): JsonResponse
     {
         $user = $request->user();
 
-        $store = Store::where('id', $storeId)
-            ->where('user_id', $user->id)
-            ->first();
-
-        if (! $store) {
+        // Verify store ownership
+        if ($store->user_id !== $user->id) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 

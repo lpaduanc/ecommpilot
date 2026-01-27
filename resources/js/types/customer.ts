@@ -8,8 +8,8 @@
  * Synced Customer interface
  */
 export interface SyncedCustomer {
-  id: number;
-  store_id: number;
+  id: string;  // UUID
+  store_id: string;  // UUID
   customer_id: string;
   name: string;
   email: string;
@@ -49,7 +49,7 @@ export interface CustomerStats {
  * Top customer interface
  */
 export interface TopCustomer {
-  id: number;
+  id: string;  // UUID
   name: string;
   email: string;
   total_orders: number;
