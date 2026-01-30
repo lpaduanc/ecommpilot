@@ -39,12 +39,12 @@ return new class extends Migration
     private function processTable(string $table): void
     {
         // Skip if table doesn't exist
-        if (!Schema::hasTable($table)) {
+        if (! Schema::hasTable($table)) {
             return;
         }
 
         // Skip if uuid column doesn't exist
-        if (!Schema::hasColumn($table, 'uuid')) {
+        if (! Schema::hasColumn($table, 'uuid')) {
             return;
         }
 
@@ -67,11 +67,11 @@ return new class extends Migration
         }
 
         // Step 3: Add UNIQUE index if it doesn't exist
-        $indexName = $table . '_uuid_unique';
-        $indexExists = DB::select("
+        $indexName = $table.'_uuid_unique';
+        $indexExists = DB::select('
             SELECT 1 FROM pg_indexes
             WHERE tablename = ? AND indexname = ?
-        ", [$table, $indexName]);
+        ', [$table, $indexName]);
 
         if (empty($indexExists)) {
             Schema::table($table, function (Blueprint $blueprint) use ($indexName) {
@@ -87,7 +87,7 @@ return new class extends Migration
             WHERE table_name = ? AND column_name = 'uuid'
         ", [$table]);
 
-        if (!empty($columnInfo) && $columnInfo[0]->is_nullable === 'YES') {
+        if (! empty($columnInfo) && $columnInfo[0]->is_nullable === 'YES') {
             DB::statement("ALTER TABLE {$table} ALTER COLUMN uuid SET NOT NULL");
         }
     }
@@ -98,18 +98,18 @@ return new class extends Migration
     public function down(): void
     {
         foreach ($this->tables as $table) {
-            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'uuid')) {
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'uuid')) {
                 continue;
             }
 
             // Drop unique index if exists
-            $indexName = $table . '_uuid_unique';
-            $indexExists = DB::select("
+            $indexName = $table.'_uuid_unique';
+            $indexExists = DB::select('
                 SELECT 1 FROM pg_indexes
                 WHERE tablename = ? AND indexname = ?
-            ", [$table, $indexName]);
+            ', [$table, $indexName]);
 
-            if (!empty($indexExists)) {
+            if (! empty($indexExists)) {
                 Schema::table($table, function (Blueprint $blueprint) use ($indexName) {
                     $blueprint->dropUnique($indexName);
                 });

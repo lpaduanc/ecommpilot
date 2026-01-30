@@ -125,7 +125,8 @@ class NuvemshopService
         ];
         $payload = json_encode($stateData);
         $signature = hash_hmac('sha256', $payload, config('app.key'));
-        return base64_encode($payload . '|' . $signature);
+
+        return base64_encode($payload.'|'.$signature);
     }
 
     /**
@@ -140,11 +141,13 @@ class NuvemshopService
                 // Fallback para state antigo (sem assinatura) - rejeitar em produção
                 if (app()->isProduction()) {
                     Log::warning('OAuth state without signature rejected in production');
+
                     return null;
                 }
                 // Em dev/local, aceita formato antigo para compatibilidade
                 Log::warning('OAuth state without signature accepted in non-production environment');
                 $legacyData = json_decode($decoded, true);
+
                 return [
                     'user_id' => $legacyData['user_id'] ?? null,
                     'store_url' => $legacyData['store_url'] ?? null,
@@ -154,10 +157,11 @@ class NuvemshopService
             [$payload, $signature] = explode('|', $decoded, 2);
             $expectedSignature = hash_hmac('sha256', $payload, config('app.key'));
 
-            if (!hash_equals($expectedSignature, $signature)) {
+            if (! hash_equals($expectedSignature, $signature)) {
                 Log::warning('OAuth state signature mismatch', [
                     'ip' => request()->ip(),
                 ]);
+
                 return null;
             }
 
@@ -169,6 +173,7 @@ class NuvemshopService
                     'expired_at' => $data['expires_at'],
                     'current_time' => now()->timestamp,
                 ]);
+
                 return null;
             }
 
@@ -178,6 +183,7 @@ class NuvemshopService
             ];
         } catch (\Exception $e) {
             Log::error('Failed to decode OAuth state', ['error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -705,7 +711,7 @@ class NuvemshopService
         // Aguarda se atingiu rate limit
         while (RateLimiter::tooManyAttempts($rateLimitKey, self::RATE_LIMIT_PER_MINUTE)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
-            Log::channel('sync')->info("[RATE-LIMIT] Aguardando {$seconds}s para loja {$store->id} (limite: " . self::RATE_LIMIT_PER_MINUTE . "/min)");
+            Log::channel('sync')->info("[RATE-LIMIT] Aguardando {$seconds}s para loja {$store->id} (limite: ".self::RATE_LIMIT_PER_MINUTE.'/min)');
             sleep($seconds + 1); // Espera o tempo completo + 1s de buffer
         }
 
@@ -791,7 +797,8 @@ class NuvemshopService
     {
         // Retry em erros de conexão/timeout (cURL errors)
         if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
-            Log::channel('sync')->info('[API] Retry após erro de conexão/timeout: ' . $exception->getMessage());
+            Log::channel('sync')->info('[API] Retry após erro de conexão/timeout: '.$exception->getMessage());
+
             return true;
         }
 
@@ -909,6 +916,7 @@ class NuvemshopService
         $now = now()->format('Y-m-d H:i:s');
 
         return [
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'store_id' => $store->id,
             'external_id' => $productData['external_id'],
             'name' => $productData['name'],
@@ -982,6 +990,7 @@ class NuvemshopService
         $now = now()->format('Y-m-d H:i:s');
 
         return [
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'store_id' => $store->id,
             'external_id' => $orderData['external_id'],
             'order_number' => $orderData['order_number'],
@@ -1080,6 +1089,7 @@ class NuvemshopService
         $now = now()->format('Y-m-d H:i:s');
 
         return [
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'store_id' => $store->id,
             'external_id' => (string) $data['id'],
             'name' => $data['name'] ?? 'Desconhecido',
@@ -1141,6 +1151,7 @@ class NuvemshopService
         $now = now()->format('Y-m-d H:i:s');
 
         return [
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'store_id' => $store->id,
             'external_id' => $couponData['external_id'],
             'code' => $couponData['code'],

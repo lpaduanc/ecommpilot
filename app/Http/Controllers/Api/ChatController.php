@@ -232,7 +232,7 @@ class ChatController extends Controller
                 'persisted' => $shouldPersist,
             ]);
         } catch (\Exception $e) {
-            $errorId = 'err_' . uniqid();
+            $errorId = 'err_'.uniqid();
 
             // Log the actual error for debugging
             \Log::error('Chat error', [

@@ -17,11 +17,9 @@ trait SafeILikeSearch
     /**
      * Realiza busca ILIKE segura em uma coluna.
      *
-     * @param  Builder  $query
      * @param  string  $column  Coluna para buscar
      * @param  string  $search  Termo de busca
      * @param  string  $position  'contains', 'starts', 'ends'
-     * @return Builder
      */
     public function scopeSafeILike(Builder $query, string $column, string $search, string $position = 'contains'): Builder
     {
@@ -46,9 +44,6 @@ trait SafeILikeSearch
 
     /**
      * Sanitiza input para uso seguro em ILIKE.
-     *
-     * @param  string  $value
-     * @return string
      */
     protected function sanitizeILikeInput(string $value): string
     {
@@ -70,10 +65,8 @@ trait SafeILikeSearch
     /**
      * Busca em múltiplas colunas com ILIKE seguro.
      *
-     * @param  Builder  $query
      * @param  array  $columns  Colunas para buscar
      * @param  string  $search  Termo de busca
-     * @return Builder
      */
     public function scopeMultiColumnSafeILike(Builder $query, array $columns, string $search): Builder
     {

@@ -18,6 +18,10 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StoreConfigController;
 use App\Http\Controllers\Api\StoreSettingsController;
+use App\Http\Controllers\Api\SuggestionCommentController;
+use App\Http\Controllers\Api\SuggestionImpactDashboardController;
+use App\Http\Controllers\Api\SuggestionStepController;
+use App\Http\Controllers\Api\SuggestionTaskController;
 use App\Http\Controllers\Api\TrackingSettingsController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -162,11 +166,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [AnalysisController::class, 'suggestions']);
         Route::get('/stats', [AnalysisController::class, 'suggestionStats']);
         Route::get('/tracking', [AnalysisController::class, 'trackingSuggestions']); // Tracking page
+        Route::get('/impact-dashboard', [SuggestionImpactDashboardController::class, 'index']);
         Route::get('/{suggestion}', [AnalysisController::class, 'showSuggestion']);
         Route::patch('/{suggestion}', [AnalysisController::class, 'updateSuggestion']);
         Route::post('/{suggestion}/accept', [AnalysisController::class, 'acceptSuggestion']);
         Route::post('/{suggestion}/reject', [AnalysisController::class, 'rejectSuggestion']);
         Route::post('/{suggestion}/feedback', [AnalysisController::class, 'submitFeedback']); // V4: Feedback loop
+        Route::patch('/{suggestion}/feedback', [SuggestionImpactDashboardController::class, 'updateFeedback']);
+
+        // Steps (Workflow - Legacy, mantido para compatibilidade)
+        Route::get('/{suggestion}/steps', [SuggestionStepController::class, 'index']);
+        Route::post('/{suggestion}/steps', [SuggestionStepController::class, 'store']);
+        Route::patch('/{suggestion}/steps/{step}', [SuggestionStepController::class, 'update']);
+        Route::delete('/{suggestion}/steps/{step}', [SuggestionStepController::class, 'destroy']);
+
+        // Tasks (New Workflow System)
+        Route::get('/{suggestion}/tasks', [SuggestionTaskController::class, 'index']);
+        Route::post('/{suggestion}/tasks', [SuggestionTaskController::class, 'store']);
+        Route::patch('/{suggestion}/tasks/{task}', [SuggestionTaskController::class, 'update']);
+        Route::delete('/{suggestion}/tasks/{task}', [SuggestionTaskController::class, 'destroy']);
+
+        // Comments
+        Route::get('/{suggestion}/comments', [SuggestionCommentController::class, 'index']);
+        Route::post('/{suggestion}/comments', [SuggestionCommentController::class, 'store']);
+        Route::delete('/{suggestion}/comments/{comment}', [SuggestionCommentController::class, 'destroy']);
     });
 
     /*

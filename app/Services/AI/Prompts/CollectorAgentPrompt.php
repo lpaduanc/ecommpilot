@@ -12,7 +12,6 @@ class CollectorAgentPrompt
      * - Lista de temas saturados com contagem
      * - Output inclui prohibited_suggestions formatada para Strategist
      */
-
     public static function get(array $context): string
     {
         $storeName = $context['store_name'] ?? 'Loja';
@@ -52,10 +51,44 @@ class CollectorAgentPrompt
         $mediaPrecosConcorrentes = self::calculateAverageCompetitorPrice($competitors);
         $diferenciaisUnicos = self::extractUniqueFeatures($competitors);
         $totalConcorrentes = count($competitors);
-        $concorrentesSucesso = count(array_filter($competitors, fn($c) => $c['sucesso'] ?? false));
+        $concorrentesSucesso = count(array_filter($competitors, fn ($c) => $c['sucesso'] ?? false));
 
         return <<<PROMPT
 # COLLECTOR AGENT — COLETA E ORGANIZAÇÃO DE DADOS
+
+## 🎭 SUA IDENTIDADE
+
+Você é **Marina Cavalcanti**, Head de Business Intelligence com 12 anos de experiência em análise de dados para e-commerce.
+
+### Seu Background
+Ex-jornalista investigativa que migrou para data science. Trabalhou no Mercado Livre por 5 anos analisando comportamento de sellers e identificando padrões de sucesso. Especialista em competitive intelligence e análise de mercado.
+
+### Sua Mentalidade
+- "Dados falam mais alto que opiniões"
+- "Se não posso provar com números, não incluo no relatório"
+- "Contexto sem dados é achismo"
+- "Minha obsessão é separar fatos de suposições"
+
+### Sua Expertise
+- Coleta e organização de dados de múltiplas fontes
+- Análise competitiva e benchmarking de mercado
+- Identificação de padrões em históricos de vendas
+- Síntese de informações complexas em relatórios acionáveis
+
+### Seu Estilo de Trabalho
+- Meticulosa e extremamente organizada
+- Documenta TODAS as fontes de dados
+- Separa claramente fatos de inferências
+- Sinaliza explicitamente quando dados estão ausentes
+- Estrutura informações para facilitar análise posterior
+
+### Seus Princípios Inegociáveis
+1. **NUNCA inventar dados** - Se não existe, marca como "NÃO DISPONÍVEL"
+2. Contextualizar números com comparativos relevantes
+3. Destacar o que é relevante para análise estratégica
+4. Organizar informação de forma que facilite o diagnóstico do Analyst
+
+---
 
 ## SEU PAPEL
 Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mercado.
@@ -257,7 +290,7 @@ PROMPT;
     private static function identifySaturatedThemes(array $suggestions): string
     {
         if (empty($suggestions)) {
-            return "Nenhuma sugestão anterior.";
+            return 'Nenhuma sugestão anterior.';
         }
 
         $keywords = [
@@ -284,54 +317,60 @@ PROMPT;
             }
         }
 
-        $saturated = array_filter($counts, fn($c) => $c >= 3);
+        $saturated = array_filter($counts, fn ($c) => $c >= 3);
         arsort($saturated);
 
         if (empty($saturated)) {
-            return "Nenhum tema saturado.";
+            return 'Nenhum tema saturado.';
         }
 
-        $output = "";
+        $output = '';
         foreach ($saturated as $theme => $count) {
             $output .= "🔴 **{$theme}**: {$count}x — EVITAR\n";
         }
+
         return $output;
     }
 
     private static function groupByCategory(array $suggestions): string
     {
         if (empty($suggestions)) {
-            return "Nenhuma sugestão anterior.";
+            return 'Nenhuma sugestão anterior.';
         }
 
         $grouped = [];
         foreach ($suggestions as $s) {
             $cat = $s['category'] ?? 'outros';
             $title = $s['title'] ?? 'Sem título';
-            if (!isset($grouped[$cat])) $grouped[$cat] = [];
+            if (! isset($grouped[$cat])) {
+                $grouped[$cat] = [];
+            }
             $grouped[$cat][] = $title;
         }
 
-        $output = "";
+        $output = '';
         foreach ($grouped as $cat => $titles) {
             $unique = array_unique($titles);
-            $output .= "\n**{$cat}** (" . count($unique) . "):\n";
+            $output .= "\n**{$cat}** (".count($unique)."):\n";
             foreach ($unique as $t) {
                 $count = array_count_values($titles)[$t];
-                $m = $count >= 3 ? "🔴" : ($count >= 2 ? "⚠️" : "•");
-                $output .= "{$m} {$t}" . ($count > 1 ? " ({$count}x)" : "") . "\n";
+                $m = $count >= 3 ? '🔴' : ($count >= 2 ? '⚠️' : '•');
+                $output .= "{$m} {$t}".($count > 1 ? " ({$count}x)" : '')."\n";
             }
         }
+
         return $output;
     }
 
     private static function formatCompetitors(array $competitors): string
     {
-        $output = "";
+        $output = '';
         $competitorsWithRichData = 0;
 
         foreach ($competitors as $c) {
-            if (!($c['sucesso'] ?? false)) continue;
+            if (! ($c['sucesso'] ?? false)) {
+                continue;
+            }
             $nome = $c['nome'] ?? 'Concorrente';
             $preco = $c['faixa_preco']['media'] ?? 0;
             $precoMin = $c['faixa_preco']['min'] ?? 0;
@@ -340,38 +379,40 @@ PROMPT;
 
             // Check if has rich data
             $dadosRicos = $c['dados_ricos'] ?? [];
-            $hasRichData = !empty($dadosRicos['categorias']) ||
-                           !empty($dadosRicos['promocoes']) ||
-                           !empty($dadosRicos['produtos']);
+            $hasRichData = ! empty($dadosRicos['categorias']) ||
+                           ! empty($dadosRicos['promocoes']) ||
+                           ! empty($dadosRicos['produtos']);
 
-            if ($hasRichData) $competitorsWithRichData++;
+            if ($hasRichData) {
+                $competitorsWithRichData++;
+            }
 
-            $richDataBadge = $hasRichData ? "✅ DADOS RICOS" : "⚠️";
+            $richDataBadge = $hasRichData ? '✅ DADOS RICOS' : '⚠️';
 
             $output .= "- **{$nome}** {$richDataBadge}: R$ {$preco} (min: R$ {$precoMin}, max: R$ {$precoMax}) | Diferenciais: {$difs}\n";
 
             // Categorias populares (DADOS RICOS)
-            if (!empty($dadosRicos['categorias'])) {
+            if (! empty($dadosRicos['categorias'])) {
                 $topCats = array_slice($dadosRicos['categorias'], 0, 5);
-                $catsStr = implode(', ', array_map(fn($cat) => "{$cat['nome']} ({$cat['mencoes']}x)", $topCats));
+                $catsStr = implode(', ', array_map(fn ($cat) => "{$cat['nome']} ({$cat['mencoes']}x)", $topCats));
                 $output .= "  → 📁 **Categorias Foco**: {$catsStr}\n";
             }
 
             // Produtos específicos (DADOS RICOS)
-            if (!empty($dadosRicos['produtos'])) {
+            if (! empty($dadosRicos['produtos'])) {
                 $topProds = array_slice($dadosRicos['produtos'], 0, 3);
-                $prodsStr = implode(', ', array_map(fn($p) => "{$p['nome']} (R$ {$p['preco']})", $topProds));
+                $prodsStr = implode(', ', array_map(fn ($p) => "{$p['nome']} (R$ {$p['preco']})", $topProds));
                 $output .= "  → 🛍️ **Produtos Destaque**: {$prodsStr}\n";
             }
 
             // Promoções ativas (DADOS RICOS)
-            if (!empty($dadosRicos['promocoes'])) {
+            if (! empty($dadosRicos['promocoes'])) {
                 $promos = self::summarizePromotions($dadosRicos['promocoes']);
                 $output .= "  → 🏷️ **Promoções**: {$promos}\n";
             }
 
             // Avaliações (DADOS RICOS)
-            if (!empty($dadosRicos['avaliacoes']['nota_media'])) {
+            if (! empty($dadosRicos['avaliacoes']['nota_media'])) {
                 $nota = $dadosRicos['avaliacoes']['nota_media'];
                 $total = $dadosRicos['avaliacoes']['total_avaliacoes'] ?? 'N/A';
                 $output .= "  → ⭐ **Avaliações**: {$nota}/5 ({$total} avaliações)\n";
@@ -384,9 +425,9 @@ PROMPT;
             }
         }
 
-        $totalCompetitors = count(array_filter($competitors, fn($c) => $c['sucesso'] ?? false));
+        $totalCompetitors = count(array_filter($competitors, fn ($c) => $c['sucesso'] ?? false));
         if ($competitorsWithRichData > 0) {
-            $output = "**{$competitorsWithRichData}/{$totalCompetitors} concorrentes com DADOS RICOS (Decodo)**\n\n" . $output;
+            $output = "**{$competitorsWithRichData}/{$totalCompetitors} concorrentes com DADOS RICOS (Decodo)**\n\n".$output;
         }
 
         return $output ?: 'Nenhum concorrente analisado.';
@@ -406,12 +447,12 @@ PROMPT;
         }
 
         $parts = [];
-        if (!empty($descontos)) {
+        if (! empty($descontos)) {
             $descontosUnicos = array_unique($descontos);
             rsort($descontosUnicos); // Maiores primeiro
-            $parts[] = "Descontos até " . $descontosUnicos[0];
+            $parts[] = 'Descontos até '.$descontosUnicos[0];
         }
-        if (!empty($especiais)) {
+        if (! empty($especiais)) {
             $parts[] = implode(', ', array_unique($especiais));
         }
 
@@ -426,6 +467,7 @@ PROMPT;
                 $prices[] = $c['faixa_preco']['media'];
             }
         }
+
         return count($prices) > 0 ? round(array_sum($prices) / count($prices), 2) : 0;
     }
 
@@ -437,6 +479,7 @@ PROMPT;
                 $features = array_merge($features, $c['diferenciais'] ?? []);
             }
         }
+
         return implode(', ', array_unique($features)) ?: 'nenhum';
     }
 

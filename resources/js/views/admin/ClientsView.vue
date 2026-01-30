@@ -122,7 +122,7 @@ function changePerPage(newPerPage) {
 }
 
 function viewClient(client) {
-    router.push({ name: 'admin-client-detail', params: { id: client.id } });
+    router.push({ name: 'admin-client-detail', params: { id: client.uuid } });
 }
 
 function formatDate(date) {
@@ -165,7 +165,7 @@ async function submitCreateClient() {
 // Toggle Status
 async function toggleStatus(client) {
     try {
-        const response = await api.post(`/admin/clients/${client.id}/toggle-status`);
+        const response = await api.post(`/admin/clients/${client.uuid}/toggle-status`);
         notificationStore.success(response.data.message);
         client.is_active = response.data.is_active;
     } catch (error) {
@@ -183,7 +183,7 @@ function openResetPasswordModal(client) {
 async function submitResetPassword() {
     isSubmitting.value = true;
     try {
-        await api.post(`/admin/clients/${selectedClient.value.id}/reset-password`, passwordForm.value);
+        await api.post(`/admin/clients/${selectedClient.value.uuid}/reset-password`, passwordForm.value);
         notificationStore.success('Senha redefinida com sucesso!');
         showResetPasswordModal.value = false;
     } catch (error) {
@@ -202,7 +202,7 @@ function openDeleteModal(client) {
 async function submitDeleteClient() {
     isSubmitting.value = true;
     try {
-        await api.delete(`/admin/clients/${selectedClient.value.id}`);
+        await api.delete(`/admin/clients/${selectedClient.value.uuid}`);
         notificationStore.success('Cliente excluído com sucesso!');
         showDeleteModal.value = false;
         fetchClients();
@@ -216,7 +216,7 @@ async function submitDeleteClient() {
 // Impersonate
 async function impersonateClient(client) {
     try {
-        const response = await api.post(`/admin/clients/${client.id}/impersonate`);
+        const response = await api.post(`/admin/clients/${client.uuid}/impersonate`);
         // Store original admin token
         localStorage.setItem('admin_token', localStorage.getItem('token'));
         // Use client token
@@ -244,7 +244,7 @@ async function openEditModal(client) {
 
     // Buscar detalhes do cliente (incluindo permissões)
     try {
-        const response = await api.get(`/admin/clients/${client.id}`);
+        const response = await api.get(`/admin/clients/${client.uuid}`);
         editForm.value = {
             name: response.data.name,
             email: response.data.email,
@@ -262,7 +262,7 @@ async function openEditModal(client) {
 async function submitEditClient() {
     isSubmitting.value = true;
     try {
-        await api.put(`/admin/clients/${selectedClient.value.id}`, editForm.value);
+        await api.put(`/admin/clients/${selectedClient.value.uuid}`, editForm.value);
         notificationStore.success('Cliente atualizado com sucesso!');
         showEditModal.value = false;
         fetchClients();

@@ -403,10 +403,10 @@ onMounted(() => {
                                                     variant="secondary"
                                                     size="sm"
                                                     @click.stop.prevent="handleSyncStore(store)"
-                                                    :disabled="isSyncing || store.sync_status === 'syncing'"
+                                                    :disabled="isSyncing || ['syncing', 'pending'].includes(store.sync_status)"
                                                 >
-                                                    <ArrowPathIcon :class="['w-4 h-4', store.sync_status === 'syncing' ? 'animate-spin' : '']" />
-                                                    {{ store.sync_status === 'syncing' ? 'Sincronizando...' : 'Sincronizar' }}
+                                                    <ArrowPathIcon :class="['w-4 h-4', ['syncing', 'pending'].includes(store.sync_status) ? 'animate-spin' : '']" />
+                                                    {{ ['syncing', 'pending'].includes(store.sync_status) ? 'Sincronizando...' : 'Sincronizar' }}
                                                 </BaseButton>
                                                 <BaseButton
                                                     variant="ghost"

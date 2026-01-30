@@ -14,6 +14,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const error = ref(null);
     const upgradeRequired = ref(false);
 
+    const impactDashboard = ref(null);
+    const impactDashboardLoading = ref(false);
+    const hasImpactDashboardAccess = ref(null); // null = not checked, true = has access, false = needs upgrade
+
     const filters = ref({
         period: 'last_15_days',
         startDate: null,
@@ -160,7 +164,25 @@ export const useDashboardStore = defineStore('dashboard', () => {
             paymentStatus: [],
         };
     }
-    
+
+    async function fetchImpactDashboard() {
+        impactDashboardLoading.value = true;
+        try {
+            const response = await api.get('/suggestions/impact-dashboard');
+            if (response.data.success) {
+                impactDashboard.value = response.data.data;
+                hasImpactDashboardAccess.value = true;
+            }
+        } catch (error) {
+            if (error.response?.status === 403 && error.response?.data?.upgrade_required) {
+                hasImpactDashboardAccess.value = false;
+            }
+            console.error('Error fetching impact dashboard:', error);
+        } finally {
+            impactDashboardLoading.value = false;
+        }
+    }
+
     return {
         stats,
         revenueChart,
@@ -174,6 +196,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
         upgradeRequired,
         filters,
         hasStore,
+        impactDashboard,
+        impactDashboardLoading,
+        hasImpactDashboardAccess,
         fetchStats,
         fetchRevenueChart,
         fetchOrdersStatusChart,
@@ -184,6 +209,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         fetchAllData,
         setFilters,
         resetFilters,
+        fetchImpactDashboard,
     };
 });
 

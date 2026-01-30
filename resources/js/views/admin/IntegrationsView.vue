@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { useNotificationStore } from '../../stores/notificationStore';
 import api from '../../services/api';
 import BaseCard from '../../components/common/BaseCard.vue';
@@ -31,6 +31,11 @@ const isTesting = ref(false);
 const isTestingDecodo = ref(false);
 const showApiKey = ref(false);
 const showDecodoPassword = ref(false);
+
+// Track if user changed credentials
+const serpapiKeyChanged = ref(false);
+const decodoUsernameChanged = ref(false);
+const decodoPasswordChanged = ref(false);
 
 // Form data
 const formData = reactive({
@@ -67,7 +72,6 @@ async function loadSettings() {
         const data = response.data.data;
 
         formData.enabled = data.enabled;
-        // Populate input with masked value from API
         formData.serpapi_key = data.serpapi_key || '';
         formData.serpapi_key_configured = data.serpapi_key_configured;
         formData.trends.enabled = data.trends.enabled;
@@ -78,15 +82,19 @@ async function loadSettings() {
 
         // Decodo settings
         formData.decodo.enabled = data.decodo?.enabled ?? false;
-        // Populate input with masked value from API
         formData.decodo.username = data.decodo?.username || '';
         formData.decodo.username_configured = data.decodo?.username_configured ?? false;
-        // Show placeholder characters when password is configured
-        formData.decodo.password = data.decodo?.password_configured ? '••••••••' : '';
+        // Show empty if password is configured (don't show bullets)
+        formData.decodo.password = '';
         formData.decodo.password_configured = data.decodo?.password_configured ?? false;
         formData.decodo.headless = data.decodo?.headless ?? 'html';
         formData.decodo.js_rendering = data.decodo?.js_rendering ?? false;
         formData.decodo.timeout = data.decodo?.timeout ?? 30;
+
+        // Reset change tracking flags
+        serpapiKeyChanged.value = false;
+        decodoUsernameChanged.value = false;
+        decodoPasswordChanged.value = false;
     } catch (error) {
         console.error('Error loading settings:', error);
         notificationStore.error('Erro ao carregar configurações');
@@ -98,7 +106,45 @@ async function loadSettings() {
 async function saveSettings() {
     isSaving.value = true;
     try {
-        await api.put('/admin/integrations/external-data', formData);
+        // Build payload - always send enabled states and non-sensitive fields
+        const payload = {
+            enabled: formData.enabled,
+            trends: formData.trends,
+            market: formData.market,
+            competitors: formData.competitors,
+            decodo: {
+                enabled: formData.decodo.enabled, // Always send enabled state
+                headless: formData.decodo.headless,
+                js_rendering: formData.decodo.js_rendering,
+                timeout: formData.decodo.timeout,
+            }
+        };
+
+        // Only include SerpAPI key if changed or not configured yet
+        if (serpapiKeyChanged.value || !formData.serpapi_key_configured) {
+            payload.serpapi_key = formData.serpapi_key || null;
+        } else {
+            // Send null to avoid sending masked value
+            payload.serpapi_key = null;
+        }
+
+        // Only include Decodo username if changed or not configured yet
+        if (decodoUsernameChanged.value || !formData.decodo.username_configured) {
+            payload.decodo.username = formData.decodo.username || null;
+        } else {
+            // Send null to avoid sending masked value
+            payload.decodo.username = null;
+        }
+
+        // Only include Decodo password if changed or not configured yet
+        if (decodoPasswordChanged.value || !formData.decodo.password_configured) {
+            payload.decodo.password = formData.decodo.password || null;
+        } else {
+            // Send null to avoid sending masked value
+            payload.decodo.password = null;
+        }
+
+        await api.put('/admin/integrations/external-data', payload);
         notificationStore.success('Configurações salvas com sucesso');
 
         // Reload to get updated state
@@ -118,9 +164,14 @@ async function saveSettings() {
 async function testConnection() {
     isTesting.value = true;
     try {
-        const response = await api.post('/admin/integrations/external-data/test', {
-            serpapi_key: formData.serpapi_key || null,
-        });
+        // Build payload - send key if user changed it or if configured
+        const payload = {};
+        if (serpapiKeyChanged.value && formData.serpapi_key) {
+            payload.serpapi_key = formData.serpapi_key;
+        }
+        // If key not changed but is configured, let backend use saved key (send empty payload)
+
+        const response = await api.post('/admin/integrations/external-data/test', payload);
 
         if (response.data.success) {
             notificationStore.success(response.data.message);
@@ -142,15 +193,26 @@ async function testConnection() {
 async function testDecodoConnection() {
     isTestingDecodo.value = true;
     try {
-        const response = await api.post('/admin/integrations/external-data/test-decodo', {
-            username: formData.decodo.username || null,
-            password: formData.decodo.password || null,
-        });
+        // Build payload - only send credentials if they were changed
+        const payload = {};
+
+        if (decodoUsernameChanged.value && formData.decodo.username) {
+            payload.username = formData.decodo.username;
+        }
+
+        if (decodoPasswordChanged.value && formData.decodo.password) {
+            payload.password = formData.decodo.password;
+        }
+
+        const response = await api.post('/admin/integrations/external-data/test-decodo', payload);
 
         if (response.data.success) {
             const ip = response.data.ip ? ` (IP: ${response.data.ip})` : '';
             const country = response.data.country ? ` - ${response.data.country}` : '';
             notificationStore.success(response.data.message + ip + country);
+
+            // Reload settings to get updated enabled state (auto-enabled on successful test)
+            await loadSettings();
         } else {
             notificationStore.error(response.data.message);
         }
@@ -165,6 +227,19 @@ async function testDecodoConnection() {
         isTestingDecodo.value = false;
     }
 }
+
+// Watch for changes in credentials
+watch(() => formData.serpapi_key, () => {
+    serpapiKeyChanged.value = true;
+});
+
+watch(() => formData.decodo.username, () => {
+    decodoUsernameChanged.value = true;
+});
+
+watch(() => formData.decodo.password, () => {
+    decodoPasswordChanged.value = true;
+});
 
 onMounted(() => {
     loadSettings();
@@ -271,7 +346,7 @@ onMounted(() => {
                                     <input
                                         :type="showApiKey ? 'text' : 'password'"
                                         v-model="formData.serpapi_key"
-                                        placeholder="Cole sua chave da API aqui"
+                                        :placeholder="formData.serpapi_key_configured ? 'Deixe vazio para manter a chave atual' : 'Cole sua chave da API aqui'"
                                         autocomplete="new-password"
                                         class="w-full px-4 py-2.5 pr-10 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20 text-sm"
                                     />
@@ -421,9 +496,14 @@ onMounted(() => {
                 <BaseCard>
                     <template #header>
                         <div class="flex items-center justify-between">
-                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                                Decodo Proxy (Web Scraping Avançado)
-                            </h3>
+                            <div class="flex-1">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                                    Decodo Proxy (Web Scraping Avançado)
+                                </h3>
+                                <p v-if="!formData.enabled || !formData.competitors.enabled" class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                    Requer "Dados Externos" e "Análise de Concorrentes" habilitados
+                                </p>
+                            </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -466,7 +546,7 @@ onMounted(() => {
                                     <input
                                         type="text"
                                         v-model="formData.decodo.username"
-                                        placeholder="Seu usuário Decodo"
+                                        :placeholder="formData.decodo.username_configured ? 'Deixe vazio para manter o usuário atual' : 'Seu usuário Decodo'"
                                         autocomplete="off"
                                         class="w-full px-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20 text-sm"
                                     />
@@ -486,7 +566,7 @@ onMounted(() => {
                                     <input
                                         :type="showDecodoPassword ? 'text' : 'password'"
                                         v-model="formData.decodo.password"
-                                        placeholder="Sua senha Decodo"
+                                        :placeholder="formData.decodo.password_configured ? 'Deixe vazio para manter a senha atual' : 'Sua senha Decodo'"
                                         autocomplete="new-password"
                                         class="w-full px-4 py-2.5 pr-10 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20 text-sm"
                                     />

@@ -110,6 +110,22 @@ class Store extends Model
         return $this->hasMany(Analysis::class);
     }
 
+    /**
+     * Get suggestions for the store.
+     */
+    public function suggestions(): HasMany
+    {
+        return $this->hasMany(Suggestion::class);
+    }
+
+    /**
+     * Alias for orders() - used by SuggestionImpactAnalysisService.
+     */
+    public function syncedOrders(): HasMany
+    {
+        return $this->orders();
+    }
+
     public function isSyncing(): bool
     {
         return $this->sync_status === SyncStatus::Syncing;

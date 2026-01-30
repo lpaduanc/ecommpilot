@@ -19,6 +19,7 @@ use Illuminate\Validation\Rule;
 class AdminController extends Controller
 {
     use SafeILikeSearch;
+
     public function dashboardStats(): JsonResponse
     {
         $totalClients = User::where('role', UserRole::Client)->count();
@@ -92,7 +93,7 @@ class AdminController extends Controller
         $sortDir = $request->input('sort_dir', 'desc');
 
         // Validate sort field against whitelist
-        if (!in_array($sortField, $allowedSortFields, true)) {
+        if (! in_array($sortField, $allowedSortFields, true)) {
             $sortField = 'created_at';
         }
 
@@ -108,6 +109,7 @@ class AdminController extends Controller
         $clients->getCollection()->transform(function ($client) {
             return [
                 'id' => $client->id,
+                'uuid' => $client->uuid,
                 'name' => $client->name,
                 'email' => $client->email,
                 'phone' => $client->phone,
@@ -169,6 +171,7 @@ class AdminController extends Controller
 
         return response()->json([
             'id' => $client->id,
+            'uuid' => $client->uuid,
             'name' => $client->name,
             'email' => $client->email,
             'phone' => $client->phone,
@@ -351,7 +354,6 @@ class AdminController extends Controller
         ]);
     }
 
-
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $admin = $request->user();
@@ -373,7 +375,7 @@ class AdminController extends Controller
         ]);
 
         // SECURITY: Verify admin password as confirmation for critical action
-        if (!Hash::check($validated['admin_password'], $admin->password)) {
+        if (! Hash::check($validated['admin_password'], $admin->password)) {
             return response()->json([
                 'message' => 'Senha de administrador incorreta.',
             ], 403);

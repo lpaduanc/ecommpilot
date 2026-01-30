@@ -19,15 +19,15 @@ trait SuggestionDeduplicationTrait
             ->get();
 
         // Separar por status para tratamento diferenciado
-        $accepted = $suggestions->filter(fn($s) => in_array($s->status, ['accepted', 'in_progress', 'completed']));
-        $rejected = $suggestions->filter(fn($s) => in_array($s->status, ['rejected', 'ignored']));
-        $pending = $suggestions->filter(fn($s) => in_array($s->status, ['new', 'pending']) || is_null($s->status));
+        $accepted = $suggestions->filter(fn ($s) => in_array($s->status, ['accepted', 'in_progress', 'completed']));
+        $rejected = $suggestions->filter(fn ($s) => in_array($s->status, ['rejected', 'ignored']));
+        $pending = $suggestions->filter(fn ($s) => in_array($s->status, ['new', 'pending']) || is_null($s->status));
 
         return [
-            'all' => $suggestions->map(fn($s) => $this->formatSuggestionForHistory($s))->toArray(),
+            'all' => $suggestions->map(fn ($s) => $this->formatSuggestionForHistory($s))->toArray(),
             'accepted_titles' => $accepted->pluck('title')->toArray(),
             'rejected_titles' => $rejected->pluck('title')->toArray(),
-            'pending' => $pending->map(fn($s) => $this->formatSuggestionForHistory($s))->toArray(),
+            'pending' => $pending->map(fn ($s) => $this->formatSuggestionForHistory($s))->toArray(),
         ];
     }
 
@@ -84,7 +84,7 @@ trait SuggestionDeduplicationTrait
             }
         }
 
-        $saturated = array_filter($counts, fn($count) => $count >= 2);
+        $saturated = array_filter($counts, fn ($count) => $count >= 2);
         arsort($saturated);
 
         return $saturated;
@@ -100,7 +100,7 @@ trait SuggestionDeduplicationTrait
         $validSuggestions = [];
         $seenTitles = [];
         $previousTitles = array_map(
-            fn($s) => $this->normalizeTitle($s['title'] ?? ''),
+            fn ($s) => $this->normalizeTitle($s['title'] ?? ''),
             $previousSuggestions
         );
 
@@ -115,8 +115,9 @@ trait SuggestionDeduplicationTrait
             if (in_array($normalizedTitle, $seenTitles)) {
                 Log::warning('Sugestão repetida INTERNAMENTE detectada', [
                     'title' => $title,
-                    'action' => 'descartada'
+                    'action' => 'descartada',
                 ]);
+
                 continue;
             }
 
@@ -125,9 +126,10 @@ trait SuggestionDeduplicationTrait
             if ($maxSimilarity > 0.75) {
                 Log::warning('Sugestão similar a HISTÓRICA detectada', [
                     'title' => $title,
-                    'similarity' => round($maxSimilarity * 100, 1) . '%',
-                    'action' => 'descartada'
+                    'similarity' => round($maxSimilarity * 100, 1).'%',
+                    'action' => 'descartada',
                 ]);
+
                 continue;
             }
 
@@ -153,6 +155,7 @@ trait SuggestionDeduplicationTrait
         $title = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title) ?: $title;
         $title = preg_replace('/[^a-z0-9\s]/', '', $title);
         $title = preg_replace('/\s+/', ' ', $title);
+
         return trim($title);
     }
 

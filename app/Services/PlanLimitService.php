@@ -135,6 +135,21 @@ class PlanLimitService
     }
 
     /**
+     * Verifica se o usuário pode acessar o Dashboard de Impacto nas Vendas.
+     */
+    public function canAccessImpactDashboard(User $user): bool
+    {
+        // Admins sempre têm acesso
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $plan = $user->currentPlan();
+
+        return $plan?->has_impact_dashboard ?? false;
+    }
+
+    /**
      * Verifica se o usuário pode adicionar uma nova integração externa.
      */
     public function canAddExternalIntegration(User $user): bool
@@ -286,6 +301,7 @@ class PlanLimitService
             'has_suggestion_history' => $plan->has_suggestion_history,
             'has_custom_dashboards' => $plan->has_custom_dashboards,
             'has_external_integrations' => $plan->has_external_integrations,
+            'has_impact_dashboard' => $plan->has_impact_dashboard,
             'external_integrations_limit' => $plan->external_integrations_limit,
         ];
     }
@@ -403,6 +419,7 @@ class PlanLimitService
                 'has_suggestion_history' => $plan->has_suggestion_history,
                 'has_custom_dashboards' => $plan->has_custom_dashboards,
                 'has_external_integrations' => $plan->has_external_integrations,
+                'has_impact_dashboard' => $plan->has_impact_dashboard,
             ],
         ];
     }

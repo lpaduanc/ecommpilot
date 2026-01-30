@@ -18,6 +18,7 @@ use Spatie\Permission\Models\Permission;
 class UserManagementController extends Controller
 {
     use SafeILikeSearch;
+
     /**
      * Display a listing of the resource.
      */

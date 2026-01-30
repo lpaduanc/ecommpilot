@@ -15,7 +15,6 @@ class StrategistAgentPrompt
      * [6] Campo de confiança no output
      * + Proteção contra repetições (zonas proibidas)
      */
-
     public static function getSeasonalityContext(): array
     {
         $mes = (int) date('n');
@@ -32,7 +31,7 @@ class StrategistAgentPrompt
             9 => ['periodo' => 'PRIMAVERA / DIA DO CLIENTE', 'foco' => 'Renovação, fidelização', 'oportunidades' => ['Lançamentos', 'Promoções Dia do Cliente', 'Programa pontos'], 'evitar' => ['Grandes descontos (guardar BF)']],
             10 => ['periodo' => 'DIA DAS CRIANÇAS / PRÉ-BLACK FRIDAY', 'foco' => 'Linha infantil, preparar BF', 'oportunidades' => ['Produtos kids', 'Reposição estoque', 'Aquecimento base'], 'evitar' => ['Queimar promoções antes BF']],
             11 => ['periodo' => 'BLACK FRIDAY', 'foco' => 'Maior evento de vendas', 'oportunidades' => ['Descontos agressivos', 'Kits exclusivos BF', 'Frete grátis'], 'evitar' => ['Descontos falsos', 'Estoque insuficiente']],
-            12 => ['periodo' => 'NATAL / FIM DE ANO', 'foco' => 'Presentes, última chance do ano', 'oportunidades' => ['Kits presenteáveis', 'Embalagens natalinas', 'Garantia entrega'], 'evitar' => ['Promoções que canibalizam margem']]
+            12 => ['periodo' => 'NATAL / FIM DE ANO', 'foco' => 'Presentes, última chance do ano', 'oportunidades' => ['Kits presenteáveis', 'Embalagens natalinas', 'Garantia entrega'], 'evitar' => ['Promoções que canibalizam margem']],
         ];
 
         return $contextos[$mes] ?? $contextos[7];
@@ -83,9 +82,9 @@ RESOURCES;
 
     public static function formatAcceptedAndRejected(array $accepted, array $rejected): string
     {
-        $output = "";
+        $output = '';
 
-        if (!empty($accepted)) {
+        if (! empty($accepted)) {
             $output .= "### ✅ SUGESTÕES ACEITAS (JÁ SERÃO IMPLEMENTADAS)\n";
             $output .= "O cliente aceitou estas sugestões. NÃO sugira nada similar:\n";
             foreach ($accepted as $title) {
@@ -94,7 +93,7 @@ RESOURCES;
             $output .= "\n";
         }
 
-        if (!empty($rejected)) {
+        if (! empty($rejected)) {
             $output .= "### ❌ SUGESTÕES REJEITADAS (CLIENTE NÃO GOSTOU)\n";
             $output .= "O cliente rejeitou estas sugestões. EVITE o mesmo tema/abordagem:\n";
             foreach ($rejected as $title) {
@@ -149,6 +148,44 @@ ANGLES;
     {
         return <<<'PROMPT'
 # STRATEGIST AGENT — GERAÇÃO DE SUGESTÕES ORIGINAIS
+
+## 🎭 SUA IDENTIDADE
+
+Você é **Felipe Andrade**, Ex-CMO de scale-up de e-commerce e hoje consultor independente de crescimento.
+
+### Seu Background
+Liderou growth em 3 e-commerces brasileiros que saíram de R$1M para R$50M+ de faturamento anual. Especialista em estratégias omnichannel e growth hacking pragmático para varejo digital. Professor convidado do Insper no MBA de Marketing Digital. Conhece profundamente o ecossistema Nuvemshop e suas possibilidades.
+
+### Sua Mentalidade
+- "Estratégia sem dados é adivinhação - e eu não adivinho"
+- "A melhor ideia é a que pode ser implementada HOJE"
+- "Crescimento sustentável > hacks de curto prazo que destroem margem"
+- "Originalidade é obrigatória - repetir sugestão é preguiça intelectual"
+- "Cada sugestão deve pagar o salário de quem vai implementar"
+
+### Sua Expertise
+- Estratégias de crescimento comprovadas para e-commerce brasileiro
+- Growth hacking pragmático (não teórico ou importado de fora)
+- Análise competitiva e posicionamento de mercado
+- Conhecimento profundo de Nuvemshop e apps do ecossistema
+- Cálculo realista de ROI e payback
+
+### Seu Estilo de Trabalho
+- Criativo mas extremamente pragmático
+- Sempre justifica com DADOS ESPECÍFICOS (nunca "achismo")
+- Calcula ROI e payback para cada sugestão
+- Adapta complexidade ao contexto real da loja
+- Equilibra quick wins com estratégias de longo prazo
+
+### Seus Princípios Inegociáveis
+1. **NUNCA sugerir o que já foi sugerido** - originalidade é lei absoluta
+2. Prioridade HIGH = OBRIGATÓRIO ter dados de concorrentes ou mercado
+3. Toda sugestão deve ser implementável na plataforma do cliente
+4. Calcular ROI realista, não otimista (usar taxas históricas de sucesso)
+5. Considerar sazonalidade e timing do mercado brasileiro
+6. Equilibrar quick wins (resultados rápidos) com estratégias de longo prazo
+
+---
 
 ## SEU PAPEL
 Gerar EXATAMENTE 9 sugestões estratégicas de alta qualidade, TODAS ORIGINAIS.
@@ -392,7 +429,7 @@ PROMPT;
     public static function formatProhibitedSuggestions(array $previousSuggestions): string
     {
         if (empty($previousSuggestions)) {
-            return "Nenhuma sugestão anterior. Liberdade total, mas busque originalidade.";
+            return 'Nenhuma sugestão anterior. Liberdade total, mas busque originalidade.';
         }
 
         $grouped = [];
@@ -402,26 +439,33 @@ PROMPT;
             $cat = $s['category'] ?? 'outros';
             $title = $s['title'] ?? 'Sem título';
             $titleCounts[$title] = ($titleCounts[$title] ?? 0) + 1;
-            if (!isset($grouped[$cat])) $grouped[$cat] = [];
-            if (!in_array($title, $grouped[$cat])) $grouped[$cat][] = $title;
+            if (! isset($grouped[$cat])) {
+                $grouped[$cat] = [];
+            }
+            if (! in_array($title, $grouped[$cat])) {
+                $grouped[$cat][] = $title;
+            }
         }
 
-        $output = "### Total: " . count($previousSuggestions) . " sugestões anteriores\n\n";
+        $output = '### Total: '.count($previousSuggestions)." sugestões anteriores\n\n";
         foreach ($grouped as $cat => $titles) {
             $output .= "**{$cat}:**\n";
             foreach ($titles as $t) {
                 $c = $titleCounts[$t];
-                $m = $c >= 3 ? "🔴" : ($c >= 2 ? "⚠️" : "•");
-                $output .= "{$m} {$t}" . ($c > 1 ? " ({$c}x)" : "") . "\n";
+                $m = $c >= 3 ? '🔴' : ($c >= 2 ? '⚠️' : '•');
+                $output .= "{$m} {$t}".($c > 1 ? " ({$c}x)" : '')."\n";
             }
             $output .= "\n";
         }
+
         return $output;
     }
 
     public static function identifySaturatedThemes(array $previousSuggestions): string
     {
-        if (empty($previousSuggestions)) return "Nenhum tema saturado.";
+        if (empty($previousSuggestions)) {
+            return 'Nenhum tema saturado.';
+        }
 
         $keywords = [
             'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado'],
@@ -436,7 +480,7 @@ PROMPT;
 
         $counts = [];
         foreach ($previousSuggestions as $s) {
-            $text = mb_strtolower(($s['title'] ?? '') . ' ' . ($s['description'] ?? ''));
+            $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
             foreach ($keywords as $theme => $kws) {
                 foreach ($kws as $kw) {
                     if (strpos($text, $kw) !== false) {
@@ -447,15 +491,18 @@ PROMPT;
             }
         }
 
-        $saturated = array_filter($counts, fn($c) => $c >= 2);
+        $saturated = array_filter($counts, fn ($c) => $c >= 2);
         arsort($saturated);
 
-        if (empty($saturated)) return "Nenhum tema saturado (2+).";
+        if (empty($saturated)) {
+            return 'Nenhum tema saturado (2+).';
+        }
 
-        $out = "";
+        $out = '';
         foreach ($saturated as $t => $c) {
             $out .= "🔴 **{$t}**: {$c}x — EVITAR\n";
         }
+
         return $out;
     }
 
@@ -465,7 +512,7 @@ PROMPT;
     public static function extractCompetitorInsights(array $competitors): string
     {
         if (empty($competitors)) {
-            return "Nenhum dado de concorrente disponível.";
+            return 'Nenhum dado de concorrente disponível.';
         }
 
         $output = "## 📊 RESUMO DE INSIGHTS COMPETITIVOS (DADOS RICOS DO DECODO)\n\n";
@@ -479,35 +526,37 @@ PROMPT;
         $totalCompetitorsWithRichData = 0;
 
         foreach ($competitors as $c) {
-            if (!($c['sucesso'] ?? false)) continue;
+            if (! ($c['sucesso'] ?? false)) {
+                continue;
+            }
 
             $nome = $c['nome'] ?? 'Concorrente';
             $dadosRicos = $c['dados_ricos'] ?? [];
 
             // Check if this competitor has rich data
-            $hasRichData = !empty($dadosRicos['categorias']) ||
-                           !empty($dadosRicos['promocoes']) ||
-                           !empty($dadosRicos['produtos']);
+            $hasRichData = ! empty($dadosRicos['categorias']) ||
+                           ! empty($dadosRicos['promocoes']) ||
+                           ! empty($dadosRicos['produtos']);
 
             if ($hasRichData) {
                 $totalCompetitorsWithRichData++;
             }
 
-            $output .= "### {$nome}" . ($hasRichData ? " ✅ (Dados Ricos Disponíveis)" : " ⚠️ (Dados Limitados)") . "\n";
+            $output .= "### {$nome}".($hasRichData ? ' ✅ (Dados Ricos Disponíveis)' : ' ⚠️ (Dados Limitados)')."\n";
 
             // Categorias com dados ricos
-            if (!empty($dadosRicos['categorias'])) {
+            if (! empty($dadosRicos['categorias'])) {
                 $topCats = array_slice($dadosRicos['categorias'], 0, 5);
                 $output .= "**Categorias Populares:**\n";
                 foreach ($topCats as $cat) {
-                    $output .= "  - 📁 **{$cat['nome']}**: {$cat['mencoes']} menções → " .
+                    $output .= "  - 📁 **{$cat['nome']}**: {$cat['mencoes']} menções → ".
                                "*Concorrente foca fortemente nesta categoria*\n";
                     $allCategories[$cat['nome']] = ($allCategories[$cat['nome']] ?? 0) + $cat['mencoes'];
                 }
             }
 
             // Produtos específicos encontrados
-            if (!empty($dadosRicos['produtos'])) {
+            if (! empty($dadosRicos['produtos'])) {
                 $topProducts = array_slice($dadosRicos['produtos'], 0, 3);
                 $output .= "**Produtos Destaque:**\n";
                 foreach ($topProducts as $prod) {
@@ -517,14 +566,16 @@ PROMPT;
             }
 
             // Promoções ativas com detalhes
-            if (!empty($dadosRicos['promocoes'])) {
+            if (! empty($dadosRicos['promocoes'])) {
                 $output .= "**Promoções Ativas:**\n";
                 $descontos = [];
                 foreach ($dadosRicos['promocoes'] as $promo) {
                     if (($promo['tipo'] ?? '') === 'desconto_percentual') {
                         $valor = (int) filter_var($promo['valor'] ?? '0', FILTER_SANITIZE_NUMBER_INT);
                         $descontos[] = $promo['valor'];
-                        if ($valor > $maxDiscount) $maxDiscount = $valor;
+                        if ($valor > $maxDiscount) {
+                            $maxDiscount = $valor;
+                        }
                         $output .= "  - 🏷️ Desconto de {$promo['valor']}\n";
                     } elseif (($promo['tipo'] ?? '') === 'promocao_especial') {
                         $desc = $promo['descricao'] ?? '';
@@ -539,7 +590,7 @@ PROMPT;
             }
 
             // Avaliações
-            if (!empty($dadosRicos['avaliacoes']['nota_media'])) {
+            if (! empty($dadosRicos['avaliacoes']['nota_media'])) {
                 $nota = $dadosRicos['avaliacoes']['nota_media'];
                 $total = $dadosRicos['avaliacoes']['total_avaliacoes'] ?? 'N/A';
                 $output .= "**Avaliações:** ⭐ {$nota}/5 ({$total} avaliações)\n";
@@ -547,7 +598,7 @@ PROMPT;
 
             // Preços
             $faixa = $c['faixa_preco'] ?? [];
-            if (!empty($faixa)) {
+            if (! empty($faixa)) {
                 $output .= "**Precificação:** R$ {$faixa['min']} - R$ {$faixa['max']} (média: R$ {$faixa['media']})\n";
             }
 
@@ -557,14 +608,16 @@ PROMPT;
         // Resumo consolidado OBRIGATÓRIO para sugestões HIGH
         $output .= "---\n\n";
         $output .= "### 🎯 ANÁLISE CONSOLIDADA - USE PARA SUGESTÕES HIGH PRIORITY\n\n";
-        $output .= "**{$totalCompetitorsWithRichData} de " . count($competitors) . " concorrentes têm dados ricos disponíveis.**\n\n";
+        $output .= "**{$totalCompetitorsWithRichData} de ".count($competitors)." concorrentes têm dados ricos disponíveis.**\n\n";
 
-        if (!empty($allCategories)) {
+        if (! empty($allCategories)) {
             arsort($allCategories);
             $output .= "**Categorias mais fortes no mercado:**\n";
             $count = 0;
             foreach ($allCategories as $cat => $mentions) {
-                if ($count++ >= 5) break;
+                if ($count++ >= 5) {
+                    break;
+                }
                 $output .= "  {$count}. **{$cat}**: {$mentions} menções totais → *Alta demanda do mercado*\n";
             }
             $output .= "\n";
@@ -576,7 +629,7 @@ PROMPT;
             $output .= "  - 💡 *Sugestão: Considere contra-estratégia ou posicionamento premium*\n\n";
         }
 
-        if (!empty($specialPromos)) {
+        if (! empty($specialPromos)) {
             $output .= "**Promoções Especiais Ativas:**\n";
             foreach (array_unique($specialPromos) as $promo) {
                 $output .= "  - {$promo}\n";
@@ -584,10 +637,10 @@ PROMPT;
             $output .= "\n";
         }
 
-        if (!empty($allProducts)) {
+        if (! empty($allProducts)) {
             $avgPrice = array_sum(array_column($allProducts, 'preco')) / count($allProducts);
-            $output .= "**Produtos Analisados:** " . count($allProducts) . " produtos\n";
-            $output .= "  - Preço médio dos destaques: R$ " . number_format($avgPrice, 2, ',', '.') . "\n\n";
+            $output .= '**Produtos Analisados:** '.count($allProducts)." produtos\n";
+            $output .= '  - Preço médio dos destaques: R$ '.number_format($avgPrice, 2, ',', '.')."\n\n";
         }
 
         if ($totalCompetitorsWithRichData > 0) {
@@ -607,8 +660,8 @@ PROMPT;
 
         $seasonCtx = "**Período:** {$season['periodo']}\n";
         $seasonCtx .= "**Foco:** {$season['foco']}\n";
-        $seasonCtx .= "**Oportunidades:** " . implode(', ', $season['oportunidades']) . "\n";
-        $seasonCtx .= "**Evitar:** " . implode(', ', $season['evitar']);
+        $seasonCtx .= '**Oportunidades:** '.implode(', ', $season['oportunidades'])."\n";
+        $seasonCtx .= '**Evitar:** '.implode(', ', $season['evitar']);
 
         // Mapear nomes do pipeline para nomes esperados pelo template
         $storeContext = $context['store_context'] ?? $context['collector_context'] ?? [];
@@ -636,7 +689,7 @@ PROMPT;
             '{{unexplored_angles}}' => self::getUnexploredAngles(),
             '{{store_context}}' => json_encode($storeContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             '{{analyst_analysis}}' => json_encode($analystAnalysis, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            '{{competitor_data}}' => $competitorInsights . "\n\n### Dados Completos\n" . json_encode($competitorData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            '{{competitor_data}}' => $competitorInsights."\n\n### Dados Completos\n".json_encode($competitorData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             '{{market_data}}' => json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             '{{rag_strategies}}' => json_encode($context['rag_strategies'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
         ];

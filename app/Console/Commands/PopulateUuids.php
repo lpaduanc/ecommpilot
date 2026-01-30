@@ -27,8 +27,6 @@ class PopulateUuids extends Command
 
     /**
      * Tables that need UUID population.
-     *
-     * @var array
      */
     private array $tables = [
         'stores',
@@ -52,15 +50,17 @@ class PopulateUuids extends Command
         $tables = $specificTable ? [$specificTable] : $this->tables;
 
         // Validar se a tabela existe
-        if ($specificTable && !in_array($specificTable, $this->tables)) {
+        if ($specificTable && ! in_array($specificTable, $this->tables)) {
             $this->error("Table '{$specificTable}' is not in the list of tables to populate.");
+
             return self::FAILURE;
         }
 
         // Confirmação
-        if (!$this->option('force')) {
-            if (!$this->confirm('This will populate UUIDs for all records without them. Continue?')) {
+        if (! $this->option('force')) {
+            if (! $this->confirm('This will populate UUIDs for all records without them. Continue?')) {
                 $this->info('Operation cancelled.');
+
                 return self::SUCCESS;
             }
         }
@@ -72,13 +72,15 @@ class PopulateUuids extends Command
         $totalUpdated = 0;
 
         foreach ($tables as $table) {
-            if (!Schema::hasTable($table)) {
+            if (! Schema::hasTable($table)) {
                 $this->warn("Table '{$table}' does not exist. Skipping...");
+
                 continue;
             }
 
-            if (!Schema::hasColumn($table, 'uuid')) {
+            if (! Schema::hasColumn($table, 'uuid')) {
                 $this->warn("Table '{$table}' does not have a 'uuid' column. Skipping...");
+
                 continue;
             }
 
@@ -90,7 +92,8 @@ class PopulateUuids extends Command
                 ->count();
 
             if ($count === 0) {
-                $this->line("  No records to update.");
+                $this->line('  No records to update.');
+
                 continue;
             }
 
@@ -124,7 +127,7 @@ class PopulateUuids extends Command
         }
 
         $this->newLine();
-        $this->info("UUID population completed!");
+        $this->info('UUID population completed!');
         $this->info("Total records processed: {$totalRecords}");
         $this->info("Total records updated: {$totalUpdated}");
 

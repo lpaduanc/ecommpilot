@@ -58,7 +58,7 @@ class AdminIntegrationsController extends Controller
             'competitors.enabled' => ['required', 'boolean'],
             'competitors.max_per_store' => ['required', 'integer', 'min:1', 'max:10'],
             'competitors.scrape_timeout' => ['required', 'integer', 'min:5', 'max:60'],
-            'decodo.enabled' => ['sometimes', 'boolean'],
+            'decodo.enabled' => ['required', 'boolean'],
             'decodo.username' => ['nullable', 'string', 'max:100'],
             'decodo.password' => ['nullable', 'string', 'max:100'],
             'decodo.headless' => ['nullable', 'string', 'in:html,true'],
@@ -78,8 +78,8 @@ class AdminIntegrationsController extends Controller
             'description' => 'Ativa ou desativa a coleta de dados externos (Google Trends, preços de mercado, concorrentes)',
         ]);
 
-        // Save API key only if provided (not empty)
-        if (! empty($validated['serpapi_key'])) {
+        // Save API key only if provided (not empty and not masked)
+        if (! empty($validated['serpapi_key']) && ! $this->isMaskedValue($validated['serpapi_key'])) {
             SystemSetting::set('external_data.serpapi_key', $validated['serpapi_key'], [
                 'type' => 'string',
                 'group' => 'external_data',
@@ -128,65 +128,64 @@ class AdminIntegrationsController extends Controller
         ]);
 
         // Save Decodo scraping API settings
-        if (isset($validated['decodo'])) {
-            SystemSetting::set('external_data.decodo.enabled', $validated['decodo']['enabled'] ?? false, [
+        // Always save the enabled state
+        SystemSetting::set('external_data.decodo.enabled', $validated['decodo']['enabled'], [
+            'type' => 'boolean',
+            'group' => 'external_data',
+            'label' => 'Habilitar Decodo API',
+            'description' => 'Ativa a API de Web Scraping Decodo para análise de concorrentes',
+        ]);
+
+        // Save Decodo username only if provided and not masked
+        if (! empty($validated['decodo']['username']) && ! $this->isMaskedValue($validated['decodo']['username'])) {
+            SystemSetting::set('external_data.decodo.username', $validated['decodo']['username'], [
+                'type' => 'string',
+                'group' => 'external_data',
+                'label' => 'Decodo Username',
+                'description' => 'Usuário da API Decodo',
+                'is_sensitive' => true,
+            ]);
+        }
+
+        // Save Decodo password only if provided and not masked
+        if (! empty($validated['decodo']['password']) && ! $this->isMaskedValue($validated['decodo']['password'])) {
+            SystemSetting::set('external_data.decodo.password', $validated['decodo']['password'], [
+                'type' => 'string',
+                'group' => 'external_data',
+                'label' => 'Decodo Password',
+                'description' => 'Senha da API Decodo',
+                'is_sensitive' => true,
+            ]);
+        }
+
+        // Save Decodo headless mode
+        if (isset($validated['decodo']['headless'])) {
+            SystemSetting::set('external_data.decodo.headless', $validated['decodo']['headless'], [
+                'type' => 'string',
+                'group' => 'external_data',
+                'label' => 'Decodo Headless Mode',
+                'description' => 'Modo headless: html (mais rápido) ou true (renderiza JS)',
+            ]);
+        }
+
+        // Save Decodo JS rendering
+        if (isset($validated['decodo']['js_rendering'])) {
+            SystemSetting::set('external_data.decodo.js_rendering', $validated['decodo']['js_rendering'], [
                 'type' => 'boolean',
                 'group' => 'external_data',
-                'label' => 'Habilitar Decodo API',
-                'description' => 'Ativa a API de Web Scraping Decodo para análise de concorrentes',
+                'label' => 'Decodo JS Rendering',
+                'description' => 'Habilita renderização de JavaScript no scraping',
             ]);
+        }
 
-            // Save Decodo username only if provided
-            if (! empty($validated['decodo']['username'])) {
-                SystemSetting::set('external_data.decodo.username', $validated['decodo']['username'], [
-                    'type' => 'string',
-                    'group' => 'external_data',
-                    'label' => 'Decodo Username',
-                    'description' => 'Usuário da API Decodo',
-                    'is_sensitive' => true,
-                ]);
-            }
-
-            // Save Decodo password only if provided
-            if (! empty($validated['decodo']['password'])) {
-                SystemSetting::set('external_data.decodo.password', $validated['decodo']['password'], [
-                    'type' => 'string',
-                    'group' => 'external_data',
-                    'label' => 'Decodo Password',
-                    'description' => 'Senha da API Decodo',
-                    'is_sensitive' => true,
-                ]);
-            }
-
-            // Save Decodo headless mode
-            if (isset($validated['decodo']['headless'])) {
-                SystemSetting::set('external_data.decodo.headless', $validated['decodo']['headless'], [
-                    'type' => 'string',
-                    'group' => 'external_data',
-                    'label' => 'Decodo Headless Mode',
-                    'description' => 'Modo headless: html (mais rápido) ou true (renderiza JS)',
-                ]);
-            }
-
-            // Save Decodo JS rendering
-            if (isset($validated['decodo']['js_rendering'])) {
-                SystemSetting::set('external_data.decodo.js_rendering', $validated['decodo']['js_rendering'], [
-                    'type' => 'boolean',
-                    'group' => 'external_data',
-                    'label' => 'Decodo JS Rendering',
-                    'description' => 'Habilita renderização de JavaScript no scraping',
-                ]);
-            }
-
-            // Save Decodo timeout if provided
-            if (! empty($validated['decodo']['timeout'])) {
-                SystemSetting::set('external_data.decodo.timeout', $validated['decodo']['timeout'], [
-                    'type' => 'integer',
-                    'group' => 'external_data',
-                    'label' => 'Decodo Timeout',
-                    'description' => 'Timeout em segundos para requisições via Decodo API',
-                ]);
-            }
+        // Save Decodo timeout if provided
+        if (! empty($validated['decodo']['timeout'])) {
+            SystemSetting::set('external_data.decodo.timeout', $validated['decodo']['timeout'], [
+                'type' => 'integer',
+                'group' => 'external_data',
+                'label' => 'Decodo Timeout',
+                'description' => 'Timeout em segundos para requisições via Decodo API',
+            ]);
         }
 
         Log::info('External data settings updated', [
@@ -194,7 +193,7 @@ class AdminIntegrationsController extends Controller
             'trends_enabled' => $validated['trends']['enabled'],
             'market_enabled' => $validated['market']['enabled'],
             'competitors_enabled' => $validated['competitors']['enabled'],
-            'decodo_enabled' => $validated['decodo']['enabled'] ?? false,
+            'decodo_enabled' => $validated['decodo']['enabled'],
         ]);
 
         return response()->json([
@@ -338,6 +337,8 @@ class AdminIntegrationsController extends Controller
                     SystemSetting::set('external_data.decodo.username', $request->input('username'), [
                         'type' => 'string',
                         'group' => 'external_data',
+                        'label' => 'Decodo Username',
+                        'description' => 'Usuário da API Decodo',
                         'is_sensitive' => true,
                     ]);
                 }
@@ -345,7 +346,19 @@ class AdminIntegrationsController extends Controller
                     SystemSetting::set('external_data.decodo.password', $request->input('password'), [
                         'type' => 'string',
                         'group' => 'external_data',
+                        'label' => 'Decodo Password',
+                        'description' => 'Senha da API Decodo',
                         'is_sensitive' => true,
+                    ]);
+                }
+
+                // Auto-enable Decodo if test is successful and credentials were just saved
+                if ($request->filled('username') || $request->filled('password')) {
+                    SystemSetting::set('external_data.decodo.enabled', true, [
+                        'type' => 'boolean',
+                        'group' => 'external_data',
+                        'label' => 'Habilitar Decodo API',
+                        'description' => 'Ativa a API de Web Scraping Decodo para análise de concorrentes',
                     ]);
                 }
 
@@ -391,5 +404,28 @@ class AdminIntegrationsController extends Controller
         }
 
         return '********';
+    }
+
+    /**
+     * Check if a value is masked (contains **** or ••••).
+     */
+    private function isMaskedValue(string $value): bool
+    {
+        // Check for asterisks (from getMaskedApiKey)
+        if (str_contains($value, '****') || str_contains($value, '********')) {
+            return true;
+        }
+
+        // Check for bullet points (from frontend placeholder)
+        if (str_contains($value, '••••')) {
+            return true;
+        }
+
+        // Check if the entire string is only asterisks or bullet points
+        if (preg_match('/^[*•]+$/', $value)) {
+            return true;
+        }
+
+        return false;
     }
 }

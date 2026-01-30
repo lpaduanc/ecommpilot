@@ -46,6 +46,7 @@ const defaultForm = {
     has_custom_dashboards: false,
     has_external_integrations: false,
     external_integrations_limit: 1,
+    has_impact_dashboard: false,
 };
 
 const form = reactive({ ...defaultForm });
@@ -349,6 +350,16 @@ onMounted(fetchPlans);
                             </template>
                         </span>
                     </div>
+                    <div class="flex items-center gap-2">
+                        <component
+                            :is="plan.has_impact_dashboard ? CheckCircleIcon : XCircleIcon"
+                            :class="plan.has_impact_dashboard ? 'text-success-500' : 'text-gray-300 dark:text-gray-600'"
+                            class="w-4 h-4 flex-shrink-0"
+                        />
+                        <span :class="plan.has_impact_dashboard ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">
+                            Dashboard de Impacto
+                        </span>
+                    </div>
                 </div>
 
                 <!-- Actions -->
@@ -600,6 +611,17 @@ onMounted(fetchPlans);
                             class="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
                         />
                     </div>
+
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            v-model="form.has_impact_dashboard"
+                            class="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            Dashboard de Impacto nas Vendas
+                        </span>
+                    </label>
 
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
                         <label class="flex items-center gap-3 cursor-pointer">

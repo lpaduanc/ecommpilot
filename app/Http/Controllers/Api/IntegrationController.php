@@ -165,7 +165,7 @@ class IntegrationController extends Controller
 
             return redirect('/integrations?success=connected');
         } catch (\Exception $e) {
-            $errorId = 'err_' . uniqid();
+            $errorId = 'err_'.uniqid();
 
             Log::error('Nuvemshop callback error', [
                 'error_id' => $errorId,
@@ -176,7 +176,7 @@ class IntegrationController extends Controller
                 'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
-            return redirect('/integrations?error=callback_failed&error_id=' . $errorId);
+            return redirect('/integrations?error=callback_failed&error_id='.$errorId);
         }
     }
 
@@ -417,7 +417,7 @@ class IntegrationController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-            $errorId = 'err_' . uniqid();
+            $errorId = 'err_'.uniqid();
 
             Log::error('Exception during Nuvemshop authorization', [
                 'error_id' => $errorId,

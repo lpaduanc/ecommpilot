@@ -22,9 +22,10 @@ use Illuminate\Support\Facades\Log;
 
 class StoreAnalysisService
 {
-    use SuggestionDeduplicationTrait;
     use FeedbackLoopTrait;
     use HistoricalMetricsTrait;
+    use SuggestionDeduplicationTrait;
+
     private string $logChannel = 'analysis';
 
     private array $collectedPrompts = [];
@@ -342,9 +343,9 @@ class StoreAnalysisService
             // Log dados ricos dos concorrentes para debugging
             $concorrentesComDadosRicos = 0;
             foreach ($externalMarketData['concorrentes'] ?? [] as $concorrente) {
-                if (!empty($concorrente['dados_ricos']['categorias']) ||
-                    !empty($concorrente['dados_ricos']['promocoes']) ||
-                    !empty($concorrente['dados_ricos']['produtos'])) {
+                if (! empty($concorrente['dados_ricos']['categorias']) ||
+                    ! empty($concorrente['dados_ricos']['promocoes']) ||
+                    ! empty($concorrente['dados_ricos']['produtos'])) {
                     $concorrentesComDadosRicos++;
                 }
             }

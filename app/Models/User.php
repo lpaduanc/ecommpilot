@@ -140,6 +140,25 @@ class User extends Authenticatable implements MustVerifyEmail
         $this->update(['last_login_at' => now()]);
     }
 
+    /**
+     * Check if user has access to a specific store.
+     * Admins have access to all stores, clients only to their own.
+     */
+    public function hasAccessToStore(?int $storeId): bool
+    {
+        if ($storeId === null) {
+            return false;
+        }
+
+        // Super admins have access to all stores
+        if ($this->hasRole('super_admin')) {
+            return true;
+        }
+
+        // Regular users only have access to their own stores
+        return $this->stores()->where('id', $storeId)->exists();
+    }
+
     // ========== Subscription/Plan Methods ==========
 
     public function subscriptions(): HasMany

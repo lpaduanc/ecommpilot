@@ -13,7 +13,7 @@ use Carbon\Carbon;
 echo "=== Testing Chat Data Query ===\n\n";
 
 $store = Store::first();
-if (!$store) {
+if (! $store) {
     echo "No store found!\n";
     exit(1);
 }
@@ -36,7 +36,7 @@ $allOrders = SyncedOrder::where('store_id', $store->id)
 echo "All orders in period: {$allOrders->count()}\n";
 
 // Test payment status distribution
-$byStatus = $allOrders->groupBy(fn($o) => $o->payment_status?->value ?? 'null')
+$byStatus = $allOrders->groupBy(fn ($o) => $o->payment_status?->value ?? 'null')
     ->map->count()
     ->toArray();
 
@@ -53,8 +53,8 @@ $paidOrders = SyncedOrder::where('store_id', $store->id)
     ->get();
 
 echo "Paid orders (NEW QUERY): {$paidOrders->count()}\n";
-echo "Total revenue: R$ " . number_format($paidOrders->sum('total'), 2, ',', '.') . "\n";
-echo "Average ticket: R$ " . number_format($paidOrders->avg('total') ?? 0, 2, ',', '.') . "\n\n";
+echo 'Total revenue: R$ '.number_format($paidOrders->sum('total'), 2, ',', '.')."\n";
+echo 'Average ticket: R$ '.number_format($paidOrders->avg('total') ?? 0, 2, ',', '.')."\n\n";
 
 // Sample paid orders
 if ($paidOrders->count() > 0) {

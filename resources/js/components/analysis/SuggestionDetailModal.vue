@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch, onUnmounted } from 'vue';
 import { useAuthStore } from '../../stores/authStore';
-import BaseModal from '../common/BaseModal.vue';
+import { useAnalysisStore } from '../../stores/analysisStore';
 import {
     CheckCircleIcon,
     ChatBubbleLeftRightIcon,
@@ -11,13 +11,14 @@ import {
     ChartBarIcon,
     XMarkIcon,
     PlayIcon,
-    XCircleIcon,
     ChevronDownIcon,
     CheckIcon,
     LockClosedIcon,
+    ListBulletIcon,
 } from '@heroicons/vue/24/outline';
 
 const authStore = useAuthStore();
+const analysisStore = useAnalysisStore();
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -26,7 +27,7 @@ const props = defineProps({
     shiftLeft: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change', 'accept', 'reject']);
+const emit = defineEmits(['close', 'ask-ai', 'mark-done', 'status-change', 'accept', 'reject', 'manage-workflow']);
 
 const showStatusDropdown = ref(false);
 
@@ -64,12 +65,6 @@ const priorityConfig = {
     low: { label: 'Baixa Prioridade', color: 'from-emerald-500 to-green-600', bg: 'bg-emerald-100', text: 'text-emerald-700' },
 };
 
-const effortLabels = {
-    low: 'Baixo',
-    medium: 'Médio',
-    high: 'Alto',
-};
-
 // Status options for tracking page
 const trackingStatusOptions = computed(() => {
     const baseOptions = [
@@ -102,48 +97,6 @@ const priority = computed(() =>
     priorityConfig[props.suggestion?.priority || props.suggestion?.expected_impact] || priorityConfig.medium
 );
 
-// Get action_steps from either action_steps or implementation_steps or recommended_action
-const actionSteps = computed(() => {
-    if (!props.suggestion) return [];
-    const steps = props.suggestion.action_steps || props.suggestion.implementation_steps;
-    if (steps && steps.length > 0) return steps;
-
-    // Handle recommended_action (can be array or string)
-    const action = props.suggestion.recommended_action;
-    if (!action) return [];
-
-    // If it's already an array, use it directly
-    if (Array.isArray(action)) {
-        return action.filter(step => step && typeof step === 'string' && step.trim());
-    }
-
-    // If it's a string, try to parse as JSON first (in case it's a JSON array string)
-    if (typeof action === 'string') {
-        try {
-            const parsed = JSON.parse(action);
-            if (Array.isArray(parsed)) {
-                return parsed.filter(step => step && typeof step === 'string' && step.trim());
-            }
-        } catch (e) {
-            // Not JSON, handle as plain string
-        }
-
-        // Try splitting by newlines
-        const lines = action.split(/\\n|\n/).filter(line => line.trim());
-        if (lines.length > 1) return lines;
-
-        // Try splitting by numbered pattern "1. ... 2. ... 3. ..."
-        const numberedSteps = action.split(/(?=\d+\.\s)/).filter(s => s.trim());
-        if (numberedSteps.length > 1) {
-            return numberedSteps.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(s => s);
-        }
-
-        return [action];
-    }
-
-    return [];
-});
-
 // Status handling
 const currentStatus = computed(() => props.suggestion?.status || 'new');
 const isOnAnalysisPage = computed(() => props.suggestion?.is_on_analysis_page ?? ['new', 'pending', 'rejected', 'ignored'].includes(currentStatus.value));
@@ -153,6 +106,49 @@ const isRejected = computed(() => ['rejected', 'ignored'].includes(currentStatus
 const currentStatusOption = computed(() =>
     trackingStatusOptions.value.find(o => o.value === currentStatus.value) || trackingStatusOptions.value[0]
 );
+
+// Parse action steps from recommended_action
+const actionSteps = computed(() => {
+    if (!props.suggestion) return [];
+
+    const action = props.suggestion.recommended_action;
+    if (!action) return [];
+
+    // If it's already an array, use it directly
+    if (Array.isArray(action)) {
+        return action.filter(s => s && typeof s === 'string' && s.trim());
+    }
+
+    // If it's a string, try to parse it
+    if (typeof action === 'string') {
+        // Try JSON parse first
+        try {
+            const parsed = JSON.parse(action);
+            if (Array.isArray(parsed)) {
+                return parsed.filter(s => s && typeof s === 'string' && s.trim());
+            }
+        } catch (e) {
+            // Not JSON, continue with string parsing
+        }
+
+        // Try splitting by newlines
+        const lines = action.split(/\\n|\n/).filter(l => l.trim());
+        if (lines.length > 1) {
+            return lines.map(l => l.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+        }
+
+        // Try splitting by numbered pattern "1. ... 2. ... 3. ..."
+        const numbered = action.split(/(?=\d+\.\s)/).filter(s => s.trim());
+        if (numbered.length > 1) {
+            return numbered.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+        }
+
+        // Return as single step
+        return [action.trim()];
+    }
+
+    return [];
+});
 
 function selectStatus(status) {
     showStatusDropdown.value = false;
@@ -182,6 +178,10 @@ function handleAccept() {
 function handleReject() {
     emit('reject', props.suggestion);
     emit('close');
+}
+
+function handleManageWorkflow() {
+    emit('manage-workflow', props.suggestion);
 }
 </script>
 
@@ -257,61 +257,46 @@ function handleReject() {
                             </p>
                         </div>
 
-                        <!-- Implementation Steps -->
+                        <!-- Action Steps (from AI) -->
                         <div v-if="actionSteps.length > 0">
-                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                                <BoltIcon class="w-5 h-5 text-primary-500" />
-                                Passos para Implementação
+                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                                <ListBulletIcon class="w-5 h-5 text-primary-500" />
+                                Passos Recomendados
                             </h3>
-                            <div class="space-y-3">
-                                <div
-                                    v-for="(step, index) in actionSteps"
-                                    :key="index"
-                                    class="flex items-start gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
-                                >
-                                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center text-sm font-bold shadow-lg shadow-primary-500/30">
-                                        {{ index + 1 }}
+                            <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-100 dark:border-gray-700">
+                                <div class="space-y-3">
+                                    <div
+                                        v-for="(step, index) in actionSteps"
+                                        :key="index"
+                                        class="flex items-start gap-3 bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700 hover:border-primary-200 dark:hover:border-primary-700 transition-colors"
+                                    >
+                                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                                            {{ index + 1 }}
+                                        </div>
+                                        <p class="flex-1 text-gray-700 dark:text-gray-300 text-sm leading-relaxed pt-0.5">{{ step }}</p>
                                     </div>
-                                    <span class="text-gray-700 dark:text-gray-300 pt-1">{{ step }}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Metrics to Track -->
-                        <div v-if="suggestion.metrics_to_track?.length > 0">
-                            <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-3">📊 Métricas para Acompanhar</h3>
-                            <div class="flex flex-wrap gap-2">
-                                <span
-                                    v-for="metric in suggestion.metrics_to_track"
-                                    :key="metric"
-                                    class="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600"
-                                >
-                                    {{ metric }}
-                                </span>
-                            </div>
+                        <!-- Quick Actions -->
+                        <div v-if="isOnTrackingPage" class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl p-5 border border-primary-200 dark:border-primary-800">
+                            <h3 class="flex items-center gap-2 font-semibold text-primary-900 dark:text-primary-200 mb-3">
+                                <BoltIcon class="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                                Gerenciar Workflow
+                            </h3>
+                            <p class="text-primary-700 dark:text-primary-300 text-sm mb-4">
+                                Acesse a página dedicada para gerenciar tarefas, passos e impactos nas vendas.
+                            </p>
+                            <button
+                                @click="handleManageWorkflow"
+                                class="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all"
+                            >
+                                <BoltIcon class="w-5 h-5" />
+                                Abrir Página de Workflow
+                            </button>
                         </div>
 
-                        <!-- Effort & Time -->
-                        <div class="flex flex-wrap gap-4">
-                            <div v-if="suggestion.estimated_effort" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                                <div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                    <BoltIcon class="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                                </div>
-                                <div>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Esforço</span>
-                                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ effortLabels[suggestion.estimated_effort] }}</span>
-                                </div>
-                            </div>
-                            <div v-if="suggestion.estimated_time" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                                <div class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                    <ClockIcon class="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <div>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400 block">Tempo Estimado</span>
-                                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ suggestion.estimated_time }}</span>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Footer -->

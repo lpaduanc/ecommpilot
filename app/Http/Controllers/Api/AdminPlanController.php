@@ -73,6 +73,7 @@ class AdminPlanController extends Controller
             'has_suggestion_history' => ['boolean'],
             'has_custom_dashboards' => ['boolean'],
             'has_external_integrations' => ['boolean'],
+            'has_impact_dashboard' => ['boolean'],
             'external_integrations_limit' => ['nullable', 'integer', 'min:-1'],
             'features' => ['nullable', 'array'],
         ]);
@@ -109,6 +110,7 @@ class AdminPlanController extends Controller
             'has_suggestion_history' => ['sometimes', 'boolean'],
             'has_custom_dashboards' => ['sometimes', 'boolean'],
             'has_external_integrations' => ['sometimes', 'boolean'],
+            'has_impact_dashboard' => ['sometimes', 'boolean'],
             'external_integrations_limit' => ['nullable', 'integer', 'min:-1'],
             'features' => ['nullable', 'array'],
         ]);
@@ -131,6 +133,9 @@ class AdminPlanController extends Controller
         }
         if ($request->has('has_external_integrations')) {
             $validated['has_external_integrations'] = (bool) $request->input('has_external_integrations');
+        }
+        if ($request->has('has_impact_dashboard')) {
+            $validated['has_impact_dashboard'] = (bool) $request->input('has_impact_dashboard');
         }
         if ($request->has('is_active')) {
             $validated['is_active'] = (bool) $request->input('is_active');

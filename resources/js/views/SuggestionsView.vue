@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import api from '../services/api';
@@ -20,6 +21,7 @@ import {
     ChevronDownIcon,
 } from '@heroicons/vue/24/outline';
 
+const router = useRouter();
 const notificationStore = useNotificationStore();
 const authStore = useAuthStore();
 
@@ -206,6 +208,12 @@ async function handleRejectSuggestion(suggestion) {
     } catch (err) {
         notificationStore.error(err.response?.data?.message || 'Erro ao rejeitar sugestão.');
     }
+}
+
+function handleManageWorkflow(suggestion) {
+    // Close modal and navigate to workflow page
+    showSuggestionDetail.value = false;
+    router.push({ name: 'suggestion-workflow', params: { id: suggestion.id } });
 }
 
 function handleSuggestionAskAI(suggestion) {
@@ -632,6 +640,7 @@ onMounted(() => {
             @status-change="handleStatusChange"
             @reject="handleRejectSuggestion"
             @ask-ai="handleSuggestionAskAI"
+            @manage-workflow="handleManageWorkflow"
         />
 
         <!-- Chat Panel (for suggestion discussions) - Opens side by side with modal -->

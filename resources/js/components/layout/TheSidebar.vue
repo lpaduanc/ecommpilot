@@ -27,6 +27,7 @@ import {
     CreditCardIcon,
     LockClosedIcon,
     ClipboardDocumentListIcon,
+    ArrowTrendingUpIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -90,6 +91,13 @@ const menuItems = computed(() => [
         icon: ClipboardDocumentListIcon,
         route: 'suggestions',
         permission: 'analysis.view',
+    },
+    {
+        name: 'Impacto nas Vendas',
+        label: 'Impacto nas Vendas',
+        icon: ArrowTrendingUpIcon,
+        route: 'impact-dashboard',
+        highlight: true,
     },
     {
         name: 'Produtos',

@@ -43,12 +43,12 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         }
     }
 
-    async function fetchUser(id) {
+    async function fetchUser(uuid) {
         isLoading.value = true;
         error.value = null;
 
         try {
-            const response = await api.get(`/users/${id}`);
+            const response = await api.get(`/users/${uuid}`);
             currentUser.value = response.data.user;
             return { success: true, user: response.data.user };
         } catch (err) {
@@ -82,15 +82,15 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         }
     }
 
-    async function updateUser(id, userData) {
+    async function updateUser(uuid, userData) {
         isLoading.value = true;
         error.value = null;
 
         try {
-            const response = await api.put(`/users/${id}`, userData);
+            const response = await api.put(`/users/${uuid}`, userData);
 
             // Atualiza o usuário na lista
-            const index = users.value.findIndex(u => u.id === id);
+            const index = users.value.findIndex(u => u.uuid === uuid);
             if (index !== -1) {
                 users.value[index] = response.data.user;
             }
@@ -108,15 +108,15 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         }
     }
 
-    async function deleteUser(id) {
+    async function deleteUser(uuid) {
         isLoading.value = true;
         error.value = null;
 
         try {
-            await api.delete(`/users/${id}`);
+            await api.delete(`/users/${uuid}`);
 
             // Remove o usuário da lista
-            users.value = users.value.filter(u => u.id !== id);
+            users.value = users.value.filter(u => u.uuid !== uuid);
 
             return { success: true };
         } catch (err) {

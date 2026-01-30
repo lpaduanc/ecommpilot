@@ -93,7 +93,7 @@ async function assignPlan() {
     isSubmitting.value = true;
     try {
         await api.post(`/admin/plans/${selectedPlanId.value}/assign`, {
-            user_id: client.value.id,
+            user_uuid: client.value.uuid,
         });
         notificationStore.success('Plano atribuído com sucesso!');
         showPlanModal.value = false;
@@ -118,7 +118,7 @@ async function removePlan() {
 
     isSubmitting.value = true;
     try {
-        await api.delete(`/admin/clients/${client.value.id}/subscription`);
+        await api.delete(`/admin/clients/${client.value.uuid}/subscription`);
         notificationStore.success('Plano removido com sucesso!');
         showPlanModal.value = false;
         subscription.value = null;

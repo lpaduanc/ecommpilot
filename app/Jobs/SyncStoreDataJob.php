@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\SyncStatus;
 use App\Jobs\Sync\SyncCouponsJob;
 use App\Jobs\Sync\SyncCustomersJob;
 use App\Jobs\Sync\SyncOrdersJob;
@@ -31,6 +32,22 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
      * Canal de log para sincronizacao
      */
     private string $logChannel = 'sync';
+
+    /**
+     * Log com fallback para canal padrão em caso de erro
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel($this->logChannel)->$level($message, $context);
+        } catch (\Exception $e) {
+            // Fallback to default log channel if sync channel fails (e.g., permission denied)
+            Log::$level("[SYNC FALLBACK] $message", array_merge($context, [
+                'original_channel' => $this->logChannel,
+                'fallback_reason' => $e->getMessage(),
+            ]));
+        }
+    }
 
     /**
      * Número de tentativas antes de falhar
@@ -181,6 +198,7 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
     ): void {
         $store = $this->store;
         $logChannel = $this->logChannel;
+        $notificationServiceRef = $notificationService; // Captura para closures
 
         Log::channel($logChannel)->info('>>> [PARALLEL MODE] Iniciando batch de sincronizacao', [
             'store_id' => $store->id,
@@ -195,33 +213,44 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         ])
             ->name("sync-store-{$store->id}")
             ->allowFailures()
-            ->then(function (Batch $batch) use ($store, $dashboardService, $productAnalyticsService, $notificationService, $startTime, $logChannel) {
+            ->then(function (Batch $batch) use ($store, $dashboardService, $productAnalyticsService, $notificationServiceRef, $startTime, $logChannel) {
                 // Todos os jobs completaram com sucesso
-                $store->markAsSynced();
+                // CRITICAL: Refresh store from database before marking as synced
+                $freshStore = Store::find($store->id);
+
+                if (!$freshStore) {
+                    Log::error('[PARALLEL MODE] Store not found during batch then', [
+                        'store_id' => $store->id,
+                        'batch_id' => $batch->id,
+                    ]);
+                    return;
+                }
+
+                $freshStore->markAsSynced();
 
                 // Clear all caches after successful sync
-                $dashboardService->clearCache($store);
-                $productAnalyticsService->invalidateABCCache($store);
+                $dashboardService->clearCache($freshStore);
+                $productAnalyticsService->invalidateABCCache($freshStore);
 
                 $totalTime = round((microtime(true) - $startTime), 2);
 
                 // Coletar estatísticas para notificação
                 $stats = [
-                    'products_count' => $store->products()->count(),
-                    'orders_count' => $store->orders()->count(),
-                    'customers_count' => $store->customers()->count(),
-                    'coupons_count' => $store->coupons()->count(),
+                    'products_count' => $freshStore->products()->count(),
+                    'orders_count' => $freshStore->orders()->count(),
+                    'customers_count' => $freshStore->customers()->count(),
+                    'coupons_count' => $freshStore->coupons()->count(),
                 ];
 
                 // Notificar conclusão da sincronização
-                $notificationService->notifySyncCompleted($store, 'all', $stats);
+                $notificationServiceRef->notifySyncCompleted($freshStore, 'all', $stats);
 
                 Log::channel($logChannel)->info('╔══════════════════════════════════════════════════════════════════╗');
                 Log::channel($logChannel)->info('║     SYNC STORE DATA - BATCH CONCLUIDO COM SUCESSO               ║');
                 Log::channel($logChannel)->info('╚══════════════════════════════════════════════════════════════════╝');
                 Log::channel($logChannel)->info('Estatisticas finais da sincronizacao paralela', [
-                    'store_id' => $store->id,
-                    'store_name' => $store->name,
+                    'store_id' => $freshStore->id,
+                    'store_name' => $freshStore->name,
                     'total_time_seconds' => $totalTime,
                     'batch_id' => $batch->id,
                     'total_jobs' => $batch->totalJobs,
@@ -230,23 +259,53 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                     'status' => 'success',
                 ]);
             })
-            ->catch(function (Batch $batch, \Throwable $e) use ($store, $logChannel) {
+            ->catch(function (Batch $batch, \Throwable $e) use ($store, $logChannel, $notificationServiceRef) {
                 // Algum job falhou
-                Log::channel($logChannel)->error('!!! [PARALLEL MODE] Batch falhou parcialmente', [
-                    'store_id' => $store->id,
+                // CRITICAL: Refresh store from database to get latest status
+                $freshStore = Store::find($store->id);
+
+                if (!$freshStore) {
+                    Log::error('[PARALLEL MODE] Store not found during batch catch', [
+                        'store_id' => $store->id,
+                        'batch_id' => $batch->id,
+                    ]);
+                    return;
+                }
+
+                // Só marca como failed se não for erro de token
+                // (token_expired é mais específico e deve ser preservado)
+                if ($freshStore->sync_status !== SyncStatus::TokenExpired) {
+                    $freshStore->markAsFailed();
+
+                    // Notificar falha da sincronização (apenas se não for token_expired)
+                    $notificationServiceRef->notifySyncFailed($freshStore, 'all', $e->getMessage());
+                }
+
+                Log::error('!!! [PARALLEL MODE] Batch falhou', [
+                    'store_id' => $freshStore->id,
                     'batch_id' => $batch->id,
                     'failed_jobs' => $batch->failedJobs,
+                    'sync_status' => $freshStore->sync_status->value,
                     'error' => $e->getMessage(),
                 ]);
             })
             ->finally(function (Batch $batch) use ($store, $logChannel) {
                 // Executado sempre, independente de sucesso ou falha
-                Log::channel($logChannel)->info('<<< [PARALLEL MODE] Batch finalizado', [
-                    'store_id' => $store->id,
-                    'batch_id' => $batch->id,
-                    'cancelled' => $batch->cancelled(),
-                    'finished' => $batch->finished(),
-                ]);
+                try {
+                    Log::channel($logChannel)->info('<<< [PARALLEL MODE] Batch finalizado', [
+                        'store_id' => $store->id,
+                        'batch_id' => $batch->id,
+                        'cancelled' => $batch->cancelled(),
+                        'finished' => $batch->finished(),
+                    ]);
+                } catch (\Exception $e) {
+                    // Fallback se houver erro de log
+                    Log::info('[SYNC FALLBACK] Batch finalizado', [
+                        'store_id' => $store->id,
+                        'batch_id' => $batch->id,
+                        'log_error' => $e->getMessage(),
+                    ]);
+                }
             })
             ->onQueue('sync')
             ->dispatch();

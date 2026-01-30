@@ -28,6 +28,7 @@ class PlanSeeder extends Seeder
                 'has_suggestion_history' => false,
                 'has_custom_dashboards' => false,
                 'has_external_integrations' => false,
+                'has_impact_dashboard' => false,
                 'external_integrations_limit' => 0,
                 'features' => [
                     'daily_email_report' => true,
@@ -52,6 +53,7 @@ class PlanSeeder extends Seeder
                 'has_suggestion_history' => false,
                 'has_custom_dashboards' => false,
                 'has_external_integrations' => true,
+                'has_impact_dashboard' => false,
                 'external_integrations_limit' => 3,
                 'features' => [
                     'daily_email_report' => true,
@@ -76,6 +78,7 @@ class PlanSeeder extends Seeder
                 'has_suggestion_history' => true,
                 'has_custom_dashboards' => true,
                 'has_external_integrations' => true,
+                'has_impact_dashboard' => true,
                 'external_integrations_limit' => -1, // Ilimitado
                 'features' => [
                     'daily_email_report' => true,

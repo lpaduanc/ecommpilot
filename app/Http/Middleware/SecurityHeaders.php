@@ -25,10 +25,10 @@ class SecurityHeaders
 
         if ($isLocal) {
             // Permitir Vite dev server em desenvolvimento
-            $viteOrigins = "http://localhost:5173 http://127.0.0.1:5173";
+            $viteOrigins = 'http://localhost:5173 http://127.0.0.1:5173';
             $scriptSrc .= " {$viteOrigins}";
             $styleSrc .= " {$viteOrigins}";
-            $connectSrc .= " ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*";
+            $connectSrc .= ' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*';
         }
 
         $csp = implode('; ', [

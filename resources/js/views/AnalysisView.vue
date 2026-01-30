@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAnalysisStore } from '../stores/analysisStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
@@ -28,6 +29,7 @@ import {
     EnvelopeIcon,
 } from '@heroicons/vue/24/outline';
 
+const router = useRouter();
 const analysisStore = useAnalysisStore();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
@@ -140,6 +142,13 @@ function handleOpportunityAskAI(opportunity) {
     showOpportunityDetail.value = false;
     showChat.value = true;
     // TODO: Pre-fill chat with opportunity context
+}
+
+function handleManageWorkflow(suggestion) {
+    // Close modal and navigate to workflow page
+    showSuggestionDetail.value = false;
+    showChatPanel.value = false;
+    router.push({ name: 'suggestion-workflow', params: { id: suggestion.id } });
 }
 
 function handleSuggestionAskAI(suggestion) {
@@ -838,6 +847,7 @@ onUnmounted(() => {
             @accept="handleAcceptSuggestion"
             @reject="handleRejectSuggestion"
             @ask-ai="handleSuggestionAskAI"
+            @manage-workflow="handleManageWorkflow"
         />
 
         <!-- Opportunity Detail Modal -->

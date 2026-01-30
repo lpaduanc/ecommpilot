@@ -28,6 +28,7 @@ class Plan extends Model
         'has_suggestion_history',
         'has_custom_dashboards',
         'has_external_integrations',
+        'has_impact_dashboard',
         'external_integrations_limit',
         'features',
     ];
@@ -51,6 +52,7 @@ class Plan extends Model
             'has_suggestion_history' => 'boolean',
             'has_custom_dashboards' => 'boolean',
             'has_external_integrations' => 'boolean',
+            'has_impact_dashboard' => 'boolean',
             'features' => 'array',
         ];
     }

@@ -16,6 +16,7 @@ export const useIntegrationStore = defineStore('integration', () => {
     const isProcessingOAuth = ref(false);
     const oauthError = ref(null);
     const syncStatusPollingInterval = ref(null);
+    const pollingStartTime = ref(null);
 
     // Nuvemshop configuration
     const nuvemshopConfig = ref({
@@ -323,15 +324,33 @@ export const useIntegrationStore = defineStore('integration', () => {
      * Start polling for sync status updates
      */
     function startSyncStatusPolling(intervalMs = 5000) {
+        const MAX_POLLING_DURATION = 300000; // 5 minutos
+
         stopSyncStatusPolling(); // Clear any existing interval
+        pollingStartTime.value = Date.now();
+
         syncStatusPollingInterval.value = setInterval(async () => {
+            // Timeout safety - para após 5 minutos
+            if (Date.now() - pollingStartTime.value > MAX_POLLING_DURATION) {
+                console.warn('[Sync Polling] Timeout após 5 minutos');
+                stopSyncStatusPolling();
+                return;
+            }
+
             const result = await fetchSyncStatus();
-            // Stop polling if sync is no longer in progress
-            if (result.success && result.data.sync_status) {
-                const status = result.data.sync_status;
-                if (!['syncing', 'pending'].includes(status)) {
-                    stopSyncStatusPolling();
-                }
+
+            // Para polling se houver erro de rede
+            if (!result.success) {
+                console.warn('[Sync Polling] Erro ao buscar status, parando polling');
+                stopSyncStatusPolling();
+                return;
+            }
+
+            // Para polling se status não é mais "em progresso"
+            const status = result.data?.sync_status;
+            if (status && !['syncing', 'pending'].includes(status)) {
+                console.log('[Sync Polling] Status final:', status);
+                stopSyncStatusPolling();
             }
         }, intervalMs);
     }
@@ -343,7 +362,15 @@ export const useIntegrationStore = defineStore('integration', () => {
         if (syncStatusPollingInterval.value) {
             clearInterval(syncStatusPollingInterval.value);
             syncStatusPollingInterval.value = null;
+            pollingStartTime.value = null;
         }
+    }
+
+    /**
+     * Helper to check if sync is in progress
+     */
+    function isSyncInProgress(status) {
+        return ['syncing', 'pending'].includes(status);
     }
 
     /**
@@ -356,6 +383,7 @@ export const useIntegrationStore = defineStore('integration', () => {
         isSyncing.value = false;
         isProcessingOAuth.value = false;
         oauthError.value = null;
+        pollingStartTime.value = null;
         nuvemshopConfig.value = {
             clientId: '',
             clientSecret: '',
@@ -402,6 +430,7 @@ export const useIntegrationStore = defineStore('integration', () => {
         fetchSyncStatus,
         startSyncStatusPolling,
         stopSyncStatusPolling,
+        isSyncInProgress,
         $reset,
     };
 });

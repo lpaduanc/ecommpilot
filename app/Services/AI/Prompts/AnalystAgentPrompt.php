@@ -12,7 +12,6 @@ class AnalystAgentPrompt
      * [5] Override do Health Score (forçar classificação em casos extremos)
      * [8] Anomalias vs histórico próprio da loja
      */
-
     public static function get(array $data): string
     {
         $storeName = $data['store_name'] ?? 'Loja';
@@ -56,14 +55,16 @@ class AnalystAgentPrompt
         $concorrentesResumo = [];
 
         foreach ($competitors as $c) {
-            if (!($c['sucesso'] ?? false)) continue;
+            if (! ($c['sucesso'] ?? false)) {
+                continue;
+            }
             $concorrentesSucesso++;
             $precoMedio = $c['faixa_preco']['media'] ?? 0;
             $somaPrecosConc += $precoMedio;
             $concorrentesResumo[] = [
                 'nome' => $c['nome'] ?? 'Concorrente',
                 'preco_medio' => $precoMedio,
-                'diferenciais' => $c['diferenciais'] ?? []
+                'diferenciais' => $c['diferenciais'] ?? [],
             ];
         }
         $mediaPrecosConcorrentes = $concorrentesSucesso > 0 ? round($somaPrecosConc / $concorrentesSucesso, 2) : 0;
@@ -75,16 +76,24 @@ class AnalystAgentPrompt
 
         if ($precoMedioMercado > 0 && $ticketMedio > 0) {
             $ratio = $ticketMedio / $precoMedioMercado;
-            if ($ratio < 0.85) $posVsMercado = 'abaixo';
-            elseif ($ratio > 1.15) $posVsMercado = 'acima';
-            else $posVsMercado = 'dentro';
+            if ($ratio < 0.85) {
+                $posVsMercado = 'abaixo';
+            } elseif ($ratio > 1.15) {
+                $posVsMercado = 'acima';
+            } else {
+                $posVsMercado = 'dentro';
+            }
         }
 
         if ($mediaPrecosConcorrentes > 0 && $ticketMedio > 0) {
             $ratio = $ticketMedio / $mediaPrecosConcorrentes;
-            if ($ratio < 0.85) $posVsConcorrentes = 'abaixo';
-            elseif ($ratio > 1.15) $posVsConcorrentes = 'acima';
-            else $posVsConcorrentes = 'dentro';
+            if ($ratio < 0.85) {
+                $posVsConcorrentes = 'abaixo';
+            } elseif ($ratio > 1.15) {
+                $posVsConcorrentes = 'acima';
+            } else {
+                $posVsConcorrentes = 'dentro';
+            }
         }
 
         // Contexto de sazonalidade [MELHORIA 3]
@@ -93,6 +102,42 @@ class AnalystAgentPrompt
 
         return <<<PROMPT
 # ANALYST AGENT — DIAGNÓSTICO COMPLETO DA LOJA
+
+## 🎭 SUA IDENTIDADE
+
+Você é **Dr. Ricardo Menezes**, Consultor Sênior de E-commerce com 15 anos de experiência em diagnóstico de operações digitais.
+
+### Seu Background
+Ex-sócio da Bain & Company, especializado em varejo digital brasileiro. Diagnosticou mais de 500 operações de e-commerce no Brasil, desde startups até grandes varejistas. PhD em Administração pela FGV com foco em métricas de performance para comércio eletrônico.
+
+### Sua Mentalidade
+- "Todo número conta uma história - meu trabalho é descobrir qual"
+- "Diagnosticar errado é pior que não diagnosticar"
+- "A saúde do negócio está nos detalhes que outros ignoram"
+- "Não existe métrica isolada - tudo está conectado"
+
+### Sua Expertise
+- Diagnóstico de saúde operacional de e-commerce
+- Identificação de anomalias e padrões ocultos
+- Análise de causa-raiz de problemas
+- Frameworks de avaliação (Health Score, benchmarking)
+- Contextualização sazonal do mercado brasileiro
+
+### Seu Estilo de Trabalho
+- Analítico e extremamente estruturado
+- Usa frameworks e metodologias comprovadas
+- Quantifica TUDO (scores, percentuais, variações)
+- Hierarquiza por severidade (crítico > atenção > monitoramento)
+- Compara sempre com múltiplas referências
+
+### Seus Princípios Inegociáveis
+1. Diagnóstico baseado em evidências múltiplas, nunca em dado isolado
+2. Comparar com 3 referências: histórico próprio, benchmark do setor, concorrentes
+3. Identificar causa-raiz, não apenas sintomas superficiais
+4. Priorizar problemas por impacto real no negócio
+5. Contextualizar sazonalmente (o que é normal para o período atual)
+
+---
 
 ## SEU PAPEL
 Você é o médico da loja. Diagnosticar saúde do negócio, identificar problemas, encontrar oportunidades e preparar briefing para o Strategist.
@@ -395,21 +440,21 @@ PROMPT;
     private static function getSeasonalityImpact(int $mes): string
     {
         $impactos = [
-            1 => "**Janeiro - Pós-Festas:** Queda natural de 20-30% nas vendas é ESPERADA. Não classificar como anomalia grave.",
-            2 => "**Fevereiro - Carnaval:** Vendas voláteis. Pico antes do feriado, queda durante.",
-            3 => "**Março - Normalização:** Retorno ao padrão normal. Bom mês para comparação.",
-            4 => "**Abril - Páscoa:** Possível leve alta em kits presenteáveis.",
-            5 => "**Maio - Dia das Mães:** ALTA TEMPORADA. Espere +30-50% nas vendas. Queda após = normal.",
-            6 => "**Junho - Inverno/Namorados:** Pico no início (Namorados), depois estabiliza.",
-            7 => "**Julho - Férias:** Vendas podem cair 10-15% (férias escolares).",
-            8 => "**Agosto - Dia dos Pais:** Leve alta em produtos masculinos. Mês de preparação para Q4.",
-            9 => "**Setembro - Dia do Cliente:** Possíveis promoções. Preparação para Black Friday.",
-            10 => "**Outubro - Pré-Black Friday:** Consumidores segurando compras. Queda pode ser estratégica.",
-            11 => "**Novembro - Black Friday:** MAIOR MÊS. Espere +50-100% nas vendas.",
-            12 => "**Dezembro - Natal:** ALTA TEMPORADA. +40-60% nas vendas até dia 20, queda após."
+            1 => '**Janeiro - Pós-Festas:** Queda natural de 20-30% nas vendas é ESPERADA. Não classificar como anomalia grave.',
+            2 => '**Fevereiro - Carnaval:** Vendas voláteis. Pico antes do feriado, queda durante.',
+            3 => '**Março - Normalização:** Retorno ao padrão normal. Bom mês para comparação.',
+            4 => '**Abril - Páscoa:** Possível leve alta em kits presenteáveis.',
+            5 => '**Maio - Dia das Mães:** ALTA TEMPORADA. Espere +30-50% nas vendas. Queda após = normal.',
+            6 => '**Junho - Inverno/Namorados:** Pico no início (Namorados), depois estabiliza.',
+            7 => '**Julho - Férias:** Vendas podem cair 10-15% (férias escolares).',
+            8 => '**Agosto - Dia dos Pais:** Leve alta em produtos masculinos. Mês de preparação para Q4.',
+            9 => '**Setembro - Dia do Cliente:** Possíveis promoções. Preparação para Black Friday.',
+            10 => '**Outubro - Pré-Black Friday:** Consumidores segurando compras. Queda pode ser estratégica.',
+            11 => '**Novembro - Black Friday:** MAIOR MÊS. Espere +50-100% nas vendas.',
+            12 => '**Dezembro - Natal:** ALTA TEMPORADA. +40-60% nas vendas até dia 20, queda após.',
         ];
 
-        return $impactos[$mes] ?? "Mês sem sazonalidade específica.";
+        return $impactos[$mes] ?? 'Mês sem sazonalidade específica.';
     }
 
     public static function getTemplate(): string

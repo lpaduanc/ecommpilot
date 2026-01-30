@@ -110,6 +110,24 @@ const routes = [
         meta: { requiresAuth: true, permission: 'analysis.view' },
     },
     {
+        path: '/suggestions/:id/workflow',
+        name: 'suggestion-workflow',
+        component: () => import(
+            /* webpackChunkName: "suggestion-workflow" */
+            '../views/SuggestionWorkflowView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'analysis.view' },
+    },
+    {
+        path: '/impact',
+        name: 'impact-dashboard',
+        component: () => import(
+            /* webpackChunkName: "impact-dashboard" */
+            '../views/ImpactDashboardView.vue'
+        ),
+        meta: { requiresAuth: true },
+    },
+    {
         path: '/chat',
         name: 'chat',
         component: () => import(

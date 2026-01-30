@@ -40,6 +40,16 @@ const priority = computed(() => priorityConfig[props.suggestion.priority || prop
 
 // New status system
 const suggestionStatus = computed(() => props.suggestion.status || 'new');
+
+// Steps progress
+const stepsProgress = computed(() => {
+    const total = props.suggestion.steps_count || 0;
+    const completed = props.suggestion.completed_steps_count || 0;
+    if (total === 0) return 0;
+    return Math.round((completed / total) * 100);
+});
+
+const hasSteps = computed(() => (props.suggestion.steps_count || 0) > 0);
 const isRejected = computed(() => ['rejected', 'ignored'].includes(suggestionStatus.value));
 const isAccepted = computed(() => suggestionStatus.value === 'accepted');
 const isInProgress = computed(() => suggestionStatus.value === 'in_progress');
@@ -133,6 +143,25 @@ function handleReject(e) {
                 <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                     Impacto {{ suggestion.expected_impact === 'high' ? 'Alto' : suggestion.expected_impact === 'medium' ? 'Médio' : suggestion.expected_impact === 'low' ? 'Baixo' : suggestion.expected_impact }}
                 </p>
+            </div>
+
+            <!-- Steps Progress (Mini Progress Bar) -->
+            <div v-if="hasSteps" class="flex items-center gap-2 mb-4">
+                <div class="flex gap-1">
+                    <div
+                        v-for="i in 5"
+                        :key="i"
+                        :class="[
+                            'w-2 h-2 rounded-full transition-colors',
+                            i <= Math.ceil((stepsProgress / 100) * 5)
+                                ? 'bg-success-500'
+                                : 'bg-gray-300 dark:bg-gray-600'
+                        ]"
+                    ></div>
+                </div>
+                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {{ stepsProgress }}% completo
+                </span>
             </div>
         </div>
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Suggestion extends Model
@@ -47,6 +48,7 @@ class Suggestion extends Model
         'data_justification',
         'embedding',
         'accepted_at',
+        'in_progress_at',
     ];
 
     protected $casts = [
@@ -58,6 +60,7 @@ class Suggestion extends Model
         'metrics_impact' => 'array',
         'completed_at' => 'datetime',
         'accepted_at' => 'datetime',
+        'in_progress_at' => 'datetime',
         'priority' => 'integer',
         'was_successful' => 'boolean',
     ];
@@ -135,6 +138,30 @@ class Suggestion extends Model
     }
 
     /**
+     * Get the steps for the suggestion.
+     */
+    public function steps(): HasMany
+    {
+        return $this->hasMany(SuggestionStep::class)->orderBy('position');
+    }
+
+    /**
+     * Get the comments for the suggestion.
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(SuggestionComment::class);
+    }
+
+    /**
+     * Get the tasks for the suggestion.
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(SuggestionTask::class);
+    }
+
+    /**
      * Accept suggestion - moves to tracking page.
      */
     public function accept(): void
@@ -143,6 +170,9 @@ class Suggestion extends Model
             'status' => self::STATUS_ACCEPTED,
             'accepted_at' => now(),
         ]);
+
+        // Sync steps from recommended_action when accepting
+        $this->syncStepsFromRecommendedAction();
     }
 
     /**
@@ -161,7 +191,10 @@ class Suggestion extends Model
      */
     public function markAsInProgress(): void
     {
-        $this->update(['status' => self::STATUS_IN_PROGRESS]);
+        $this->update([
+            'status' => self::STATUS_IN_PROGRESS,
+            'in_progress_at' => now(),
+        ]);
     }
 
     /**
@@ -415,5 +448,73 @@ class Suggestion extends Model
             self::CATEGORY_CONVERSION,
             self::CATEGORY_PRICING,
         ];
+    }
+
+    /**
+     * Get progress percentage of completed steps.
+     */
+    public function getProgressAttribute(): int
+    {
+        $total = $this->steps()->count();
+
+        if ($total === 0) {
+            return 0;
+        }
+
+        $completed = $this->steps()->completed()->count();
+
+        return (int) round(($completed / $total) * 100);
+    }
+
+    /**
+     * Get progress percentage of completed tasks.
+     */
+    public function getTasksProgressAttribute(): int
+    {
+        $total = $this->tasks()->count();
+
+        if ($total === 0) {
+            return 0;
+        }
+
+        $completed = $this->tasks()->completed()->count();
+
+        return (int) round(($completed / $total) * 100);
+    }
+
+    /**
+     * Sync steps from recommended_action array.
+     * Creates SuggestionStep records from the JSON array.
+     */
+    public function syncStepsFromRecommendedAction(): void
+    {
+        // Only sync if steps don't exist
+        if ($this->steps()->exists()) {
+            return;
+        }
+
+        $recommendedActions = $this->recommended_action;
+
+        if (! is_array($recommendedActions) || empty($recommendedActions)) {
+            return;
+        }
+
+        foreach ($recommendedActions as $index => $action) {
+            // Handle both string and array formats
+            $title = is_string($action) ? $action : ($action['title'] ?? $action['action'] ?? '');
+            $description = is_array($action) ? ($action['description'] ?? null) : null;
+
+            if (empty($title)) {
+                continue;
+            }
+
+            $this->steps()->create([
+                'title' => $title,
+                'description' => $description,
+                'position' => $index + 1,
+                'is_custom' => false,
+                'status' => SuggestionStep::STATUS_PENDING,
+            ]);
+        }
     }
 }

@@ -13,7 +13,6 @@ class CriticAgentPrompt
      * + Validação de repetição interna e histórica
      * + Criação de substitutas quando necessário
      */
-
     public static function getSubcategoryProducts(string $niche, string $subcategory): array
     {
         $config = config('subcategories', []);
@@ -120,22 +119,28 @@ CONFIDENCE;
         $nomesConc = [];
         $todosDiferenciais = [];
         foreach ($competitors as $c) {
-            if (!($c['sucesso'] ?? false)) continue;
+            if (! ($c['sucesso'] ?? false)) {
+                continue;
+            }
             $concorrentesSucesso++;
             $nomesConc[] = $c['nome'] ?? 'Concorrente';
             $todosDiferenciais = array_merge($todosDiferenciais, $c['diferenciais'] ?? []);
         }
-        $listaConc = !empty($nomesConc) ? implode(', ', $nomesConc) : 'nenhum';
+        $listaConc = ! empty($nomesConc) ? implode(', ', $nomesConc) : 'nenhum';
         $todosDiferenciais = array_values(array_unique($todosDiferenciais));
-        $diferenciaisLista = !empty($todosDiferenciais) ? implode(', ', $todosDiferenciais) : 'nenhum';
+        $diferenciaisLista = ! empty($todosDiferenciais) ? implode(', ', $todosDiferenciais) : 'nenhum';
 
         // Calcular posicionamento
         $posicaoPreco = 'nao_calculado';
         if ($precoMedioMercado > 0 && $ticketMedio > 0) {
             $ratio = $ticketMedio / $precoMedioMercado;
-            if ($ratio < 0.85) $posicaoPreco = 'abaixo';
-            elseif ($ratio > 1.15) $posicaoPreco = 'acima';
-            else $posicaoPreco = 'dentro';
+            if ($ratio < 0.85) {
+                $posicaoPreco = 'abaixo';
+            } elseif ($ratio > 1.15) {
+                $posicaoPreco = 'acima';
+            } else {
+                $posicaoPreco = 'dentro';
+            }
         }
 
         // Sugestões
@@ -157,6 +162,44 @@ CONFIDENCE;
 
         return <<<PROMPT
 # CRITIC AGENT — REVISÃO E GARANTIA DE QUALIDADE
+
+## 🎭 SUA IDENTIDADE
+
+Você é **Ana Beatriz Torres**, Diretora de Operações e Qualidade com 18 anos de experiência em varejo digital brasileiro.
+
+### Seu Background
+Ex-Head de Operações da VTEX Brasil, responsável por garantir que estratégias de clientes fossem realmente implementáveis na plataforma. Conhece intimamente as limitações e possibilidades de cada plataforma de e-commerce, especialmente Nuvemshop. Obsessão por viabilidade e execução real, não teórica.
+
+### Sua Mentalidade
+- "Uma ideia brilhante que não pode ser implementada vale zero"
+- "Meu trabalho é transformar 'boas ideias' em 'ideias executáveis'"
+- "Prefiro melhorar a rejeitar - mas rejeito sem dó quando necessário"
+- "Confiança sem evidência é arrogância"
+- "Detalhes de implementação separam sucesso de fracasso"
+
+### Sua Expertise
+- Validação de viabilidade técnica e operacional em plataformas de e-commerce
+- Conhecimento profundo de Nuvemshop (recursos nativos vs apps vs impossível)
+- Detecção de repetições e redundâncias em estratégias
+- Calibração de scores de confiança baseada em evidências
+- Identificação de custos ocultos de implementação
+
+### Seu Estilo de Trabalho
+- Rigorosa mas construtiva (não destrutiva)
+- Valida item por item com critérios claros e objetivos
+- Sugere melhorias específicas quando encontra problemas
+- Documenta motivos de cada decisão para rastreabilidade
+- Foco em entregar 9 sugestões de qualidade real
+
+### Seus Princípios Inegociáveis
+1. Validar CADA sugestão contra 3 critérios: originalidade, viabilidade, qualidade
+2. **Melhorar > Rejeitar** (exceto repetições óbvias e funcionalidades impossíveis)
+3. Ajustar confiança baseado em evidências reais, não otimismo
+4. Garantir distribuição 3-3-3 (high-medium-low) sempre
+5. Score mínimo 6.0 para aprovação de qualquer sugestão
+6. Sugestão HIGH sem dados externos = máximo 7.0 (penalidade obrigatória)
+
+---
 
 ## SEU PAPEL
 1. Revisar as 9 sugestões do Strategist
@@ -434,7 +477,7 @@ PROMPT;
     private static function formatPreviousSuggestions(array $previousSuggestions): string
     {
         if (empty($previousSuggestions)) {
-            return "Nenhuma sugestão anterior. Todas serão consideradas originais.";
+            return 'Nenhuma sugestão anterior. Todas serão consideradas originais.';
         }
 
         $grouped = [];
@@ -444,25 +487,32 @@ PROMPT;
             $title = $s['title'] ?? 'Sem título';
             $category = $s['category'] ?? 'outros';
             $titleCounts[$title] = ($titleCounts[$title] ?? 0) + 1;
-            if (!isset($grouped[$category])) $grouped[$category] = [];
-            if (!in_array($title, $grouped[$category])) $grouped[$category][] = $title;
+            if (! isset($grouped[$category])) {
+                $grouped[$category] = [];
+            }
+            if (! in_array($title, $grouped[$category])) {
+                $grouped[$category][] = $title;
+            }
         }
 
-        $output = "**Total:** " . count($previousSuggestions) . " sugestões\n\n";
+        $output = '**Total:** '.count($previousSuggestions)." sugestões\n\n";
         foreach ($grouped as $cat => $titles) {
             $output .= "**{$cat}:**\n";
             foreach ($titles as $t) {
                 $c = $titleCounts[$t];
-                $m = $c >= 3 ? "🔴" : ($c >= 2 ? "⚠️" : "•");
-                $output .= "{$m} {$t}" . ($c > 1 ? " ({$c}x)" : "") . "\n";
+                $m = $c >= 3 ? '🔴' : ($c >= 2 ? '⚠️' : '•');
+                $output .= "{$m} {$t}".($c > 1 ? " ({$c}x)" : '')."\n";
             }
         }
+
         return $output;
     }
 
     private static function identifySaturatedThemes(array $previousSuggestions): string
     {
-        if (empty($previousSuggestions)) return "Nenhum tema saturado.";
+        if (empty($previousSuggestions)) {
+            return 'Nenhum tema saturado.';
+        }
 
         $keywords = [
             'Quiz' => ['quiz', 'questionário', 'personalizado'],
@@ -476,7 +526,7 @@ PROMPT;
 
         $counts = [];
         foreach ($previousSuggestions as $s) {
-            $text = mb_strtolower(($s['title'] ?? '') . ' ' . ($s['description'] ?? ''));
+            $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
             foreach ($keywords as $theme => $kws) {
                 foreach ($kws as $kw) {
                     if (strpos($text, $kw) !== false) {
@@ -487,13 +537,16 @@ PROMPT;
             }
         }
 
-        $saturated = array_filter($counts, fn($c) => $c >= 3);
-        if (empty($saturated)) return "Nenhum tema saturado.";
+        $saturated = array_filter($counts, fn ($c) => $c >= 3);
+        if (empty($saturated)) {
+            return 'Nenhum tema saturado.';
+        }
 
-        $out = "";
+        $out = '';
         foreach ($saturated as $t => $c) {
             $out .= "🔴 **{$t}**: {$c}x — NÃO APROVAR\n";
         }
+
         return $out;
     }
 

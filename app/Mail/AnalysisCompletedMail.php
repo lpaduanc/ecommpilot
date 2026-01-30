@@ -65,10 +65,10 @@ class AnalysisCompletedMail extends Mailable
                 if (is_array($recommendedAction)) {
                     $recommendedAction = implode("\n", array_map(function ($item, $index) {
                         if (is_array($item)) {
-                            return ($index + 1) . '. ' . ($item['step'] ?? $item['action'] ?? json_encode($item));
+                            return ($index + 1).'. '.($item['step'] ?? $item['action'] ?? json_encode($item));
                         }
 
-                        return ($index + 1) . '. ' . $item;
+                        return ($index + 1).'. '.$item;
                     }, $recommendedAction, array_keys($recommendedAction)));
                 }
 

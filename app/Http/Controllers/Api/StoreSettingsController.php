@@ -215,7 +215,7 @@ class StoreSettingsController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-            $errorId = 'err_' . uniqid();
+            $errorId = 'err_'.uniqid();
 
             Log::error('Exception during Nuvemshop token exchange', [
                 'error_id' => $errorId,

@@ -36,10 +36,18 @@ trait HistoricalMetricsTrait
 
         foreach ($analyses as $analysis) {
             $data = $analysis->data ?? [];
-            if (isset($data['ticket_medio'])) $ticketValues[] = $data['ticket_medio'];
-            if (isset($data['pedidos_mes'])) $ordersValues[] = $data['pedidos_mes'];
-            if (isset($data['taxa_conversao'])) $conversionValues[] = $data['taxa_conversao'];
-            if (isset($data['taxa_cancelamento'])) $cancellationValues[] = $data['taxa_cancelamento'];
+            if (isset($data['ticket_medio'])) {
+                $ticketValues[] = $data['ticket_medio'];
+            }
+            if (isset($data['pedidos_mes'])) {
+                $ordersValues[] = $data['pedidos_mes'];
+            }
+            if (isset($data['taxa_conversao'])) {
+                $conversionValues[] = $data['taxa_conversao'];
+            }
+            if (isset($data['taxa_cancelamento'])) {
+                $cancellationValues[] = $data['taxa_cancelamento'];
+            }
         }
 
         $metrics['averages'] = [
@@ -55,8 +63,8 @@ trait HistoricalMetricsTrait
             $recent = $analyses->take($midpoint);
             $older = $analyses->skip($midpoint);
 
-            $recentTicket = $recent->avg(fn($a) => $a->data['ticket_medio'] ?? 0);
-            $olderTicket = $older->avg(fn($a) => $a->data['ticket_medio'] ?? 0);
+            $recentTicket = $recent->avg(fn ($a) => $a->data['ticket_medio'] ?? 0);
+            $olderTicket = $older->avg(fn ($a) => $a->data['ticket_medio'] ?? 0);
 
             if ($olderTicket > 0) {
                 $ticketTrend = (($recentTicket - $olderTicket) / $olderTicket) * 100;

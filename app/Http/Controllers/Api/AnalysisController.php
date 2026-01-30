@@ -106,9 +106,9 @@ class AnalysisController extends Controller
             ], 400);
         }
 
-        // Check if there's already a pending analysis for this store
+        // Check if there's already a pending/processing analysis for this store
         $pendingAnalysis = $this->analysisService->getPendingAnalysis($user, $store);
-        if ($pendingAnalysis) {
+        if ($pendingAnalysis && $pendingAnalysis->status !== \App\Enums\AnalysisStatus::Failed) {
             return response()->json([
                 'message' => 'Já existe uma análise em andamento para esta loja.',
                 'pending_analysis' => [

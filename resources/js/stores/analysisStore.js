@@ -412,6 +412,177 @@ export const useAnalysisStore = defineStore('analysis', () => {
         fetchPersistentSuggestions(1);
     }
 
+    // Suggestion Steps Actions
+    async function fetchSuggestionSteps(suggestionId) {
+        try {
+            const response = await api.get(`/suggestions/${suggestionId}/steps`);
+            return { success: true, steps: response.data.steps };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao carregar passos',
+            };
+        }
+    }
+
+    async function createSuggestionStep(suggestionId, data) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/steps`, data);
+            return { success: true, step: response.data.step };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao criar passo',
+            };
+        }
+    }
+
+    async function updateSuggestionStep(suggestionId, stepId, data) {
+        try {
+            const response = await api.patch(`/suggestions/${suggestionId}/steps/${stepId}`, data);
+            return { success: true, step: response.data.step };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao atualizar passo',
+            };
+        }
+    }
+
+    async function deleteSuggestionStep(suggestionId, stepId) {
+        try {
+            await api.delete(`/suggestions/${suggestionId}/steps/${stepId}`);
+            return { success: true };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao deletar passo',
+            };
+        }
+    }
+
+    async function toggleStepStatus(suggestionId, stepId) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/steps/${stepId}/toggle`);
+            return { success: true, step: response.data.step };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao atualizar status',
+            };
+        }
+    }
+
+    // Suggestion Comments Actions
+    async function fetchSuggestionComments(suggestionId) {
+        try {
+            const response = await api.get(`/suggestions/${suggestionId}/comments`);
+            return { success: true, comments: response.data.comments };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao carregar comentários',
+            };
+        }
+    }
+
+    async function createSuggestionComment(suggestionId, data) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/comments`, data);
+            return { success: true, comment: response.data.comment };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao criar comentário',
+            };
+        }
+    }
+
+    async function deleteSuggestionComment(suggestionId, commentId) {
+        try {
+            await api.delete(`/suggestions/${suggestionId}/comments/${commentId}`);
+            return { success: true };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao deletar comentário',
+            };
+        }
+    }
+
+    // Suggestion Tasks Actions
+    async function fetchSuggestionTasks(suggestionId) {
+        try {
+            const response = await api.get(`/suggestions/${suggestionId}/tasks`);
+            return { success: true, tasks: response.data.tasks };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao carregar tarefas',
+            };
+        }
+    }
+
+    async function createSuggestionTask(suggestionId, data) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/tasks`, data);
+            return { success: true, task: response.data.task };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao criar tarefa',
+            };
+        }
+    }
+
+    async function updateSuggestionTask(suggestionId, taskId, data) {
+        try {
+            const response = await api.patch(`/suggestions/${suggestionId}/tasks/${taskId}`, data);
+            return { success: true, task: response.data.task };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao atualizar tarefa',
+            };
+        }
+    }
+
+    async function deleteSuggestionTask(suggestionId, taskId) {
+        try {
+            await api.delete(`/suggestions/${suggestionId}/tasks/${taskId}`);
+            return { success: true };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao deletar tarefa',
+            };
+        }
+    }
+
+    async function toggleTaskStatus(suggestionId, taskId) {
+        try {
+            const response = await api.post(`/suggestions/${suggestionId}/tasks/${taskId}/toggle`);
+            return { success: true, task: response.data.task };
+        } catch (err) {
+            return {
+                success: false,
+                message: err.response?.data?.message || 'Erro ao atualizar status da tarefa',
+            };
+        }
+    }
+
+    async function updateSuggestionFeedback(suggestionId, wasSuccessful) {
+        try {
+            const response = await api.patch(`/suggestions/${suggestionId}/feedback`, {
+                was_successful: wasSuccessful,
+            });
+            return { success: true, suggestion: response.data.suggestion };
+        } catch (error) {
+            console.error('Error updating feedback:', error);
+            return { success: false, error };
+        }
+    }
+
     async function resendAnalysisEmail(analysisId) {
         try {
             const response = await api.post(`/analysis/${analysisId}/resend-email`);
@@ -489,6 +660,28 @@ export const useAnalysisStore = defineStore('analysis', () => {
         getSuggestionDetail,
         setSuggestionsFilter,
         clearSuggestionsFilter,
+
+        // Steps actions
+        fetchSuggestionSteps,
+        createSuggestionStep,
+        updateSuggestionStep,
+        deleteSuggestionStep,
+        toggleStepStatus,
+
+        // Comments actions
+        fetchSuggestionComments,
+        createSuggestionComment,
+        deleteSuggestionComment,
+
+        // Tasks actions
+        fetchSuggestionTasks,
+        createSuggestionTask,
+        updateSuggestionTask,
+        deleteSuggestionTask,
+        toggleTaskStatus,
+
+        // Feedback actions
+        updateSuggestionFeedback,
     };
 });
 
