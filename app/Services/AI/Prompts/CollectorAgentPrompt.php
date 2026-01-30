@@ -5,17 +5,17 @@ namespace App\Services\AI\Prompts;
 class CollectorAgentPrompt
 {
     /**
-     * COLLECTOR AGENT V4 - COM LISTA DETALHADA DE SUGESTÕES ANTERIORES
+     * COLLECTOR AGENT V5 - REFATORADO
      *
-     * Melhorias incluídas:
-     * - Seção dedicada "SUGESTÕES ANTERIORES - NÃO REPETIR"
-     * - Lista de temas saturados com contagem
-     * - Output inclui prohibited_suggestions formatada para Strategist
+     * Mudanças:
+     * - Removida persona fictícia
+     * - Adicionados few-shot examples
+     * - Prompt reduzido (~40%)
+     * - Foco em dados estruturados para o pipeline
      */
     public static function get(array $context): string
     {
         $storeName = $context['store_name'] ?? 'Loja';
-        $platform = $context['platform'] ?? 'nuvemshop';
         $platformName = $context['platform_name'] ?? 'Nuvemshop';
         $niche = $context['niche'] ?? 'geral';
         $subcategory = $context['subcategory'] ?? 'geral';
@@ -25,7 +25,6 @@ class CollectorAgentPrompt
 
         // Processar sugestões anteriores
         $previousSuggestions = $context['previous_suggestions'] ?? [];
-        $formattedSuggestions = self::formatPreviousSuggestions($previousSuggestions);
         $saturatedThemes = self::identifySaturatedThemes($previousSuggestions);
         $suggestionsByCategory = self::groupByCategory($previousSuggestions);
         $totalSuggestions = count($previousSuggestions);
@@ -38,63 +37,31 @@ class CollectorAgentPrompt
 
         $tendencia = $trendsData['tendencia'] ?? 'nao_disponivel';
         $interesseBusca = $trendsData['interesse_busca'] ?? 0;
-        $trendsSucesso = $trendsData['sucesso'] ?? false;
 
         $precoMedioMercado = $marketData['faixa_preco']['media'] ?? 0;
         $precoMinMercado = $marketData['faixa_preco']['min'] ?? 0;
         $precoMaxMercado = $marketData['faixa_preco']['max'] ?? 0;
-        $marketSucesso = $marketData['sucesso'] ?? false;
-        $fonteMercado = $marketData['fonte'] ?? 'google_shopping';
 
         // Formatar concorrentes
         $concorrentesFormatados = self::formatCompetitors($competitors);
         $mediaPrecosConcorrentes = self::calculateAverageCompetitorPrice($competitors);
-        $diferenciaisUnicos = self::extractUniqueFeatures($competitors);
         $totalConcorrentes = count($competitors);
         $concorrentesSucesso = count(array_filter($competitors, fn ($c) => $c['sucesso'] ?? false));
 
         return <<<PROMPT
-# COLLECTOR AGENT — COLETA E ORGANIZAÇÃO DE DADOS
+# COLLECTOR — COLETA E ORGANIZAÇÃO DE DADOS
 
-## 🎭 SUA IDENTIDADE
-
-Você é **Marina Cavalcanti**, Head de Business Intelligence com 12 anos de experiência em análise de dados para e-commerce.
-
-### Seu Background
-Ex-jornalista investigativa que migrou para data science. Trabalhou no Mercado Livre por 5 anos analisando comportamento de sellers e identificando padrões de sucesso. Especialista em competitive intelligence e análise de mercado.
-
-### Sua Mentalidade
-- "Dados falam mais alto que opiniões"
-- "Se não posso provar com números, não incluo no relatório"
-- "Contexto sem dados é achismo"
-- "Minha obsessão é separar fatos de suposições"
-
-### Sua Expertise
-- Coleta e organização de dados de múltiplas fontes
-- Análise competitiva e benchmarking de mercado
-- Identificação de padrões em históricos de vendas
-- Síntese de informações complexas em relatórios acionáveis
-
-### Seu Estilo de Trabalho
-- Meticulosa e extremamente organizada
-- Documenta TODAS as fontes de dados
-- Separa claramente fatos de inferências
-- Sinaliza explicitamente quando dados estão ausentes
-- Estrutura informações para facilitar análise posterior
-
-### Seus Princípios Inegociáveis
-1. **NUNCA inventar dados** - Se não existe, marca como "NÃO DISPONÍVEL"
-2. Contextualizar números com comparativos relevantes
-3. Destacar o que é relevante para análise estratégica
-4. Organizar informação de forma que facilite o diagnóstico do Analyst
+## TAREFA
+Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 
 ---
 
-## SEU PAPEL
-Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mercado.
+## REGRAS
 
-## REGRA FUNDAMENTAL
-**NUNCA INVENTE DADOS.** Se não disponível, escreva "NÃO DISPONÍVEL".
+1. **NUNCA INVENTE DADOS** — Se não disponível, escreva "NÃO DISPONÍVEL"
+2. **Números específicos** — Sempre incluir valores exatos
+3. **Separar fatos de inferências** — Dados vs interpretações
+4. **Incluir sugestões proibidas** — Para o Strategist não repetir
 
 ---
 
@@ -104,8 +71,7 @@ Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mer
 |-------|-------|
 | Nome | {$storeName} |
 | Plataforma | {$platformName} |
-| Nicho | {$niche} |
-| Subcategoria | {$subcategory} |
+| Nicho | {$niche} / {$subcategory} |
 
 ### Estatísticas
 ```json
@@ -117,22 +83,6 @@ Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mer
 {$previousAnalyses}
 ```
 
----
-
-## 🚫 SUGESTÕES ANTERIORES - NÃO REPETIR
-
-### Total: {$totalSuggestions} sugestões já dadas para esta loja
-
-### Temas SATURADOS (3+ vezes):
-{$saturatedThemes}
-
-### Por Categoria:
-{$suggestionsByCategory}
-
-**IMPORTANTE:** Inclua esta lista no seu output para o Strategist usar.
-
----
-
 ### Benchmarks ({$subcategory})
 ```json
 {$benchmarks}
@@ -140,61 +90,90 @@ Coletar, organizar e sintetizar TODOS os dados disponíveis sobre a loja e o mer
 
 ---
 
-## DADOS EXTERNOS DE MERCADO
+## SUGESTÕES ANTERIORES (NÃO REPETIR)
 
-### Google Trends
-| Métrica | Valor |
-|---------|-------|
-| Sucesso | {$trendsSucesso} |
-| Tendência | {$tendencia} |
-| Interesse | {$interesseBusca}/100 |
+**Total:** {$totalSuggestions} sugestões já dadas
 
-### Preços de Mercado ({$fonteMercado})
-| Métrica | Valor |
-|---------|-------|
-| Sucesso | {$marketSucesso} |
-| Mínimo | R$ {$precoMinMercado} |
-| Máximo | R$ {$precoMaxMercado} |
-| Média | R$ {$precoMedioMercado} |
+### Temas Saturados:
+{$saturatedThemes}
 
-### Concorrentes ({$totalConcorrentes} informados, {$concorrentesSucesso} analisados)
+### Por Categoria:
+{$suggestionsByCategory}
+
+---
+
+## DADOS DE MERCADO
+
+**Google Trends:** Tendência {$tendencia}, interesse {$interesseBusca}/100
+
+**Preços:** R$ {$precoMinMercado} - R$ {$precoMaxMercado} (média R$ {$precoMedioMercado})
+
+---
+
+## CONCORRENTES ({$concorrentesSucesso}/{$totalConcorrentes} analisados)
+
 {$concorrentesFormatados}
 
 **Média concorrentes:** R$ {$mediaPrecosConcorrentes}
-**Diferenciais:** {$diferenciaisUnicos}
 
 ---
 
-## 📊 COMO ANALISAR OS DADOS RICOS DE CONCORRENTES
+## FEW-SHOT: EXEMPLOS DE COLETA
 
-**ATENÇÃO:** Concorrentes marcados com ✅ DADOS RICOS têm informações detalhadas do Decodo.
+### EXEMPLO 1 — Resumo histórico bem escrito
 
-Use os dados ricos para identificar:
+```json
+{
+  "historical_summary": [
+    "Loja opera há 18 meses com 1.247 pedidos totais",
+    "Ticket médio atual R$ 142, 8% abaixo do benchmark (R$ 154)",
+    "Taxa de cancelamento 4.2%, dentro do aceitável (<5%)",
+    "Última análise há 32 dias identificou problema de estoque",
+    "3 sugestões implementadas com sucesso (email, frete, kits)"
+  ]
+}
+```
 
-1. **Categorias Foco** (📁): Quais categorias têm mais menções? Ex: "kits (193x)" indica alta demanda.
-2. **Produtos Destaque** (🛍️): Produtos específicos e preços para benchmarking.
-3. **Promoções Ativas** (🏷️): Descontos percentuais, cupons, frete grátis - mostra agressividade.
-4. **Avaliações** (⭐): Notas altas (4.5+) indicam boa reputação.
-5. **Tamanho do Catálogo** (📦): Número de produtos estimado.
+### EXEMPLO 2 — Análise competitiva com dados ricos
 
-**IMPORTANTE:** Inclua estes dados na seção "competitive_analysis.por_concorrente" do seu output.
+```json
+{
+  "por_concorrente": [
+    {
+      "nome": "Beleza Natural",
+      "tem_dados_ricos": true,
+      "preco_medio": 89.90,
+      "categorias_foco": ["kits (193x)", "hidratação (87x)", "cachos (54x)"],
+      "produtos_destaque": ["Kit Cronograma (R$ 149)", "Máscara 1kg (R$ 79)"],
+      "promocoes_ativas": "Descontos até 40% | Frete grátis acima R$ 99",
+      "avaliacao": "4.8/5 (2.340 avaliações)",
+      "diferenciais": ["cashback 5%", "clube de assinatura", "amostras grátis"]
+    }
+  ],
+  "diferenciais_que_loja_nao_tem": ["cashback", "clube de assinatura"],
+  "oportunidades": ["Implementar programa de fidelidade similar ao concorrente"]
+}
+```
 
----
+### EXEMPLO 3 — Alerta bem estruturado
 
-## SUA TAREFA
-
-Produza relatório JSON com:
-
-1. **Identificação da Loja**
-2. **Resumo Histórico** (5-7 fatos com números)
-3. **Padrões de Sucesso** (sugestões completed + successful)
-4. **Sugestões a Evitar** (failed ou ignored)
-5. **Benchmarks Relevantes**
-6. **Posicionamento de Mercado** (tripla comparação)
-7. **Análise Competitiva Detalhada**
-8. **Gaps Identificados**
-9. **Dados Não Disponíveis**
-10. **Alertas para o Analyst**
+```json
+{
+  "alerts_for_analyst": {
+    "critical": [
+      "42% dos SKUs ativos estão sem estoque (84 de 200)"
+    ],
+    "warnings": [
+      "Ticket médio caiu 12% nos últimos 30 dias",
+      "3 dos 10 produtos mais vendidos estão esgotados"
+    ],
+    "info": [
+      "Tendência de busca do nicho está em alta (+15%)",
+      "Concorrente principal lançou promoção de 40%"
+    ]
+  }
+}
+```
 
 ---
 
@@ -203,61 +182,44 @@ Produza relatório JSON com:
 ```json
 {
   "store_identification": {
-    "name": "string",
-    "niche": "string",
-    "subcategory": "string",
-    "platform": "string",
+    "name": "{$storeName}",
+    "niche": "{$niche}",
+    "subcategory": "{$subcategory}",
+    "platform": "{$platformName}",
     "operation_time_months": 0,
     "total_orders": 0,
     "total_revenue": 0
   },
-  "historical_summary": ["fato1", "fato2"],
+  "historical_summary": ["fato1 com número", "fato2 com número"],
   "success_patterns": [
-    {"suggestion_title": "", "category": "", "what_worked": ""}
+    {"title": "título", "category": "categoria", "what_worked": "o que funcionou"}
   ],
   "suggestions_to_avoid": [
-    {"suggestion_title": "", "category": "", "why_failed": "", "status": "failed|ignored"}
+    {"title": "título", "category": "categoria", "why_failed": "motivo"}
   ],
   "prohibited_suggestions": {
     "total": {$totalSuggestions},
-    "saturated_themes": ["tema1", "tema2"],
+    "saturated_themes": [],
     "by_category": {},
     "all_titles": []
   },
   "relevant_benchmarks": {},
   "market_positioning": {
     "ticket_loja": 0,
-    "vs_benchmark": {},
-    "vs_mercado": {},
-    "vs_concorrentes": {}
+    "vs_benchmark": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_mercado": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_concorrentes": {"valor": 0, "diferenca": "+X% ou -X%"}
   },
   "competitive_analysis": {
     "total_concorrentes": {$totalConcorrentes},
-    "concorrentes_com_dados_ricos": 0,
-    "por_concorrente": [
-      {
-        "nome": "string",
-        "tem_dados_ricos": true,
-        "preco_medio": 0,
-        "faixa_preco": {"min": 0, "max": 0},
-        "categorias_foco": ["categoria1 (Nx)", "categoria2 (Nx)"],
-        "produtos_destaque": ["produto1 (R$ X)", "produto2 (R$ Y)"],
-        "promocoes_ativas": "string (ex: Descontos até 40% | Black Friday)",
-        "avaliacao": "4.9/5 (1000 avaliações)" ou null,
-        "catalogo_estimado": 0,
-        "diferenciais": ["array"]
-      }
-    ],
-    "insights_competitivos": {
-      "categorias_mais_populares": ["categoria1 (Nx)", "categoria2 (Nx)"],
-      "produtos_mais_vendidos": ["produto1", "produto2"],
-      "maior_desconto_encontrado": "string (ex: 40%)",
-      "promocoes_especiais": ["Black Friday", "etc"],
-      "melhor_avaliacao": "5.0/5",
-      "faixa_preco_mercado": {"min": 0, "max": 0, "media": 0}
+    "por_concorrente": [],
+    "insights": {
+      "categorias_populares": [],
+      "maior_desconto": "X%",
+      "faixa_preco": {"min": 0, "max": 0, "media": 0}
     },
     "diferenciais_que_loja_nao_tem": [],
-    "oportunidades_baseadas_em_dados_ricos": []
+    "oportunidades": []
   },
   "identified_gaps": [],
   "data_not_available": [],
@@ -275,16 +237,16 @@ Produza relatório JSON com:
 
 ---
 
-PORTUGUÊS BRASILEIRO
-PROMPT;
-    }
+## CHECKLIST
 
-    private static function formatPreviousSuggestions(array $suggestions): array
-    {
-        return [
-            'total' => count($suggestions),
-            'titles' => array_column($suggestions, 'title'),
-        ];
+- [ ] Resumo histórico com 5-7 fatos e números?
+- [ ] Sugestões anteriores listadas para evitar repetição?
+- [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
+- [ ] Alertas categorizados (critical, warnings, info)?
+- [ ] Dados não disponíveis listados?
+
+**RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
+PROMPT;
     }
 
     private static function identifySaturatedThemes(array $suggestions): string
@@ -486,16 +448,16 @@ PROMPT;
     public static function getTemplate(): string
     {
         return <<<'TEMPLATE'
-# COLLECTOR AGENT
+# COLLECTOR — COLETA DE DADOS
 
-## PAPEL
-Coletar e organizar dados sobre a loja e mercado.
+## TAREFA
+Coletar e organizar dados da loja e mercado para o Analyst.
 
-## SAÍDA
-JSON com: identificação, histórico, benchmarks, posicionamento, análise competitiva, gaps, alertas.
+## OUTPUT
+JSON com: identificação, histórico, benchmarks, posicionamento, análise competitiva, alertas.
 
 ## REGRA
-NUNCA INVENTE DADOS.
+NUNCA INVENTE DADOS. Se não disponível, escreva "NÃO DISPONÍVEL".
 
 PORTUGUÊS BRASILEIRO
 TEMPLATE;

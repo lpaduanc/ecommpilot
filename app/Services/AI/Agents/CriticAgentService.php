@@ -109,76 +109,141 @@ class CriticAgentService
 
     /**
      * Normalize the response structure.
+     * Supports both V4 (approved_suggestions, final_version) and V5 (suggestions, final) formats.
      */
     private function normalizeResponse(array $response): array
     {
         $approvedSuggestions = [];
+        $removedSuggestions = [];
 
-        $rawApproved = $response['approved_suggestions'] ?? [];
-        Log::channel($this->logChannel)->info('    [CRITIC] Processando sugestoes aprovadas', [
-            'total_no_json' => count($rawApproved),
+        // V5 format uses 'suggestions' array with 'status' field
+        // V4 format uses 'approved_suggestions' array
+        $rawSuggestions = $response['suggestions'] ?? $response['approved_suggestions'] ?? [];
+
+        Log::channel($this->logChannel)->info('    [CRITIC] Processando sugestoes', [
+            'total_no_json' => count($rawSuggestions),
+            'format' => isset($response['suggestions']) ? 'V5' : 'V4',
         ]);
 
-        foreach ($rawApproved as $index => $approved) {
-            // Usar final_version se disponível, senão fallback para original (compatibilidade)
-            $finalVersion = $approved['final_version'] ?? $approved['original'] ?? [];
+        foreach ($rawSuggestions as $index => $item) {
+            // Check if this is V5 format (has 'final' and 'status')
+            $isV5 = isset($item['final']) || isset($item['status']);
 
-            if (! empty($finalVersion)) {
-                // Extrair quality_score de múltiplos locais possíveis
-                $qualityScore = $approved['review']['quality_score']
-                    ?? $approved['quality_score']
-                    ?? $approved['review']['score']
-                    ?? 5.0;
+            if ($isV5) {
+                // V5 format
+                $status = $item['status'] ?? 'approved';
+                $finalVersion = $item['final'] ?? [];
 
-                // Formato simplificado: apenas campos necessários para persistência
-                $approvedSuggestions[] = [
-                    'final_version' => $this->normalizeFinalVersion($finalVersion),
-                    'quality_score' => floatval($qualityScore),
-                    'final_priority' => intval($approved['review']['final_priority'] ?? $approved['final_priority'] ?? ($index + 1)),
-                ];
+                if ($status === 'replaced' && empty($finalVersion)) {
+                    // Rejected without replacement
+                    $removedSuggestions[] = [
+                        'original_title' => $item['original_title'] ?? '',
+                        'reason' => $item['changes_made'] ?? 'Rejeitada',
+                    ];
+
+                    continue;
+                }
+
+                if (! empty($finalVersion)) {
+                    $approvedSuggestions[] = [
+                        'final_version' => $this->normalizeFinalVersion($finalVersion),
+                        'quality_score' => 7.0, // V5 doesn't have quality_score, use default
+                        'final_priority' => intval($finalVersion['priority'] ?? ($index + 1)),
+                        'status' => $status,
+                        'changes_made' => $item['changes_made'] ?? null,
+                    ];
+                }
             } else {
-                Log::channel($this->logChannel)->warning("    [CRITIC] Sugestao {$index} com final_version vazio", [
-                    'has_final_version' => isset($approved['final_version']),
-                    'has_original' => isset($approved['original']),
-                ]);
+                // V4 format
+                $finalVersion = $item['final_version'] ?? $item['original'] ?? [];
+
+                if (! empty($finalVersion)) {
+                    $qualityScore = $item['review']['quality_score']
+                        ?? $item['quality_score']
+                        ?? $item['review']['score']
+                        ?? 5.0;
+
+                    $approvedSuggestions[] = [
+                        'final_version' => $this->normalizeFinalVersion($finalVersion),
+                        'quality_score' => floatval($qualityScore),
+                        'final_priority' => intval($item['review']['final_priority'] ?? $item['final_priority'] ?? ($index + 1)),
+                    ];
+                } else {
+                    Log::channel($this->logChannel)->warning("    [CRITIC] Sugestao {$index} com final_version vazio");
+                }
             }
+        }
+
+        // V4 format has separate removed_suggestions
+        if (isset($response['removed_suggestions'])) {
+            $removedSuggestions = array_merge($removedSuggestions, $response['removed_suggestions']);
+        }
+
+        // V5 format has rejected_suggestions
+        if (isset($response['rejected_suggestions'])) {
+            $removedSuggestions = array_merge($removedSuggestions, $response['rejected_suggestions']);
         }
 
         Log::channel($this->logChannel)->info('    [CRITIC] Normalizacao concluida', [
             'total_aprovadas' => count($approvedSuggestions),
-            'total_removidas' => count($response['removed_suggestions'] ?? []),
+            'total_removidas' => count($removedSuggestions),
         ]);
 
         // Enforce 3-3-3 distribution
         $approvedSuggestions = $this->enforceDistribution($approvedSuggestions);
 
+        // V5 has review_summary, V4 has general_analysis
+        $reviewSummary = $response['review_summary'] ?? $response['general_analysis'] ?? [];
+
         return [
             'approved_suggestions' => $approvedSuggestions,
-            'removed_suggestions' => $response['removed_suggestions'] ?? [],
+            'removed_suggestions' => $removedSuggestions,
             'general_analysis' => array_merge([
-                'total_received' => 0,
+                'total_received' => $reviewSummary['approved'] ?? 0 + ($reviewSummary['improved'] ?? 0) + ($reviewSummary['rejected'] ?? 0),
                 'total_approved' => count($approvedSuggestions),
-                'total_removed' => count($response['removed_suggestions'] ?? []),
+                'total_removed' => count($removedSuggestions),
                 'average_quality' => $this->calculateAverageQuality($approvedSuggestions),
                 'observations' => '',
-            ], $response['general_analysis'] ?? []),
+            ], $reviewSummary),
         ];
     }
 
     /**
      * Normalize the final version of a suggestion.
+     * Supports both V4 and V5 formats.
      */
     private function normalizeFinalVersion(array $suggestion): array
     {
+        // V5 uses 'problem', V4 uses 'description'
+        $description = $suggestion['description'] ?? $suggestion['problem'] ?? '';
+
+        // V5 uses 'action', V4 uses 'recommended_action'
+        $recommendedAction = $suggestion['recommended_action'] ?? $suggestion['action'] ?? '';
+
+        // V5 uses 'data_source', V4 uses 'data_justification'
+        $dataJustification = $suggestion['data_justification'] ?? $suggestion['data_source'] ?? '';
+
+        // V5 uses 'expected_result' in specific_data
+        $specificData = $suggestion['specific_data'] ?? [];
+        if (! empty($suggestion['expected_result'])) {
+            $specificData['expected_result'] = $suggestion['expected_result'];
+        }
+
+        // V5 has 'implementation' object
+        $implementation = $suggestion['implementation'] ?? [];
+
         return [
             'category' => $suggestion['category'] ?? 'general',
             'title' => substr($suggestion['title'] ?? '', 0, 255),
-            'description' => $suggestion['description'] ?? '',
-            'recommended_action' => $suggestion['recommended_action'] ?? '',
+            'description' => $description,
+            'recommended_action' => $recommendedAction,
             'expected_impact' => $this->normalizeImpact($suggestion['expected_impact'] ?? 'medium'),
             'target_metrics' => $suggestion['target_metrics'] ?? [],
-            'specific_data' => $suggestion['specific_data'] ?? [],
-            'data_justification' => $suggestion['data_justification'] ?? '',
+            'specific_data' => $specificData,
+            'data_justification' => $dataJustification,
+            // V5 additional fields
+            'implementation' => $implementation,
+            'competitor_reference' => $suggestion['competitor_reference'] ?? null,
         ];
     }
 

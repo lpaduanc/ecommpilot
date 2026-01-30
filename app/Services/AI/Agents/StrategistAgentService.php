@@ -142,35 +142,60 @@ class StrategistAgentService
 
     /**
      * Check if a suggestion has required fields.
+     * Supports both V4 (description, recommended_action) and V5 (problem, action) formats.
      */
     private function isValidSuggestion(array $suggestion): bool
     {
-        $required = ['category', 'title', 'description', 'recommended_action', 'expected_impact'];
+        // V5 format uses 'problem' and 'action'
+        // V4 format uses 'description' and 'recommended_action'
+        $hasDescription = ! empty($suggestion['description']) || ! empty($suggestion['problem']);
+        $hasAction = ! empty($suggestion['recommended_action']) || ! empty($suggestion['action']);
 
-        foreach ($required as $field) {
-            if (empty($suggestion[$field])) {
-                return false;
-            }
-        }
-
-        return true;
+        return ! empty($suggestion['category'])
+            && ! empty($suggestion['title'])
+            && $hasDescription
+            && $hasAction
+            && ! empty($suggestion['expected_impact']);
     }
 
     /**
      * Normalize suggestion structure.
+     * Supports both V4 and V5 formats.
      */
     private function normalizeSuggestion(array $suggestion): array
     {
+        // V5 uses 'problem', V4 uses 'description'
+        $description = $suggestion['description'] ?? $suggestion['problem'] ?? '';
+
+        // V5 uses 'action', V4 uses 'recommended_action'
+        $recommendedAction = $suggestion['recommended_action'] ?? $suggestion['action'] ?? '';
+
+        // V5 uses 'expected_result', V4 uses 'specific_data'
+        $specificData = $suggestion['specific_data'] ?? [];
+        if (! empty($suggestion['expected_result'])) {
+            $specificData['expected_result'] = $suggestion['expected_result'];
+        }
+
+        // V5 uses 'data_source', V4 uses 'data_justification'
+        $dataJustification = $suggestion['data_justification'] ?? $suggestion['data_source'] ?? '';
+
+        // V5 has 'implementation' object
+        $implementation = $suggestion['implementation'] ?? [];
+        $implementationTime = $suggestion['implementation_time'] ?? $implementation['complexity'] ?? 'immediate';
+
         return [
             'category' => $suggestion['category'],
             'title' => substr($suggestion['title'], 0, 255),
-            'description' => $suggestion['description'],
-            'recommended_action' => $suggestion['recommended_action'],
+            'description' => $description,
+            'recommended_action' => $recommendedAction,
             'expected_impact' => $this->normalizeImpact($suggestion['expected_impact']),
             'target_metrics' => $suggestion['target_metrics'] ?? [],
-            'implementation_time' => $suggestion['implementation_time'] ?? 'immediate',
-            'specific_data' => $suggestion['specific_data'] ?? [],
-            'data_justification' => $suggestion['data_justification'] ?? '',
+            'implementation_time' => $implementationTime,
+            'specific_data' => $specificData,
+            'data_justification' => $dataJustification,
+            // V5 additional fields
+            'implementation' => $implementation,
+            'competitor_reference' => $suggestion['competitor_reference'] ?? null,
         ];
     }
 

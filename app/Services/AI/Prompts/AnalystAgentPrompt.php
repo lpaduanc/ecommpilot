@@ -5,18 +5,18 @@ namespace App\Services\AI\Prompts;
 class AnalystAgentPrompt
 {
     /**
-     * ANALYST AGENT V4 - COM MELHORIAS
+     * ANALYST AGENT V5 - REFATORADO
      *
-     * Melhorias incluídas:
-     * [3] Contexto de sazonalidade
-     * [5] Override do Health Score (forçar classificação em casos extremos)
-     * [8] Anomalias vs histórico próprio da loja
+     * Mudanças:
+     * - Removida persona fictícia
+     * - Adicionados few-shot examples de diagnóstico
+     * - Prompt reduzido (~50%)
+     * - Formato de saída simplificado
+     * - Mantido: Health Score, Override, Sazonalidade, Comparação tripla
      */
     public static function get(array $data): string
     {
         $storeName = $data['store_name'] ?? 'Loja';
-        $platform = $data['platform'] ?? 'nuvemshop';
-        $platformName = $data['platform_name'] ?? 'Nuvemshop';
         $niche = $data['niche'] ?? 'geral';
         $subcategory = $data['subcategory'] ?? 'geral';
         $periodDays = $data['period_days'] ?? 15;
@@ -29,147 +29,65 @@ class AnalystAgentPrompt
         $products = json_encode($data['products_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $inventory = json_encode($data['inventory_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $coupons = json_encode($data['coupons_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $benchmarks = json_encode($data['structured_benchmarks'] ?? $data['niche_benchmarks'] ?? $data['benchmarks'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-        // Histórico da própria loja [MELHORIA 8]
+        // Histórico para detectar anomalias
         $historicalData = json_encode($data['historical_metrics'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-        // Dados externos de mercado
+        // Dados externos
         $externalData = $data['external_data'] ?? [];
-        $trends = $externalData['dados_mercado']['google_trends'] ?? [];
-        $market = $externalData['dados_mercado']['precos_mercado'] ?? [];
         $competitors = $externalData['concorrentes'] ?? [];
+        $marketData = $externalData['dados_mercado'] ?? [];
 
-        $tendencia = $trends['tendencia'] ?? 'nao_disponivel';
-        $interesseBusca = $trends['interesse_busca'] ?? 0;
-        $trendsSucesso = $trends['sucesso'] ?? false;
+        // Processar concorrentes
+        $competitorSummary = self::summarizeCompetitors($competitors);
+        $marketSummary = self::summarizeMarket($marketData, $ticketMedio);
 
-        $precoMedioMercado = $market['faixa_preco']['media'] ?? 0;
-        $precoMinMercado = $market['faixa_preco']['min'] ?? 0;
-        $precoMaxMercado = $market['faixa_preco']['max'] ?? 0;
-        $marketSucesso = $market['sucesso'] ?? false;
-
-        // Calcular média dos concorrentes
-        $somaPrecosConc = 0;
-        $concorrentesSucesso = 0;
-        $concorrentesResumo = [];
-
-        foreach ($competitors as $c) {
-            if (! ($c['sucesso'] ?? false)) {
-                continue;
-            }
-            $concorrentesSucesso++;
-            $precoMedio = $c['faixa_preco']['media'] ?? 0;
-            $somaPrecosConc += $precoMedio;
-            $concorrentesResumo[] = [
-                'nome' => $c['nome'] ?? 'Concorrente',
-                'preco_medio' => $precoMedio,
-                'diferenciais' => $c['diferenciais'] ?? [],
-            ];
-        }
-        $mediaPrecosConcorrentes = $concorrentesSucesso > 0 ? round($somaPrecosConc / $concorrentesSucesso, 2) : 0;
-        $concorrentesJson = json_encode($concorrentesResumo, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-
-        // Calcular posicionamento
-        $posVsMercado = 'nao_calculado';
-        $posVsConcorrentes = 'nao_calculado';
-
-        if ($precoMedioMercado > 0 && $ticketMedio > 0) {
-            $ratio = $ticketMedio / $precoMedioMercado;
-            if ($ratio < 0.85) {
-                $posVsMercado = 'abaixo';
-            } elseif ($ratio > 1.15) {
-                $posVsMercado = 'acima';
-            } else {
-                $posVsMercado = 'dentro';
-            }
-        }
-
-        if ($mediaPrecosConcorrentes > 0 && $ticketMedio > 0) {
-            $ratio = $ticketMedio / $mediaPrecosConcorrentes;
-            if ($ratio < 0.85) {
-                $posVsConcorrentes = 'abaixo';
-            } elseif ($ratio > 1.15) {
-                $posVsConcorrentes = 'acima';
-            } else {
-                $posVsConcorrentes = 'dentro';
-            }
-        }
-
-        // Contexto de sazonalidade [MELHORIA 3]
+        // Sazonalidade
         $mes = (int) date('n');
-        $sazonalidade = self::getSeasonalityImpact($mes);
+        $sazonalidade = self::getSeasonalityContext($mes);
 
         return <<<PROMPT
-# ANALYST AGENT — DIAGNÓSTICO COMPLETO DA LOJA
+# ANALYST — DIAGNÓSTICO DA LOJA
 
-## 🎭 SUA IDENTIDADE
-
-Você é **Dr. Ricardo Menezes**, Consultor Sênior de E-commerce com 15 anos de experiência em diagnóstico de operações digitais.
-
-### Seu Background
-Ex-sócio da Bain & Company, especializado em varejo digital brasileiro. Diagnosticou mais de 500 operações de e-commerce no Brasil, desde startups até grandes varejistas. PhD em Administração pela FGV com foco em métricas de performance para comércio eletrônico.
-
-### Sua Mentalidade
-- "Todo número conta uma história - meu trabalho é descobrir qual"
-- "Diagnosticar errado é pior que não diagnosticar"
-- "A saúde do negócio está nos detalhes que outros ignoram"
-- "Não existe métrica isolada - tudo está conectado"
-
-### Sua Expertise
-- Diagnóstico de saúde operacional de e-commerce
-- Identificação de anomalias e padrões ocultos
-- Análise de causa-raiz de problemas
-- Frameworks de avaliação (Health Score, benchmarking)
-- Contextualização sazonal do mercado brasileiro
-
-### Seu Estilo de Trabalho
-- Analítico e extremamente estruturado
-- Usa frameworks e metodologias comprovadas
-- Quantifica TUDO (scores, percentuais, variações)
-- Hierarquiza por severidade (crítico > atenção > monitoramento)
-- Compara sempre com múltiplas referências
-
-### Seus Princípios Inegociáveis
-1. Diagnóstico baseado em evidências múltiplas, nunca em dado isolado
-2. Comparar com 3 referências: histórico próprio, benchmark do setor, concorrentes
-3. Identificar causa-raiz, não apenas sintomas superficiais
-4. Priorizar problemas por impacto real no negócio
-5. Contextualizar sazonalmente (o que é normal para o período atual)
+## TAREFA
+Analisar os dados da loja e produzir um diagnóstico estruturado com:
+1. Health Score (0-100)
+2. Alertas priorizados
+3. 5 oportunidades com potencial de receita
+4. Briefing para o Strategist
 
 ---
 
-## SEU PAPEL
-Você é o médico da loja. Diagnosticar saúde do negócio, identificar problemas, encontrar oportunidades e preparar briefing para o Strategist.
+## REGRAS
+
+1. **Health Score:** Calcular baseado nos 5 componentes. Aplicar OVERRIDE se situação crítica.
+2. **Alertas:** Apenas problemas reais com dados que comprovem. Não inventar alertas.
+3. **Oportunidades:** Cada uma deve ter número específico (R$ ou %).
+4. **Comparação tripla:** Sempre comparar ticket da loja vs benchmark vs concorrentes.
+5. **Sazonalidade:** Considerar antes de classificar algo como anomalia.
 
 ---
 
 ## CONTEXTO DA LOJA
 
-| Campo | Valor |
-|-------|-------|
-| Nome | {$storeName} |
-| Plataforma | {$platformName} |
-| Nicho | {$niche} |
-| Subcategoria | {$subcategory} |
-| Ticket Médio | R$ {$ticketMedio} |
-| Pedidos/Mês | {$pedidosMes} |
-| Faturamento Estimado | R$ {$faturamentoMes}/mês |
-| Período Analisado | {$periodDays} dias |
+- **Nome:** {$storeName}
+- **Nicho:** {$niche} / {$subcategory}
+- **Ticket Médio:** R$ {$ticketMedio}
+- **Pedidos/Mês:** {$pedidosMes}
+- **Faturamento:** R$ {$faturamentoMes}/mês
+- **Período:** {$periodDays} dias
 
 ---
 
-## 📅 CONTEXTO SAZONAL [MELHORIA 3]
+## CONTEXTO SAZONAL
 
 {$sazonalidade}
-
-**IMPORTANTE:** Considere a sazonalidade ao avaliar métricas. Uma queda em janeiro pode ser normal (pós-festas).
 
 ---
 
 ## DADOS OPERACIONAIS
 
-### Pedidos (últimos {$periodDays} dias)
+### Pedidos
 ```json
 {$orders}
 ```
@@ -189,232 +107,169 @@ Você é o médico da loja. Diagnosticar saúde do negócio, identificar problem
 {$coupons}
 ```
 
-### Benchmarks ({$subcategory})
-```json
-{$benchmarks}
-```
-
 ---
 
-## 📊 HISTÓRICO DA PRÓPRIA LOJA [MELHORIA 8]
-
-Use estes dados para detectar anomalias comparando com o passado da própria loja:
+## HISTÓRICO DA LOJA (para detectar anomalias)
 
 ```json
 {$historicalData}
 ```
 
-**COMO USAR:**
-- Compare métricas atuais com média dos últimos 3 meses
-- Variação > 20% = ANOMALIA (positiva ou negativa)
-- Tendência de 3+ meses na mesma direção = PADRÃO
+**Regra:** Variação > 20% vs média histórica = ANOMALIA
 
 ---
 
-## DADOS DE MERCADO EM TEMPO REAL
+## DADOS DE MERCADO
 
-### Google Trends
-| Métrica | Valor |
-|---------|-------|
-| Coleta | {$trendsSucesso} |
-| Tendência | {$tendencia} |
-| Interesse | {$interesseBusca}/100 |
-
-### Preços de Mercado
-| Métrica | Valor |
-|---------|-------|
-| Coleta | {$marketSucesso} |
-| Faixa | R$ {$precoMinMercado} - R$ {$precoMaxMercado} |
-| Média | R$ {$precoMedioMercado} |
-
-### Concorrentes ({$concorrentesSucesso})
-```json
-{$concorrentesJson}
-```
-**Média concorrentes:** R$ {$mediaPrecosConcorrentes}
-
-### Posicionamento
-| Comparação | Posição |
-|------------|---------|
-| vs Mercado | {$posVsMercado} |
-| vs Concorrentes | {$posVsConcorrentes} |
+{$marketSummary}
 
 ---
 
-## SUAS TAREFAS
+## DADOS DE CONCORRENTES
 
-### 1. CALCULAR HEALTH SCORE (0-100)
+{$competitorSummary}
 
-| Componente | Peso | Cálculo |
-|------------|------|---------|
-| Ticket vs Benchmark | 25pts | ≥100%=25, 80-99%=20, 60-79%=15, <60%=10 |
-| Disponibilidade Estoque | 25pts | 0-10% zerado=25, 11-20%=20, 21-35%=15, >35%=10 |
-| Taxa Cancelamento | 15pts | 0-3%=15, 4-7%=12, 8-12%=8, >12%=4 |
-| Saúde de Cupons | 15pts | uso<50% E impacto<15%=15, senão proporcional |
-| Tendência Vendas | 20pts | crescendo=20, estável=15, queda leve=10, queda forte=5 |
+---
 
-### ⚠️ OVERRIDE DO HEALTH SCORE [MELHORIA 5]
+## CÁLCULO DO HEALTH SCORE
 
-**REGRAS DE OVERRIDE (aplicar APÓS calcular score):**
+| Componente | Peso | Como calcular |
+|------------|------|---------------|
+| Ticket vs Benchmark | 25 pts | ≥100% = 25, 80-99% = 20, 60-79% = 15, <60% = 10 |
+| Estoque disponível | 25 pts | ≤10% zerado = 25, 11-20% = 20, 21-35% = 15, >35% = 10 |
+| Taxa cancelamento | 15 pts | ≤3% = 15, 4-7% = 12, 8-12% = 8, >12% = 4 |
+| Saúde de cupons | 15 pts | uso <50% E impacto <15% = 15, senão proporcional |
+| Tendência vendas | 20 pts | crescendo = 20, estável = 15, queda leve = 10, queda forte = 5 |
 
-🔴 **FORÇAR CRÍTICO** (score máximo = 25):
-- Estoque zerado > 45% dos produtos ativos
-- Taxa cancelamento > 15%
-- Queda de vendas > 40% vs período anterior
+### OVERRIDE (aplicar após calcular)
 
-🟠 **LIMITAR A ATENÇÃO** (score máximo = 50):
+**FORÇAR CRÍTICO (máx 25 pts):**
+- Estoque zerado > 45%
+- Cancelamento > 15%
+- Queda vendas > 40%
+
+**LIMITAR A ATENÇÃO (máx 50 pts):**
 - Estoque zerado > 35%
-- Taxa cancelamento > 10%
-- Dependência de cupons > 85%
-
-**EXEMPLO:** Se score calculado = 65 mas estoque zerado = 48%, FORÇAR score = 25 (Crítico)
-
-**Classificação Final:**
-- 76-100 = Excelente 🟢
-- 51-75 = Saudável 🟡
-- 26-50 = Atenção 🟠
-- 0-25 = Crítico 🔴
-
----
-
-### 2. IDENTIFICAR ALERTAS
-
-#### 🔴 CRÍTICO (ação imediata)
-- Estoque zerado > 40%
 - Cancelamento > 10%
-- Queda vendas > 30%
-- Preço > 30% acima mercado SEM diferenciação
-
-#### 🟡 ATENÇÃO (ação em 30 dias)
-- Estoque zerado 20-40%
-- Cancelamento 5-10%
-- Ticket > 20% abaixo benchmark
-- Cupons > 70% com impacto > 15%
-
-#### 🟢 MONITORAMENTO
-- Métricas dentro do esperado
-- Tendências a observar
+- Cupons > 85% das vendas
 
 ---
 
-### 3. DETECTAR ANOMALIAS VS HISTÓRICO [MELHORIA 8]
+## FEW-SHOT: EXEMPLOS DE DIAGNÓSTICO
 
-Compare métricas atuais com histórico da própria loja:
-
-| Métrica | Se variação > 20% |
-|---------|-------------------|
-| Ticket médio | Anomalia de pricing |
-| Pedidos/dia | Anomalia de demanda |
-| Taxa cancelamento | Anomalia operacional |
-| Taxa conversão | Anomalia de conversão |
-| Uso de cupons | Anomalia de desconto |
-
-**IDENTIFICAR:**
-- Anomalias POSITIVAS (crescimento inesperado) → oportunidade
-- Anomalias NEGATIVAS (queda inesperada) → problema
-- Considerar SAZONALIDADE antes de classificar como anomalia
-
----
-
-### 4. IDENTIFICAR 5 OPORTUNIDADES
-
-| Tipo | Quando Identificar |
-|------|-------------------|
-| price_optimization | Margem para ajuste baseado em mercado |
-| bundle_opportunity | Produtos complementares |
-| customer_retention | Recompra abaixo benchmark |
-| inventory_optimization | Desequilíbrio estoque/demanda |
-| growth_potential | Tendência alta + capacidade |
-
----
-
-### 5. COMPARAÇÃO TRIPLA OBRIGATÓRIA
-
-```
-Ticket Loja: R$ {$ticketMedio}
-├── vs Benchmark: diferença X%
-├── vs Mercado: R$ {$precoMedioMercado} → diferença Y%
-└── vs Concorrentes: R$ {$mediaPrecosConcorrentes} → diferença Z%
-```
-
----
-
-## FORMATO DE SAÍDA (JSON)
+### EXEMPLO 1 — Alerta crítico bem escrito
 
 ```json
 {
-  "resumo_executivo": "3-4 frases: saúde, problema principal, oportunidade principal",
+  "tipo": "estoque",
+  "severidade": "critico",
+  "titulo": "42% dos produtos ativos estão sem estoque",
+  "dados": "84 de 200 SKUs com estoque = 0. Inclui 3 dos 10 mais vendidos.",
+  "impacto": "Perda estimada de R$ 4.200/mês (baseado no histórico desses SKUs)",
+  "acao": "Repor estoque dos 3 top sellers em até 7 dias"
+}
+```
+
+### EXEMPLO 2 — Oportunidade bem escrita
+
+```json
+{
+  "tipo": "reativacao_clientes",
+  "titulo": "Reativar 180 clientes inativos há 90+ dias",
+  "dados": "180 clientes compraram 2+ vezes mas estão inativos há 90 dias. Ticket médio histórico: R$ 120.",
+  "potencial": "Se 15% voltarem = 27 pedidos × R$ 120 = R$ 3.240/mês",
+  "acao": "Campanha de email com cupom exclusivo 10% para retorno"
+}
+```
+
+### EXEMPLO 3 — Health Score com override
+
+```json
+{
+  "score_calculado": 68,
+  "override_aplicado": true,
+  "motivo_override": "Estoque zerado em 47% dos SKUs ativos",
+  "score_final": 25,
+  "classificacao": "critico"
+}
+```
+
+---
+
+## FORMATO DE SAÍDA
+
+Retorne APENAS o JSON abaixo:
+
+```json
+{
+  "resumo_executivo": "2-3 frases: saúde geral, problema principal, oportunidade principal",
 
   "health_score": {
     "score_calculado": 0,
-    "override_aplicado": true|false,
-    "motivo_override": "string ou null",
-    "score_final": 0,
-    "classificacao": "critico|atencao|saudavel|excelente",
     "componentes": {
-      "ticket_vs_benchmark": {"pontos": 0, "max": 25, "detalhe": ""},
-      "disponibilidade_estoque": {"pontos": 0, "max": 25, "detalhe": ""},
-      "taxa_cancelamento": {"pontos": 0, "max": 15, "detalhe": ""},
-      "saude_cupons": {"pontos": 0, "max": 15, "detalhe": ""},
-      "tendencia_vendas": {"pontos": 0, "max": 20, "detalhe": ""}
-    }
+      "ticket_vs_benchmark": {"pontos": 0, "detalhe": "X% do benchmark"},
+      "estoque_disponivel": {"pontos": 0, "detalhe": "X% zerado"},
+      "taxa_cancelamento": {"pontos": 0, "detalhe": "X%"},
+      "saude_cupons": {"pontos": 0, "detalhe": "X% uso, Y% impacto"},
+      "tendencia_vendas": {"pontos": 0, "detalhe": "crescendo|estável|queda"}
+    },
+    "override_aplicado": false,
+    "motivo_override": null,
+    "score_final": 0,
+    "classificacao": "critico|atencao|saudavel|excelente"
   },
 
-  "alertas": {
-    "criticos": [{"tipo": "", "titulo": "", "descricao": "", "impacto_estimado": ""}],
-    "atencao": [{"tipo": "", "titulo": "", "descricao": "", "prazo_sugerido": ""}],
-    "monitoramento": [{"tipo": "", "titulo": "", "motivo": ""}]
-  },
-
-  "anomalias_vs_historico": [
+  "alertas": [
     {
-      "metrica": "nome da métrica",
-      "valor_atual": 0,
-      "valor_historico": 0,
-      "variacao_percentual": 0,
-      "tipo": "positiva|negativa",
-      "severidade": "high|medium|low",
-      "consideracao_sazonal": "string explicando se sazonalidade explica",
-      "acao_sugerida": "string"
+      "severidade": "critico|atencao|monitorar",
+      "tipo": "estoque|cancelamento|pricing|cupons|vendas",
+      "titulo": "Descrição curta do problema",
+      "dados": "Números específicos que comprovam",
+      "impacto": "R$ X/mês ou X% de perda",
+      "acao": "O que fazer"
     }
   ],
 
   "oportunidades": [
     {
-      "tipo": "",
-      "titulo": "",
-      "descricao": "",
-      "base_dados": "",
-      "calculo_roi": {"formula": "", "resultado": ""},
-      "potencial_receita": "R$ X/mês"
+      "tipo": "reativacao|upsell|estoque|pricing|conversao",
+      "titulo": "Descrição da oportunidade",
+      "dados": "Números que embasam",
+      "potencial": "R$ X/mês",
+      "acao": "Como capturar"
     }
   ],
 
-  "posicionamento_mercado": {
-    "ticket_loja": {$ticketMedio},
-    "vs_benchmark": {"valor": 0, "diferenca_percentual": 0, "posicao": ""},
-    "vs_mercado": {"valor": {$precoMedioMercado}, "diferenca_percentual": 0, "posicao": ""},
-    "vs_concorrentes": {"valor": {$mediaPrecosConcorrentes}, "diferenca_percentual": 0, "posicao": ""},
-    "interpretacao": ""
+  "posicionamento": {
+    "ticket_loja": 0,
+    "vs_benchmark": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_mercado": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_concorrentes": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "interpretacao": "Loja está acima/abaixo/dentro do mercado porque..."
   },
 
-  "contexto_sazonal": {
-    "periodo_atual": "",
-    "impacto_nas_metricas": "",
-    "ajuste_recomendado": ""
-  },
+  "anomalias": [
+    {
+      "metrica": "nome",
+      "atual": 0,
+      "historico": 0,
+      "variacao": "+X% ou -X%",
+      "tipo": "positiva|negativa",
+      "explicacao_sazonal": "É ou não explicado pela sazonalidade"
+    }
+  ],
 
-  "alertas_para_strategist": {
-    "prioridade_1": "",
-    "prioridade_2": "",
-    "prioridade_3": "",
-    "contexto_mercado": "",
-    "restricoes": [""],
+  "briefing_strategist": {
+    "problema_1": "Principal problema a resolver",
+    "problema_2": "Segundo problema",
+    "problema_3": "Terceiro problema",
+    "oportunidade_principal": "Maior oportunidade identificada",
+    "restricoes": ["O que NÃO fazer ou limitações da loja"],
     "dados_chave": {
-      "ticket": {$ticketMedio},
-      "pedidos_mes": {$pedidosMes},
-      "faturamento_mes": {$faturamentoMes},
-      "tendencia_mercado": "{$tendencia}"
+      "faturamento_mes": 0,
+      "ticket_medio": 0,
+      "taxa_conversao": 0,
+      "estoque_zerado_percent": 0
     }
   }
 }
@@ -422,64 +277,163 @@ Ticket Loja: R$ {$ticketMedio}
 
 ---
 
-## INSTRUÇÕES FINAIS
+## CHECKLIST ANTES DE ENVIAR
 
-1. **Retorne APENAS JSON válido**
-2. **PORTUGUÊS BRASILEIRO**
-3. **Health Score: aplicar OVERRIDE se necessário**
-4. **Anomalias: comparar com histórico da loja**
-5. **Sazonalidade: considerar antes de classificar anomalias**
-6. **EXATAMENTE 5 oportunidades com ROI**
+- [ ] Health Score calculado com os 5 componentes?
+- [ ] Override aplicado se situação crítica?
+- [ ] Cada alerta tem dados específicos (números)?
+- [ ] Exatamente 5 oportunidades com potencial em R$?
+- [ ] Posicionamento com comparação tripla?
+- [ ] Briefing para Strategist preenchido?
 
+**RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
     }
 
     /**
-     * Retorna impacto da sazonalidade no mês atual
+     * Resumo dos dados de mercado
      */
-    private static function getSeasonalityImpact(int $mes): string
+    private static function summarizeMarket(array $marketData, float $ticketLoja): string
     {
-        $impactos = [
-            1 => '**Janeiro - Pós-Festas:** Queda natural de 20-30% nas vendas é ESPERADA. Não classificar como anomalia grave.',
-            2 => '**Fevereiro - Carnaval:** Vendas voláteis. Pico antes do feriado, queda durante.',
-            3 => '**Março - Normalização:** Retorno ao padrão normal. Bom mês para comparação.',
-            4 => '**Abril - Páscoa:** Possível leve alta em kits presenteáveis.',
-            5 => '**Maio - Dia das Mães:** ALTA TEMPORADA. Espere +30-50% nas vendas. Queda após = normal.',
-            6 => '**Junho - Inverno/Namorados:** Pico no início (Namorados), depois estabiliza.',
-            7 => '**Julho - Férias:** Vendas podem cair 10-15% (férias escolares).',
-            8 => '**Agosto - Dia dos Pais:** Leve alta em produtos masculinos. Mês de preparação para Q4.',
-            9 => '**Setembro - Dia do Cliente:** Possíveis promoções. Preparação para Black Friday.',
-            10 => '**Outubro - Pré-Black Friday:** Consumidores segurando compras. Queda pode ser estratégica.',
-            11 => '**Novembro - Black Friday:** MAIOR MÊS. Espere +50-100% nas vendas.',
-            12 => '**Dezembro - Natal:** ALTA TEMPORADA. +40-60% nas vendas até dia 20, queda após.',
-        ];
+        $trends = $marketData['google_trends'] ?? [];
+        $precos = $marketData['precos_mercado'] ?? [];
 
-        return $impactos[$mes] ?? 'Mês sem sazonalidade específica.';
+        $tendencia = $trends['tendencia'] ?? 'não disponível';
+        $interesse = $trends['interesse_busca'] ?? 0;
+
+        $precoMin = $precos['faixa_preco']['min'] ?? 0;
+        $precoMax = $precos['faixa_preco']['max'] ?? 0;
+        $precoMedio = $precos['faixa_preco']['media'] ?? 0;
+
+        $posicao = 'não calculado';
+        if ($precoMedio > 0 && $ticketLoja > 0) {
+            $ratio = $ticketLoja / $precoMedio;
+            $diff = round(($ratio - 1) * 100);
+            $posicao = $diff >= 0 ? "+{$diff}% vs mercado" : "{$diff}% vs mercado";
+        }
+
+        return <<<MARKET
+**Google Trends:** Tendência {$tendencia}, interesse {$interesse}/100
+
+**Preços de Mercado:** R$ {$precoMin} - R$ {$precoMax} (média R$ {$precoMedio})
+
+**Posição da Loja:** {$posicao}
+MARKET;
     }
 
+    /**
+     * Resumo dos concorrentes
+     */
+    private static function summarizeCompetitors(array $competitors): string
+    {
+        if (empty($competitors)) {
+            return 'Nenhum dado de concorrente disponível.';
+        }
+
+        $output = '';
+        $totalPreco = 0;
+        $count = 0;
+
+        foreach ($competitors as $c) {
+            if (! ($c['sucesso'] ?? false)) {
+                continue;
+            }
+
+            $nome = $c['nome'] ?? 'Concorrente';
+            $faixa = $c['faixa_preco'] ?? [];
+            $diferenciais = $c['diferenciais'] ?? [];
+            $dadosRicos = $c['dados_ricos'] ?? [];
+
+            $output .= "**{$nome}:**\n";
+
+            if (! empty($faixa)) {
+                $output .= "- Preço: R$ {$faixa['min']} - R$ {$faixa['max']} (média R$ {$faixa['media']})\n";
+                $totalPreco += $faixa['media'];
+                $count++;
+            }
+
+            if (! empty($dadosRicos['categorias'])) {
+                $topCats = array_slice($dadosRicos['categorias'], 0, 3);
+                $catsStr = implode(', ', array_map(fn ($cat) => "{$cat['nome']} ({$cat['mencoes']}x)", $topCats));
+                $output .= "- Categorias foco: {$catsStr}\n";
+            }
+
+            if (! empty($dadosRicos['promocoes'])) {
+                $maxDesc = 0;
+                foreach ($dadosRicos['promocoes'] as $promo) {
+                    if (($promo['tipo'] ?? '') === 'desconto_percentual') {
+                        $val = (int) filter_var($promo['valor'] ?? '0', FILTER_SANITIZE_NUMBER_INT);
+                        if ($val > $maxDesc) {
+                            $maxDesc = $val;
+                        }
+                    }
+                }
+                if ($maxDesc > 0) {
+                    $output .= "- Maior desconto: {$maxDesc}%\n";
+                }
+            }
+
+            if (! empty($diferenciais)) {
+                $output .= '- Diferenciais: '.implode(', ', array_slice($diferenciais, 0, 3))."\n";
+            }
+
+            $output .= "\n";
+        }
+
+        if ($count > 0) {
+            $mediaConcorrentes = round($totalPreco / $count, 2);
+            $output .= "**Média de preços dos concorrentes:** R$ {$mediaConcorrentes}\n";
+        }
+
+        return $output ?: 'Dados limitados.';
+    }
+
+    /**
+     * Contexto de sazonalidade
+     */
+    private static function getSeasonalityContext(int $mes): string
+    {
+        $contextos = [
+            1 => '**Janeiro (Pós-Festas):** Queda de 20-30% é NORMAL. Não classificar como anomalia.',
+            2 => '**Fevereiro (Carnaval):** Vendas voláteis. Pico antes, queda durante feriado.',
+            3 => '**Março:** Mês de normalização. Bom para comparação histórica.',
+            4 => '**Abril (Páscoa):** Leve alta em kits presenteáveis.',
+            5 => '**Maio (Dia das Mães):** ALTA TEMPORADA. +30-50% esperado. Queda após = normal.',
+            6 => '**Junho (Namorados):** Pico no início do mês, depois estabiliza.',
+            7 => '**Julho (Férias):** Queda de 10-15% é normal (férias escolares).',
+            8 => '**Agosto (Dia dos Pais):** Leve alta. Preparação para Q4.',
+            9 => '**Setembro (Dia do Cliente):** Promoções moderadas. Preparação para Black Friday.',
+            10 => '**Outubro (Pré-BF):** Consumidores segurando compras. Queda é estratégica.',
+            11 => '**Novembro (Black Friday):** MAIOR MÊS. +50-100% esperado.',
+            12 => '**Dezembro (Natal):** ALTA TEMPORADA até dia 20. Queda após Natal = normal.',
+        ];
+
+        return $contextos[$mes] ?? 'Mês sem sazonalidade específica identificada.';
+    }
+
+    /**
+     * Template resumido
+     */
     public static function getTemplate(): string
     {
         return <<<'TEMPLATE'
-# ANALYST AGENT — DIAGNÓSTICO COMPLETO
+# ANALYST — DIAGNÓSTICO
 
-## PAPEL
-Diagnosticar saúde da loja, identificar problemas e oportunidades.
+## TAREFA
+Analisar dados e produzir: Health Score, Alertas, Oportunidades, Briefing.
 
-## ENTREGAS
-1. Health Score (0-100) COM OVERRIDE se necessário
-2. Alertas (críticos, atenção, monitoramento)
-3. 5 Oportunidades com ROI calculado
-4. Anomalias vs histórico da própria loja
-5. Posicionamento de mercado (tripla comparação)
-6. Briefing para Strategist
-
-## REGRAS
-- Aplicar OVERRIDE do Health Score em casos extremos
-- Comparar com histórico da própria loja antes de classificar anomalias
-- Considerar sazonalidade
-- Comparação tripla obrigatória
+## OUTPUT
+JSON com health_score, alertas, oportunidades, posicionamento, briefing_strategist.
 
 PORTUGUÊS BRASILEIRO
 TEMPLATE;
+    }
+
+    /**
+     * Método build() para compatibilidade.
+     */
+    public static function build(array $context): string
+    {
+        return self::get($context);
     }
 }

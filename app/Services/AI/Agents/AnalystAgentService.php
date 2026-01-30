@@ -116,37 +116,92 @@ class AnalystAgentService
 
     /**
      * Normalize the analysis structure.
-     * Supports V3 format with Portuguese field names.
+     * Supports V4 format and V5 format with simplified field names.
      */
     private function normalizeAnalysis(array $analysis): array
     {
         $default = $this->getDefaultAnalysis();
 
-        // Extract health score from V3 format (health_score object) or legacy (overall_health)
-        $healthV3 = $analysis['health_score'] ?? [];
+        // Extract health score from V5/V4 format (health_score object) or legacy (overall_health)
+        $healthScore = $analysis['health_score'] ?? [];
         $healthLegacy = $analysis['overall_health'] ?? [];
 
         $overallHealth = [
-            // V3 format uses score_final (after override), fallback to score for legacy
-            'score' => $healthV3['score_final'] ?? $healthV3['score'] ?? $healthLegacy['score'] ?? $default['overall_health']['score'],
-            'classification' => $healthV3['classificacao'] ?? $healthLegacy['classification'] ?? $default['overall_health']['classification'],
+            // V5/V4 format uses score_final (after override), fallback to score for legacy
+            'score' => $healthScore['score_final'] ?? $healthScore['score'] ?? $healthLegacy['score'] ?? $default['overall_health']['score'],
+            'classification' => $healthScore['classificacao'] ?? $healthLegacy['classification'] ?? $default['overall_health']['classification'],
             'main_points' => [$analysis['resumo_executivo'] ?? ($healthLegacy['main_points'][0] ?? $default['overall_health']['main_points'][0])],
         ];
 
+        // V5 uses 'posicionamento', V4 uses 'posicionamento_mercado'
+        $posicionamento = $analysis['posicionamento_mercado'] ?? $analysis['posicionamento'] ?? [];
+
+        // V5 uses 'briefing_strategist', V4 uses 'alertas_para_strategist'
+        $alertasStrategist = $analysis['alertas_para_strategist'] ?? $analysis['briefing_strategist'] ?? [];
+
+        // V5 uses flat 'alertas' array with 'severidade' field
+        // V4 uses 'alertas' with criticos/atencao/monitoramento structure
+        $alertas = $this->normalizeAlertas($analysis['alertas'] ?? []);
+
+        // V5 uses 'anomalias', V4 uses 'anomalies'
+        $anomalias = $analysis['anomalies'] ?? $analysis['anomalias'] ?? [];
+
         return [
             'metrics' => array_merge($default['metrics'], $analysis['metricas_detalhadas'] ?? $analysis['metrics'] ?? []),
-            'anomalies' => $analysis['anomalies'] ?? [],
+            'anomalies' => $anomalias,
             'identified_patterns' => $analysis['identified_patterns'] ?? [],
-            // V3 fields passthrough
+            // V5/V4 fields passthrough
             'oportunidades' => $analysis['oportunidades'] ?? [],
-            'alertas' => $analysis['alertas'] ?? [],
-            'posicionamento_mercado' => $analysis['posicionamento_mercado'] ?? [],
+            'alertas' => $alertas,
+            'posicionamento_mercado' => $posicionamento,
             'contexto_mercado' => $analysis['contexto_mercado'] ?? [],
-            'alertas_para_strategist' => $analysis['alertas_para_strategist'] ?? [],
+            'alertas_para_strategist' => $alertasStrategist,
             'resumo_executivo' => $analysis['resumo_executivo'] ?? null,
-            'health_score' => $healthV3,
+            'health_score' => $healthScore,
             'overall_health' => $overallHealth,
         ];
+    }
+
+    /**
+     * Normalize alertas structure.
+     * V5 uses flat array with 'severidade' field.
+     * V4 uses nested structure with criticos/atencao/monitoramento.
+     */
+    private function normalizeAlertas(array $alertas): array
+    {
+        // If it's already V4 format (has criticos key), return as-is
+        if (isset($alertas['criticos']) || isset($alertas['atencao']) || isset($alertas['monitoramento'])) {
+            return $alertas;
+        }
+
+        // V5 format: flat array with 'severidade' field
+        // Convert to V4 format for compatibility
+        $normalized = [
+            'criticos' => [],
+            'atencao' => [],
+            'monitoramento' => [],
+        ];
+
+        foreach ($alertas as $alerta) {
+            $severidade = $alerta['severidade'] ?? 'monitorar';
+
+            // Map V5 severidade to V4 keys
+            $key = match ($severidade) {
+                'critico' => 'criticos',
+                'atencao' => 'atencao',
+                default => 'monitoramento',
+            };
+
+            $normalized[$key][] = [
+                'tipo' => $alerta['tipo'] ?? '',
+                'titulo' => $alerta['titulo'] ?? '',
+                'descricao' => $alerta['dados'] ?? $alerta['descricao'] ?? '',
+                'impacto_estimado' => $alerta['impacto'] ?? '',
+                'acao' => $alerta['acao'] ?? '',
+            ];
+        }
+
+        return $normalized;
     }
 
     /**
