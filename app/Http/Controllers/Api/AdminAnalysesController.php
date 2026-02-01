@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminAnalysisDetailResource;
 use App\Http\Resources\AdminAnalysisResource;
 use App\Models\Analysis;
+use App\Traits\SafeILikeSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdminAnalysesController extends Controller
 {
+    use SafeILikeSearch;
+
     /**
      * List analyses with filters and pagination.
      */
@@ -42,23 +45,36 @@ class AdminAnalysesController extends Controller
             $query->whereDate('created_at', '<=', $request->input('date_to'));
         }
 
-        // Busca em summary
+        // Busca em summary - SECURITY: sanitize search input
         if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->whereRaw('LOWER(summary::text) LIKE ?', ['%'.strtolower($search).'%'])
-                    ->orWhereHas('store', function ($q) use ($search) {
-                        $q->where('name', 'like', '%'.$search.'%');
+            $sanitized = $this->sanitizeILikeInput($search);
+            $pattern = '%'.$sanitized.'%';
+
+            $query->where(function ($q) use ($pattern) {
+                $q->whereRaw('LOWER(summary::text) LIKE LOWER(?)', [$pattern])
+                    ->orWhereHas('store', function ($q) use ($pattern) {
+                        $q->where('name', 'ILIKE', $pattern);
                     })
-                    ->orWhereHas('user', function ($q) use ($search) {
-                        $q->where('name', 'like', '%'.$search.'%');
+                    ->orWhereHas('user', function ($q) use ($pattern) {
+                        $q->where('name', 'ILIKE', $pattern);
                     });
             });
         }
 
-        // Ordenação
+        // Ordenação - SECURITY: Whitelist para prevenir SQL injection
+        $allowedOrderFields = ['id', 'created_at', 'status', 'completed_at', 'user_id', 'store_id'];
         $orderBy = $request->input('order_by', 'created_at');
         $orderDir = $request->input('order_dir', 'desc');
+
+        // Validar order_by contra whitelist
+        if (! in_array($orderBy, $allowedOrderFields, true)) {
+            $orderBy = 'created_at';
+        }
+
+        // Validar order_dir
+        $orderDir = strtolower($orderDir) === 'asc' ? 'asc' : 'desc';
+
         $query->orderBy($orderBy, $orderDir);
 
         // Paginação

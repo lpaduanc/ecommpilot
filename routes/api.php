@@ -43,6 +43,7 @@ Route::prefix('auth')->group(function () {
         Route::put('profile', [AuthController::class, 'updateProfile'])->middleware('throttle:10,1');
         Route::put('password', [AuthController::class, 'updatePassword'])->middleware('throttle:5,1');
         Route::post('logout', [AuthController::class, 'logout']);
+        Route::post('logout-all', [AuthController::class, 'logoutAll']);
     });
 });
 

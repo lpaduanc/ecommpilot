@@ -170,10 +170,9 @@ class IntegrationController extends Controller
             Log::error('Nuvemshop callback error', [
                 'error_id' => $errorId,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                // Stack trace apenas em ambiente local
-                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             return redirect('/integrations?error=callback_failed&error_id='.$errorId);
@@ -422,10 +421,9 @@ class IntegrationController extends Controller
             Log::error('Exception during Nuvemshop authorization', [
                 'error_id' => $errorId,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                // Stack trace apenas em ambiente local
-                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             return response()->json([

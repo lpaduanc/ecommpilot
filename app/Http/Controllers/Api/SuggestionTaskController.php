@@ -56,12 +56,16 @@ class SuggestionTaskController extends Controller
 
             return $this->successResponse(['tasks' => $tasks]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error fetching suggestion tasks', [
+                'error_id' => $errorId,
                 'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao buscar tarefas.', 500);
+            return $this->errorResponse('Erro ao buscar tarefas.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -131,12 +135,16 @@ class SuggestionTaskController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Dados inválidos.', 422, ['errors' => $e->errors()]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error creating suggestion task', [
+                'error_id' => $errorId,
                 'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao criar tarefa.', 500);
+            return $this->errorResponse('Erro ao criar tarefa.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -217,12 +225,16 @@ class SuggestionTaskController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Dados inválidos.', 422, ['errors' => $e->errors()]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error updating suggestion task', [
+                'error_id' => $errorId,
                 'task_id' => $task->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao atualizar tarefa.', 500);
+            return $this->errorResponse('Erro ao atualizar tarefa.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -253,12 +265,16 @@ class SuggestionTaskController extends Controller
 
             return $this->successResponse(null, 'Tarefa removida com sucesso.');
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error deleting suggestion task', [
+                'error_id' => $errorId,
                 'task_id' => $task->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao remover tarefa.', 500);
+            return $this->errorResponse('Erro ao remover tarefa.', 500, ['error_id' => $errorId]);
         }
     }
 }
