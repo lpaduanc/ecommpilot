@@ -59,9 +59,17 @@ class AdminEmailConfigurationController extends Controller
                 'data' => $this->emailConfigService->getForDisplay($configuration->id),
             ], 201);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao criar configuração de e-mail', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'message' => 'Erro ao criar configuração de e-mail.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -76,9 +84,17 @@ class AdminEmailConfigurationController extends Controller
                 'data' => $this->emailConfigService->getForDisplay($emailConfiguration->id),
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao buscar configuração', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'message' => 'Erro ao buscar configuração.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -96,9 +112,17 @@ class AdminEmailConfigurationController extends Controller
                 'data' => $this->emailConfigService->getForDisplay($configuration->id),
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao atualizar configuração de e-mail', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'message' => 'Erro ao atualizar configuração de e-mail.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -115,9 +139,17 @@ class AdminEmailConfigurationController extends Controller
                 'message' => 'Configuração de e-mail excluída com sucesso.',
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao excluir configuração de e-mail', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'message' => 'Erro ao excluir configuração de e-mail.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -139,10 +171,18 @@ class AdminEmailConfigurationController extends Controller
 
             return response()->json($result, $result['success'] ? 200 : 400);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao testar configuração de e-mail', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao testar configuração de e-mail.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }

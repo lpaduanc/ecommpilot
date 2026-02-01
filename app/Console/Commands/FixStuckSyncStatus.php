@@ -35,8 +35,9 @@ class FixStuckSyncStatus extends Command
         $fixAll = $this->option('all');
         $dryRun = $this->option('dry-run');
 
-        if (!$storeId && !$fixAll) {
+        if (! $storeId && ! $fixAll) {
             $this->error('Você deve especificar um store_id ou usar a opção --all');
+
             return 1;
         }
 
@@ -54,6 +55,7 @@ class FixStuckSyncStatus extends Command
 
         if ($stuckStores->isEmpty()) {
             $this->info('Nenhuma loja com status travado encontrada.');
+
             return 0;
         }
 
@@ -67,17 +69,17 @@ class FixStuckSyncStatus extends Command
             $this->line("  Status atual: {$store->sync_status->value}");
             $this->line("  Travado há: {$minutesStuck} minutos");
             $this->line("  Última atualização: {$store->updated_at->format('Y-m-d H:i:s')}");
-            $this->line("  Última sync: " . ($store->last_sync_at ? $store->last_sync_at->format('Y-m-d H:i:s') : 'Nunca'));
+            $this->line('  Última sync: '.($store->last_sync_at ? $store->last_sync_at->format('Y-m-d H:i:s') : 'Nunca'));
 
             // Verificar se há jobs pendentes na fila
             $pendingJobs = DB::table('jobs')
                 ->where('queue', 'sync')
-                ->where('payload', 'like', '%"store_id":' . $store->id . '%')
+                ->where('payload', 'like', '%"store_id":'.$store->id.'%')
                 ->count();
 
             $this->line("  Jobs pendentes: {$pendingJobs}");
 
-            if (!$dryRun) {
+            if (! $dryRun) {
                 // Verificar se a sincronização foi realmente concluída
                 // Checar timestamp dos dados mais recentes
                 $latestProduct = $store->products()->latest('updated_at')->first();
@@ -108,10 +110,10 @@ class FixStuckSyncStatus extends Command
                     $store->update([
                         'sync_status' => SyncStatus::Failed,
                     ]);
-                    $this->warn("  ✓ Status corrigido para: failed (sem dados recentes)");
+                    $this->warn('  ✓ Status corrigido para: failed (sem dados recentes)');
                 }
             } else {
-                $this->comment("  [DRY RUN] Status seria corrigido");
+                $this->comment('  [DRY RUN] Status seria corrigido');
             }
 
             $this->newLine();

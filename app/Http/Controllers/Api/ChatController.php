@@ -240,10 +240,9 @@ class ChatController extends Controller
                 'user_id' => $user->id,
                 'message' => $validated['message'],
                 'exception_message' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                // Stack trace apenas em ambiente local
-                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             // Delete user message on failure (if it was persisted)

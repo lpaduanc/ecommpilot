@@ -218,11 +218,12 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                 // CRITICAL: Refresh store from database before marking as synced
                 $freshStore = Store::find($store->id);
 
-                if (!$freshStore) {
+                if (! $freshStore) {
                     Log::error('[PARALLEL MODE] Store not found during batch then', [
                         'store_id' => $store->id,
                         'batch_id' => $batch->id,
                     ]);
+
                     return;
                 }
 
@@ -259,16 +260,17 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                     'status' => 'success',
                 ]);
             })
-            ->catch(function (Batch $batch, \Throwable $e) use ($store, $logChannel, $notificationServiceRef) {
+            ->catch(function (Batch $batch, \Throwable $e) use ($store, $notificationServiceRef) {
                 // Algum job falhou
                 // CRITICAL: Refresh store from database to get latest status
                 $freshStore = Store::find($store->id);
 
-                if (!$freshStore) {
+                if (! $freshStore) {
                     Log::error('[PARALLEL MODE] Store not found during batch catch', [
                         'store_id' => $store->id,
                         'batch_id' => $batch->id,
                     ]);
+
                     return;
                 }
 
@@ -500,15 +502,19 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         $this->store->markAsFailed();
         $this->clearCheckpoint();
 
+        $errorId = 'err_'.uniqid();
+
         Log::channel($this->logChannel)->error('╔══════════════════════════════════════════════════════════════════╗');
         Log::channel($this->logChannel)->error('║     SYNC STORE DATA - FALHA PERMANENTE                          ║');
         Log::channel($this->logChannel)->error('╚══════════════════════════════════════════════════════════════════╝');
         Log::channel($this->logChannel)->error('Detalhes da falha permanente', [
+            'error_id' => $errorId,
             'store_id' => $this->store->id,
             'store_name' => $this->store->name,
             'error' => $exception->getMessage(),
             'exception_class' => get_class($exception),
-            'trace' => $exception->getTraceAsString(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
             'timestamp' => now()->toIso8601String(),
         ]);
     }

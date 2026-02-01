@@ -52,12 +52,16 @@ class SuggestionStepController extends Controller
                 'progress' => $suggestion->progress,
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error fetching suggestion steps', [
+                'error_id' => $errorId,
                 'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao buscar passos da sugestão.', 500);
+            return $this->errorResponse('Erro ao buscar passos da sugestão.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -113,12 +117,16 @@ class SuggestionStepController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Dados inválidos.', 422, ['errors' => $e->errors()]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error creating suggestion step', [
+                'error_id' => $errorId,
                 'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao criar passo.', 500);
+            return $this->errorResponse('Erro ao criar passo.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -187,12 +195,16 @@ class SuggestionStepController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Dados inválidos.', 422, ['errors' => $e->errors()]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error updating suggestion step', [
+                'error_id' => $errorId,
                 'step_id' => $step->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao atualizar passo.', 500);
+            return $this->errorResponse('Erro ao atualizar passo.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -230,12 +242,16 @@ class SuggestionStepController extends Controller
                 'progress' => $suggestion->fresh()->progress,
             ], 'Passo removido com sucesso.');
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error deleting suggestion step', [
+                'error_id' => $errorId,
                 'step_id' => $step->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao remover passo.', 500);
+            return $this->errorResponse('Erro ao remover passo.', 500, ['error_id' => $errorId]);
         }
     }
 }

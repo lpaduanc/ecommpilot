@@ -357,14 +357,18 @@ class ProcessAnalysisJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
+        $errorId = 'err_'.uniqid();
+
         Log::channel($this->logChannel)->error('╔══════════════════════════════════════════════════════════════════╗');
         Log::channel($this->logChannel)->error('║     PROCESS ANALYSIS - FALHA PERMANENTE                         ║');
         Log::channel($this->logChannel)->error('╚══════════════════════════════════════════════════════════════════╝');
         Log::channel($this->logChannel)->error('Detalhes da falha permanente', [
+            'error_id' => $errorId,
             'analysis_id' => $this->analysis->id,
             'error' => $exception->getMessage(),
             'exception_class' => get_class($exception),
-            'trace' => $exception->getTraceAsString(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
             'timestamp' => now()->toIso8601String(),
         ]);
 
