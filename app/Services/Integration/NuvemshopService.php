@@ -75,9 +75,9 @@ class NuvemshopService
         ?OrderAdapterInterface $orderAdapter = null,
         ?CouponAdapterInterface $couponAdapter = null
     ) {
-        // Always use .env for client credentials
-        $this->clientId = env('NUVEMSHOP_CLIENT_ID', '');
-        $this->clientSecret = env('NUVEMSHOP_CLIENT_SECRET', '');
+        // Use config() instead of env() - required when config is cached
+        $this->clientId = config('services.nuvemshop.client_id', '');
+        $this->clientSecret = config('services.nuvemshop.client_secret', '');
 
         $this->redirectUri = config('services.nuvemshop.redirect_uri')
             ?? url('/api/integrations/nuvemshop/callback');

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Horizon\Horizon;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -83,6 +84,12 @@ class AppServiceProvider extends ServiceProvider
 
         // SECURITY: Log all dangerous artisan commands
         $this->registerDangerousCommandLogger();
+
+        // Configure Horizon authorization
+        Horizon::auth(function ($request) {
+            // Allow access if user is authenticated and is super_admin
+            return $request->user()?->hasRole('super_admin') ?? false;
+        });
     }
 
     /**

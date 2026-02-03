@@ -23,8 +23,8 @@ class StoreSettingsController extends Controller
      */
     public function getStoreSettings(): JsonResponse
     {
-        $clientId = env('NUVEMSHOP_CLIENT_ID', '');
-        $clientSecret = env('NUVEMSHOP_CLIENT_SECRET', '');
+        $clientId = config('services.nuvemshop.client_id', '');
+        $clientSecret = config('services.nuvemshop.client_secret', '');
         $grantType = SystemSetting::get('nuvemshop.grant_type', 'authorization_code');
 
         return response()->json([
@@ -130,8 +130,8 @@ class StoreSettingsController extends Controller
     {
         $validated = $request->validated();
 
-        $clientId = env('NUVEMSHOP_CLIENT_ID', '');
-        $clientSecret = env('NUVEMSHOP_CLIENT_SECRET', '');
+        $clientId = config('services.nuvemshop.client_id', '');
+        $clientSecret = config('services.nuvemshop.client_secret', '');
 
         if (empty($clientId) || empty($clientSecret)) {
             return response()->json([

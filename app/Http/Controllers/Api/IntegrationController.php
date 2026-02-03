@@ -191,9 +191,9 @@ class IntegrationController extends Controller
 
         $code = $request->input('code');
 
-        // Get client credentials from .env
-        $clientId = env('NUVEMSHOP_CLIENT_ID');
-        $clientSecret = env('NUVEMSHOP_CLIENT_SECRET');
+        // Get client credentials from config (env() doesn't work with cached config)
+        $clientId = config('services.nuvemshop.client_id');
+        $clientSecret = config('services.nuvemshop.client_secret');
 
         if (empty($clientId) || empty($clientSecret)) {
             return response()->json([
