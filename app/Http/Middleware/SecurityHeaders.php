@@ -15,6 +15,11 @@ class SecurityHeaders
     {
         $response = $next($request);
 
+        // Skip CSP for Horizon routes (Horizon needs unsafe-eval for Vue.js)
+        if ($request->is('horizon*')) {
+            return $response;
+        }
+
         $isLocal = app()->isLocal() || app()->environment('development', 'testing');
         $unsafeEval = env('CSP_UNSAFE_EVAL', $isLocal) ? " 'unsafe-eval'" : '';
 
