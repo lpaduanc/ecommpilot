@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Permission;
 
 class UserManagementController extends Controller
@@ -125,10 +126,17 @@ class UserManagementController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao criar usuário', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
 
             return response()->json([
                 'message' => 'Erro ao criar usuário.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -212,10 +220,17 @@ class UserManagementController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao atualizar usuário', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
 
             return response()->json([
                 'message' => 'Erro ao atualizar usuário.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -241,9 +256,17 @@ class UserManagementController extends Controller
                 'message' => 'Usuário removido com sucesso.',
             ]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+            Log::error('Erro ao remover usuário', [
+                'error_id' => $errorId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'message' => 'Erro ao remover usuário.',
-                'error' => $e->getMessage(),
+                'error_id' => $errorId,
             ], 500);
         }
     }

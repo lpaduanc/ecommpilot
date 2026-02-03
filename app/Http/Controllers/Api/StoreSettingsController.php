@@ -220,16 +220,14 @@ class StoreSettingsController extends Controller
             Log::error('Exception during Nuvemshop token exchange', [
                 'error_id' => $errorId,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                // Stack trace apenas em ambiente local
-                'trace' => app()->isLocal() ? $e->getTraceAsString() : null,
             ]);
 
             return response()->json([
                 'message' => 'Erro ao processar a autenticação.',
                 'error_id' => $errorId,
-                'error' => config('app.debug') ? $e->getMessage() : 'internal_error',
             ], 500);
         }
     }
@@ -280,14 +278,18 @@ class StoreSettingsController extends Controller
                 'error' => $response->json()['error'] ?? 'unknown_error',
             ], 400);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Exception during Nuvemshop connection test', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Erro ao testar conexão.',
-                'error' => config('app.debug') ? $e->getMessage() : 'internal_error',
+                'error_id' => $errorId,
             ], 500);
         }
     }

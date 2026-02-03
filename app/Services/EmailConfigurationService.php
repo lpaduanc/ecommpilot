@@ -143,14 +143,18 @@ class EmailConfigurationService
                     ];
             }
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Erro ao enviar e-mail de teste', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return [
                 'success' => false,
-                'message' => 'Erro ao enviar e-mail: '.$e->getMessage(),
+                'message' => 'Erro ao enviar e-mail.',
+                'error_id' => $errorId,
             ];
         }
     }
@@ -517,16 +521,20 @@ class EmailConfigurationService
                     ];
             }
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             $this->logMail('error', 'Erro ao enviar e-mail HTML', [
+                'error_id' => $errorId,
                 'identifier' => $identifier,
                 'to' => $toEmail,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return [
                 'success' => false,
-                'message' => 'Erro ao enviar e-mail: '.$e->getMessage(),
+                'message' => 'Erro ao enviar e-mail.',
+                'error_id' => $errorId,
             ];
         }
     }

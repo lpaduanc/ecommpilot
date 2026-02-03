@@ -24,6 +24,7 @@ class SafeMigrateCommand extends Command
                 'user' => get_current_user(),
                 'ip' => request()?->ip() ?? 'CLI',
             ]);
+
             return Command::FAILURE;
         }
 
@@ -43,8 +44,9 @@ class SafeMigrateCommand extends Command
             $this->showDataCounts();
 
             // Require explicit confirmation
-            if (!$this->confirm('Are you ABSOLUTELY SURE you want to delete all data?', false)) {
+            if (! $this->confirm('Are you ABSOLUTELY SURE you want to delete all data?', false)) {
                 $this->info('Operation cancelled.');
+
                 return Command::SUCCESS;
             }
 
@@ -52,6 +54,7 @@ class SafeMigrateCommand extends Command
             $confirmation = $this->ask('Type "DELETE ALL DATA" to confirm');
             if ($confirmation !== 'DELETE ALL DATA') {
                 $this->info('Operation cancelled - confirmation text did not match.');
+
                 return Command::SUCCESS;
             }
 
@@ -118,11 +121,11 @@ class SafeMigrateCommand extends Command
     private function createBackup(): ?string
     {
         try {
-            $filename = 'backup_' . date('Y-m-d_H-i-s') . '.sql';
-            $path = storage_path('backups/' . $filename);
+            $filename = 'backup_'.date('Y-m-d_H-i-s').'.sql';
+            $path = storage_path('backups/'.$filename);
 
             // Create backups directory if not exists
-            if (!is_dir(storage_path('backups'))) {
+            if (! is_dir(storage_path('backups'))) {
                 mkdir(storage_path('backups'), 0755, true);
             }
 

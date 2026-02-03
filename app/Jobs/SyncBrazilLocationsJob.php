@@ -57,9 +57,14 @@ class SyncBrazilLocationsJob implements ShouldQueue
 
             Log::info('Brazil locations sync completed successfully');
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
+
             Log::error('Brazil locations sync failed', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             throw $e;

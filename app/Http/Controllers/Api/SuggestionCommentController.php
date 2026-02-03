@@ -47,12 +47,16 @@ class SuggestionCommentController extends Controller
 
             return $this->successResponse(['comments' => $comments]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error fetching suggestion comments', [
+                'error_id' => $errorId,
                 'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao buscar comentários.', 500);
+            return $this->errorResponse('Erro ao buscar comentários.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -114,12 +118,16 @@ class SuggestionCommentController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Dados inválidos.', 422, ['errors' => $e->errors()]);
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error creating suggestion comment', [
+                'error_id' => $errorId,
                 'suggestion_id' => $suggestion->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao criar comentário.', 500);
+            return $this->errorResponse('Erro ao criar comentário.', 500, ['error_id' => $errorId]);
         }
     }
 
@@ -155,12 +163,16 @@ class SuggestionCommentController extends Controller
 
             return $this->successResponse(null, 'Comentário removido com sucesso.');
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Error deleting suggestion comment', [
+                'error_id' => $errorId,
                 'comment_id' => $comment->id,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
-            return $this->errorResponse('Erro ao remover comentário.', 500);
+            return $this->errorResponse('Erro ao remover comentário.', 500, ['error_id' => $errorId]);
         }
     }
 }

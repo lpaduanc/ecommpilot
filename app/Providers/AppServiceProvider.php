@@ -101,7 +101,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             foreach (self::ALWAYS_BLOCKED_COMMANDS as $blocked) {
-                if ($command === $blocked || str_starts_with($command, $blocked . ' ')) {
+                if ($command === $blocked || str_starts_with($command, $blocked.' ')) {
                     // Log the blocked attempt
                     Log::channel('daily')->emergency('🚨 BLOCKED DANGEROUS COMMAND - USE migrate:safe INSTEAD', [
                         'command' => $command,
@@ -112,23 +112,23 @@ class AppServiceProvider extends ServiceProvider
                         'cwd' => getcwd(),
                         'php_sapi' => PHP_SAPI,
                         'backtrace' => collect(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 15))
-                            ->map(fn ($trace) => ($trace['file'] ?? 'unknown') . ':' . ($trace['line'] ?? '?'))
+                            ->map(fn ($trace) => ($trace['file'] ?? 'unknown').':'.($trace['line'] ?? '?'))
                             ->toArray(),
                     ]);
 
                     // ALWAYS block - no exceptions
                     throw new \RuntimeException(
-                        "\n\n" .
-                        "╔════════════════════════════════════════════════════════════════════╗\n" .
-                        "║  🚨 BLOQUEADO: O comando '{$command}' está DESABILITADO!         ║\n" .
-                        "╠════════════════════════════════════════════════════════════════════╣\n" .
-                        "║  Este comando DESTRUIRIA todos os dados do banco de dados.        ║\n" .
-                        "║                                                                    ║\n" .
-                        "║  Se você REALMENTE precisa resetar o banco, use:                  ║\n" .
-                        "║                                                                    ║\n" .
-                        "║    php artisan migrate:safe --fresh --seed                        ║\n" .
-                        "║                                                                    ║\n" .
-                        "║  Este comando cria um backup antes e exige confirmação.           ║\n" .
+                        "\n\n".
+                        "╔════════════════════════════════════════════════════════════════════╗\n".
+                        "║  🚨 BLOQUEADO: O comando '{$command}' está DESABILITADO!         ║\n".
+                        "╠════════════════════════════════════════════════════════════════════╣\n".
+                        "║  Este comando DESTRUIRIA todos os dados do banco de dados.        ║\n".
+                        "║                                                                    ║\n".
+                        "║  Se você REALMENTE precisa resetar o banco, use:                  ║\n".
+                        "║                                                                    ║\n".
+                        "║    php artisan migrate:safe --fresh --seed                        ║\n".
+                        "║                                                                    ║\n".
+                        "║  Este comando cria um backup antes e exige confirmação.           ║\n".
                         "╚════════════════════════════════════════════════════════════════════╝\n\n"
                     );
                 }
@@ -136,7 +136,7 @@ class AppServiceProvider extends ServiceProvider
 
             // Log other dangerous commands (but don't block in local)
             foreach (self::DANGEROUS_COMMANDS as $dangerous) {
-                if ($command === $dangerous || str_starts_with($command, $dangerous . ' ')) {
+                if ($command === $dangerous || str_starts_with($command, $dangerous.' ')) {
                     // Log with CRITICAL level
                     Log::channel('daily')->critical('⚠️ DANGEROUS COMMAND EXECUTED', [
                         'command' => $command,
@@ -147,7 +147,7 @@ class AppServiceProvider extends ServiceProvider
                         'cwd' => getcwd(),
                         'php_sapi' => PHP_SAPI,
                         'backtrace' => collect(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 15))
-                            ->map(fn ($trace) => ($trace['file'] ?? 'unknown') . ':' . ($trace['line'] ?? '?'))
+                            ->map(fn ($trace) => ($trace['file'] ?? 'unknown').':'.($trace['line'] ?? '?'))
                             ->toArray(),
                     ]);
 

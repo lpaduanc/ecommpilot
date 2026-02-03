@@ -273,13 +273,18 @@ class AdminIntegrationsController extends Controller
             ], 400);
 
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('SerpAPI test failed', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro ao testar conexão: '.$e->getMessage(),
+                'message' => 'Erro ao testar conexão.',
+                'error_id' => $errorId,
             ], 500);
         }
     }
@@ -377,13 +382,18 @@ class AdminIntegrationsController extends Controller
             ], 400);
 
         } catch (\Exception $e) {
+            $errorId = 'err_'.uniqid();
             Log::error('Decodo test failed', [
+                'error_id' => $errorId,
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erro ao testar conexão: '.$e->getMessage(),
+                'message' => 'Erro ao testar conexão.',
+                'error_id' => $errorId,
             ], 500);
         }
     }

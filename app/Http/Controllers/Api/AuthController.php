@@ -182,6 +182,23 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Logout de todos os dispositivos do usuário.
+     */
+    public function logoutAll(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Delete all tokens for the user
+        $user->tokens()->delete();
+
+        ActivityLog::log('user.logout_all', $user);
+
+        return response()->json([
+            'message' => 'Logout realizado em todos os dispositivos.',
+        ]);
+    }
+
     public function getNotificationSettings(Request $request): JsonResponse
     {
         $user = $request->user();
