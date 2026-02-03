@@ -2,6 +2,7 @@
 import { ref, computed, onBeforeUnmount } from 'vue';
 import { useIntegration } from '../composables/useIntegration';
 import { useAuthStore } from '../stores/authStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { usePreviewMode } from '../composables/usePreviewMode';
 import BaseCard from '../components/common/BaseCard.vue';
 import BaseButton from '../components/common/BaseButton.vue';
