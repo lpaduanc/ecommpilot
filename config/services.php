@@ -23,8 +23,8 @@ return [
     ],
 
     'mailjet' => [
-        'key' => env('MAILJET_API_KEY'),
-        'secret' => env('MAILJET_SECRET_KEY'),
+        'key' => env('MAILJET_APIKEY'),
+        'secret' => env('MAILJET_APISECRET'),
     ],
 
     'slack' => [

@@ -102,6 +102,8 @@ Analisar os dados da loja e produzir um diagnóstico estruturado com:
 {$inventory}
 ```
 
+**IMPORTANTE:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis (identificados por termos como "brinde", "grátis", "amostra", "gift", etc.). Esses produtos não devem ser considerados em alertas de estoque baixo ou zerado.
+
 ### Cupons
 ```json
 {$coupons}

@@ -175,56 +175,6 @@ services:
     profiles:
       - frontend
 
-  # ==========================================================================
-  # Laravel Horizon (Queue Monitor)
-  # ==========================================================================
-  horizon:
-    build:
-      context: ./docker/php
-      dockerfile: Dockerfile
-      args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
-    container_name: ecommpilot-horizon
-    restart: unless-stopped
-    working_dir: /var/www/html
-    volumes:
-      - .:/var/www/html:cached
-      - vendor-data:/var/www/html/vendor
-      - ./docker/scripts/horizon-entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
-    entrypoint: ["/usr/local/bin/entrypoint.sh"]
-    environment:
-      - APP_ENV=${APP_ENV:-local}
-      - APP_DEBUG=${APP_DEBUG:-true}
-      - APP_KEY=${APP_KEY:-}
-      - DB_CONNECTION=pgsql
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-laravel}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-root}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
-      - REDIS_CLIENT=predis
-      - REDIS_DB=0
-      - REDIS_CACHE_DB=1
-      - REDIS_QUEUE_DB=2
-      - QUEUE_CONNECTION=redis
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-    depends_on:
-      app:
-        condition: service_started
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - ecommpilot-network
-
 # ==========================================================================
 # Networks
 # ==========================================================================

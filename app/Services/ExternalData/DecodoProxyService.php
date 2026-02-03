@@ -121,9 +121,9 @@ class DecodoProxyService
                 $payload['markdown'] = true;
             }
 
-            // Add JS rendering if enabled
+            // Add JS rendering if enabled (headless must be 'html' or 'png')
             if ($options['js_rendering'] ?? $this->getJsRendering()) {
-                $payload['headless'] = 'true'; // JS rendering requires headless: true
+                $payload['headless'] = 'html';
             }
 
             Log::channel($this->logChannel)->debug('DecodoProxyService: Starting scrape request', [

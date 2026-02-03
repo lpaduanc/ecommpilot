@@ -67,6 +67,8 @@ return [
 
         'mailjet' => [
             'transport' => 'mailjet',
+            'key' => env('MAILJET_APIKEY'),
+            'secret' => env('MAILJET_APISECRET'),
         ],
 
         'sendmail' => [

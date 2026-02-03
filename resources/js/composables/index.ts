@@ -18,3 +18,4 @@ export { useValidation } from './useValidation';
 export { useScroll } from './useScroll';
 export { useSanitize, useSanitizeArray } from './useSanitize';
 export { useLoadingState } from './useLoadingState';
+export { usePreviewMode } from './usePreviewMode';

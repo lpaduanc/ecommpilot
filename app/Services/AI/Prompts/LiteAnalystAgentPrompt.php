@@ -30,6 +30,8 @@ Analisar dados e retornar métricas + anomalias de forma concisa.
 {$storeData}
 ```
 
+**IMPORTANTE:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis. O campo `gifts_filtered` indica quantos produtos foram excluídos. Não considere brindes em alertas de estoque.
+
 ---
 
 ## EXEMPLO DE SAÍDA

@@ -33,6 +33,7 @@ const niches = ref([]);
 const form = reactive({
     niche: '',
     niche_subcategory: '',
+    website_url: '',
     monthly_goal: null,
     annual_goal: null,
     target_ticket: null,
@@ -44,6 +45,7 @@ const form = reactive({
 const errors = reactive({
     niche: '',
     niche_subcategory: '',
+    website_url: '',
     monthly_goal: '',
     annual_goal: '',
     target_ticket: '',
@@ -102,6 +104,7 @@ async function loadConfig() {
 
         form.niche = data.niche || '';
         form.niche_subcategory = data.niche_subcategory || '';
+        form.website_url = data.website_url || '';
         form.monthly_goal = data.monthly_goal;
         form.annual_goal = data.annual_goal;
         form.target_ticket = data.target_ticket;
@@ -289,6 +292,33 @@ onMounted(async () => {
                                     Selecione um nicho primeiro
                                 </p>
                             </div>
+                        </div>
+                    </BaseCard>
+
+                    <!-- Website URL Section -->
+                    <BaseCard padding="lg">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                                <GlobeAltIcon class="w-4 h-4 text-white" />
+                            </div>
+                            Site da Loja
+                        </h2>
+                        <p class="text-gray-500 dark:text-gray-400 mb-6">
+                            Informe o endereço do site real/customizado da sua loja. Este campo é diferente do domínio da Nuvemshop.
+                        </p>
+
+                        <div class="max-w-md">
+                            <BaseInput
+                                v-model="form.website_url"
+                                type="url"
+                                label="Site da Loja"
+                                placeholder="https://www.minhaloja.com.br"
+                                :error="errors.website_url"
+                                :disabled="!canEdit"
+                            />
+                            <p class="text-sm text-gray-400 mt-2">
+                                Este é o site onde seus clientes fazem compras (diferente do domínio Nuvemshop)
+                            </p>
                         </div>
                     </BaseCard>
 

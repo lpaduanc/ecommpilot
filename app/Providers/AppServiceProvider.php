@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Mail\Transport\MailjetTransport;
+use App\Notifications\Channels\DatabaseEmailChannel;
 use App\Services\AI\AIManager;
 use App\Services\ExternalData\CompetitorAnalysisService;
 use App\Services\ExternalData\DecodoProxyService;
@@ -10,9 +11,11 @@ use App\Services\ExternalData\ExternalDataAggregator;
 use App\Services\ExternalData\GoogleTrendsService;
 use App\Services\ExternalData\MarketDataService;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -69,6 +72,13 @@ class AppServiceProvider extends ServiceProvider
                 config('services.mailjet.key', ''),
                 config('services.mailjet.secret', '')
             );
+        });
+
+        // Register custom notification channel for admin-configured email
+        Notification::resolved(function (ChannelManager $service) {
+            $service->extend('database-email', function ($app) {
+                return new DatabaseEmailChannel;
+            });
         });
 
         // SECURITY: Log all dangerous artisan commands

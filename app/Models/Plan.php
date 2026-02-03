@@ -23,6 +23,7 @@ class Plan extends Model
         'analysis_history_limit',
         'data_retention_months',
         'has_ai_analysis',
+        'has_auto_analysis',
         'has_ai_chat',
         'has_suggestion_discussion',
         'has_suggestion_history',
@@ -47,6 +48,7 @@ class Plan extends Model
             'price' => 'decimal:2',
             'is_active' => 'boolean',
             'has_ai_analysis' => 'boolean',
+            'has_auto_analysis' => 'boolean',
             'has_ai_chat' => 'boolean',
             'has_suggestion_discussion' => 'boolean',
             'has_suggestion_history' => 'boolean',
@@ -55,14 +57,6 @@ class Plan extends Model
             'has_impact_dashboard' => 'boolean',
             'features' => 'array',
         ];
-    }
-
-    /**
-     * Use slug as route key for security (avoid exposing numeric IDs).
-     */
-    public function getRouteKeyName(): string
-    {
-        return 'slug';
     }
 
     public function subscriptions(): HasMany

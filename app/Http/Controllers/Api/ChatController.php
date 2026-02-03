@@ -139,15 +139,16 @@ class ChatController extends Controller
 
         // Get or create conversation (only if persisting)
         $conversation = null;
+        $suggestion = null;
         if ($shouldPersist) {
             // Determina o suggestion_id baseado no contexto
-            $suggestionId = null;
+            $suggestionDbId = null;
             if ($isSuggestionContext && isset($context['suggestion']['id'])) {
-                $suggestionId = $context['suggestion']['id'];
+                $suggestionUuid = $context['suggestion']['id'];
 
                 // Validar que a sugestão pertence à loja ativa do usuário (evita IDOR)
                 if ($store) {
-                    $suggestion = Suggestion::where('id', $suggestionId)
+                    $suggestion = Suggestion::where('uuid', $suggestionUuid)
                         ->where('store_id', $store->id)
                         ->first();
 
@@ -156,6 +157,9 @@ class ChatController extends Controller
                             'message' => 'Sugestão não encontrada.',
                         ], 404);
                     }
+
+                    // Use the actual database ID for foreign key
+                    $suggestionDbId = $suggestion->id;
                 }
             }
 
@@ -166,8 +170,8 @@ class ChatController extends Controller
             ];
 
             // Adiciona suggestion_id ao where se for chat de sugestão
-            if ($suggestionId !== null) {
-                $conversationWhere['suggestion_id'] = $suggestionId;
+            if ($suggestionDbId !== null) {
+                $conversationWhere['suggestion_id'] = $suggestionDbId;
             } else {
                 // Para chat geral, garante que não há suggestion_id
                 $conversation = ChatConversation::where($conversationWhere)
@@ -185,9 +189,9 @@ class ChatController extends Controller
             }
 
             // Para chat de sugestão, usa firstOrCreate normalmente
-            if ($suggestionId !== null && ! $conversation) {
+            if ($suggestionDbId !== null && ! $conversation) {
                 $conversation = ChatConversation::firstOrCreate(
-                    $conversationWhere + ['suggestion_id' => $suggestionId],
+                    $conversationWhere,
                     [
                         'store_id' => $store?->id,
                     ]

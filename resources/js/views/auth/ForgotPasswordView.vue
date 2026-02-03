@@ -33,9 +33,16 @@ async function handleSubmit() {
     
     if (result.success) {
         emailSent.value = true;
-        notificationStore.success('E-mail enviado com sucesso!');
     } else {
-        notificationStore.error(result.message);
+        // Mostrar erro genérico para não revelar se e-mail existe
+        if (result.error.status === 422) {
+            // Erros de validação
+            if (result.error.errors?.email) {
+                errors.email = result.error.errors.email[0];
+            }
+        } else {
+            notificationStore.error(result.error.message || 'Erro ao enviar e-mail de recuperação');
+        }
     }
 }
 
@@ -89,7 +96,7 @@ function resetForm() {
                         E-mail Enviado!
                     </h2>
                     <p class="text-gray-500 mb-6">
-                        Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.
+                        Se o e-mail informado estiver cadastrado, você receberá as instruções para redefinir sua senha. Verifique também a caixa de spam.
                     </p>
                     <div class="space-y-3">
                         <BaseButton

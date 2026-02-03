@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             // Core seeders (required)
             PermissionSeeder::class,
             AdminSeeder::class,
+            EmailConfigurationSeeder::class,
 
             // Demo data seeders
             UserSeeder::class,

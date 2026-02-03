@@ -90,7 +90,9 @@ class LiteStoreAnalysisService
         $paidOrders = $orders->filter(fn ($o) => $o->isPaid());
 
         // Products (top 20 best sellers + basic counts)
+        $allProductsCount = $store->products()->count();
         $products = $store->products()->excludeGifts()->get();
+        $giftsFiltered = $allProductsCount - $products->count();
         $bestSellers = $this->getBestSellers($paidOrders, 20);
 
         // Compact coupon summary (no detailed list)
@@ -121,6 +123,7 @@ class LiteStoreAnalysisService
                 'out_of_stock' => $products->filter(fn ($p) => $p->isOutOfStock())->count(),
                 'low_stock' => $products->filter(fn ($p) => $p->hasLowStock())->count(),
                 'best_sellers_count' => count($bestSellers),
+                'gifts_filtered' => $giftsFiltered,
             ],
             'coupons' => [
                 'usage_rate' => $usageRate,

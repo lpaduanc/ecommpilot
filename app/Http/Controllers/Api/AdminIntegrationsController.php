@@ -35,6 +35,7 @@ class AdminIntegrationsController extends Controller
                 'enabled' => SystemSetting::get('external_data.decodo.enabled', false),
                 'username' => $this->getMaskedApiKey('external_data.decodo.username'),
                 'username_configured' => ! empty(SystemSetting::get('external_data.decodo.username')),
+                'password' => $this->getMaskedApiKey('external_data.decodo.password'),
                 'password_configured' => ! empty(SystemSetting::get('external_data.decodo.password')),
                 'headless' => SystemSetting::get('external_data.decodo.headless', 'html'),
                 'js_rendering' => SystemSetting::get('external_data.decodo.js_rendering', false),

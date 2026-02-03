@@ -1,7 +1,7 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import BaseButton from './BaseButton.vue';
-import { LockClosedIcon } from '@heroicons/vue/24/outline';
+import { LockClosedIcon, EyeIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     title: {
@@ -18,14 +18,16 @@ const props = defineProps({
     }
 });
 
+const emit = defineEmits(['enable-preview']);
+
 const router = useRouter();
 
 function goToUpgrade() {
     router.push('/settings#plans');
 }
 
-function goBack() {
-    router.push('/');
+function handleEnablePreview() {
+    emit('enable-preview', props.featureName);
 }
 </script>
 
@@ -53,9 +55,10 @@ function goBack() {
                 <BaseButton
                     variant="secondary"
                     size="lg"
-                    @click="goBack"
+                    @click="handleEnablePreview"
                 >
-                    Voltar ao início
+                    <EyeIcon class="w-5 h-5" />
+                    Ver funcionalidade
                 </BaseButton>
             </div>
         </div>

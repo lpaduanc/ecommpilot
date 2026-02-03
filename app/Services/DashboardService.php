@@ -209,6 +209,7 @@ class DashboardService
     public function getLowStockProducts(Store $store, int $threshold = 10): array
     {
         return $store->products()
+            ->excludeGifts()  // Exclude gifts/brindes
             ->where('is_active', true)  // Explicitly filter active products only
             ->where('stock_quantity', '<=', $threshold)
             ->where('stock_quantity', '>=', 0)  // Exclude negative stock

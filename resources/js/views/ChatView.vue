@@ -1,20 +1,33 @@
 <script setup>
-import { onMounted, onBeforeUnmount, computed } from 'vue';
+import { onMounted, onBeforeUnmount, computed, ref } from 'vue';
 import { useChatStore } from '../stores/chatStore';
 import { useAuthStore } from '../stores/authStore';
+import { usePreviewMode } from '../composables/usePreviewMode';
 import ChatContainer from '../components/chat/ChatContainer.vue';
 import UpgradeBanner from '../components/common/UpgradeBanner.vue';
+import PreviewModeBanner from '../components/common/PreviewModeBanner.vue';
 import { ExclamationTriangleIcon, SparklesIcon } from '@heroicons/vue/24/outline';
+import { mockChatMessages } from '../mocks/previewMocks';
 
 const chatStore = useChatStore();
 const authStore = useAuthStore();
+const { isInPreviewMode, enablePreviewMode, disablePreviewMode } = usePreviewMode();
 
 // Verifica acesso pelo plano (authStore) ou se backend retornou 403 (chatStore)
 const upgradeRequired = computed(() => !authStore.canAccessAiChat || chatStore.upgradeRequired);
 
+// Determina se deve mostrar o conteúdo (tem acesso OU está em preview mode)
+const showContent = computed(() => !upgradeRequired.value || isInPreviewMode.value);
+
+// Usa dados mockados quando em preview mode E não tem acesso
+const shouldUseMocks = computed(() => isInPreviewMode.value && upgradeRequired.value);
+
 onMounted(() => {
-    // Só inicializa o chat se tiver acesso
-    if (authStore.canAccessAiChat) {
+    if (shouldUseMocks.value) {
+        // Em preview mode, carrega mensagens mockadas
+        chatStore.messages = [...mockChatMessages];
+    } else if (authStore.canAccessAiChat) {
+        // Com acesso real, inicializa normalmente
         chatStore.resetLocalState();
         chatStore.addWelcomeMessage();
     }
@@ -22,23 +35,40 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     // Limpa o chat ao sair da página (backend e frontend)
-    if (authStore.canAccessAiChat) {
+    if (authStore.canAccessAiChat && !shouldUseMocks.value) {
         chatStore.resetAndClearBackend();
+    }
+    // Desabilita preview mode ao sair
+    if (isInPreviewMode.value) {
+        disablePreviewMode();
     }
 });
 </script>
 
 <template>
     <div class="space-y-6">
-        <!-- Banner de Upgrade - Plano não inclui Assistente IA -->
-        <UpgradeBanner
-            v-if="upgradeRequired"
-            title="Recurso não disponível no seu plano"
-            description="Seu plano atual não inclui acesso ao Assistente IA. Faça upgrade para desbloquear conversas ilimitadas com nossa IA especializada em e-commerce."
+        <!-- Banner de Preview Mode - Aparece quando está visualizando sem acesso -->
+        <PreviewModeBanner
+            v-if="isInPreviewMode && upgradeRequired"
+            feature-name="Assistente IA"
+            @close="disablePreviewMode"
         />
 
-        <!-- Conteúdo normal - só mostra se tiver acesso -->
-        <div v-else class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8">
+        <!-- Banner de Upgrade - Plano não inclui Assistente IA -->
+        <UpgradeBanner
+            v-if="upgradeRequired && !isInPreviewMode"
+            title="Recurso não disponível no seu plano"
+            description="Seu plano atual não inclui acesso ao Assistente IA. Faça upgrade para desbloquear conversas ilimitadas com nossa IA especializada em e-commerce."
+            feature-name="Assistente IA"
+            @enable-preview="enablePreviewMode('Assistente IA')"
+        />
+
+        <!-- Conteúdo - mostra se tiver acesso OU estiver em preview mode -->
+        <div
+            v-if="showContent"
+            class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8"
+            :class="shouldUseMocks ? 'preview-mode-disabled' : ''"
+        >
             <!-- Hero Header with Gradient -->
             <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
                 <!-- Background Elements -->
@@ -100,3 +130,25 @@ onBeforeUnmount(() => {
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Preview Mode - Disabled State */
+.preview-mode-disabled {
+    pointer-events: none;
+    user-select: none;
+}
+
+.preview-mode-disabled * {
+    opacity: 0.9;
+    cursor: not-allowed !important;
+}
+
+.preview-mode-disabled button,
+.preview-mode-disabled a,
+.preview-mode-disabled input,
+.preview-mode-disabled textarea,
+.preview-mode-disabled select {
+    pointer-events: none !important;
+    filter: grayscale(0.2);
+}
+</style>

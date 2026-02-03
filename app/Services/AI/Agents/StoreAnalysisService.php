@@ -1110,8 +1110,14 @@ class StoreAnalysisService
         $paidOrders = $orders->filter(fn ($o) => $o->isPaid());
 
         // Products (excluding gifts/brindes)
+        $allProductsCount = $store->products()->count();
         $products = $store->products()->excludeGifts()->get();
+        $giftsFiltered = $allProductsCount - $products->count();
         $activeProducts = $products->filter(fn ($p) => $p->is_active && ! $p->isGift());
+
+        if ($giftsFiltered > 0) {
+            Log::channel($this->logChannel)->info(">>> {$giftsFiltered} produto(s) brinde foram excluídos da análise");
+        }
 
         return [
             'orders' => [
@@ -1131,6 +1137,7 @@ class StoreAnalysisService
                 'out_of_stock' => $products->filter(fn ($p) => $p->isOutOfStock())->count(),
                 'best_sellers' => $this->getBestSellers($store, $paidOrders),
                 'no_sales_period' => $this->getNoSalesProducts($store, $periodDays),
+                'gifts_filtered' => $giftsFiltered,
             ],
             'inventory' => [
                 'total_value' => $products->sum(fn ($p) => ($p->stock_quantity ?? 0) * ($p->cost ?? 0)),

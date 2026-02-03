@@ -1,10 +1,12 @@
 <script setup>
-import { onMounted, computed } from 'vue';
+import { onMounted, onBeforeUnmount, computed } from 'vue';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { useAuthStore } from '../stores/authStore';
+import { usePreviewMode } from '../composables/usePreviewMode';
 import BaseCard from '../components/common/BaseCard.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import UpgradeBanner from '../components/common/UpgradeBanner.vue';
+import PreviewModeBanner from '../components/common/PreviewModeBanner.vue';
 import StatCard from '../components/dashboard/StatCard.vue';
 import RevenueChart from '../components/dashboard/RevenueChart.vue';
 import OrdersStatusChart from '../components/dashboard/OrdersStatusChart.vue';
@@ -22,16 +24,35 @@ import {
     ArrowTrendingUpIcon,
     SparklesIcon,
 } from '@heroicons/vue/24/outline';
+import {
+    mockDashboardStats,
+    mockRevenueChart,
+    mockOrdersStatusChart,
+    mockTopProducts,
+    mockLowStockProducts,
+} from '../mocks/previewMocks';
 
 const dashboardStore = useDashboardStore();
 const authStore = useAuthStore();
-
-const stats = computed(() => dashboardStore.stats);
-const isLoading = computed(() => dashboardStore.isLoading);
-const hasStore = computed(() => dashboardStore.hasStore);
+const { isInPreviewMode, enablePreviewMode, disablePreviewMode } = usePreviewMode();
 
 // Verifica acesso pelo plano (authStore) ou se backend retornou 403 (dashboardStore)
 const upgradeRequired = computed(() => !authStore.canAccessCustomDashboards || dashboardStore.upgradeRequired);
+
+// Determina se deve mostrar o conteúdo (tem acesso OU está em preview mode)
+const showContent = computed(() => !upgradeRequired.value || isInPreviewMode.value);
+
+// Usa dados mockados quando em preview mode E não tem dados reais
+const shouldUseMocks = computed(() => isInPreviewMode.value && upgradeRequired.value);
+
+const stats = computed(() => shouldUseMocks.value ? mockDashboardStats : dashboardStore.stats);
+const isLoading = computed(() => shouldUseMocks.value ? false : dashboardStore.isLoading);
+const hasStore = computed(() => shouldUseMocks.value ? true : dashboardStore.hasStore);
+
+const revenueChartData = computed(() => shouldUseMocks.value ? mockRevenueChart : dashboardStore.revenueChart);
+const ordersStatusChartData = computed(() => shouldUseMocks.value ? mockOrdersStatusChart : dashboardStore.ordersStatusChart);
+const topProductsData = computed(() => shouldUseMocks.value ? mockTopProducts : dashboardStore.topProducts);
+const lowStockProductsData = computed(() => shouldUseMocks.value ? mockLowStockProducts : dashboardStore.lowStockProducts);
 
 // Verifica se o período selecionado é de apenas 1 dia
 const isSingleDayPeriod = computed(() => {
@@ -109,24 +130,44 @@ async function handleFiltersChange() {
 }
 
 onMounted(() => {
-    // Só busca dados se tiver acesso
+    // Só busca dados se tiver acesso (não em preview mode)
     if (authStore.canAccessCustomDashboards) {
         dashboardStore.fetchAllData();
+    }
+});
+
+onBeforeUnmount(() => {
+    // Desabilita preview mode ao sair
+    if (isInPreviewMode.value) {
+        disablePreviewMode();
     }
 });
 </script>
 
 <template>
     <div class="space-y-6">
-        <!-- Banner de Upgrade - Plano não inclui Dashboard -->
-        <UpgradeBanner
-            v-if="upgradeRequired"
-            title="Recurso não disponível no seu plano"
-            description="Seu plano atual não inclui acesso ao Dashboard. Faça upgrade para desbloquear análises detalhadas, gráficos em tempo real e insights poderosos sobre sua loja."
+        <!-- Banner de Preview Mode - Aparece quando está visualizando sem acesso -->
+        <PreviewModeBanner
+            v-if="isInPreviewMode && upgradeRequired"
+            feature-name="Dashboard Personalizado"
+            @close="disablePreviewMode"
         />
 
-        <!-- Conteúdo normal - só mostra se tiver acesso -->
-        <div v-else class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8">
+        <!-- Banner de Upgrade - Plano não inclui Dashboard -->
+        <UpgradeBanner
+            v-if="upgradeRequired && !isInPreviewMode"
+            title="Recurso não disponível no seu plano"
+            description="Seu plano atual não inclui acesso ao Dashboard. Faça upgrade para desbloquear análises detalhadas, gráficos em tempo real e insights poderosos sobre sua loja."
+            feature-name="Dashboard Personalizado"
+            @enable-preview="enablePreviewMode('Dashboard Personalizado')"
+        />
+
+        <!-- Conteúdo - mostra se tiver acesso OU estiver em preview mode -->
+        <div
+            v-if="showContent"
+            class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8"
+            :class="isInPreviewMode && upgradeRequired ? 'preview-mode-disabled' : ''"
+        >
             <!-- Hero Header with Gradient -->
         <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
             <!-- Background Elements -->
@@ -203,7 +244,7 @@ onMounted(() => {
                                 </div>
                                 Receita ao Longo do Tempo
                             </h3>
-                            <RevenueChart :data="dashboardStore.revenueChart" />
+                            <RevenueChart :data="revenueChartData" />
                         </BaseCard>
 
                         <!-- Gráfico de Pedidos - ocupa espaço completo quando período é de 1 dia -->
@@ -214,7 +255,7 @@ onMounted(() => {
                                 </div>
                                 Pedidos por Status
                             </h3>
-                            <OrdersStatusChart :data="dashboardStore.ordersStatusChart" />
+                            <OrdersStatusChart :data="ordersStatusChartData" />
                         </BaseCard>
                     </div>
 
@@ -227,7 +268,7 @@ onMounted(() => {
                                 </div>
                                 Produtos Mais Vendidos
                             </h3>
-                            <TopProductsChart :data="dashboardStore.topProducts" />
+                            <TopProductsChart :data="topProductsData" />
                         </BaseCard>
 
                         <BaseCard padding="normal">
@@ -237,7 +278,7 @@ onMounted(() => {
                                 </div>
                                 Alerta de Estoque
                             </h3>
-                            <LowStockAlert :products="dashboardStore.lowStockProducts" />
+                            <LowStockAlert :products="lowStockProductsData" />
                         </BaseCard>
                     </div>
                 </div>
@@ -246,3 +287,25 @@ onMounted(() => {
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Preview Mode - Disabled State */
+.preview-mode-disabled {
+    pointer-events: none;
+    user-select: none;
+}
+
+.preview-mode-disabled * {
+    opacity: 0.9;
+    cursor: not-allowed !important;
+}
+
+.preview-mode-disabled button,
+.preview-mode-disabled a,
+.preview-mode-disabled input,
+.preview-mode-disabled textarea,
+.preview-mode-disabled select {
+    pointer-events: none !important;
+    filter: grayscale(0.2);
+}
+</style>

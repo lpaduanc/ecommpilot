@@ -112,8 +112,36 @@ class SyncedProduct extends Model
 
     /**
      * Termos que identificam produtos brinde pelo nome.
+     * Lista expandida para capturar variações em português e inglês.
      */
-    private const GIFT_TERMS = ['brinde', 'gift', 'grátis', 'gratis', 'amostra', 'cortesia'];
+    private const GIFT_TERMS = [
+        'brinde',
+        'brindes',
+        'grátis',
+        'gratis',
+        'gratuito',
+        'gift',
+        'gifts',
+        'amostra',
+        'amostras',
+        'sample',
+        'samples',
+        'cortesia',
+        'mimo',
+        'mimos',
+        'bônus',
+        'bonus',
+        'free',
+        'promotional',
+        'promo',
+        'giveaway',
+        'presente grátis',
+        'kit brinde',
+        'miniatura',
+        'sachê',
+        'sachet',
+        'travel size',
+    ];
 
     /**
      * Verifica se o produto é um brinde baseado no nome.

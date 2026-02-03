@@ -28,6 +28,7 @@ import {
     LockClosedIcon,
     ClipboardDocumentListIcon,
     ArrowTrendingUpIcon,
+    SignalIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({

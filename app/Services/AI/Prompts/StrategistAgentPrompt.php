@@ -120,6 +120,8 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição: 3 HIGH, 3
 
 {{store_context}}
 
+**NOTA:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis. Não crie sugestões de reposição de estoque para produtos gratuitos.
+
 ---
 
 ## ANÁLISE DO ANALYST

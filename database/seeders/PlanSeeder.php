@@ -23,6 +23,7 @@ class PlanSeeder extends Seeder
                 'analysis_history_limit' => 4,
                 'data_retention_months' => 12,
                 'has_ai_analysis' => true,
+                'has_auto_analysis' => true,
                 'has_ai_chat' => false,
                 'has_suggestion_discussion' => false,
                 'has_suggestion_history' => false,
@@ -48,6 +49,7 @@ class PlanSeeder extends Seeder
                 'analysis_history_limit' => -1, // Ilimitado
                 'data_retention_months' => 48,
                 'has_ai_analysis' => true,
+                'has_auto_analysis' => true,
                 'has_ai_chat' => true,
                 'has_suggestion_discussion' => true,
                 'has_suggestion_history' => false,
@@ -73,6 +75,7 @@ class PlanSeeder extends Seeder
                 'analysis_history_limit' => -1, // Ilimitado
                 'data_retention_months' => -1, // Ilimitado
                 'has_ai_analysis' => true,
+                'has_auto_analysis' => true,
                 'has_ai_chat' => true,
                 'has_suggestion_discussion' => true,
                 'has_suggestion_history' => true,
@@ -90,7 +93,7 @@ class PlanSeeder extends Seeder
         ];
 
         foreach ($plans as $plan) {
-            Plan::firstOrCreate(
+            Plan::updateOrCreate(
                 ['slug' => $plan['slug']],
                 $plan
             );

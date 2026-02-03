@@ -37,11 +37,13 @@ class Store extends Model
         'external_store_id',
         'name',
         'domain',
+        'website_url',
         'email',
         'access_token',
         'refresh_token',
         'token_requires_reconnection',
         'sync_status',
+        'auto_analysis_enabled',
         'last_sync_at',
         'metadata',
         'niche',
@@ -66,6 +68,7 @@ class Store extends Model
             'uuid' => 'string',
             'platform' => Platform::class,
             'sync_status' => SyncStatus::class,
+            'auto_analysis_enabled' => 'boolean',
             'last_sync_at' => 'datetime',
             'metadata' => 'array',
             'access_token' => 'encrypted',
@@ -160,6 +163,41 @@ class Store extends Model
     public function requiresReconnection(): bool
     {
         return $this->token_requires_reconnection === true || $this->sync_status === SyncStatus::TokenExpired;
+    }
+
+    /**
+     * Check if the store is eligible for automatic analysis.
+     * Requires: user has active plan with auto_analysis + store has it enabled + sync completed.
+     */
+    public function isEligibleForAutoAnalysis(): bool
+    {
+        // Store must have auto-analysis enabled
+        if (! $this->auto_analysis_enabled) {
+            return false;
+        }
+
+        // Store must have completed sync (has data to analyze)
+        if ($this->sync_status !== SyncStatus::Completed) {
+            return false;
+        }
+
+        // Store must not require reconnection
+        if ($this->requiresReconnection()) {
+            return false;
+        }
+
+        // User must have active plan with auto-analysis benefit
+        $user = $this->user;
+        if (! $user) {
+            return false;
+        }
+
+        $plan = $user->currentPlan();
+        if (! $plan || ! $plan->has_auto_analysis || ! $plan->has_ai_analysis) {
+            return false;
+        }
+
+        return true;
     }
 
     public function getFormattedGoals(): array

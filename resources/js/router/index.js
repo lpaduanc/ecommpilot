@@ -40,6 +40,15 @@ const routes = [
         ),
         meta: { guest: true },
     },
+    {
+        path: '/change-password',
+        name: 'change-password',
+        component: () => import(
+            /* webpackChunkName: "auth-change-password" */
+            '../views/auth/ChangePasswordView.vue'
+        ),
+        meta: { requiresAuth: true, allowMustChangePassword: true },
+    },
 
     // Main App Routes - High priority routes with prefetch
     {
@@ -303,6 +312,7 @@ router.beforeEach(async (to, from, next) => {
     const requiresAuth = to.meta.requiresAuth;
     const isGuestOnly = to.meta.guest;
     const requiredPermission = to.meta.permission;
+    const allowMustChangePassword = to.meta.allowMustChangePassword;
 
     // Redirect to login if not authenticated
     if (requiresAuth && !isAuthenticated) {
@@ -312,6 +322,12 @@ router.beforeEach(async (to, from, next) => {
     // Redirect to dashboard if already authenticated
     if (isGuestOnly && isAuthenticated) {
         return next({ name: 'dashboard' });
+    }
+
+    // SECURITY: Force password change if required
+    // Only allow access to the change-password page when must_change_password is true
+    if (isAuthenticated && authStore.mustChangePassword && !allowMustChangePassword) {
+        return next({ name: 'change-password', query: { redirect: to.fullPath } });
     }
 
     // Check permission

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\SubscriptionStatus;
 use App\Enums\UserRole;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -205,5 +206,13 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isOnTrial(): bool
     {
         return $this->activeSubscription()?->isOnTrial() ?? false;
+    }
+
+    /**
+     * Send the password reset notification.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 }

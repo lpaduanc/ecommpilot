@@ -15,6 +15,9 @@ import {
     BellIcon,
     UsersIcon,
     BuildingStorefrontIcon,
+    SignalIcon,
+    CheckCircleIcon,
+    ChartBarIcon,
 } from '@heroicons/vue/24/outline';
 
 const router = useRouter();
@@ -27,6 +30,8 @@ const isLoadingPassword = ref(false);
 const isLoadingNotifications = ref(false);
 const isSavingNotifications = ref(false);
 const isLoadingStore = ref(false);
+const isLoadingTracking = ref(false);
+const isSavingTracking = ref(false);
 const storeInfo = ref(null);
 
 const profileForm = reactive({
@@ -60,11 +65,31 @@ const notificationSettings = reactive({
     system_updates: true,
 });
 
+const trackingForm = reactive({
+    ga: {
+        enabled: false,
+        measurement_id: '',
+    },
+    meta_pixel: {
+        enabled: false,
+        pixel_id: '',
+    },
+    clarity: {
+        enabled: false,
+        project_id: '',
+    },
+    hotjar: {
+        enabled: false,
+        site_id: '',
+    },
+});
+
 const tabs = [
     { id: 'profile', name: 'Perfil', icon: UserCircleIcon, gradient: 'from-blue-500 to-indigo-600' },
     { id: 'password', name: 'Senha', icon: LockClosedIcon, gradient: 'from-purple-500 to-pink-600' },
     { id: 'notifications', name: 'Notificações', icon: BellIcon, gradient: 'from-amber-500 to-orange-600' },
     { id: 'store', name: 'Informações da Loja', icon: BuildingStorefrontIcon, gradient: 'from-green-500 to-emerald-600' },
+    { id: 'tracking', name: 'Tracking & Analytics', icon: SignalIcon, gradient: 'from-cyan-500 to-blue-600' },
 ]
 
 const visibleTabs = computed(() => {
@@ -171,7 +196,7 @@ async function updatePassword() {
 
 async function saveNotificationSettings() {
     isSavingNotifications.value = true;
-    
+
     try {
         await api.put('/settings/notifications', notificationSettings);
         notificationStore.success('Preferências de notificação salvas!');
@@ -179,6 +204,35 @@ async function saveNotificationSettings() {
         notificationStore.error('Erro ao salvar preferências');
     } finally {
         isSavingNotifications.value = false;
+    }
+}
+
+async function loadTrackingSettings() {
+    isLoadingTracking.value = true;
+    try {
+        const response = await api.get('/settings/tracking/edit');
+        if (response.data?.data) {
+            Object.assign(trackingForm.ga, response.data.data.ga || {});
+            Object.assign(trackingForm.meta_pixel, response.data.data.meta_pixel || {});
+            Object.assign(trackingForm.clarity, response.data.data.clarity || {});
+            Object.assign(trackingForm.hotjar, response.data.data.hotjar || {});
+        }
+    } catch {
+        // Use defaults
+    } finally {
+        isLoadingTracking.value = false;
+    }
+}
+
+async function saveTrackingSettings() {
+    isSavingTracking.value = true;
+    try {
+        await api.put('/settings/tracking', trackingForm);
+        notificationStore.success('Configurações de tracking salvas com sucesso!');
+    } catch (error) {
+        notificationStore.error(error.response?.data?.message || 'Erro ao salvar configurações de tracking');
+    } finally {
+        isSavingTracking.value = false;
     }
 }
 
@@ -254,6 +308,7 @@ onMounted(() => {
     loadUserData();
     loadNotificationSettings();
     loadStoreInfo();
+    loadTrackingSettings();
 });
 </script>
 
@@ -617,6 +672,198 @@ onMounted(() => {
                                         </router-link>
                                     </div>
                                 </div>
+                            </div>
+                        </BaseCard>
+
+                        <!-- Tracking & Analytics Tab -->
+                        <BaseCard v-if="activeTab === 'tracking'" padding="lg">
+                            <div class="max-w-4xl">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                                        <SignalIcon class="w-4 h-4 text-white" />
+                                    </div>
+                                    Integrações de Tracking
+                                </h2>
+
+                                <!-- Loading State -->
+                                <div v-if="isLoadingTracking" class="flex items-center justify-center py-12">
+                                    <LoadingSpinner size="lg" />
+                                </div>
+
+                                <template v-else>
+                                    <!-- Info Banner -->
+                                    <div class="mb-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                                        <div class="flex items-start gap-3">
+                                            <ChartBarIcon class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                            <div>
+                                                <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                                                    Sobre as Integrações de Tracking
+                                                </h3>
+                                                <p class="text-sm text-blue-700 dark:text-blue-300">
+                                                    Configure os códigos de rastreamento das principais ferramentas de analytics e marketing.
+                                                    Os códigos serão automaticamente inseridos na sua loja quando habilitados.
+                                                    <strong class="block mt-2">Certifique-se de usar os IDs corretos para evitar perda de dados.</strong>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tracking Services Grid -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                        <!-- Google Analytics 4 -->
+                                        <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                            <div class="flex items-start justify-between mb-4">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Google Analytics 4</h3>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400">Métricas e conversão</p>
+                                                    </div>
+                                                </div>
+                                                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        v-model="trackingForm.ga.enabled"
+                                                        :disabled="!authStore.hasPermission('integrations.manage')"
+                                                        class="sr-only peer"
+                                                    />
+                                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                </label>
+                                            </div>
+                                            <div v-if="trackingForm.ga.enabled">
+                                                <BaseInput
+                                                    v-model="trackingForm.ga.measurement_id"
+                                                    label="Measurement ID"
+                                                    placeholder="G-XXXXXXXXXX"
+                                                    hint="Google Analytics > Administrador > Fluxo de dados"
+                                                    :disabled="!authStore.hasPermission('integrations.manage')"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <!-- Meta Pixel -->
+                                        <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                            <div class="flex items-start justify-between mb-4">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96C18.34 21.21 22 17.06 22 12.06C22 6.53 17.5 2.04 12 2.04Z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Meta Pixel</h3>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400">Facebook & Instagram Ads</p>
+                                                    </div>
+                                                </div>
+                                                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        v-model="trackingForm.meta_pixel.enabled"
+                                                        :disabled="!authStore.hasPermission('integrations.manage')"
+                                                        class="sr-only peer"
+                                                    />
+                                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                </label>
+                                            </div>
+                                            <div v-if="trackingForm.meta_pixel.enabled">
+                                                <BaseInput
+                                                    v-model="trackingForm.meta_pixel.pixel_id"
+                                                    label="Pixel ID"
+                                                    placeholder="123456789012345"
+                                                    hint="Meta Business Suite > Gerenciador de Eventos"
+                                                    :disabled="!authStore.hasPermission('integrations.manage')"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <!-- Microsoft Clarity -->
+                                        <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                            <div class="flex items-start justify-between mb-4">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M21.17 3.25H2.83c-.46 0-.83.37-.83.83v15.84c0 .46.37.83.83.83h18.34c.46 0 .83-.37.83-.83V4.08c0-.46-.37-.83-.83-.83zM12 18.25c-3.45 0-6.25-2.8-6.25-6.25S8.55 5.75 12 5.75s6.25 2.8 6.25 6.25-2.8 6.25-6.25 6.25z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Microsoft Clarity</h3>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400">Heatmaps e sessões (gratuito)</p>
+                                                    </div>
+                                                </div>
+                                                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        v-model="trackingForm.clarity.enabled"
+                                                        :disabled="!authStore.hasPermission('integrations.manage')"
+                                                        class="sr-only peer"
+                                                    />
+                                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                </label>
+                                            </div>
+                                            <div v-if="trackingForm.clarity.enabled">
+                                                <BaseInput
+                                                    v-model="trackingForm.clarity.project_id"
+                                                    label="Project ID"
+                                                    placeholder="abcdefghij"
+                                                    hint="clarity.microsoft.com > Configurações > Setup"
+                                                    :disabled="!authStore.hasPermission('integrations.manage')"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <!-- Hotjar -->
+                                        <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                            <div class="flex items-start justify-between mb-4">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Hotjar</h3>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400">Heatmaps e feedback</p>
+                                                    </div>
+                                                </div>
+                                                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        v-model="trackingForm.hotjar.enabled"
+                                                        :disabled="!authStore.hasPermission('integrations.manage')"
+                                                        class="sr-only peer"
+                                                    />
+                                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                </label>
+                                            </div>
+                                            <div v-if="trackingForm.hotjar.enabled">
+                                                <BaseInput
+                                                    v-model="trackingForm.hotjar.site_id"
+                                                    label="Site ID"
+                                                    placeholder="1234567"
+                                                    hint="insights.hotjar.com > Sites & Organizations"
+                                                    :disabled="!authStore.hasPermission('integrations.manage')"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Button -->
+                                    <BaseButton
+                                        v-if="authStore.hasPermission('integrations.manage')"
+                                        @click="saveTrackingSettings"
+                                        :loading="isSavingTracking"
+                                    >
+                                        <CheckCircleIcon class="w-5 h-5" />
+                                        Salvar Configurações de Tracking
+                                    </BaseButton>
+                                    <p v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
+                                        Você não possui permissão para editar as configurações de tracking.
+                                    </p>
+                                </template>
                             </div>
                         </BaseCard>
                     </div>

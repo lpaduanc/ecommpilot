@@ -14,6 +14,7 @@ class StoreResource extends JsonResource
             'platform' => $this->platform?->value,
             'name' => $this->name,
             'domain' => $this->domain,
+            'website_url' => $this->website_url,
             'email' => $this->email,
             'user_id' => $this->external_store_id,
             'sync_status' => $this->sync_status?->value,

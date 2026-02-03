@@ -98,8 +98,10 @@ class ProductAnalyticsService
         $cacheKey = "sales_metrics:{$store->id}:{$periodDays}";
 
         return Cache::remember($cacheKey, now()->addHours(1), function () use ($store, $periodDays) {
-            // Get all products for this store
-            $products = SyncedProduct::where('store_id', $store->id)->get(['id', 'external_id', 'name']);
+            // Get all products for this store (excluding gifts/brindes)
+            $products = SyncedProduct::where('store_id', $store->id)
+                ->excludeGifts()
+                ->get(['id', 'external_id', 'name']);
 
             if ($products->isEmpty()) {
                 return [];
@@ -339,8 +341,10 @@ class ProductAnalyticsService
      */
     private function calculateABCCategoriesForAllProducts(Store $store, int $periodDays): array
     {
-        // Get all products with sales data
-        $products = SyncedProduct::where('store_id', $store->id)->get();
+        // Get all products with sales data (excluding gifts/brindes)
+        $products = SyncedProduct::where('store_id', $store->id)
+            ->excludeGifts()
+            ->get();
 
         if ($products->isEmpty()) {
             return [];
@@ -402,7 +406,9 @@ class ProductAnalyticsService
      */
     private function calculateStockHealthForAllProducts(Store $store, int $periodDays): array
     {
-        $products = SyncedProduct::where('store_id', $store->id)->get(['id', 'stock_quantity']);
+        $products = SyncedProduct::where('store_id', $store->id)
+            ->excludeGifts()
+            ->get(['id', 'stock_quantity']);
 
         if ($products->isEmpty()) {
             return [];

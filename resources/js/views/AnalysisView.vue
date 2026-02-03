@@ -5,10 +5,12 @@ import { useAnalysisStore } from '../stores/analysisStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useIntegrationStore } from '../stores/integrationStore';
+import { usePreviewMode } from '../composables/usePreviewMode';
 import BaseButton from '../components/common/BaseButton.vue';
 import BaseModal from '../components/common/BaseModal.vue';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import UpgradeBanner from '../components/common/UpgradeBanner.vue';
+import PreviewModeBanner from '../components/common/PreviewModeBanner.vue';
 import SuggestionCard from '../components/analysis/SuggestionCard.vue';
 import SuggestionDetailModal from '../components/analysis/SuggestionDetailModal.vue';
 import OpportunityDetailModal from '../components/analysis/OpportunityDetailModal.vue';
@@ -28,17 +30,31 @@ import {
     ArrowLeftIcon,
     EnvelopeIcon,
 } from '@heroicons/vue/24/outline';
+import {
+    mockCurrentAnalysis,
+    mockAnalysisSummary,
+    mockSuggestions,
+    mockAnalysisAlerts,
+    mockOpportunities,
+} from '../mocks/previewMocks';
 
 const router = useRouter();
 const analysisStore = useAnalysisStore();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
 const integrationStore = useIntegrationStore();
+const { isInPreviewMode, enablePreviewMode, disablePreviewMode } = usePreviewMode();
 
 const isStoreSyncing = computed(() => integrationStore.isActiveStoreSyncing);
 
 // Verifica acesso pelo plano
 const canAccessAnalysis = computed(() => authStore.canAccessAiAnalysis);
+
+// Determina se deve mostrar o conteúdo (tem acesso OU está em preview mode)
+const showContent = computed(() => canAccessAnalysis.value || isInPreviewMode.value);
+
+// Usa dados mockados quando em preview mode E não tem acesso
+const shouldUseMocks = computed(() => isInPreviewMode.value && !canAccessAnalysis.value);
 
 const showRateLimitWarning = ref(false);
 const selectedSuggestion = ref(null);
@@ -60,17 +76,17 @@ const originalAnalysis = ref(null);
 const elapsedSeconds = ref(0);
 const elapsedInterval = ref(null);
 
-const isLoading = computed(() => analysisStore.isLoading);
-const isRequesting = computed(() => analysisStore.isRequesting);
-const currentAnalysis = computed(() => analysisStore.currentAnalysis);
-const hasAnalysisInProgress = computed(() => analysisStore.hasAnalysisInProgress);
-const pendingAnalysis = computed(() => analysisStore.pendingAnalysis);
-const suggestions = computed(() => analysisStore.suggestions);
-const summary = computed(() => analysisStore.summary);
-const alerts = computed(() => analysisStore.alerts);
-const opportunities = computed(() => analysisStore.opportunities);
-const canRequestAnalysis = computed(() => analysisStore.canRequestAnalysis);
-const timeUntilNext = computed(() => analysisStore.timeUntilNextAnalysis);
+const isLoading = computed(() => shouldUseMocks.value ? false : analysisStore.isLoading);
+const isRequesting = computed(() => shouldUseMocks.value ? false : analysisStore.isRequesting);
+const currentAnalysis = computed(() => shouldUseMocks.value ? mockCurrentAnalysis : analysisStore.currentAnalysis);
+const hasAnalysisInProgress = computed(() => shouldUseMocks.value ? false : analysisStore.hasAnalysisInProgress);
+const pendingAnalysis = computed(() => shouldUseMocks.value ? null : analysisStore.pendingAnalysis);
+const suggestions = computed(() => shouldUseMocks.value ? mockSuggestions : analysisStore.suggestions);
+const summary = computed(() => shouldUseMocks.value ? mockAnalysisSummary : analysisStore.summary);
+const alerts = computed(() => shouldUseMocks.value ? mockAnalysisAlerts : analysisStore.alerts);
+const opportunities = computed(() => shouldUseMocks.value ? mockOpportunities : analysisStore.opportunities);
+const canRequestAnalysis = computed(() => shouldUseMocks.value ? true : analysisStore.canRequestAnalysis);
+const timeUntilNext = computed(() => shouldUseMocks.value ? '00:00' : analysisStore.timeUntilNextAnalysis);
 
 const pendingAnalysisElapsed = computed(() => {
     if (!pendingAnalysis.value?.created_at) return null;
@@ -348,13 +364,16 @@ watch(showSuggestionDetail, (isOpen) => {
 });
 
 onMounted(() => {
-    analysisStore.fetchCurrentAnalysis();
-    analysisStore.fetchAnalysisHistory();
-    startCountdown();
+    // Só busca dados se tiver acesso (não em preview mode)
+    if (canAccessAnalysis.value) {
+        analysisStore.fetchCurrentAnalysis();
+        analysisStore.fetchAnalysisHistory();
+        startCountdown();
 
-    // Inicia timer se já houver análise em andamento
-    if (hasAnalysisInProgress.value) {
-        startElapsedTimer();
+        // Inicia timer se já houver análise em andamento
+        if (hasAnalysisInProgress.value) {
+            startElapsedTimer();
+        }
     }
 });
 
@@ -369,15 +388,24 @@ onUnmounted(() => {
 
 <template>
     <div class="space-y-6">
-        <!-- Banner de Upgrade - Plano não inclui Análises IA -->
-        <UpgradeBanner
-            v-if="!canAccessAnalysis"
-            title="Recurso não disponível no seu plano"
-            description="Seu plano atual não inclui acesso às Análises IA. Faça upgrade para desbloquear análises inteligentes da sua loja com sugestões personalizadas."
+        <!-- Banner de Preview Mode - Aparece quando está visualizando sem acesso -->
+        <PreviewModeBanner
+            v-if="isInPreviewMode && !canAccessAnalysis"
+            feature-name="Análises IA"
+            @close="disablePreviewMode"
         />
 
-        <!-- Conteúdo normal - só mostra se tiver acesso -->
-        <template v-else>
+        <!-- Banner de Upgrade - Plano não inclui Análises IA -->
+        <UpgradeBanner
+            v-if="!canAccessAnalysis && !isInPreviewMode"
+            title="Recurso não disponível no seu plano"
+            description="Seu plano atual não inclui acesso às Análises IA. Faça upgrade para desbloquear análises inteligentes da sua loja com sugestões personalizadas."
+            feature-name="Análises IA"
+            @enable-preview="enablePreviewMode('Análises IA')"
+        />
+
+        <!-- Conteúdo - mostra se tiver acesso OU estiver em preview mode -->
+        <template v-if="showContent">
 
         <!-- Banner de Análise com Erro (status = failed) -->
         <div
@@ -557,8 +585,11 @@ onUnmounted(() => {
                 <button
                     v-if="authStore.hasPermission('analysis.request')"
                     @click="handleRequestAnalysis"
-                    :disabled="isRequesting || isStoreSyncing || hasAnalysisInProgress"
-                    class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-primary-500 to-secondary-500 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isRequesting || isStoreSyncing || hasAnalysisInProgress || (isInPreviewMode && !canAccessAnalysis)"
+                    :class="[
+                        'flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-primary-500 to-secondary-500 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed',
+                        isInPreviewMode && !canAccessAnalysis ? 'pointer-events-none opacity-60' : ''
+                    ]"
                 >
                     <SparklesIcon v-if="!isRequesting" class="w-4 h-4" />
                     <LoadingSpinner v-else size="sm" class="text-white" />
@@ -657,7 +688,10 @@ onUnmounted(() => {
 
         <!-- Main Content -->
         <template v-else>
-            <div class="flex gap-6">
+            <div
+                class="flex gap-6"
+                :class="shouldUseMocks ? 'preview-mode-disabled' : ''"
+            >
                 <!-- Main Column -->
                 <div class="flex-1 min-w-0 space-y-6">
                     <!-- Health Score + Alerts Row -->
@@ -886,5 +920,25 @@ onUnmounted(() => {
 
 .animate-progress-indeterminate {
     animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+/* Preview Mode - Disabled State */
+.preview-mode-disabled {
+    pointer-events: none;
+    user-select: none;
+}
+
+.preview-mode-disabled * {
+    opacity: 0.9;
+    cursor: not-allowed !important;
+}
+
+.preview-mode-disabled button,
+.preview-mode-disabled a,
+.preview-mode-disabled input,
+.preview-mode-disabled textarea,
+.preview-mode-disabled select {
+    pointer-events: none !important;
+    filter: grayscale(0.2);
 }
 </style>

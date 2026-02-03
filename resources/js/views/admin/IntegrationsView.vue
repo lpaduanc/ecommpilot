@@ -84,8 +84,7 @@ async function loadSettings() {
         formData.decodo.enabled = data.decodo?.enabled ?? false;
         formData.decodo.username = data.decodo?.username || '';
         formData.decodo.username_configured = data.decodo?.username_configured ?? false;
-        // Show empty if password is configured (don't show bullets)
-        formData.decodo.password = '';
+        formData.decodo.password = data.decodo?.password || '';
         formData.decodo.password_configured = data.decodo?.password_configured ?? false;
         formData.decodo.headless = data.decodo?.headless ?? 'html';
         formData.decodo.js_rendering = data.decodo?.js_rendering ?? false;
