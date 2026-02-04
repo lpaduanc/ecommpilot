@@ -163,7 +163,17 @@ class DecodoProxyService
             }
 
             // Extract HTML content from response
-            $htmlContent = $responseData['content'] ?? $responseData['body'] ?? $responseData['html'] ?? null;
+            // Decodo API v2 returns content inside results array: {"results":[{"content":"..."}]}
+            $htmlContent = null;
+            if (isset($responseData['results'][0]['content'])) {
+                $htmlContent = $responseData['results'][0]['content'];
+            } elseif (isset($responseData['content'])) {
+                $htmlContent = $responseData['content'];
+            } elseif (isset($responseData['body'])) {
+                $htmlContent = $responseData['body'];
+            } elseif (isset($responseData['html'])) {
+                $htmlContent = $responseData['html'];
+            }
 
             if ($response->successful() && $htmlContent) {
                 Log::channel($this->logChannel)->info('DecodoProxyService: Request completed', [
