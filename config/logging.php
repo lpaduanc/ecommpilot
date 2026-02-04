@@ -76,7 +76,7 @@ return [
         'ai' => [
             'driver' => 'daily',
             'path' => storage_path('logs/ai.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => env('LOG_LEVEL_AI', 'info'),
             'days' => env('LOG_DAILY_DAYS', 30),
             'replace_placeholders' => true,
         ],
@@ -84,7 +84,7 @@ return [
         'embeddings' => [
             'driver' => 'daily',
             'path' => storage_path('logs/embeddings.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => env('LOG_LEVEL_EMBEDDINGS', 'info'),
             'days' => env('LOG_DAILY_DAYS', 30),
             'replace_placeholders' => true,
         ],
@@ -100,7 +100,7 @@ return [
         'analysis' => [
             'driver' => 'daily',
             'path' => storage_path('logs/analysis.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => env('LOG_LEVEL_ANALYSIS', 'info'),
             'days' => env('LOG_DAILY_DAYS', 30),
             'replace_placeholders' => true,
         ],
