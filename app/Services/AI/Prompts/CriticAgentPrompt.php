@@ -69,6 +69,30 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 
 ---
 
+## VALIDAÇÃO OBRIGATÓRIA: CITAÇÕES DE CONCORRENTES
+
+**REGRA CRÍTICA:** No mínimo **3 sugestões** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
+
+✅ **Dados específicos aceitos:**
+- Preços reais: "Hidratei oferece ticket médio de R$ 259"
+- Diferenciais únicos: "Noma Beauty usa quiz personalizado com 15 perguntas"
+- Promoções ativas: "Forever Liss oferece frete grátis acima de R$130"
+- Categorias em destaque: "Hidratei tem 168 kits no catálogo"
+
+❌ **NÃO ACEITO (genérico demais):**
+- "Concorrentes oferecem frete grátis"
+- "Outras lojas têm programa de fidelidade"
+- "O mercado está fazendo X"
+
+**Se menos de 3 sugestões citam concorrentes com dados específicos:**
+1. Identificar sugestões sem `competitor_reference`
+2. Adicionar dados de concorrentes disponíveis OU
+3. Criar sugestões substitutas que usem dados de concorrentes
+
+**Prioridade:** As 3 sugestões devem citar concorrentes DIFERENTES quando possível
+
+---
+
 ## CONTEXTO DA LOJA
 
 - **Nome:** {$storeName}
@@ -169,6 +193,45 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 
 ---
 
+### EXEMPLO 5 — MELHORAR (adicionar competitor_reference)
+
+**Sugestão recebida:**
+```json
+{
+  "title": "Aumentar ticket médio com kits",
+  "problem": "Ticket médio de R$ 85 está abaixo do potencial",
+  "expected_result": "Aumentar ticket médio em 15%",
+  "competitor_reference": null
+}
+```
+
+**Decisão:** MELHORAR
+**Motivo:** Sugestão HIGH sem referência a concorrente. Dados disponíveis mostram que Hidratei tem ticket médio de R$ 259 com foco em kits.
+**Correção:**
+```json
+{
+  "title": "Aumentar ticket médio com kits seguindo modelo Hidratei",
+  "problem": "Ticket médio de R$ 85 é 67% menor que Hidratei (R$ 259), que foca em kits (168 produtos)",
+  "expected_result": "Aumentar ticket médio de R$ 85 para R$ 110 (+29%) = +R$ 2.500/mês",
+  "competitor_reference": "Hidratei tem ticket médio de R$ 259 com 168 kits no catálogo"
+}
+```
+
+---
+
+### EXEMPLO 6 — VALIDAÇÃO DE CITAÇÕES (contagem)
+
+**Cenário:** Das 9 sugestões recebidas, apenas 2 têm competitor_reference preenchido.
+
+**Ação obrigatória:**
+1. Identificar 1+ sugestões sem competitor_reference
+2. Adicionar dados específicos de concorrentes disponíveis
+3. Resultado: 3+ sugestões com competitor_reference
+
+**Prioridade para adicionar:** Sugestões HIGH primeiro, depois MEDIUM
+
+---
+
 ## FORMATO DE SAÍDA
 
 Retorne APENAS o JSON abaixo:
@@ -201,7 +264,7 @@ Retorne APENAS o JSON abaixo:
           "complexity": "baixa|media|alta",
           "cost": "R$ X/mês ou R$ 0"
         },
-        "competitor_reference": "dado de concorrente se HIGH, senão null"
+        "competitor_reference": "OBRIGATÓRIO para as 3 HIGH quando dados disponíveis, opcional para MEDIUM/LOW"
       }
     }
   ],
@@ -210,6 +273,12 @@ Retorne APENAS o JSON abaixo:
     "medium": 3,
     "low": 3,
     "valid": true
+  },
+  "competitor_citations_check": {
+    "count": 3,
+    "minimum_required": 3,
+    "valid": true,
+    "competitors_cited": ["Hidratei", "Noma Beauty", "Forever Liss"]
   }
 }
 ```
@@ -224,6 +293,8 @@ Retorne APENAS o JSON abaixo:
 - [ ] Todas viáveis na Nuvemshop?
 - [ ] Toda sugestão tem `expected_result` com número?
 - [ ] Toda HIGH tem dado específico no `problem`?
+- [ ] **MÍNIMO 3 sugestões com competitor_reference preenchido com dados ESPECÍFICOS?** ← OBRIGATÓRIO
+- [ ] **As 3 citações usam dados reais (preços, categorias, diferenciais)?** ← OBRIGATÓRIO
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
@@ -252,15 +323,26 @@ PROMPT;
             $output .= "**{$cat}:** ".implode(', ', $titles)."\n";
         }
 
-        // Identificar temas saturados
+        // Identificar temas saturados (expandido para 18 temas)
         $keywords = [
-            'Quiz' => ['quiz', 'questionário', 'personalizado'],
-            'Frete Grátis' => ['frete grátis', 'frete gratuito'],
-            'Fidelidade' => ['fidelidade', 'pontos', 'cashback'],
-            'Kits' => ['kit', 'combo', 'bundle'],
-            'Estoque' => ['estoque', 'avise-me', 'reposição'],
-            'Email' => ['email', 'newsletter', 'automação'],
-            'Assinatura' => ['assinatura', 'recorrência'],
+            'Quiz' => ['quiz', 'questionário', 'personalizado', 'personalização'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete gratis'],
+            'Fidelidade' => ['fidelidade', 'pontos', 'cashback', 'recompensa', 'loyalty'],
+            'Kits' => ['kit', 'combo', 'bundle', 'pack'],
+            'Estoque' => ['estoque', 'avise-me', 'reposição', 'inventário'],
+            'Email' => ['email', 'newsletter', 'automação', 'e-mail'],
+            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
+            'Cupom' => ['cupom', 'desconto', 'voucher', 'código'],
+            'Checkout' => ['checkout', 'finalização', 'carrinho', 'abandono'],
+            'Reviews' => ['review', 'avaliação', 'avaliações', 'depoimento'],
+            'WhatsApp' => ['whatsapp', 'zap', 'mensagem'],
+            'Vídeo' => ['vídeo', 'video', 'youtube', 'reels'],
+            'Influenciador' => ['influenciador', 'influencer', 'parceria', 'afiliado'],
+            'Carnaval' => ['carnaval', 'folia', 'fantasia'],
+            'Ticket' => ['ticket', 'ticket médio', 'aov'],
+            'Cancelamento' => ['cancelamento', 'cancelado', 'desistência'],
+            'Reativação' => ['reativação', 'reativar', 'inativos', 'dormentes'],
+            'Cross-sell' => ['cross-sell', 'cross sell', 'upsell', 'up-sell', 'venda cruzada'],
         ];
 
         $counts = [];
@@ -276,13 +358,15 @@ PROMPT;
             }
         }
 
-        $saturated = array_filter($counts, fn ($c) => $c >= 2);
+        // Threshold reduzido de 2 para 1: qualquer tema já sugerido é considerado saturado
+        $saturated = array_filter($counts, fn ($c) => $c >= 1);
         if (! empty($saturated)) {
             arsort($saturated);
-            $output .= "\n**TEMAS SATURADOS (NÃO USAR):**\n";
+            $output .= "\n**⚠️ TEMAS JÁ USADOS (EVITAR REPETIR):**\n";
             foreach ($saturated as $t => $c) {
-                $output .= "- {$t} ({$c}x)\n";
+                $output .= "- ❌ {$t} ({$c}x)\n";
             }
+            $output .= "\n**CRIAR SUGESTÕES COM TEMAS DIFERENTES DOS LISTADOS ACIMA!**\n";
         }
 
         return $output;

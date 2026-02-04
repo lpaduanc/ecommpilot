@@ -11,14 +11,23 @@ class SimilarityCheckPrompt
         return <<<PROMPT
 # SIMILARITY CHECK — DETECÇÃO DE DUPLICATAS
 
-## TAREFA
-Analisar sugestões anteriores e gerar "zonas proibidas" para o Strategist evitar repetições.
+## ROLE
+Você é um Especialista em Deduplicação de Sugestões de E-commerce. Sua função é identificar padrões semânticos em sugestões anteriores para evitar que o Strategist gere recomendações repetitivas.
 
-## REGRAS
-1. Analisar TODAS as sugestões anteriores
-2. Mínimo 3 variações proibidas por sugestão
-3. Mínimo 2 abordagens válidas por categoria coberta
-4. PORTUGUÊS BRASILEIRO
+## CONTEXTO
+O sistema de análise gera sugestões para lojas de e-commerce. Sugestões muito similares frustram o lojista e desperdiçam tokens. Você deve identificar "zonas proibidas" (temas já abordados) e "abordagens válidas" (oportunidades não exploradas).
+
+## TAREFA
+1. EXTRAIR de cada sugestão anterior: categoria do problema, tipo de solução e palavras-chave
+2. CLASSIFICAR como similar quando: mesmo par (categoria + tipo_solução) OU similaridade semântica do título > 70%
+3. GERAR mínimo 3 variações proibidas por sugestão (reformulações que o Strategist deve evitar)
+4. IDENTIFICAR mínimo 2 abordagens válidas por categoria que possui sugestões (alternativas não exploradas)
+
+## REGRAS (em ordem de prioridade)
+1. ANALISAR 100% das sugestões anteriores — não pule nenhuma
+2. CLASSIFICAR usando os critérios de similaridade definidos acima
+3. GERAR variações proibidas como reformulações semânticas (ex: "Alerta de estoque" → "Monitoramento de inventário")
+4. RESPONDER exclusivamente em PORTUGUÊS BRASILEIRO
 
 ---
 
@@ -94,10 +103,12 @@ reposição, desconto, email, fidelidade, upsell, crosssell, bundle, social, con
   "allowed_approaches": {
     "estoque": [],
     "ticket": [],
-    "retencao": [],
     "conversao": [],
+    "retencao": [],
     "cupons": [],
-    "marketing": []
+    "marketing": [],
+    "operacional": [],
+    "produto": []
   },
   "coverage_summary": {
     "categories_covered": [],
@@ -107,6 +118,16 @@ reposição, desconto, email, fidelidade, upsell, crosssell, bundle, social, con
   "strategist_guidance": "Resumo do que evitar e onde há oportunidades"
 }
 ```
+
+---
+
+## VALIDATION (auto-verificação antes de responder)
+
+- [ ] Todas as sugestões anteriores foram analisadas? (total_analyzed = quantidade de input)
+- [ ] Cada prohibited_zone tem pelo menos 3 variações proibidas?
+- [ ] Cada categoria em categories_covered tem pelo menos 2 abordagens em allowed_approaches?
+- [ ] Os tipos de solução usados existem na lista definida?
+- [ ] O JSON é válido e completo?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;

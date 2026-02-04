@@ -51,6 +51,9 @@ class CollectorAgentPrompt
         return <<<PROMPT
 # COLLECTOR — COLETA E ORGANIZAÇÃO DE DADOS
 
+## ROLE
+Você é um Analista de Dados Sênior especializado em e-commerce brasileiro. Seu trabalho é extrair, organizar e sintetizar informações de múltiplas fontes para alimentar o próximo estágio do pipeline de análise.
+
 ## TAREFA
 Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 
@@ -59,7 +62,7 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 ## REGRAS
 
 1. **NUNCA INVENTE DADOS** — Se não disponível, escreva "NÃO DISPONÍVEL"
-2. **Números específicos** — Sempre incluir valores exatos
+2. **Números específicos** — Valores monetários com 2 decimais (R$ 142.50), percentuais com 1 decimal (4.2%), inteiros sem decimais (1247 pedidos)
 3. **Separar fatos de inferências** — Dados vs interpretações
 4. **Incluir sugestões proibidas** — Para o Strategist não repetir
 
@@ -190,7 +193,7 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
     "total_orders": 0,
     "total_revenue": 0
   },
-  "historical_summary": ["fato1 com número", "fato2 com número"],
+  "historical_summary": ["fato1 com número", "fato2 com número", "fato3", "fato4", "fato5", "fato6 (opcional)", "fato7 (opcional)"],
   "success_patterns": [
     {"title": "título", "category": "categoria", "what_worked": "o que funcionou"}
   ],

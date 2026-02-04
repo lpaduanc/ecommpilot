@@ -82,17 +82,36 @@ RESOURCES;
         return <<<'PROMPT'
 # STRATEGIST — GERADOR DE SUGESTÕES
 
-## TAREFA
-Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição: 3 HIGH, 3 MEDIUM, 3 LOW.
+## PAPEL
+Você é um consultor sênior de e-commerce especializado em lojas Nuvemshop no Brasil. Sua expertise inclui:
+- Análise de métricas de vendas e conversão
+- Estratégias de pricing e promoções
+- Otimização de catálogo e estoque
+- Benchmarking competitivo no mercado brasileiro
+
+Seu objetivo é transformar dados em ações concretas que aumentem receita.
 
 ---
 
-## REGRAS OBRIGATÓRIAS
+## TAREFA
+Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatória: 3 HIGH, 3 MEDIUM, 3 LOW.
+
+---
+
+## REGRAS OBRIGATÓRIAS (em ordem de prioridade)
 
 1. **NUNCA repetir** tema de sugestão anterior (veja ZONAS PROIBIDAS)
 2. **HIGH (prioridades 1-3):** Obrigatório citar dado específico (número) da loja ou concorrente
 3. **Cada sugestão deve ter:** problema específico + ação específica + resultado esperado com número
 4. **Se não há dado para embasar:** não pode ser HIGH, rebaixe para MEDIUM ou LOW
+5. **Referências a concorrentes (CONDICIONAL):**
+   - SE houver dados em DADOS DE CONCORRENTES: inclua competitor_reference em pelo menos 3 sugestões
+   - SE NÃO houver dados de concorrentes: use dados de mercado ou práticas padrão do setor
+   - NUNCA invente dados de concorrentes - use apenas informações fornecidas
+6. **Comparações diretas:** Ao citar concorrente, compare e sugira ação (ex: "Concorrente X oferece Y, a loja pode oferecer Z")
+7. **Formato do campo competitor_reference:**
+   - Para HIGH: obrigatório se houver dados de concorrente relevantes, senão use dados da própria loja
+   - Para MEDIUM/LOW: opcional, preencha se houver dado relevante disponível
 
 ---
 
@@ -242,14 +261,17 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
 
 ---
 
-## CHECKLIST ANTES DE ENVIAR
+## VALIDAÇÃO OBRIGATÓRIA
 
-- [ ] Exatamente 9 sugestões?
-- [ ] 3 HIGH, 3 MEDIUM, 3 LOW?
-- [ ] Nenhum tema repetido das ZONAS PROIBIDAS?
-- [ ] Toda HIGH tem dado específico (número) no campo problem?
-- [ ] Toda sugestão tem expected_result com número?
-- [ ] Todas as sugestões são viáveis na Nuvemshop?
+Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrija antes de enviar:
+
+1. **Contagem:** Conte as sugestões. SE não forem exatamente 9, adicione ou remova até ter 9.
+2. **Distribuição:** Conte por impacto. SE não forem 3 HIGH + 3 MEDIUM + 3 LOW, ajuste os expected_impact.
+3. **Zonas proibidas:** Compare cada título com ZONAS PROIBIDAS. SE houver overlap temático, substitua a sugestão.
+4. **Dados em HIGH:** Para cada HIGH, verifique se problem contém número específico. SE não contiver, rebaixe para MEDIUM.
+5. **Resultados quantificados:** Para cada sugestão, verifique se expected_result contém R$ ou %. SE não contiver, adicione estimativa.
+6. **Viabilidade:** Para cada sugestão, verifique se é possível na Nuvemshop. SE não for, substitua por alternativa viável.
+7. **Referências a concorrentes:** SE houver dados em DADOS DE CONCORRENTES, verifique se pelo menos 3 sugestões têm competitor_reference preenchido.
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
@@ -258,27 +280,70 @@ PROMPT;
     public static function formatProhibitedSuggestions(array $previousSuggestions): string
     {
         if (empty($previousSuggestions)) {
-            return 'Nenhuma sugestão anterior.';
+            return 'Nenhuma sugestão anterior registrada.';
         }
 
-        $grouped = [];
+        $output = "**ATENÇÃO: Estas sugestões JÁ FORAM DADAS. NÃO repita o mesmo tema, mesmo com palavras diferentes:**\n\n";
+
+        // Listar títulos completos para a IA entender o que evitar
         foreach ($previousSuggestions as $s) {
-            $cat = $s['category'] ?? 'outros';
             $title = $s['title'] ?? 'Sem título';
-            if (! isset($grouped[$cat])) {
-                $grouped[$cat] = [];
-            }
-            if (! in_array($title, $grouped[$cat])) {
-                $grouped[$cat][] = $title;
-            }
+            $category = $s['category'] ?? 'outros';
+            $output .= "- [{$category}] {$title}\n";
         }
 
-        $output = 'Total: '.count($previousSuggestions)." sugestões anteriores\n\n";
-        foreach ($grouped as $cat => $titles) {
-            $output .= "**{$cat}:** ".implode(', ', $titles)."\n";
+        // Extrair palavras-chave proibidas
+        $keywords = self::extractProhibitedKeywords($previousSuggestions);
+        if (! empty($keywords)) {
+            $output .= "\n**Palavras-chave/temas a EVITAR (já usados):**\n";
+            $output .= implode(', ', $keywords)."\n";
         }
+
+        $output .= "\n**Total:** ".count($previousSuggestions)." sugestões já dadas\n";
 
         return $output;
+    }
+
+    /**
+     * Extract prohibited keywords from previous suggestions.
+     */
+    private static function extractProhibitedKeywords(array $suggestions): array
+    {
+        $patterns = [
+            'kits' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
+            'cupom' => ['cupom', 'desconto', 'voucher', 'código', 'coupon'],
+            'frete' => ['frete', 'entrega', 'shipping', 'envio'],
+            'fidelidade' => ['fidelidade', 'pontos', 'recompensa', 'loyalty', 'cashback'],
+            'cancelamento' => ['cancelamento', 'abandono', 'desistência', 'carrinho abandonado'],
+            'checkout' => ['checkout', 'finalização', 'carrinho', 'conversão'],
+            'estoque' => ['estoque', 'reposição', 'inventário', 'avise-me'],
+            'email' => ['email', 'newsletter', 'automação', 'e-mail'],
+            'quiz' => ['quiz', 'questionário', 'personalização', 'teste'],
+            'ticket' => ['ticket médio', 'ticket', 'aov', 'valor médio'],
+            'upsell' => ['upsell', 'cross-sell', 'venda cruzada', 'produtos relacionados'],
+            'reativacao' => ['reativação', 'reativar', 'clientes inativos', 'win-back'],
+            'reviews' => ['review', 'avaliação', 'depoimento', 'prova social'],
+            'conteudo' => ['conteúdo', 'blog', 'seo', 'redes sociais'],
+            'assinatura' => ['assinatura', 'recorrência', 'subscription'],
+        ];
+
+        $foundKeywords = [];
+        foreach ($suggestions as $s) {
+            $title = mb_strtolower($s['title'] ?? '');
+            $description = mb_strtolower($s['description'] ?? '');
+            $text = $title.' '.$description;
+
+            foreach ($patterns as $theme => $words) {
+                foreach ($words as $word) {
+                    if (mb_strpos($text, $word) !== false) {
+                        $foundKeywords[$theme] = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return array_keys($foundKeywords);
     }
 
     public static function identifySaturatedThemes(array $previousSuggestions): string
@@ -287,14 +352,26 @@ PROMPT;
             return 'Nenhum.';
         }
 
+        // V5: Keywords expandidas para capturar mais variações
         $keywords = [
-            'Quiz' => ['quiz', 'questionário', 'personalizado'],
-            'Frete Grátis' => ['frete grátis', 'frete gratuito'],
-            'Fidelidade' => ['fidelidade', 'pontos', 'cashback'],
-            'Kits' => ['kit', 'combo', 'bundle', 'cronograma'],
-            'Estoque' => ['estoque', 'avise-me', 'reposição'],
-            'Email' => ['email', 'newsletter', 'automação'],
-            'Assinatura' => ['assinatura', 'recorrência'],
+            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado', 'teste de'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete condicional'],
+            'Fidelidade/Pontos' => ['fidelidade', 'pontos', 'cashback', 'recompensa', 'loyalty'],
+            'Kits/Combos' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
+            'Estoque/Reposição' => ['estoque', 'avise-me', 'reposição', 'inventário'],
+            'Email Marketing' => ['email', 'newsletter', 'automação', 'e-mail marketing'],
+            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
+            'Cupom/Desconto' => ['cupom', 'desconto', 'voucher', 'código promocional'],
+            'Checkout/Conversão' => ['checkout', 'carrinho', 'abandono', 'conversão'],
+            'Cancelamento' => ['cancelamento', 'taxa de cancelamento', 'desistência'],
+            'Ticket Médio' => ['ticket médio', 'aov', 'valor médio', 'ticket'],
+            'Upsell/Cross-sell' => ['upsell', 'cross-sell', 'venda cruzada', 'produtos relacionados'],
+            'Reativação' => ['reativação', 'clientes inativos', 'win-back', 'reativar'],
+            'Reviews/Avaliações' => ['review', 'avaliação', 'depoimento', 'prova social'],
+            'SEO/Conteúdo' => ['seo', 'conteúdo', 'blog', 'descrição de produto'],
+            'Redes Sociais' => ['instagram', 'facebook', 'redes sociais', 'social'],
+            'WhatsApp' => ['whatsapp', 'zap', 'atendimento'],
+            'Pós-Venda' => ['pós-venda', 'pós compra', 'acompanhamento', 'feedback'],
         ];
 
         $counts = [];
@@ -302,7 +379,7 @@ PROMPT;
             $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
             foreach ($keywords as $theme => $kws) {
                 foreach ($kws as $kw) {
-                    if (strpos($text, $kw) !== false) {
+                    if (mb_strpos($text, $kw) !== false) {
                         $counts[$theme] = ($counts[$theme] ?? 0) + 1;
                         break;
                     }
@@ -310,7 +387,8 @@ PROMPT;
             }
         }
 
-        $saturated = array_filter($counts, fn ($c) => $c >= 2);
+        // V5: Threshold baixado de 2 para 1 - qualquer tema já usado é considerado saturado
+        $saturated = array_filter($counts, fn ($c) => $c >= 1);
         arsort($saturated);
 
         if (empty($saturated)) {
@@ -319,7 +397,8 @@ PROMPT;
 
         $out = '';
         foreach ($saturated as $t => $c) {
-            $out .= "- {$t} ({$c}x) — NÃO USAR\n";
+            $label = $c >= 2 ? 'MUITO USADO' : 'JÁ USADO';
+            $out .= "- {$t} ({$c}x) — {$label}, EVITAR\n";
         }
 
         return $out;

@@ -47,36 +47,53 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
-     * Identifica temas saturados (sugeridos 2+ vezes)
+     * Identifica temas saturados (sugeridos 1+ vezes)
+     *
+     * Threshold reduzido de 2 para 1: qualquer tema já sugerido é considerado saturado
+     * para forçar máxima diversidade entre análises consecutivas.
      */
     protected function identifySaturatedThemes(array $suggestions): array
     {
+        // Expandido para 25 categorias de temas monitorados
         $themeKeywords = [
-            'quiz' => ['quiz', 'questionário', 'personalizado', 'recomendação'],
-            'frete_gratis' => ['frete grátis', 'frete gratuito', 'entrega grátis'],
+            // Temas originais
+            'quiz' => ['quiz', 'questionário', 'personalizado', 'recomendação', 'personalização'],
+            'frete_gratis' => ['frete grátis', 'frete gratuito', 'entrega grátis', 'frete gratis'],
             'fidelidade' => ['fidelidade', 'pontos', 'cashback', 'loyalty', 'recompensa'],
-            'kits' => ['kit', 'combo', 'bundle', 'cronograma'],
+            'kits' => ['kit', 'combo', 'bundle', 'cronograma', 'pack'],
             'estoque' => ['estoque', 'avise-me', 'reposição', 'inventário', 'ruptura'],
             'email' => ['email', 'e-mail', 'newsletter', 'automação', 'pós-venda'],
-            'video' => ['vídeo', 'tutorial', 'youtube'],
+            'video' => ['vídeo', 'video', 'tutorial', 'youtube', 'reels'],
             'assinatura' => ['assinatura', 'recorrência', 'subscription', 'clube'],
-            'cupom' => ['cupom', 'desconto', 'promoção'],
-            'checkout' => ['checkout', 'carrinho', 'conversão', 'abandono'],
-            'whatsapp' => ['whatsapp', 'telegram', 'chat', 'mensagem'],
+            'cupom' => ['cupom', 'desconto', 'promoção', 'voucher', 'código'],
+            'checkout' => ['checkout', 'carrinho', 'conversão', 'abandono', 'finalização'],
+            'whatsapp' => ['whatsapp', 'telegram', 'chat', 'mensagem', 'zap'],
             'reviews' => ['review', 'ugc', 'avaliação', 'depoimento', 'fotos', 'vídeos', 'antes e depois'],
-            'pos_compra' => ['pós-compra', 'pos-compra', 'cancelamento', 'follow-up', 'acompanhamento'],
-            'influenciadores' => ['influenciador', 'micro-influenciador', 'embaixador', 'embaixadora', 'parceria'],
-            'gamificacao' => ['gamificação', 'gamificacao', 'pontos', 'desafio', 'milhas', 'níveis'],
-            'conteudo' => ['conteúdo', 'conteudo', 'hub', 'guia', 'educativo', 'tutorial'],
+            'pos_compra' => ['pós-compra', 'pos-compra', 'follow-up', 'acompanhamento'],
+            'influenciadores' => ['influenciador', 'micro-influenciador', 'embaixador', 'embaixadora', 'parceria', 'afiliado'],
+            'gamificacao' => ['gamificação', 'gamificacao', 'desafio', 'milhas', 'níveis'],
+            'conteudo' => ['conteúdo', 'conteudo', 'hub', 'guia', 'educativo'],
+
+            // Novos temas adicionados (sazonais e operacionais)
+            'carnaval' => ['carnaval', 'folia', 'fantasia', 'bloco'],
+            'ticket' => ['ticket médio', 'ticket', 'aov', 'valor médio'],
+            'cancelamento' => ['cancelamento', 'cancelado', 'desistência', 'churn'],
+            'reativacao' => ['reativação', 'reativar', 'inativos', 'dormentes', 'win-back'],
+            'upsell' => ['upsell', 'up-sell', 'upgrade', 'premium'],
+            'cross_sell' => ['cross-sell', 'cross sell', 'venda cruzada', 'produtos relacionados', 'compre junto'],
+            'preco' => ['preço', 'pricing', 'margem', 'precificação'],
+            'seo' => ['seo', 'google', 'busca', 'orgânico', 'ranqueamento'],
+            'remarketing' => ['remarketing', 'retargeting', 'pixel', 'público similar'],
         ];
 
         $counts = [];
 
         foreach ($suggestions as $suggestion) {
-            $title = mb_strtolower($suggestion['title'] ?? '');
+            // Verificar título E descrição para maior precisão
+            $text = mb_strtolower(($suggestion['title'] ?? '').(' '.($suggestion['description'] ?? '')));
             foreach ($themeKeywords as $theme => $keywords) {
                 foreach ($keywords as $keyword) {
-                    if (str_contains($title, $keyword)) {
+                    if (str_contains($text, $keyword)) {
                         $counts[$theme] = ($counts[$theme] ?? 0) + 1;
                         break;
                     }
@@ -84,7 +101,9 @@ trait SuggestionDeduplicationTrait
             }
         }
 
-        $saturated = array_filter($counts, fn ($count) => $count >= 2);
+        // Threshold reduzido: qualquer ocorrência conta como saturado
+        // Isso força diversidade máxima entre análises
+        $saturated = array_filter($counts, fn ($count) => $count >= 1);
         arsort($saturated);
 
         return $saturated;

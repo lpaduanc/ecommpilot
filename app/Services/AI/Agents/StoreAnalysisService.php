@@ -679,11 +679,20 @@ class StoreAnalysisService
             throw $e;
         }
 
-        // Garantir mínimo de 5 sugestões APÓS o filtro de similaridade
-        // (O fallback precisa acontecer DEPOIS do filtro para compensar remoções)
+        // =====================================================
+        // V5: Pré-validar sugestões do Strategist contra histórico ANTES de recuperar
+        // Isso garante que sugestões recuperadas não sejam similares ao histórico
+        // =====================================================
+        $validatedStrategistSuggestions = $this->preValidateStrategistSuggestions(
+            $generatedSuggestions['suggestions'] ?? [],
+            $previousSuggestions['all'] ?? []
+        );
+
+        // Garantir mínimo de 9 sugestões APÓS o filtro de similaridade
+        // (O fallback usa apenas sugestões já validadas contra o histórico)
         $finalSuggestions = $this->ensureMinimumSuggestions(
             $filteredSuggestions,
-            $generatedSuggestions['suggestions'] ?? [],
+            $validatedStrategistSuggestions,
             [
                 'niche' => $niche,
                 'subcategory' => $subcategory,
@@ -691,14 +700,12 @@ class StoreAnalysisService
                 'platform_name' => $platformName,
                 'ticket_medio' => $ticketMedio,
                 'pedidos_mes' => $ordersTotal,
-            ]
+            ],
+            $previousSuggestions['all'] ?? []
         );
 
-        // =====================================================
-        // V4: Validação final de unicidade antes de salvar
-        // =====================================================
+        // V5: Não precisa mais validar depois, pois já foi feito antes
         $beforeValidation = count($finalSuggestions);
-        $finalSuggestions = $this->validateSuggestionUniqueness($finalSuggestions, $previousSuggestions['all']);
 
         // Logar estatísticas de deduplicação
         $this->logDeduplicationStats($analysis->id, [
@@ -1294,9 +1301,9 @@ class StoreAnalysisService
                 ];
 
                 // Check similarity with existing suggestions in DB
-                // Threshold de 0.90 = apenas sugestões muito similares (90%+) são filtradas
-                // Isso permite mais variação entre análises consecutivas
-                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.90)) {
+                // Threshold de 0.75 = sugestões com 75%+ de similaridade são filtradas
+                // Isso evita sugestões muito parecidas entre análises consecutivas
+                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.75)) {
                     $suggestion['embedding'] = $embedding;
                     $filteredSuggestions[] = $suggestion;
                 } else {
@@ -1691,12 +1698,66 @@ class StoreAnalysisService
     }
 
     /**
+     * V5: Pre-validate Strategist suggestions against historical suggestions.
+     * This ensures that suggestions used for recovery are not similar to past suggestions.
+     */
+    private function preValidateStrategistSuggestions(array $strategistSuggestions, array $previousSuggestions): array
+    {
+        if (empty($previousSuggestions)) {
+            return $strategistSuggestions;
+        }
+
+        // Build list of historical titles (normalized)
+        $historicalTitles = [];
+        foreach ($previousSuggestions as $prev) {
+            $title = $prev['title'] ?? '';
+            if (! empty($title)) {
+                $historicalTitles[] = $this->normalizeTitle($title);
+            }
+        }
+
+        $validated = [];
+        foreach ($strategistSuggestions as $suggestion) {
+            $title = $suggestion['title'] ?? '';
+            $normalizedTitle = $this->normalizeTitle($title);
+
+            // Check similarity against historical suggestions
+            $isSimilarToHistory = false;
+            foreach ($historicalTitles as $histTitle) {
+                $similarity = $this->calculateTitleSimilarity($normalizedTitle, $histTitle);
+                if ($similarity >= 0.75) {
+                    Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered (similar to history)', [
+                        'title' => $title,
+                        'similarity' => round($similarity * 100, 1).'%',
+                    ]);
+                    $isSimilarToHistory = true;
+                    break;
+                }
+            }
+
+            if (! $isSimilarToHistory) {
+                $validated[] = $suggestion;
+            }
+        }
+
+        Log::channel($this->logChannel)->info('Pre-validation of Strategist suggestions', [
+            'input' => count($strategistSuggestions),
+            'output' => count($validated),
+            'filtered_by_history' => count($strategistSuggestions) - count($validated),
+        ]);
+
+        return $validated;
+    }
+
+    /**
      * Ensure we ALWAYS have exactly 9 suggestions with 3-3-3 distribution.
      * This is a CRITICAL business requirement - the client must always receive 9 suggestions.
      *
      * Priority: Use Strategist suggestions that were filtered by similarity before generic fallbacks.
+     *
+     * V5: Now also validates against historical suggestions to prevent duplicates.
      */
-    private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context): array
+    private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context, array $previousSuggestions = []): array
     {
         // REGRA DE NEGÓCIO CRÍTICA: SEMPRE 9 sugestões com distribuição 3-3-3
         $required = 9;

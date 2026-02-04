@@ -61,10 +61,11 @@ Analisar os dados da loja e produzir um diagnóstico estruturado com:
 ## REGRAS
 
 1. **Health Score:** Calcular baseado nos 5 componentes. Aplicar OVERRIDE se situação crítica.
-2. **Alertas:** Apenas problemas reais com dados que comprovem. Não inventar alertas.
-3. **Oportunidades:** Cada uma deve ter número específico (R$ ou %).
+2. **Alertas:** Apenas problemas reais com dados que comprovem. Não inventar alertas. Máximo 5 alertas, priorizados por severidade.
+3. **Oportunidades:** Gerar exatamente 5 oportunidades, cada uma com potencial específico em R$.
 4. **Comparação tripla:** Sempre comparar ticket da loja vs benchmark vs concorrentes.
 5. **Sazonalidade:** Considerar antes de classificar algo como anomalia.
+6. **Classificação Health Score:** critico (0-25), atencao (26-50), saudavel (51-75), excelente (76-100).
 
 ---
 
@@ -222,6 +223,7 @@ Retorne APENAS o JSON abaixo:
   },
 
   "alertas": [
+    // MÁXIMO 5 ALERTAS, ordenados por severidade (critico primeiro)
     {
       "severidade": "critico|atencao|monitorar",
       "tipo": "estoque|cancelamento|pricing|cupons|vendas",
@@ -233,6 +235,7 @@ Retorne APENAS o JSON abaixo:
   ],
 
   "oportunidades": [
+    // EXATAMENTE 5 OPORTUNIDADES, ordenadas por potencial (maior primeiro)
     {
       "tipo": "reativacao|upsell|estoque|pricing|conversao",
       "titulo": "Descrição da oportunidade",
@@ -281,12 +284,12 @@ Retorne APENAS o JSON abaixo:
 
 ## CHECKLIST ANTES DE ENVIAR
 
-- [ ] Health Score calculado com os 5 componentes?
-- [ ] Override aplicado se situação crítica?
-- [ ] Cada alerta tem dados específicos (números)?
-- [ ] Exatamente 5 oportunidades com potencial em R$?
-- [ ] Posicionamento com comparação tripla?
-- [ ] Briefing para Strategist preenchido?
+- [ ] Health Score calculado com os 5 componentes e classificação correta (critico 0-25, atencao 26-50, saudavel 51-75, excelente 76-100)?
+- [ ] Override aplicado se situação crítica (estoque >45%, cancelamento >15%, queda >40%)?
+- [ ] Máximo 5 alertas, cada um com dados específicos (números)?
+- [ ] Exatamente 5 oportunidades, cada uma com potencial em R$?
+- [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
+- [ ] Briefing para Strategist com 3 problemas e restrições?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
