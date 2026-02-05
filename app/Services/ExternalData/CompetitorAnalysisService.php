@@ -59,6 +59,14 @@ class CompetitorAnalysisService
     }
 
     /**
+     * Get delay between requests in seconds.
+     */
+    private function getRequestDelay(): int
+    {
+        return (int) SystemSetting::get('external_data.competitors.request_delay', 3);
+    }
+
+    /**
      * Analyze competitors for a store.
      *
      * @param  Store  $store  Store to analyze competitors for
@@ -106,8 +114,10 @@ class CompetitorAnalysisService
 
         $analyzedCompetitors = [];
         $successCount = 0;
+        $requestDelay = $this->getRequestDelay();
+        $totalCompetitors = count($competitors);
 
-        foreach ($competitors as $competitor) {
+        foreach ($competitors as $index => $competitor) {
             $url = $competitor['url'] ?? '';
             $name = $competitor['name'] ?? $this->extractDomain($url);
 
@@ -119,10 +129,22 @@ class CompetitorAnalysisService
                 continue;
             }
 
+            // Add delay between requests (except for the first one)
+            if ($index > 0 && $requestDelay > 0) {
+                Log::channel($this->logChannel)->debug('CompetitorAnalysisService: Aguardando antes do próximo scraping', [
+                    'delay_seconds' => $requestDelay,
+                    'current' => $index + 1,
+                    'total' => $totalCompetitors,
+                ]);
+                sleep($requestDelay);
+            }
+
             // Scrape competitor
             Log::channel($this->logChannel)->info('CompetitorAnalysisService: Iniciando scraping', [
                 'name' => $name,
                 'url' => $url,
+                'index' => $index + 1,
+                'total' => $totalCompetitors,
             ]);
 
             $result = $this->scrapeCompetitor($url, $name);
@@ -136,6 +158,8 @@ class CompetitorAnalysisService
                 'faixa_preco' => $result['faixa_preco'] ?? [],
                 'diferenciais' => $result['diferenciais'] ?? [],
                 'motivo_falha' => $result['motivo_falha'] ?? null,
+                'index' => $index + 1,
+                'total' => $totalCompetitors,
             ]);
 
             if ($result['sucesso']) {
@@ -182,13 +206,28 @@ class CompetitorAnalysisService
                 $result = $this->decodoProxy->get($url);
 
                 if (! $result['success']) {
-                    // Fallback to direct request if Decodo fails
-                    Log::channel($this->logChannel)->info('CompetitorAnalysisService: Decodo failed, trying direct', [
+                    // Log Decodo failure with details
+                    Log::channel($this->logChannel)->warning('CompetitorAnalysisService: Decodo failed after retries', [
                         'url' => $url,
+                        'name' => $name,
                         'error' => $result['error'],
+                        'status' => $result['status'],
                     ]);
 
-                    return $this->scrapeDirectly($url, $name);
+                    // Check if we should try direct fallback
+                    $shouldFallback = $this->shouldFallbackToDirect($result);
+
+                    if ($shouldFallback) {
+                        Log::channel($this->logChannel)->info('CompetitorAnalysisService: Attempting direct fallback', [
+                            'url' => $url,
+                            'name' => $name,
+                        ]);
+
+                        return $this->scrapeDirectly($url, $name);
+                    }
+
+                    // Return failure without fallback
+                    return $this->emptyCompetitorResponse($name, $url, $result['error']);
                 }
 
                 $content = $result['body'];
@@ -494,6 +533,41 @@ class CompetitorAnalysisService
 
         // Remove www.
         return preg_replace('/^www\./', '', $host);
+    }
+
+    /**
+     * Check if we should fallback to direct scraping.
+     * Only fallback on network errors or timeouts, not on content/auth errors.
+     */
+    private function shouldFallbackToDirect(array $result): bool
+    {
+        $error = $result['error'] ?? '';
+        $status = $result['status'] ?? null;
+
+        // Fallback on timeouts
+        if (str_contains(strtolower($error), 'timeout') ||
+            str_contains(strtolower($error), 'timed out')) {
+            return true;
+        }
+
+        // Fallback on connection errors
+        if (str_contains(strtolower($error), 'connection') ||
+            str_contains(strtolower($error), 'curl error')) {
+            return true;
+        }
+
+        // Fallback on rate limit (429)
+        if ($status === 429) {
+            return true;
+        }
+
+        // Fallback on server errors (5xx)
+        if ($status >= 500) {
+            return true;
+        }
+
+        // Don't fallback on auth errors, client errors, or content issues
+        return false;
     }
 
     /**

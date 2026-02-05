@@ -73,7 +73,31 @@ class DecodoProxyService
      */
     private function getTimeout(): int
     {
-        return (int) SystemSetting::get('external_data.decodo.timeout', 30);
+        return (int) SystemSetting::get('external_data.decodo.timeout', 60);
+    }
+
+    /**
+     * Get max retry attempts for failed requests.
+     */
+    private function getMaxRetries(): int
+    {
+        return (int) SystemSetting::get('external_data.decodo.max_retries', 3);
+    }
+
+    /**
+     * Get retry delays in seconds (exponential backoff).
+     */
+    private function getRetryDelays(): array
+    {
+        return [2, 5, 10]; // 2s, 5s, 10s
+    }
+
+    /**
+     * Get minimum content length to consider valid.
+     */
+    private function getMinContentLength(): int
+    {
+        return (int) SystemSetting::get('external_data.decodo.min_content_length', 100);
     }
 
     /**
@@ -87,7 +111,7 @@ class DecodoProxyService
     }
 
     /**
-     * Make a scraping request through Decodo API.
+     * Make a scraping request through Decodo API with retry mechanism.
      *
      * @param  string  $url  Target URL to scrape
      * @param  array  $options  Additional options (headless, js_rendering, etc.)
@@ -104,6 +128,56 @@ class DecodoProxyService
             ];
         }
 
+        $maxRetries = $this->getMaxRetries();
+        $retryDelays = $this->getRetryDelays();
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $result = $this->makeRequest($url, $options, $attempt);
+
+            if ($result['success']) {
+                return $result;
+            }
+
+            $lastError = $result['error'];
+
+            // Don't retry on certain errors
+            if ($this->shouldNotRetry($result)) {
+                Log::channel($this->logChannel)->info('DecodoProxyService: Error not retryable', [
+                    'url' => $url,
+                    'error' => $lastError,
+                    'attempt' => $attempt,
+                ]);
+                break;
+            }
+
+            // Wait before retrying (except on last attempt)
+            if ($attempt < $maxRetries) {
+                $delay = $retryDelays[$attempt - 1] ?? 10;
+                Log::channel($this->logChannel)->info('DecodoProxyService: Retrying after delay', [
+                    'url' => $url,
+                    'attempt' => $attempt,
+                    'max_retries' => $maxRetries,
+                    'delay_seconds' => $delay,
+                    'error' => $lastError,
+                ]);
+                sleep($delay);
+            }
+        }
+
+        return [
+            'success' => false,
+            'body' => null,
+            'status' => null,
+            'error' => $lastError ?? 'Unknown error after retries',
+        ];
+    }
+
+    /**
+     * Make a single request attempt.
+     */
+    private function makeRequest(string $url, array $options, int $attempt): array
+    {
         $startTime = microtime(true);
 
         try {
@@ -131,6 +205,7 @@ class DecodoProxyService
                 'headless' => $payload['headless'],
                 'markdown' => $payload['markdown'] ?? false,
                 'geo' => $payload['geo'],
+                'attempt' => $attempt,
             ]);
 
             $response = Http::timeout($this->getTimeout())
@@ -152,6 +227,7 @@ class DecodoProxyService
                     'url' => $url,
                     'error' => $responseData['error'],
                     'time_ms' => $elapsedMs,
+                    'attempt' => $attempt,
                 ]);
 
                 return [
@@ -163,14 +239,39 @@ class DecodoProxyService
             }
 
             // Extract HTML content from response
-            $htmlContent = $responseData['content'] ?? $responseData['body'] ?? $responseData['html'] ?? null;
+            // Decodo API v2 returns content inside results array: {"results":[{"content":"..."}]}
+            $htmlContent = null;
+            if (isset($responseData['results'][0]['content'])) {
+                $htmlContent = $responseData['results'][0]['content'];
+            } elseif (isset($responseData['content'])) {
+                $htmlContent = $responseData['content'];
+            } elseif (isset($responseData['body'])) {
+                $htmlContent = $responseData['body'];
+            } elseif (isset($responseData['html'])) {
+                $htmlContent = $responseData['html'];
+            }
 
-            if ($response->successful() && $htmlContent) {
-                Log::channel($this->logChannel)->info('DecodoProxyService: Request completed', [
+            // Validate content
+            $contentLength = $htmlContent ? strlen($htmlContent) : 0;
+            $minLength = $this->getMinContentLength();
+
+            Log::channel($this->logChannel)->debug('DecodoProxyService: Content validation', [
+                'url' => $url,
+                'status' => $response->status(),
+                'content_length' => $contentLength,
+                'min_required' => $minLength,
+                'has_content' => $htmlContent !== null,
+                'is_empty' => $htmlContent === '',
+                'attempt' => $attempt,
+            ]);
+
+            if ($response->successful() && $htmlContent !== null && $contentLength >= $minLength) {
+                Log::channel($this->logChannel)->info('DecodoProxyService: Request completed successfully', [
                     'url' => $url,
                     'status' => $response->status(),
                     'time_ms' => $elapsedMs,
-                    'body_size' => strlen($htmlContent),
+                    'body_size' => $contentLength,
+                    'attempt' => $attempt,
                 ]);
 
                 return [
@@ -181,19 +282,31 @@ class DecodoProxyService
                 ];
             }
 
-            // Handle non-successful responses
-            Log::channel($this->logChannel)->warning('DecodoProxyService: Request failed', [
+            // Handle non-successful or invalid content responses
+            $errorMessage = 'HTTP '.$response->status();
+            if ($contentLength === 0) {
+                $errorMessage .= ': Empty content returned';
+            } elseif ($contentLength < $minLength) {
+                $errorMessage .= ": Content too short ({$contentLength} bytes, min {$minLength})";
+            } else {
+                $errorMessage .= ': '.($responseData['message'] ?? 'Unknown error');
+            }
+
+            Log::channel($this->logChannel)->warning('DecodoProxyService: Request failed validation', [
                 'url' => $url,
                 'status' => $response->status(),
                 'time_ms' => $elapsedMs,
-                'response' => substr($response->body(), 0, 500),
+                'content_length' => $contentLength,
+                'error' => $errorMessage,
+                'response_preview' => substr($response->body(), 0, 500),
+                'attempt' => $attempt,
             ]);
 
             return [
                 'success' => false,
                 'body' => null,
                 'status' => $response->status(),
-                'error' => 'HTTP '.$response->status().': '.($responseData['message'] ?? 'Unknown error'),
+                'error' => $errorMessage,
             ];
 
         } catch (\Exception $e) {
@@ -203,6 +316,7 @@ class DecodoProxyService
                 'url' => $url,
                 'error' => $e->getMessage(),
                 'time_ms' => $elapsedMs,
+                'attempt' => $attempt,
             ]);
 
             return [
@@ -212,6 +326,30 @@ class DecodoProxyService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Check if the error should not be retried.
+     */
+    private function shouldNotRetry(array $result): bool
+    {
+        $error = $result['error'] ?? '';
+        $status = $result['status'] ?? null;
+
+        // Don't retry on client errors (4xx except 429)
+        if ($status >= 400 && $status < 500 && $status !== 429) {
+            return true;
+        }
+
+        // Don't retry on authentication errors
+        if (str_contains(strtolower($error), 'unauthorized') ||
+            str_contains(strtolower($error), 'forbidden') ||
+            str_contains(strtolower($error), 'authentication')) {
+            return true;
+        }
+
+        // Retry on timeouts, server errors, rate limits, and content issues
+        return false;
     }
 
     /**
@@ -274,6 +412,8 @@ class DecodoProxyService
             'js_rendering' => $this->getJsRendering(),
             'output_format' => $this->getOutputFormat(),
             'timeout' => $this->getTimeout(),
+            'max_retries' => $this->getMaxRetries(),
+            'min_content_length' => $this->getMinContentLength(),
         ];
     }
 }
