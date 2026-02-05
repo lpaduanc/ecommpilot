@@ -1847,16 +1847,52 @@ class StoreAnalysisService
         }
 
         return collect($anomalies)
-            ->map(fn ($a) => [
-                'type' => $a['type'] ?? $a['tipo'] ?? 'general',
-                'description' => $a['description'] ?? $a['descricao'] ?? 'Anomalia não especificada',
-                'severity' => $a['severity'] ?? 'medium',
-                'metric' => $a['metric'] ?? null,
-                'expected' => $a['expected'] ?? null,
-                'actual' => $a['actual'] ?? null,
-                'affected_items' => $a['affected_items'] ?? $a['items'] ?? [],
-                'variation_percent' => $a['variation_percent'] ?? $a['variacao'] ?? null,
-            ])
+            ->map(function ($a) {
+                // Mapear campos do formato do Analyst para o formato esperado
+                $metrica = $a['metric'] ?? $a['metrica'] ?? null;
+                $atual = $a['actual'] ?? $a['atual'] ?? null;
+                $historico = $a['expected'] ?? $a['historico'] ?? null;
+                $variacao = $a['variation_percent'] ?? $a['variacao'] ?? null;
+                $tipo = $a['type'] ?? $a['tipo'] ?? 'general';
+                $explicacao = $a['explicacao_sazonal'] ?? null;
+
+                // Construir descrição se não existir
+                $description = $a['description'] ?? $a['descricao'] ?? null;
+                if (! $description && $metrica) {
+                    $description = $metrica;
+                    if ($atual !== null && $historico !== null) {
+                        $description .= " (Atual: {$atual}, Histórico: {$historico})";
+                    }
+                    if ($variacao) {
+                        $description .= " - Variação: {$variacao}";
+                    }
+                }
+
+                // Inferir severidade baseado no tipo e variação
+                $severity = $a['severity'] ?? null;
+                if (! $severity) {
+                    $variacaoNum = abs((float) str_replace(['%', '+', '-'], '', (string) $variacao));
+                    if ($tipo === 'negativa' && $variacaoNum > 50) {
+                        $severity = 'high';
+                    } elseif ($tipo === 'negativa') {
+                        $severity = 'medium';
+                    } else {
+                        $severity = 'low';
+                    }
+                }
+
+                return [
+                    'type' => $tipo,
+                    'description' => $description ?? 'Anomalia detectada',
+                    'severity' => $severity,
+                    'metric' => $metrica,
+                    'expected' => $historico,
+                    'actual' => $atual,
+                    'affected_items' => $a['affected_items'] ?? $a['items'] ?? [],
+                    'variation_percent' => $variacao,
+                    'explicacao_sazonal' => $explicacao,
+                ];
+            })
             ->toArray();
     }
 

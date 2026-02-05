@@ -102,14 +102,15 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 
 1. **NUNCA repetir** tema de sugestão anterior (veja ZONAS PROIBIDAS)
 2. **HIGH (prioridades 1-3):** Obrigatório citar dado específico (número) da loja ou concorrente
-3. **Cada sugestão deve ter:** problema específico + ação específica + resultado esperado com número
-4. **Se não há dado para embasar:** não pode ser HIGH, rebaixe para MEDIUM ou LOW
-5. **Referências a concorrentes (CONDICIONAL):**
+3. **CITE NOMES DE PRODUTOS:** Ao sugerir kits, combos, reposição ou otimização, SEMPRE mencione os nomes reais dos produtos da seção "PRODUTOS MAIS VENDIDOS" ou "PRODUTOS SEM ESTOQUE". NUNCA diga "crie kits premium" sem especificar quais produtos usar.
+4. **Cada sugestão deve ter:** problema específico + ação específica + resultado esperado com número
+5. **Se não há dado para embasar:** não pode ser HIGH, rebaixe para MEDIUM ou LOW
+6. **Referências a concorrentes (CONDICIONAL):**
    - SE houver dados em DADOS DE CONCORRENTES: inclua competitor_reference em pelo menos 3 sugestões
    - SE NÃO houver dados de concorrentes: use dados de mercado ou práticas padrão do setor
    - NUNCA invente dados de concorrentes - use apenas informações fornecidas
-6. **Comparações diretas:** Ao citar concorrente, compare e sugira ação (ex: "Concorrente X oferece Y, a loja pode oferecer Z")
-7. **Formato do campo competitor_reference:**
+7. **Comparações diretas:** Ao citar concorrente, compare e sugira ação (ex: "Concorrente X oferece Y, a loja pode oferecer Z")
+8. **Formato do campo competitor_reference:**
    - Para HIGH: obrigatório se houver dados de concorrente relevantes, senão use dados da própria loja
    - Para MEDIUM/LOW: opcional, preencha se houver dado relevante disponível
 
@@ -153,11 +154,18 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 
 {{best_sellers_section}}
 
+**INSTRUÇÃO CRÍTICA:** Use os nomes dos produtos acima nas suas sugestões. Por exemplo:
+- Para sugestões de kits: "Monte kit com [Produto 1] + [Produto 2] + [Produto 3]"
+- Para reposição: "Reponha [Produto X] e [Produto Y] que estão sem estoque"
+- Para otimização: "Melhore a página do [Produto Z] que tem alta visualização"
+
 ---
 
 ## PRODUTOS SEM ESTOQUE
 
 {{out_of_stock_section}}
+
+**INSTRUÇÃO CRÍTICA:** Se sugerir reposição, cite os NOMES dos produtos acima, não apenas "47 SKUs".
 
 ---
 
@@ -663,23 +671,42 @@ PROMPT;
      */
     private static function formatStoreGoals(array $goals): string
     {
-        if (empty($goals)) {
+        if (empty($goals) || empty(array_filter($goals))) {
             return "Nenhum objetivo específico definido pela loja. Foque em:\n- Aumentar faturamento\n- Aumentar ticket médio\n- Melhorar conversão";
         }
 
+        // Mapeamento de chaves para labels legíveis
+        $labels = [
+            'monthly_goal' => 'Meta Mensal de Faturamento',
+            'annual_goal' => 'Meta Anual de Faturamento',
+            'target_ticket' => 'Ticket Médio Alvo',
+            'monthly_revenue' => 'Receita Mensal Atual',
+            'monthly_visits' => 'Visitas Mensais',
+        ];
+
         $output = "A loja definiu os seguintes objetivos:\n\n";
-        foreach ($goals as $goal) {
-            if (is_array($goal)) {
-                $nome = $goal['goal'] ?? $goal['name'] ?? $goal['objetivo'] ?? 'Objetivo';
-                $meta = $goal['target'] ?? $goal['meta'] ?? '';
-                $output .= "- **{$nome}**";
-                if ($meta) {
-                    $output .= ": {$meta}";
-                }
-                $output .= "\n";
-            } else {
-                $output .= "- {$goal}\n";
+
+        foreach ($goals as $key => $value) {
+            // Ignorar arrays vazios (como competitors)
+            if (is_array($value)) {
+                continue;
             }
+            // Ignorar valores vazios ou zero
+            if (empty($value) || $value == 0) {
+                continue;
+            }
+
+            // Obter label legível
+            $label = $labels[$key] ?? ucfirst(str_replace('_', ' ', $key));
+
+            // Formatar valor (moeda ou número)
+            if (in_array($key, ['monthly_goal', 'annual_goal', 'target_ticket', 'monthly_revenue'])) {
+                $formattedValue = 'R$ '.number_format((float) $value, 2, ',', '.');
+            } else {
+                $formattedValue = number_format((float) $value, 0, ',', '.');
+            }
+
+            $output .= "- **{$label}:** {$formattedValue}\n";
         }
 
         $output .= "\n**IMPORTANTE:** Priorize sugestões que ajudem a atingir esses objetivos. Sugestões alinhadas aos objetivos devem ser HIGH ou MEDIUM.";
@@ -865,9 +892,26 @@ PROMPT;
         $output = "**Total de anomalias:** ".count($anomalies)."\n\n";
 
         // Agrupar por severidade
+        // Mapear 'tipo' (positiva/negativa) para severity se necessário
         $bySeverity = ['high' => [], 'medium' => [], 'low' => []];
         foreach ($anomalies as $anomaly) {
-            $severity = $anomaly['severity'] ?? 'medium';
+            $severity = $anomaly['severity'] ?? null;
+
+            // Se não tem severity, inferir do tipo
+            if (! $severity && isset($anomaly['tipo'])) {
+                $tipo = $anomaly['tipo'];
+                // Anomalias negativas com variação grande são high
+                $variacao = abs((float) str_replace(['%', '+', '-'], '', $anomaly['variacao'] ?? '0'));
+                if ($tipo === 'negativa' && $variacao > 50) {
+                    $severity = 'high';
+                } elseif ($tipo === 'negativa') {
+                    $severity = 'medium';
+                } else {
+                    $severity = 'low';
+                }
+            }
+
+            $severity = $severity ?? 'medium';
             $bySeverity[$severity][] = $anomaly;
         }
 
@@ -898,20 +942,38 @@ PROMPT;
 
     /**
      * Formata uma única anomalia.
+     * Suporta dois formatos:
+     * - Novo: type, description, severity, metric, expected, actual, variation_percent
+     * - Original: metrica, atual, historico, variacao, tipo, explicacao_sazonal
      */
     private static function formatSingleAnomaly(array $anomaly): string
     {
-        $type = $anomaly['type'] ?? 'geral';
-        $description = $anomaly['description'] ?? 'Anomalia não especificada';
-        $metric = $anomaly['metric'] ?? null;
-        $expected = $anomaly['expected'] ?? null;
-        $actual = $anomaly['actual'] ?? null;
-        $variation = $anomaly['variation_percent'] ?? null;
+        // Mapear campos do formato original para o esperado
+        $type = $anomaly['type'] ?? $anomaly['tipo'] ?? 'geral';
+        $metric = $anomaly['metric'] ?? $anomaly['metrica'] ?? null;
+        $actual = $anomaly['actual'] ?? $anomaly['atual'] ?? null;
+        $expected = $anomaly['expected'] ?? $anomaly['historico'] ?? null;
+        $variation = $anomaly['variation_percent'] ?? $anomaly['variacao'] ?? null;
         $affectedItems = $anomaly['affected_items'] ?? [];
+
+        // Gerar descrição se não existir
+        $description = $anomaly['description'] ?? $anomaly['descricao'] ?? null;
+        if (! $description && $metric) {
+            // Construir descrição a partir dos dados
+            $description = $metric;
+            if ($actual !== null && $expected !== null) {
+                $description .= " - Atual: {$actual}, Histórico: {$expected}";
+            }
+            if (isset($anomaly['explicacao_sazonal'])) {
+                $description .= " ({$anomaly['explicacao_sazonal']})";
+            }
+        }
+        $description = $description ?? 'Anomalia detectada';
 
         $output = "- **{$type}:** {$description}\n";
 
-        if ($metric && ($expected !== null || $actual !== null)) {
+        // Adicionar detalhes se disponíveis e não já incluídos na descrição
+        if ($metric && ! str_contains($description, $metric)) {
             $output .= "  - Métrica: {$metric}";
             if ($expected !== null) {
                 $output .= " | Esperado: {$expected}";
@@ -920,7 +982,9 @@ PROMPT;
                 $output .= " | Atual: {$actual}";
             }
             if ($variation !== null) {
-                $output .= " | Variação: {$variation}%";
+                // Remover % se já existir
+                $variationClean = str_replace('%', '', (string) $variation);
+                $output .= " | Variação: {$variationClean}%";
             }
             $output .= "\n";
         }
