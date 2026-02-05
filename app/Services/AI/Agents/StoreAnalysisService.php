@@ -523,7 +523,8 @@ class StoreAnalysisService
             // ═══════════════════════════════════════════════════════════════════
             $this->logFullData('BEST SELLERS (Top 10)', $storeData['products']['best_sellers'] ?? []);
             $this->logFullData('PRODUTOS SEM ESTOQUE', $storeData['products']['out_of_stock_list'] ?? []);
-            $this->logFullData('PRODUTOS SEM VENDAS NO PERIODO', $storeData['products']['no_sales_period'] ?? []);
+            // no_sales_period é um contador (int), não array - logar como info simples
+            Log::channel($this->logChannel)->info('PRODUTOS SEM VENDAS NO PERIODO: '.($storeData['products']['no_sales_period'] ?? 0).' produtos');
             $this->logFullData('DADOS DE CUPONS', $storeData['coupons'] ?? []);
             $this->logFullData('PEDIDOS POR DIA', $storeData['orders']['by_day'] ?? []);
             $this->logFullData('PEDIDOS POR STATUS DE PAGAMENTO', $storeData['orders']['by_payment_status'] ?? []);
