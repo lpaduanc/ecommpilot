@@ -48,6 +48,10 @@ class CollectorAgentPrompt
         $totalConcorrentes = count($competitors);
         $concorrentesSucesso = count(array_filter($competitors, fn ($c) => $c['sucesso'] ?? false));
 
+        // Learning Context (V5 - feedback de análises anteriores)
+        $learningContext = $context['learning_context'] ?? [];
+        $learningSection = self::formatLearningContext($learningContext);
+
         return <<<PROMPT
 # COLLECTOR — COLETA E ORGANIZAÇÃO DE DADOS
 
@@ -118,6 +122,12 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 {$concorrentesFormatados}
 
 **Média concorrentes:** R$ {$mediaPrecosConcorrentes}
+
+---
+
+## APRENDIZADO DE ANÁLISES ANTERIORES (FEEDBACK)
+
+{$learningSection}
 
 ---
 
@@ -434,6 +444,76 @@ PROMPT;
         }
 
         return count($prices) > 0 ? round(array_sum($prices) / count($prices), 2) : 0;
+    }
+
+    /**
+     * Formata o contexto de aprendizado para o Collector (Mudança 13).
+     */
+    private static function formatLearningContext(array $learningContext): string
+    {
+        if (empty($learningContext)) {
+            return "Nenhum histórico de feedback disponível. Esta é uma das primeiras análises desta loja.";
+        }
+
+        $output = '';
+
+        // Taxa de sucesso por categoria
+        $categoryRates = $learningContext['category_success_rates'] ?? [];
+        if (! empty($categoryRates)) {
+            $output .= "### Taxas de Sucesso por Categoria\n\n";
+            $output .= "| Categoria | Taxa de Sucesso | Total Implementadas |\n";
+            $output .= "|-----------|-----------------|---------------------|\n";
+            foreach ($categoryRates as $category => $stats) {
+                $rate = $stats['success_rate'] ?? 0;
+                $total = $stats['total_implemented'] ?? 0;
+                $emoji = $rate >= 70 ? '✅' : ($rate >= 40 ? '⚠️' : '❌');
+                $output .= "| {$emoji} {$category} | {$rate}% | {$total} |\n";
+            }
+            $output .= "\n**INSIGHT:** Priorize categorias com >70% de sucesso para sugestões HIGH.\n\n";
+        }
+
+        // Casos de sucesso
+        $successCases = $learningContext['success_cases'] ?? [];
+        if (! empty($successCases)) {
+            $output .= "### Casos de Sucesso Recentes\n\n";
+            foreach ($successCases as $case) {
+                $title = $case['title'] ?? 'Sem título';
+                $category = $case['category'] ?? 'geral';
+                $impact = $case['metrics_impact'] ?? null;
+                $output .= "- ✅ **{$title}** ({$category})";
+                if ($impact) {
+                    $impactStr = is_array($impact) ? json_encode($impact) : $impact;
+                    $output .= " → Impacto: {$impactStr}";
+                }
+                $output .= "\n";
+            }
+            $output .= "\n**INSIGHT:** Esses temas funcionam bem para este cliente. Considere variações.\n\n";
+        }
+
+        // Casos de falha
+        $failureCases = $learningContext['failure_cases'] ?? [];
+        if (! empty($failureCases)) {
+            $output .= "### Padrões de Falha (EVITAR)\n\n";
+            foreach ($failureCases as $case) {
+                $title = $case['title'] ?? 'Sem título';
+                $category = $case['category'] ?? 'geral';
+                $reason = $case['failure_reason'] ?? 'Não informado';
+                $output .= "- ❌ **{$title}** ({$category}): {$reason}\n";
+            }
+            $output .= "\n**INSIGHT:** Evitar temas similares ou abordar de forma completamente diferente.\n\n";
+        }
+
+        // Categorias bloqueadas
+        $blockedCategories = $learningContext['blocked_categories'] ?? [];
+        if (! empty($blockedCategories)) {
+            $output .= "### ⛔ CATEGORIAS BLOQUEADAS (3+ rejeições)\n\n";
+            foreach ($blockedCategories as $category => $count) {
+                $output .= "- 🚫 **{$category}** ({$count} rejeições consecutivas)\n";
+            }
+            $output .= "\n**REGRA CRÍTICA:** NÃO gerar sugestões nestas categorias.\n\n";
+        }
+
+        return $output ?: "Histórico de feedback ainda em construção.";
     }
 
     private static function extractUniqueFeatures(array $competitors): string

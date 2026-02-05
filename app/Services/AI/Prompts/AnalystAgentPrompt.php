@@ -42,9 +42,19 @@ class AnalystAgentPrompt
         $competitorSummary = self::summarizeCompetitors($competitors);
         $marketSummary = self::summarizeMarket($marketData, $ticketMedio);
 
+        // Gerar comparativo loja vs concorrentes (Mudança 11)
+        $categoriasFoco = $data['products_summary']['top_categories'] ?? [];
+        $promocoesAtivas = $data['coupons_summary']['registered_active'] ?? 0;
+        $comparativoLojaConcorrentes = self::generateComparativo($ticketMedio, $pedidosMes, $categoriasFoco, $promocoesAtivas, $competitors);
+
         // Sazonalidade
         $mes = (int) date('n');
         $sazonalidade = self::getSeasonalityContext($mes);
+
+        // Benchmarks do RAG
+        $benchmarks = $data['benchmarks'] ?? [];
+        $structuredBenchmarks = $data['structured_benchmarks'] ?? [];
+        $benchmarkSummary = self::summarizeBenchmarks($structuredBenchmarks, $benchmarks, $ticketMedio);
 
         return <<<PROMPT
 # ANALYST — DIAGNÓSTICO DA LOJA
@@ -131,6 +141,20 @@ Analisar os dados da loja e produzir um diagnóstico estruturado com:
 ## DADOS DE CONCORRENTES
 
 {$competitorSummary}
+
+---
+
+## COMPARATIVO LOJA vs CONCORRENTES
+
+{$comparativoLojaConcorrentes}
+
+**IMPORTANTE:** Use estes dados para preencher a seção `comparativo_concorrentes` no JSON de saída.
+
+---
+
+## BENCHMARKS DO SETOR (Base de Conhecimento)
+
+{$benchmarkSummary}
 
 ---
 
@@ -441,6 +465,20 @@ MARKET;
                 $output .= "- Produtos no catálogo: ~{$c['produtos_estimados']}\n";
             }
 
+            // Top produtos do concorrente (NOVO - dados que estavam sendo ignorados)
+            $produtos = $dadosRicos['produtos'] ?? [];
+            if (! empty($produtos)) {
+                $topProdutos = array_slice($produtos, 0, 5);
+                $output .= "- Produtos destaque:\n";
+                foreach ($topProdutos as $i => $prod) {
+                    $nomeProd = $prod['nome'] ?? $prod['name'] ?? 'Produto';
+                    $precoProd = $prod['preco'] ?? $prod['price'] ?? 0;
+                    $precoFormatado = is_numeric($precoProd) ? 'R$ '.number_format($precoProd, 2, ',', '.') : $precoProd;
+                    $rank = $i + 1;
+                    $output .= "  {$rank}. {$nomeProd} ({$precoFormatado})\n";
+                }
+            }
+
             $output .= "\n";
         }
 
@@ -491,6 +529,208 @@ MARKET;
         ];
 
         return $contextos[$mes] ?? 'Mês sem sazonalidade específica identificada.';
+    }
+
+    /**
+     * Resumo dos benchmarks do RAG
+     */
+    private static function summarizeBenchmarks(array $structured, array $raw, float $ticketLoja): string
+    {
+        $output = '';
+
+        // Dados estruturados (prioritários)
+        if (! empty($structured)) {
+            // Ticket médio
+            if (isset($structured['ticket_medio'])) {
+                $tm = $structured['ticket_medio'];
+                if (is_array($tm)) {
+                    $min = $tm['min'] ?? 0;
+                    $media = $tm['media'] ?? $tm['avg'] ?? 0;
+                    $max = $tm['max'] ?? 0;
+                    $output .= "**Ticket Médio do Setor:**\n";
+                    $output .= "- Mínimo: R$ ".number_format($min, 2, ',', '.')."\n";
+                    $output .= "- Média: R$ ".number_format($media, 2, ',', '.')."\n";
+                    $output .= "- Máximo: R$ ".number_format($max, 2, ',', '.')."\n";
+
+                    // Comparação com a loja
+                    if ($media > 0 && $ticketLoja > 0) {
+                        $diff = round((($ticketLoja / $media) - 1) * 100);
+                        $posicao = $diff >= 0 ? "+{$diff}%" : "{$diff}%";
+                        $output .= "- **Loja vs Benchmark:** {$posicao}\n";
+                    }
+                    $output .= "\n";
+                }
+            }
+
+            // Taxa de conversão
+            if (isset($structured['taxa_conversao'])) {
+                $tc = $structured['taxa_conversao'];
+                if (is_array($tc)) {
+                    $output .= "**Taxa de Conversão do Setor:**\n";
+                    $output .= "- Mínimo: ".($tc['min'] ?? 0)."%\n";
+                    $output .= "- Média: ".($tc['media'] ?? 0)."%\n";
+                    $output .= "- Máximo: ".($tc['max'] ?? 0)."%\n\n";
+                } else {
+                    $output .= "**Taxa de Conversão do Setor:** {$tc}%\n\n";
+                }
+            }
+
+            // Abandono de carrinho
+            if (isset($structured['abandono_carrinho'])) {
+                $output .= "**Abandono de Carrinho (benchmark):** {$structured['abandono_carrinho']}%\n\n";
+            }
+
+            // Tráfego mobile
+            if (isset($structured['trafego_mobile'])) {
+                $output .= "**Tráfego Mobile (benchmark):** {$structured['trafego_mobile']}%\n\n";
+            }
+
+            // Crescimento do setor
+            if (isset($structured['crescimento_setor'])) {
+                $output .= "**Crescimento do Setor:** {$structured['crescimento_setor']}% ao ano\n\n";
+            }
+
+            // Fonte dos dados
+            if (isset($structured['benchmark_source'])) {
+                $output .= "**Fonte:** {$structured['benchmark_source']}\n\n";
+            }
+        }
+
+        // Dados brutos (complementares)
+        if (! empty($raw) && empty($output)) {
+            $output .= "**Benchmarks Disponíveis:**\n\n";
+            foreach (array_slice($raw, 0, 3) as $benchmark) {
+                $title = $benchmark['title'] ?? 'Benchmark';
+                $content = $benchmark['content'] ?? '';
+                $output .= "### {$title}\n{$content}\n\n";
+            }
+        }
+
+        if (empty($output)) {
+            return "Nenhum benchmark específico disponível para este nicho. Use médias gerais de e-commerce:\n- Ticket Médio: R$ 250-350\n- Taxa de Conversão: 1.5-2.5%\n- Abandono de Carrinho: 65-75%\n- Tráfego Mobile: 70-80%";
+        }
+
+        $output .= "**IMPORTANTE:** Use estes benchmarks para calcular o componente 'Ticket vs Benchmark' do Health Score.\n";
+
+        return $output;
+    }
+
+    /**
+     * Gera comparativo estruturado loja vs concorrentes (Mudança 11).
+     */
+    private static function generateComparativo(float $ticketLoja, int $pedidosMes, array $categoriasFoco, int $promocoesAtivas, array $competitors): string
+    {
+        if (empty($competitors)) {
+            return "Nenhum dado de concorrente disponível para comparação.\n";
+        }
+
+        $competitorsValidos = array_filter($competitors, fn ($c) => $c['sucesso'] ?? false);
+        if (empty($competitorsValidos)) {
+            return "Dados de concorrentes não processados com sucesso.\n";
+        }
+
+        $output = '';
+
+        // 1. Comparativo de Ticket Médio
+        $ticketsConcorrentes = [];
+        $avaliacoesConcorrentes = [];
+        $categoriasConcorrentes = [];
+        $promocoesConcorrentes = 0;
+
+        foreach ($competitorsValidos as $c) {
+            $faixa = $c['faixa_preco'] ?? [];
+            if (! empty($faixa['media'])) {
+                $ticketsConcorrentes[] = [
+                    'nome' => $c['nome'] ?? 'Concorrente',
+                    'ticket' => $faixa['media'],
+                ];
+            }
+
+            $dadosRicos = $c['dados_ricos'] ?? [];
+            $avaliacoes = $dadosRicos['avaliacoes'] ?? [];
+            if (! empty($avaliacoes['nota_media'])) {
+                $avaliacoesConcorrentes[] = [
+                    'nome' => $c['nome'] ?? 'Concorrente',
+                    'nota' => $avaliacoes['nota_media'],
+                    'total' => $avaliacoes['total_avaliacoes'] ?? 0,
+                ];
+            }
+
+            // Categorias
+            foreach ($dadosRicos['categorias'] ?? [] as $cat) {
+                $catNome = $cat['nome'] ?? 'outros';
+                $categoriasConcorrentes[$catNome] = ($categoriasConcorrentes[$catNome] ?? 0) + ($cat['mencoes'] ?? 1);
+            }
+
+            // Promoções
+            $promocoesConcorrentes += count($dadosRicos['promocoes'] ?? []);
+        }
+
+        // Ticket Médio
+        if (! empty($ticketsConcorrentes)) {
+            $ticketMediaConcorrentes = array_sum(array_column($ticketsConcorrentes, 'ticket')) / count($ticketsConcorrentes);
+            $diffTicket = $ticketLoja > 0 ? round((($ticketLoja / $ticketMediaConcorrentes) - 1) * 100) : 0;
+            $diffStr = $diffTicket >= 0 ? "+{$diffTicket}%" : "{$diffTicket}%";
+
+            $output .= "### Ticket Médio\n\n";
+            $output .= "| | Valor |\n";
+            $output .= "|---|------|\n";
+            $output .= "| **Sua Loja** | R$ ".number_format($ticketLoja, 2, ',', '.')." |\n";
+            $output .= "| **Média Concorrentes** | R$ ".number_format($ticketMediaConcorrentes, 2, ',', '.')." |\n";
+            $output .= "| **Diferença** | {$diffStr} |\n\n";
+
+            if ($diffTicket < -20) {
+                $output .= "⚠️ **ALERTA:** Ticket 20%+ abaixo da concorrência. Considere upsell/kits.\n\n";
+            } elseif ($diffTicket > 20) {
+                $output .= "✅ **POSITIVO:** Ticket acima da concorrência. Pode indicar melhor posicionamento.\n\n";
+            }
+        }
+
+        // Avaliações
+        if (! empty($avaliacoesConcorrentes)) {
+            $output .= "### Avaliações\n\n";
+            $output .= "| Concorrente | Nota | Reviews |\n";
+            $output .= "|-------------|------|--------|\n";
+            usort($avaliacoesConcorrentes, fn ($a, $b) => $b['nota'] <=> $a['nota']);
+            foreach ($avaliacoesConcorrentes as $av) {
+                $output .= "| {$av['nome']} | {$av['nota']}/5 | {$av['total']} |\n";
+            }
+            $output .= "\n**INSIGHT:** Se sua loja não tem programa de reviews, considere implementar.\n\n";
+        }
+
+        // Categorias
+        if (! empty($categoriasConcorrentes)) {
+            arsort($categoriasConcorrentes);
+            $topCategorias = array_slice($categoriasConcorrentes, 0, 5, true);
+
+            $output .= "### Categorias Foco dos Concorrentes\n\n";
+            foreach ($topCategorias as $cat => $mencoes) {
+                $output .= "- **{$cat}** ({$mencoes} menções)\n";
+            }
+            $output .= "\n";
+
+            // Oportunidades
+            $catsConcorrentes = array_keys($topCategorias);
+            $catsLoja = is_array($categoriasFoco) ? array_keys($categoriasFoco) : [];
+            $oportunidades = array_diff($catsConcorrentes, $catsLoja);
+            if (! empty($oportunidades)) {
+                $output .= "**Oportunidade:** Concorrentes focam em categorias que você não tem: ".implode(', ', array_slice($oportunidades, 0, 3))."\n\n";
+            }
+        }
+
+        // Promoções
+        $mediaPromosConcorrentes = count($competitorsValidos) > 0 ? round($promocoesConcorrentes / count($competitorsValidos)) : 0;
+        $output .= "### Promoções\n\n";
+        $output .= "| | Quantidade |\n";
+        $output .= "|---|------|\n";
+        $output .= "| **Sua Loja** | {$promocoesAtivas} promoções ativas |\n";
+        $output .= "| **Média Concorrentes** | {$mediaPromosConcorrentes} promoções |\n\n";
+
+        if ($promocoesAtivas < $mediaPromosConcorrentes * 0.5) {
+            $output .= "⚠️ **ALERTA:** Você tem bem menos promoções que a concorrência.\n\n";
+        }
+
+        return $output;
     }
 
     /**

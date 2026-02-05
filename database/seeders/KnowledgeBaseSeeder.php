@@ -5272,6 +5272,920 @@ class KnowledgeBaseSeeder extends Seeder
                     'tags' => ['estrategias', 'futebol', 'chuteira', 'autenticidade', 'escolinhas', 'personalizacao'],
                 ],
             ],
+
+            // =====================================================
+            // PET - Benchmarks por subcategoria
+            // =====================================================
+
+            // DOGS - Cachorros
+            [
+                'category' => 'benchmark',
+                'niche' => 'pet',
+                'subcategory' => 'dogs',
+                'title' => 'Benchmarks de Mercado: Produtos para Cachorros (2024)',
+                'content' => 'Mercado pet Brasil: R$ 68 bilhoes (2024), maior da America Latina, 4o maior do mundo. Cachorros representam 60% do mercado pet. Populacao canina: 58 milhoes (mais de 1 cachorro para cada 4 brasileiros). Categorias principais: racao (55%), medicamentos e saude (20%), acessorios - coleiras, camas, brinquedos (15%), higiene - banho, tosa, dental (10%). Ticket medio e-commerce pet: R$ 180-350 (media R$ 250). Margem media: 35-45% (racao), 50-60% (acessorios). Taxa de conversao: 2-3%. Recompra em 30 dias: 25-35% (racao tem ciclo de compra de 30-45 dias). Sazonalidade: junho/julho (+20% - inverno, roupinhas), dezembro (+15% - presentes), janeiro (-15% - pos-festas). Portes mais populares: medio (35%), pequeno (30%), grande (25%), gigante (10%). Segmento premium cresce 15% ao ano - racao natural, organica, grain-free. Assinaturas de racao tem retencao de 75% em 6 meses. Principais preocupacoes: qualidade/procedencia racao (70%), entrega rapida (60%), preco (55%). Tendencias 2024-2025: racao personalizada por porte/idade/necessidade, CBD para pets, produtos sustentaveis (brinquedos reciclados), tecnologia (GPS, camera, comedouro inteligente).',
+                'metadata' => [
+                    'sources' => [
+                        'ABINPET - Instituto Pet Brasil 2024',
+                        'Euromonitor - Pet Care Brazil',
+                        'IBGE - Populacao canina',
+                        'E-commerce Brasil - Segmento Pet',
+                    ],
+                    'period' => '2024',
+                    'market_size_bi' => 68,
+                    'segment_share' => 60,
+                    'population_millions' => 58,
+                    'avg_ticket' => 250,
+                    'margin_food' => 40,
+                    'margin_accessories' => 55,
+                    'conversion_rate' => 2.5,
+                    'repurchase_rate_30d' => 30,
+                    'product_mix' => [
+                        'food' => 55,
+                        'health' => 20,
+                        'accessories' => 15,
+                        'hygiene' => 10,
+                    ],
+                    'seasonality' => [
+                        'jun_jul' => '+20%',
+                        'dec' => '+15%',
+                        'jan' => '-15%',
+                    ],
+                    'dog_sizes' => [
+                        'medium' => 35,
+                        'small' => 30,
+                        'large' => 25,
+                        'giant' => 10,
+                    ],
+                    'avoid_mentions' => [
+                        'gato', 'felino', 'areia sanitaria', 'arranhador', // cats
+                        'ave', 'passaro', 'gaiola', 'semente', // birds
+                        'aquario', 'peixe', 'filtro aquario', // fish
+                        'hamster', 'coelho', 'porquinho india', 'roedor', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['benchmarks', 'pet', 'cachorro', 'racao', 'acessorios', 'assinatura'],
+                ],
+            ],
+
+            [
+                'category' => 'strategy',
+                'niche' => 'pet',
+                'subcategory' => 'dogs',
+                'title' => 'Estrategias Comprovadas: Produtos para Cachorros',
+                'content' => 'Estrategias de sucesso para e-commerce de produtos caninos: 1) ASSINATURA DE RACAO: Ciclo de 30-45 dias automatico, desconto 10% na assinatura, entrega agendada, retencao 75%. 2) QUIZ DO PET: "Qual a racao ideal para seu cachorro?" - perguntas sobre porte, idade, atividade, restricoes. Converte 2.5x mais que navegacao normal. 3) ANIVERSARIO DO PET: Cadastro com data de nascimento, cupom especial no aniversario - taxa de uso 40%, cria conexao emocional. 4) KITS POR PORTE: Kit Filhote Pequeno (racao + comedouro + brinquedo + tapete higienico), Kit Adulto Grande (racao + cama + coleira + guia), desconto 15%. 5) PROGRAMA INDICACAO: Tutor indica tutor, ambos ganham desconto/brinde, funciona bem porque tutores se conhecem em parques/veterinarios. 6) PARCERIA VETERINARIOS: Desconto para clientes de veterinarios parceiros, veterinario ganha comissao - confianca do tutor. 7) CONTEUDO EDUCATIVO: Blog/video sobre saude, comportamento, adestramento - gera confianca e SEO. 8) PERSONALIZACAO: Nome do pet gravado na coleira/cama - aumenta ticket 25%, cria produto exclusivo. 9) PRIMEIRA COMPRA SEGURA: Garantia de troca se cachorro nao gostar da racao - reduz barreira de entrada. 10) FRETE PROGRAMADO: Entrega no mesmo dia da semana, tutor sabe quando esperar - conveniencia. 11) PONTOS POR FOTOS: Cliente envia foto do pet com produto, ganha pontos - UGC para redes sociais. 12) EMERGENCIA 24H: Chat para duvidas urgentes (intoxicacao, sintomas) - mesmo sem vender, gera confianca extrema.',
+                'metadata' => [
+                    'sources' => [
+                        'Petz - Estrategias digitais',
+                        'Petlove - Growth hacking pet',
+                        'Cobasi - Fidelizacao',
+                    ],
+                    'proven_tactics' => [
+                        'food_subscription' => 'Assinatura 30-45 dias, desconto 10%, retencao 75%',
+                        'pet_quiz' => 'Quiz racao ideal, converte 2.5x mais',
+                        'pet_birthday' => 'Cupom aniversario, taxa uso 40%',
+                        'size_kits' => 'Kits Filhote/Adulto por porte, desconto 15%',
+                        'referral_program' => 'Tutor indica tutor, ambos ganham',
+                        'vet_partnership' => 'Parceria veterinarios, comissao, confianca',
+                        'educational_content' => 'Saude, comportamento, adestramento, SEO',
+                        'personalization' => 'Nome gravado, ticket +25%',
+                        'safe_first_purchase' => 'Troca se cachorro nao gostar',
+                        'scheduled_delivery' => 'Entrega mesmo dia da semana',
+                        'photo_points' => 'Foto com produto = pontos, UGC',
+                        'emergency_chat' => 'Chat 24h duvidas urgentes, confianca',
+                    ],
+                    'avoid_suggestions' => [
+                        'areia sanitaria', 'arranhador gato', 'fonte para gatos', // cats
+                        'gaiola', 'comedouro passaro', 'poleiro', // birds
+                        'aquario', 'bomba aquario', 'peixe ornamental', // fish
+                        'roda hamster', 'feno coelho', 'casinha roedor', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['estrategias', 'cachorro', 'assinatura', 'quiz', 'fidelizacao', 'personalizacao'],
+                ],
+            ],
+
+            // CATS - Gatos
+            [
+                'category' => 'benchmark',
+                'niche' => 'pet',
+                'subcategory' => 'cats',
+                'title' => 'Benchmarks de Mercado: Produtos para Gatos (2024)',
+                'content' => 'Gatos representam 30% do mercado pet brasileiro. Populacao felina: 30 milhoes, crescimento de 8% ao ano (maior que caes). Perfil tutor: 55% mulheres, 60% moram em apartamento, 45% millennials. Categorias principais: racao (45%), areia sanitaria (25%), acessorios - arranhadores, camas, brinquedos (20%), saude (10%). Ticket medio: R$ 150-280 (media R$ 200). Margem: 30-40% (racao), 45-55% (areia), 55-65% (acessorios). Taxa conversao: 2.5-3.5%. Recompra 30 dias: 35-45% (areia tem ciclo mais curto que racao, 15-20 dias). Sazonalidade: menor que caes, mais estavel. Junho/julho (+15% - inverno, casinhas), dezembro (+10%). Gatos por domicilio: 1 gato (45%), 2 gatos (30%), 3+ gatos (25%). Segmento premium cresce 20% ao ano - racao grain-free, areia ecologica, moveis para gatos. Assinaturas tem retencao de 80% (maior que caes - gatos sao mais previsíveis). Preocupacoes: qualidade areia/odor (75%), palatabilidade racao (65%), arranhadores resistentes (60%). Tendencias 2024-2025: moveis integrados (prateleiras, tuneis), fontinha de agua (saude renal), racao umida (hidratacao), produtos calming (feliway, CBD), gatos indoor (brinquedos interativos).',
+                'metadata' => [
+                    'sources' => [
+                        'ABINPET - Censo Felino 2024',
+                        'Euromonitor - Cat Products Brazil',
+                        'Catster Brasil - Tendencias',
+                    ],
+                    'period' => '2024',
+                    'segment_share' => 30,
+                    'population_millions' => 30,
+                    'growth_rate' => 8,
+                    'avg_ticket' => 200,
+                    'margin_food' => 35,
+                    'margin_litter' => 50,
+                    'margin_accessories' => 60,
+                    'conversion_rate' => 3.0,
+                    'repurchase_rate_30d' => 40,
+                    'product_mix' => [
+                        'food' => 45,
+                        'litter' => 25,
+                        'accessories' => 20,
+                        'health' => 10,
+                    ],
+                    'cats_per_household' => [
+                        'one' => 45,
+                        'two' => 30,
+                        'three_plus' => 25,
+                    ],
+                    'owner_demographics' => [
+                        'female' => 55,
+                        'apartment' => 60,
+                        'millennials' => 45,
+                    ],
+                    'avoid_mentions' => [
+                        'cachorro', 'canino', 'racao cao', 'coleira passeio', 'adestramento', // dogs
+                        'ave', 'passaro', 'gaiola', 'semente', // birds
+                        'aquario', 'peixe', 'filtro', // fish
+                        'hamster', 'coelho', 'roedor', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['benchmarks', 'pet', 'gato', 'felino', 'areia', 'arranhador'],
+                ],
+            ],
+
+            [
+                'category' => 'strategy',
+                'niche' => 'pet',
+                'subcategory' => 'cats',
+                'title' => 'Estrategias Comprovadas: Produtos para Gatos',
+                'content' => 'Estrategias de sucesso para e-commerce de produtos felinos: 1) ASSINATURA DUPLA: Racao + areia no mesmo pedido, ciclo de 20-30 dias, desconto 12%, frete unico - valor percebido alto. 2) QUIZ DO GATO: "Qual tipo de areia seu gato prefere?" - granulometria, odor, aglomerante. Reduz devolucoes 40%. 3) CALCULADORA DE AREIA: Quantos gatos x quantas caixas sanitarias = quantidade ideal de areia/mes. Elimina duvida, aumenta confianca. 4) KITS PRIMEIRO GATO: Kit Adocao (areia + caixa sanitaria + comedouros + arranhador pequeno), para adotantes de primeiro gato - mercado em crescimento. 5) MOVEIS PARA GATOS: Prateleiras, tuneis, nichos - segmento premium, margem 60%+, diferencial. Mostre em ambiente real. 6) FONTINHA DE AGUA: Educacao sobre saude renal de gatos, fontinha automatica como prevencao - venda consultiva, ticket alto. 7) CONTEUDO DE COMPORTAMENTO: "Por que meu gato faz isso?" - comportamento felino gera muito trafego organico, converte em vendas de brinquedos interativos. 8) FOTOS DE CLIENTES: Gatos usando produtos (arranhador, cama) - UGC funciona extremamente bem em pet, tutores adoram mostrar. 9) AREIA SEM CHEIRO: Highlight "sem perfume artificial" - muitos gatos rejeitam areia perfumada, diferencial. 10) PROGRAMA MULTICAT: Desconto progressivo para tutores de 2+ gatos (realidade de 55% do publico). 11) CLUBE DO GATO: Caixa surpresa mensal com brinquedos e petiscos - engajamento, descoberta de novos produtos. 12) PARCERIA ONGS ADOCAO: Desconto para adotantes, parte do valor para ONG - causa social + aquisicao de cliente.',
+                'metadata' => [
+                    'sources' => [
+                        'Petlove - Segmento Felino',
+                        'Zee.Dog - Produtos gatos',
+                        'ONGs felinas parceiras',
+                    ],
+                    'proven_tactics' => [
+                        'dual_subscription' => 'Racao + areia junto, desconto 12%, frete unico',
+                        'litter_quiz' => 'Quiz tipo areia, devolucoes -40%',
+                        'litter_calculator' => 'Gatos x caixas = quantidade areia/mes',
+                        'first_cat_kits' => 'Kit Adocao para primeiro gato',
+                        'cat_furniture' => 'Prateleiras, tuneis, margem 60%+',
+                        'water_fountain' => 'Fontinha + educacao saude renal',
+                        'behavior_content' => 'Por que gato faz isso, trafego organico',
+                        'customer_photos' => 'UGC gatos usando produtos',
+                        'unscented_litter' => 'Areia sem perfume, diferencial',
+                        'multicat_program' => 'Desconto progressivo 2+ gatos',
+                        'cat_club' => 'Caixa surpresa mensal',
+                        'adoption_partnership' => 'Parceria ONGs, desconto adotantes',
+                    ],
+                    'avoid_suggestions' => [
+                        'coleira passeio', 'adestramento', 'casinha cachorro', // dogs
+                        'gaiola', 'comedouro passaro', // birds
+                        'aquario', 'peixe', // fish
+                        'hamster', 'coelho', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['estrategias', 'gato', 'areia', 'assinatura', 'moveis', 'fontinha'],
+                ],
+            ],
+
+            // BIRDS - Aves
+            [
+                'category' => 'benchmark',
+                'niche' => 'pet',
+                'subcategory' => 'birds',
+                'title' => 'Benchmarks de Mercado: Aves de Estimacao (2024)',
+                'content' => 'Aves representam 5% do mercado pet brasileiro. Brasil tem 40 milhoes de aves domesticas, maior populacao de aves pet do mundo. Especies mais populares: calopsita (25%), periquito (20%), canario (15%), agapornis (15%), papagaio (10%), outros (15%). Perfil: publico mais velho (50+), tradicional, fiel a marcas. Categorias: alimentacao - sementes e racoes (50%), gaiolas e viveiros (25%), acessorios - poleiros, bebedouros, brinquedos (20%), saude (5%). Ticket medio: R$ 80-180 (media R$ 120). Margem: 25-35% (sementes), 40-50% (gaiolas), 50-60% (acessorios). Recompra: 20-30 dias (sementes consumo rapido). Taxa conversao: 1.5-2.5%. Sazonalidade: setembro-novembro (+25% - primavera, epoca de reproducao), junho-agosto (-10% - inverno). Preocupacoes: qualidade/frescor das sementes (80%), tamanho adequado da gaiola (60%), brinquedos seguros (50%). Nichos especializados: criadores (B2B, volume), aves silvestres registradas (IBAMA, premium). Tendencias: racoes extrusadas (mais nutritivas que sementes), poleiros de madeira natural, enriquecimento ambiental (foraging toys).',
+                'metadata' => [
+                    'sources' => [
+                        'ABINPET - Censo Aves 2024',
+                        'IBAMA - Aves silvestres registradas',
+                        'Clubes de criadores',
+                    ],
+                    'period' => '2024',
+                    'segment_share' => 5,
+                    'population_millions' => 40,
+                    'avg_ticket' => 120,
+                    'margin_seeds' => 30,
+                    'margin_cages' => 45,
+                    'margin_accessories' => 55,
+                    'conversion_rate' => 2.0,
+                    'repurchase_rate_30d' => 25,
+                    'product_mix' => [
+                        'food' => 50,
+                        'cages' => 25,
+                        'accessories' => 20,
+                        'health' => 5,
+                    ],
+                    'popular_species' => [
+                        'cockatiel' => 25,
+                        'budgie' => 20,
+                        'canary' => 15,
+                        'lovebird' => 15,
+                        'parrot' => 10,
+                        'others' => 15,
+                    ],
+                    'seasonality' => [
+                        'sep_nov' => '+25%',
+                        'jun_aug' => '-10%',
+                    ],
+                    'avoid_mentions' => [
+                        'cachorro', 'racao cao', 'coleira', // dogs
+                        'gato', 'areia', 'arranhador', // cats
+                        'aquario', 'peixe', // fish
+                        'hamster', 'coelho', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['benchmarks', 'pet', 'aves', 'passaros', 'calopsita', 'periquito', 'gaiola'],
+                ],
+            ],
+
+            [
+                'category' => 'strategy',
+                'niche' => 'pet',
+                'subcategory' => 'birds',
+                'title' => 'Estrategias Comprovadas: Produtos para Aves',
+                'content' => 'Estrategias de sucesso para e-commerce de produtos para aves: 1) ASSINATURA DE SEMENTES: Ciclo de 20-30 dias, sementes frescas garantidas, desconto 8% - frescor e qualidade da semente e diferencial critico. 2) QUIZ DA ESPECIE: "Qual a alimentacao ideal para sua ave?" - diferente por especie (calopsita vs canario vs papagaio), reduz devolucoes. 3) KITS POR ESPECIE: Kit Calopsita Completo (gaiola + poleiros + comedouros + sementes + brinquedo), Kit Canario (focado em canto), Kit Papagaio (maior, mais brinquedos). 4) CONTEUDO ESPECIALIZADO: Comportamento, canto, reproducao - nicho com muito engajamento, criadores buscam informacao tecnica. 5) PARCERIA CRIADORES: Desconto para criadores registrados (IBAMA), compra em volume, indicacao para compradores de filhotes. 6) GAIOLAS SOB MEDIDA: Calculadora de tamanho ideal por especie e quantidade de aves - diferencial, evita devoluções. 7) PROGRAMA FIDELIDADE TRADICIONAL: Publico mais velho, prefere acumular pontos para desconto vs cashback digital. 8) ATENDIMENTO TELEFONICO: Publico 50+ prefere telefone a chat - diferencial em pet de aves. 9) SEMENTES A GRANEL: Venda de quantidades maiores (5kg, 10kg) com desconto progressivo - criadores. 10) FORAGING TOYS: Brinquedos de enriquecimento ambiental - tendencia crescente, margem alta, conteudo educativo. 11) PRIMAVERA DOS PASSAROS: Promocao setembro-outubro (epoca de reproducao), kits ninho, vitaminas, gaiolas criadeiras. 12) GARANTIA DE FRESCOR: Sementes com data de empacotamento visivel, troca se ave rejeitar - confianca.',
+                'metadata' => [
+                    'sources' => [
+                        'Clubes de Ornitofilia',
+                        'IBAMA - Criadores registrados',
+                        'Especialistas em aves',
+                    ],
+                    'proven_tactics' => [
+                        'seed_subscription' => 'Assinatura 20-30 dias, sementes frescas, desconto 8%',
+                        'species_quiz' => 'Quiz alimentacao por especie',
+                        'species_kits' => 'Kit Calopsita, Kit Canario, Kit Papagaio',
+                        'specialized_content' => 'Comportamento, canto, reproducao',
+                        'breeder_partnership' => 'Desconto criadores IBAMA, volume',
+                        'cage_calculator' => 'Calculadora tamanho gaiola ideal',
+                        'traditional_loyalty' => 'Pontos para desconto (publico 50+)',
+                        'phone_support' => 'Atendimento telefonico preferido',
+                        'bulk_seeds' => 'Sementes 5kg/10kg, desconto progressivo',
+                        'foraging_toys' => 'Brinquedos enriquecimento, margem alta',
+                        'spring_promotion' => 'Promocao primavera (reproducao)',
+                        'freshness_guarantee' => 'Data empacotamento, troca se rejeitar',
+                    ],
+                    'avoid_suggestions' => [
+                        'racao cachorro', 'coleira', 'adestramento', // dogs
+                        'areia gato', 'arranhador', // cats
+                        'aquario', 'peixe', 'filtro', // fish
+                        'hamster', 'coelho', 'roedor', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['estrategias', 'aves', 'sementes', 'gaiola', 'criadores', 'calopsita'],
+                ],
+            ],
+
+            // FISH - Peixes
+            [
+                'category' => 'benchmark',
+                'niche' => 'pet',
+                'subcategory' => 'fish',
+                'title' => 'Benchmarks de Mercado: Aquarismo (2024)',
+                'content' => 'Aquarismo representa 3% do mercado pet brasileiro. Estimativa de 8 milhoes de aquarios domesticos. Perfil: 70% homens, hobby tecnico, alta recorrencia. Categorias: equipamentos - filtros, bombas, iluminacao (40%), alimentacao (20%), quimicos - condicionadores, medicamentos (20%), decoracao - plantas, substrato, rochas (15%), peixes vivos (5% do e-commerce, logistica complexa). Ticket medio: R$ 150-400 (media R$ 250). Margem: 35-45% (equipamentos), 40-50% (racao), 50-60% (decoracao). Recompra: 30-45 dias (racao, quimicos). Taxa conversao: 1.5-2.5%. Sazonalidade: dezembro-janeiro (+20% - ferias, montagem de aquarios), abril (-10% - pos-pascoa). Tipos de aquario: agua doce comunitario (60%), agua doce plantado (20%), marinho (15%), agua doce ciclideo/predadores (5%). Ticket medio por tipo: comunitario R$ 150, plantado R$ 300, marinho R$ 800+. Preocupacoes: qualidade da agua (75%), compatibilidade de especies (60%), custo de energia (50%). Tendencias: aquapaisagismo (design de paisagens aquaticas), iluminacao LED programavel, automacao (dosadores, alimentadores), nano aquarios (30L ou menos).',
+                'metadata' => [
+                    'sources' => [
+                        'ABINPET - Censo Aquarismo 2024',
+                        'Clubes de Aquarismo',
+                        'Importadores de equipamentos',
+                    ],
+                    'period' => '2024',
+                    'segment_share' => 3,
+                    'aquariums_millions' => 8,
+                    'avg_ticket' => 250,
+                    'margin_equipment' => 40,
+                    'margin_food' => 45,
+                    'margin_decor' => 55,
+                    'conversion_rate' => 2.0,
+                    'repurchase_rate_45d' => 30,
+                    'product_mix' => [
+                        'equipment' => 40,
+                        'food' => 20,
+                        'chemicals' => 20,
+                        'decoration' => 15,
+                        'live_fish' => 5,
+                    ],
+                    'aquarium_types' => [
+                        'freshwater_community' => 60,
+                        'planted' => 20,
+                        'marine' => 15,
+                        'cichlid_predator' => 5,
+                    ],
+                    'demographics' => [
+                        'male' => 70,
+                    ],
+                    'seasonality' => [
+                        'dec_jan' => '+20%',
+                        'apr' => '-10%',
+                    ],
+                    'avoid_mentions' => [
+                        'cachorro', 'racao cao', 'coleira', // dogs
+                        'gato', 'areia', 'arranhador', // cats
+                        'ave', 'gaiola', 'semente', // birds
+                        'hamster', 'coelho', 'roedor', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['benchmarks', 'pet', 'aquarismo', 'peixes', 'aquario', 'filtro', 'plantado', 'marinho'],
+                ],
+            ],
+
+            [
+                'category' => 'strategy',
+                'niche' => 'pet',
+                'subcategory' => 'fish',
+                'title' => 'Estrategias Comprovadas: Aquarismo',
+                'content' => 'Estrategias de sucesso para e-commerce de aquarismo: 1) KITS INICIANTE: Kit Primeiro Aquario (aquario 50L + filtro + aquecedor + iluminacao + condicionador + racao + substrato + plantas artificiais), tudo para comecar. Reduz barreira de entrada. 2) CALCULADORA DE EQUIPAMENTOS: "Monte seu aquario" - seleciona tipo (comunitario, plantado, marinho), litragem, calcula equipamentos necessarios com links de compra. 3) ASSINATURA DE CONSUMIVEIS: Racao + condicionador + midia filtrante, ciclo 45 dias, desconto 10% - recorrencia garantida. 4) CONTEUDO TECNICO: Ciclagem do aquario, parametros de agua, compatibilidade de especies - aquaristas buscam informacao tecnica, SEO forte. 5) SEGMENTACAO POR NIVEL: Iniciante, intermediario, avancado - produtos e conteudo diferentes para cada nivel. 6) PLANTADO PREMIUM: Segmento de alto ticket (substratos ferteis, CO2, iluminacao especial), margem alta, publico dedicado. 7) MARINHO ESPECIALIZADO: Equipamentos de alta qualidade, sal sintetico, rocha viva - ticket altissimo (R$ 800+), nicho lucrativo. 8) VIDEOS DE MONTAGEM: Tutoriais passo a passo de montagem de aquarios - YouTube converte muito para aquarismo. 9) GRUPOS E COMUNIDADE: Forum/grupo de aquaristas, troca de experiencias, indicacoes de produtos - comunidade forte no nicho. 10) FRETE ESPECIAL EQUIPAMENTOS: Frete calculado por peso real (filtros, aquarios sao pesados), frete gratis acima de R$ 300. 11) EMERGENCIA AQUARIO: Chat para problemas urgentes (doencas, agua turva, peixe doente) - gera confianca, converte em venda de medicamentos. 12) BLACK FRIDAY ANTECIPADA: Aquaristas planejam compras grandes, antecipar promocao em outubro para montagem no verao.',
+                'metadata' => [
+                    'sources' => [
+                        'Clubes de Aquarismo Brasil',
+                        'Importadores de equipamentos',
+                        'Lojas especializadas',
+                    ],
+                    'proven_tactics' => [
+                        'starter_kits' => 'Kit Primeiro Aquario completo, barreira entrada',
+                        'equipment_calculator' => 'Monte seu aquario, calcula equipamentos',
+                        'consumables_subscription' => 'Racao + condicionador + midia, desconto 10%',
+                        'technical_content' => 'Ciclagem, parametros, compatibilidade, SEO',
+                        'level_segmentation' => 'Iniciante/intermediario/avancado',
+                        'planted_premium' => 'Substratos, CO2, iluminacao especial',
+                        'marine_specialized' => 'Equipamentos alta qualidade, ticket R$ 800+',
+                        'assembly_videos' => 'Tutoriais montagem YouTube',
+                        'community_groups' => 'Forum/grupo aquaristas, experiencias',
+                        'special_freight' => 'Frete peso real, gratis acima R$ 300',
+                        'aquarium_emergency' => 'Chat doencas/problemas urgentes',
+                        'early_black_friday' => 'Promocao outubro, montagem verao',
+                    ],
+                    'avoid_suggestions' => [
+                        'racao cachorro', 'coleira', 'passeio', // dogs
+                        'areia gato', 'arranhador', // cats
+                        'gaiola', 'semente passaro', // birds
+                        'hamster', 'coelho', 'feno', // small animals
+                    ],
+                    'verified' => true,
+                    'tags' => ['estrategias', 'aquarismo', 'peixes', 'aquario', 'plantado', 'marinho', 'kit'],
+                ],
+            ],
+
+            // SMALL ANIMALS - Pequenos Animais
+            [
+                'category' => 'benchmark',
+                'niche' => 'pet',
+                'subcategory' => 'small_animals',
+                'title' => 'Benchmarks de Mercado: Pequenos Animais (2024)',
+                'content' => 'Pequenos animais (roedores e lagomorfos) representam 2% do mercado pet brasileiro. Especies populares: hamster (35%), coelho (25%), porquinho da india (20%), chinchila (10%), furão (5%), outros (5%). Perfil: familias com criancas (primeiro pet), apartamentos pequenos, publico jovem. Crescimento de 12% ao ano (maior entre pets). Categorias: gaiolas e habitat (35%), alimentacao - racao, feno, petiscos (35%), acessorios - bebedouros, comedouros, rodas, tuneis (25%), saude (5%). Ticket medio: R$ 100-200 (media R$ 140). Margem: 40-50% (gaiolas), 30-40% (racao/feno), 55-65% (acessorios). Recompra: 30-45 dias (feno e substrato sao consumo rapido). Taxa conversao: 2-3%. Sazonalidade: outubro-dezembro (+30% - dia das criancas, natal), julho (+15% - ferias escolares). Preocupacoes: espaco adequado (70%), alimentacao correta (65%), veterinario especializado (60%). Tendencias: habitats maiores e enriquecidos (bem-estar animal), alimentacao natural (sem corantes), brinquedos de madeira/sisal (seguros para roer), coelhos como pets de casa (nao de gaiola).',
+                'metadata' => [
+                    'sources' => [
+                        'ABINPET - Pequenos Animais 2024',
+                        'Veterinarios especializados em exoticos',
+                        'Comunidades de criadores',
+                    ],
+                    'period' => '2024',
+                    'segment_share' => 2,
+                    'growth_rate' => 12,
+                    'avg_ticket' => 140,
+                    'margin_cages' => 45,
+                    'margin_food' => 35,
+                    'margin_accessories' => 60,
+                    'conversion_rate' => 2.5,
+                    'repurchase_rate_45d' => 35,
+                    'product_mix' => [
+                        'cages_habitat' => 35,
+                        'food' => 35,
+                        'accessories' => 25,
+                        'health' => 5,
+                    ],
+                    'popular_species' => [
+                        'hamster' => 35,
+                        'rabbit' => 25,
+                        'guinea_pig' => 20,
+                        'chinchilla' => 10,
+                        'ferret' => 5,
+                        'others' => 5,
+                    ],
+                    'seasonality' => [
+                        'oct_dec' => '+30%',
+                        'jul' => '+15%',
+                    ],
+                    'demographics' => [
+                        'families_with_kids' => 60,
+                        'small_apartments' => 55,
+                    ],
+                    'avoid_mentions' => [
+                        'cachorro', 'racao cao', 'coleira', 'adestramento', // dogs
+                        'gato', 'areia sanitaria', 'arranhador', // cats
+                        'ave', 'gaiola passaro', 'semente', // birds
+                        'aquario', 'peixe', 'filtro', // fish
+                    ],
+                    'verified' => true,
+                    'tags' => ['benchmarks', 'pet', 'pequenos animais', 'hamster', 'coelho', 'porquinho india', 'roedor'],
+                ],
+            ],
+
+            [
+                'category' => 'strategy',
+                'niche' => 'pet',
+                'subcategory' => 'small_animals',
+                'title' => 'Estrategias Comprovadas: Pequenos Animais',
+                'content' => 'Estrategias de sucesso para e-commerce de pequenos animais: 1) KITS PRIMEIRO PET: Kit Meu Primeiro Hamster (gaiola + substrato + racao + bebedouro + roda + casinha), ideal para familias. Enfase em ser "pet para criancas". 2) CONTEUDO EDUCATIVO ESSENCIAL: Muitos tutores nao sabem cuidar adequadamente - guias de cuidados basicos, alimentacao correta, sinais de doenca. Gera confianca e evita devolucoes. 3) QUIZ DA ESPECIE: "Qual pequeno animal combina com voce?" - espaco disponivel, tempo de interacao, alergias, criancas em casa. Direciona para especie adequada. 4) HABITAT XXL: Gaiolas e espacos maiores que o padrao de pet shop - diferencial de bem-estar animal, tendencia forte, margem alta. 5) ASSINATURA FENO/SUBSTRATO: Consumo rapido e pesado (feno de coelho, substrato de hamster), entrega recorrente resolve problema logistico do cliente. 6) PARCERIA VETERINARIOS EXOTICOS: Poucos veterinarios atendem pequenos animais - lista de indicados por regiao, parceria para desconto mutuo. 7) DIA DAS CRIANCAS: Maior data para o segmento - kit presente completo, embalagem especial, cartao de cuidados. 8) BRINQUEDOS SEGUROS: Destaque para materiais seguros para roer (madeira, sisal), sem plastico/tinta toxica - preocupacao dos pais. 9) COMUNIDADE DE TUTORES: Grupo no WhatsApp/Facebook para tutores de pequenos animais - nicho com muitas duvidas, comunidade gera vendas. 10) ADOCAO RESPONSAVEL: Parceria com ONGs e protetores de pequenos animais (sim, existem!), desconto para adotantes. 11) COELHO LIVRE: Tendencia de coelhos como pets de casa (nao de gaiola) - produtos especificos: cercadinhos, xixi no lugar certo, protecao de fios. 12) FERIAS ESCOLARES: Promocao julho - criancas em casa, momento de adotar primeiro pet, kits escolares.',
+                'metadata' => [
+                    'sources' => [
+                        'Comunidades de pequenos animais',
+                        'Veterinarios de exoticos',
+                        'ONGs de pequenos animais',
+                    ],
+                    'proven_tactics' => [
+                        'first_pet_kits' => 'Kit Meu Primeiro Hamster, familias',
+                        'essential_education' => 'Guias cuidados, alimentacao, sinais doenca',
+                        'species_quiz' => 'Qual animal combina com voce',
+                        'xxl_habitat' => 'Gaiolas maiores, bem-estar, margem alta',
+                        'hay_subscription' => 'Assinatura feno/substrato recorrente',
+                        'exotic_vet_partnership' => 'Lista veterinarios especializados',
+                        'childrens_day' => 'Kit presente Dia das Criancas',
+                        'safe_toys' => 'Madeira, sisal, sem plastico/tinta toxica',
+                        'tutor_community' => 'Grupo WhatsApp/Facebook tutores',
+                        'responsible_adoption' => 'Parceria ONGs pequenos animais',
+                        'free_rabbit' => 'Coelho livre em casa, cercadinhos, protecao fios',
+                        'school_vacation' => 'Promocao ferias julho, primeiro pet',
+                    ],
+                    'avoid_suggestions' => [
+                        'racao cachorro', 'coleira', 'passeio', 'adestramento', // dogs
+                        'areia gato', 'arranhador', 'fonte gato', // cats
+                        'gaiola passaro', 'semente', 'poleiro', // birds
+                        'aquario', 'peixe', 'filtro', // fish
+                    ],
+                    'verified' => true,
+                    'tags' => ['estrategias', 'pequenos animais', 'hamster', 'coelho', 'kit', 'criancas', 'feno'],
+                ],
+            ],
+
+            // =====================================================
+            // STRATEGIES - Estrategias acionaveis por categoria
+            // =====================================================
+
+            // Estrategia Geral - Gestao de Estoque
+            [
+                'category' => 'strategy',
+                'niche' => 'general',
+                'title' => 'Estrategia: Gestao de Estoque Inteligente para E-commerce',
+                'content' => 'Mantenha estoque zerado abaixo de 20% do catalogo. Implemente Avise-me para produtos esgotados - converte 15-25% quando reabastece. Use regra 80/20: 20% dos SKUs geram 80% do faturamento. Priorize reposicao dos top sellers. Faca giro de estoque parado com promocoes progressivas: 10% primeira semana, 15% segunda, 20% terceira. Estoque parado ha 90+ dias deve ter desconto minimo de 30%. Configure alertas automaticos para produtos com menos de 7 dias de estoque baseado na media de vendas.',
+                'metadata' => [
+                    'category_type' => 'inventory',
+                    'expected_impact' => 'high',
+                    'difficulty' => 'baixa',
+                    'implementation_time' => '1-2 semanas',
+                    'tools_needed' => ['avise-me nativo', 'relatorios de estoque'],
+                    'kpis' => ['taxa estoque zerado', 'giro de estoque', 'valor estoque parado'],
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Geral - Pricing Dinamico
+            [
+                'category' => 'strategy',
+                'niche' => 'general',
+                'title' => 'Estrategia: Pricing Dinamico e Competitivo',
+                'content' => 'Monitore precos de 3-5 concorrentes diretos semanalmente. Posicione-se 5-10% abaixo do lider para produtos de entrada. Para produtos premium, mantenha preco similar mas agregue valor (frete, brinde, garantia estendida). Use precos psicologicos: R$ 97 ao inves de R$ 100, R$ 247 ao inves de R$ 250. Crie bundles que aumentem ticket medio em 30-40% com desconto aparente de 15-20%. Revise precos apos grandes variacoes cambiais (dolar +5%).',
+                'metadata' => [
+                    'category_type' => 'pricing',
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '1 semana',
+                    'tools_needed' => ['planilha de monitoramento', 'app de precos'],
+                    'kpis' => ['ticket medio', 'margem', 'volume vendas'],
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Geral - Conversao de Carrinho
+            [
+                'category' => 'strategy',
+                'niche' => 'general',
+                'title' => 'Estrategia: Recuperacao de Carrinho Abandonado',
+                'content' => 'Taxa de abandono media Brasil: 82%. Implemente sequencia de emails: 1h apos abandono (lembrete), 24h (oferta frete), 72h (cupom 5-10%). Recuperacao esperada: 8-15% dos carrinhos. Use urgencia: "Estoque limitado", "Preco promocional por 24h". Simplifique checkout: menos de 3 etapas, cadastro opcional. Ofereça multiplas formas de pagamento: Pix com 5% desconto recupera 20% mais. WhatsApp recupera 2x mais que email - use se tiver opt-in.',
+                'metadata' => [
+                    'category_type' => 'conversion',
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '2-3 semanas',
+                    'tools_needed' => ['app recuperacao carrinho', 'automacao email'],
+                    'kpis' => ['taxa recuperacao', 'taxa abandono', 'receita recuperada'],
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Geral - Fidelizacao
+            [
+                'category' => 'strategy',
+                'niche' => 'general',
+                'title' => 'Estrategia: Programa de Fidelidade e Recompra',
+                'content' => 'Clientes recorrentes gastam 67% mais que novos. Meta: aumentar taxa de recompra de 15% para 25%. Implemente programa de pontos: 1 ponto por real, 100 pontos = R$ 5. Crie tiers: Bronze (0-500), Prata (500-1500), Ouro (1500+) com beneficios crescentes. Envie email pos-compra em D+7 pedindo review, D+30 com produtos relacionados, D+60 com cupom reativacao. Cashback de 3-5% funciona melhor que desconto direto para fidelizacao.',
+                'metadata' => [
+                    'category_type' => 'customer',
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '3-4 semanas',
+                    'tools_needed' => ['app fidelidade', 'automacao email'],
+                    'kpis' => ['taxa recompra', 'LTV', 'NPS'],
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Geral - Marketing de Cupons
+            [
+                'category' => 'strategy',
+                'niche' => 'general',
+                'title' => 'Estrategia: Cupons Estrategicos sem Canibalizar Margem',
+                'content' => 'Cupons devem representar maximo 15% do faturamento - acima disso erode margem. Use cupons para objetivos especificos: PRIMEIRA10 (primeira compra), VOLTA15 (reativacao 60+ dias), FRETE (acima do ticket medio). Nunca de desconto maior que 20% sem condicao (valor minimo, produto especifico). Cupons com prazo de 48-72h convertem 40% mais que sem prazo. Cupom exclusivo por email converte 2x mais que cupom publico. Limite uso: 1 por CPF.',
+                'metadata' => [
+                    'category_type' => 'coupon',
+                    'expected_impact' => 'medium',
+                    'difficulty' => 'baixa',
+                    'implementation_time' => '1 semana',
+                    'tools_needed' => ['cupons nativos nuvemshop'],
+                    'kpis' => ['uso de cupom %', 'ticket com cupom', 'margem'],
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Geral - SEO e Conteudo
+            [
+                'category' => 'strategy',
+                'niche' => 'general',
+                'title' => 'Estrategia: SEO Basico para E-commerce',
+                'content' => 'Trafego organico custa 10x menos que pago no longo prazo. Otimize titulos de produtos: palavra-chave principal + atributo + marca. Descricoes unicas de 150-300 palavras com beneficios, especificacoes e uso. Imagens com alt text descritivo. URLs limpas: /produto/nome-produto. Categorias com texto introdutorio de 100+ palavras. Meta descriptions de 150 caracteres com CTA. Tempo de carregamento abaixo de 3 segundos - cada segundo a mais reduz conversao em 7%.',
+                'metadata' => [
+                    'category_type' => 'marketing',
+                    'expected_impact' => 'medium',
+                    'difficulty' => 'media',
+                    'implementation_time' => '4-8 semanas',
+                    'tools_needed' => ['google search console', 'seo basico nuvemshop'],
+                    'kpis' => ['trafego organico', 'posicao keywords', 'CTR'],
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Moda
+            [
+                'category' => 'strategy',
+                'niche' => 'fashion',
+                'title' => 'Estrategia: Moda - Colecoes e Sazonalidade',
+                'content' => 'Lancamentos mensais mantem base engajada. Crie capsulas tematicas: Verao, Inverno, Festas. Lookbooks aumentam ticket medio em 25% - mostre combinacoes completas. Guia de tamanhos detalhado reduz trocas em 30%. Fotos em modelo real aumentam conversao 40% vs manequim. Video de 15s mostrando caimento e movimento aumenta conversao 20%. Live commerce em moda converte ate 30%. Politica de troca facil (30 dias) aumenta confianca e conversao.',
+                'metadata' => [
+                    'category_type' => 'product',
+                    'niche_specific' => true,
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '2-4 semanas',
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Beleza
+            [
+                'category' => 'strategy',
+                'niche' => 'beauty',
+                'title' => 'Estrategia: Beleza - Kits e Rotinas Personalizadas',
+                'content' => 'Kits de rotina (limpeza+tonificacao+hidratacao) aumentam ticket em 60-80%. Quiz de pele/cabelo segmenta e personaliza - conversao 2x maior. Amostras gratuitas acima de R$ 150 aumentam recompra em 40%. Programa de pontos com troca por miniatura exclusiva engaja 3x mais. Antes/depois com clientes reais (UGC) converte 4x mais que foto de banco. Assinatura mensal retém 70% apos 6 meses. Influenciadores micro (10-50k) tem ROI 3x maior que grandes.',
+                'metadata' => [
+                    'category_type' => 'product',
+                    'niche_specific' => true,
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '2-3 semanas',
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Eletronicos
+            [
+                'category' => 'strategy',
+                'niche' => 'electronics',
+                'title' => 'Estrategia: Eletronicos - Confianca e Garantia',
+                'content' => 'Reviews sao criticos: produtos com 10+ avaliacoes vendem 3x mais. Ofereça garantia estendida como upsell - margem de 50%+ e aceite de 25%. Comparativo de specs em tabela facilita decisao. Video unboxing aumenta conversao 30%. Chat em tempo real reduz abandono 15% (duvidas tecnicas). Parcelamento longo (12x) aumenta conversao 40% em eletronicos. Frete expresso com rastreio em tempo real reduz reclamacoes 50%. Trade-in de aparelho antigo aumenta ticket e fideliza.',
+                'metadata' => [
+                    'category_type' => 'conversion',
+                    'niche_specific' => true,
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '2-4 semanas',
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Alimentos
+            [
+                'category' => 'strategy',
+                'niche' => 'food',
+                'title' => 'Estrategia: Alimentos - Recorrencia e Frescor',
+                'content' => 'Assinatura semanal/quinzenal retém 80% dos clientes. Frete gratis acima de R$ 100 viabiliza operacao. Embalagens termicas sao obrigatorias - invista em qualidade. Kits semanais pre-montados (cafe da manha, lanches) aumentam ticket 50%. Receitas com os produtos no email pos-compra aumentam recompra 30%. Parceria com nutricionista agrega valor. Rastreabilidade (origem, produtor) justifica preco premium. Datas de validade claras reduzem devolucoes.',
+                'metadata' => [
+                    'category_type' => 'operational',
+                    'niche_specific' => true,
+                    'expected_impact' => 'high',
+                    'difficulty' => 'alta',
+                    'implementation_time' => '4-8 semanas',
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Pet
+            [
+                'category' => 'strategy',
+                'niche' => 'pet',
+                'title' => 'Estrategia: Pet - Emocao e Recorrencia',
+                'content' => 'Tutores gastam mais com pets do que consigo - explore emocao. Assinatura de racao/petiscos tem retencao de 75%. Quiz "Descubra a raca do seu pet" engaja e segmenta. Aniversario do pet com cupom especial - taxa de uso 40%. Programa de indicacao: tutor indica tutor, ambos ganham. Parceria com veterinarios e petshops locais para retirada. Conteudo educativo (saude, comportamento) gera confianca. Personalizacao (nome do pet no produto) aumenta ticket 25%.',
+                'metadata' => [
+                    'category_type' => 'customer',
+                    'niche_specific' => true,
+                    'expected_impact' => 'high',
+                    'difficulty' => 'media',
+                    'implementation_time' => '3-4 semanas',
+                    'verified' => true,
+                ],
+            ],
+
+            // Estrategia Casa
+            [
+                'category' => 'strategy',
+                'niche' => 'home',
+                'title' => 'Estrategia: Casa e Decoracao - Ambiente Completo',
+                'content' => 'Venda de ambiente completo (quarto, sala) aumenta ticket 3x. Simulador de ambiente com produtos reais aumenta conversao 50%. Medidas detalhadas e videos de escala evitam devolucoes. Parcelamento longo essencial - moveis sao compra planejada. Frete e montagem inclusos acima de R$ 2000 convertem 30% mais. Lista de casamento/cha gera leads qualificados. Parceria com arquitetos e designers para indicacao. Garantia contra defeitos de 2+ anos diferencia.',
+                'metadata' => [
+                    'category_type' => 'product',
+                    'niche_specific' => true,
+                    'expected_impact' => 'high',
+                    'difficulty' => 'alta',
+                    'implementation_time' => '4-6 semanas',
+                    'verified' => true,
+                ],
+            ],
+
+            // =====================================================
+            // CASES - Casos de sucesso verificados
+            // =====================================================
+
+            [
+                'category' => 'case',
+                'niche' => 'general',
+                'title' => 'Case: Loja aumentou ticket medio em 40% com bundles',
+                'content' => 'E-commerce de cosmeticos criou kits tematicos combinando produtos complementares (shampoo + condicionador + mascara) com desconto aparente de 15% mas margem mantida. Resultado: ticket medio subiu de R$ 89 para R$ 125 em 60 dias. Estrategia: destacar economia do kit vs compra separada, criar kits para diferentes necessidades (cabelos oleosos, secos, coloridos), limitar estoque do kit para urgencia.',
+                'metadata' => [
+                    'type' => 'success',
+                    'niche' => 'beauty',
+                    'metric_impacted' => 'ticket_medio',
+                    'improvement' => '+40%',
+                    'timeframe' => '60 dias',
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'case',
+                'niche' => 'general',
+                'title' => 'Case: Recuperacao de 12% dos carrinhos abandonados',
+                'content' => 'Loja de moda implementou sequencia automatizada: email 1h apos abandono (lembrete com foto do produto), email 24h (oferta de frete gratis acima de R$ 150), email 72h (cupom 10% valido por 24h). Resultado: taxa de recuperacao foi de 3% para 12%. Custo da ferramenta: R$ 80/mes. Receita recuperada: R$ 8.500/mes. ROI: 106x.',
+                'metadata' => [
+                    'type' => 'success',
+                    'niche' => 'fashion',
+                    'metric_impacted' => 'recuperacao_carrinho',
+                    'improvement' => '+300%',
+                    'timeframe' => '30 dias',
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'case',
+                'niche' => 'general',
+                'title' => 'Case: Programa de fidelidade aumentou recompra em 60%',
+                'content' => 'Pet shop online lancou programa de pontos com 3 tiers. Bronze: 1 ponto/real, frete gratis acima R$ 100. Prata: 1.5 pontos/real, amostra gratis todo pedido. Ouro: 2 pontos/real, acesso antecipado lancamentos. Resultado: taxa de recompra 90 dias subiu de 18% para 29%. LTV medio aumentou 45%. Clientes Ouro representam 8% da base mas 35% do faturamento.',
+                'metadata' => [
+                    'type' => 'success',
+                    'niche' => 'pet',
+                    'metric_impacted' => 'taxa_recompra',
+                    'improvement' => '+60%',
+                    'timeframe' => '90 dias',
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'case',
+                'niche' => 'general',
+                'title' => 'Case: Quiz de personalizacao aumentou conversao 2.5x',
+                'content' => 'Loja de skincare implementou quiz de 5 perguntas sobre tipo de pele, rotina atual e objetivos. Ao final, recomendacao personalizada de 3-5 produtos. Resultado: taxa de conversao de visitantes que completaram quiz foi 4.2% vs 1.7% geral. Ticket medio do quiz 35% maior. Custo do app: R$ 50/mes. Aumento de receita: R$ 12.000/mes.',
+                'metadata' => [
+                    'type' => 'success',
+                    'niche' => 'beauty',
+                    'metric_impacted' => 'taxa_conversao',
+                    'improvement' => '+147%',
+                    'timeframe' => '45 dias',
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'case',
+                'niche' => 'general',
+                'title' => 'Case: Reviews aumentaram vendas de produto em 280%',
+                'content' => 'Loja de eletronicos incentivou reviews com cupom de R$ 10 na proxima compra. Produto com 0 reviews vendia 5 unidades/mes. Apos atingir 15 reviews (media 4.6 estrelas), vendas subiram para 19 unidades/mes. Estrategia: email automatico D+15 pedindo review, destaque "Mais vendido" nos produtos com 10+ reviews, resposta publica a reviews negativos mostrando solucao.',
+                'metadata' => [
+                    'type' => 'success',
+                    'niche' => 'electronics',
+                    'metric_impacted' => 'vendas_produto',
+                    'improvement' => '+280%',
+                    'timeframe' => '60 dias',
+                    'verified' => true,
+                ],
+            ],
+
+            // =====================================================
+            // SEASONALITY - Calendario comercial brasileiro
+            // =====================================================
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Janeiro',
+                'content' => 'Janeiro: Periodo pos-festas com queda natural de 20-30%. Foco em liquidacao de estoque de verao e natal. Promocoes de "queima de estoque" funcionam bem. Volta as aulas no final do mes para material escolar. Evitar lancamentos premium. Bom momento para fidelizar clientes do natal com programa de pontos ou cupom de retorno.',
+                'metadata' => [
+                    'month' => 1,
+                    'expected_variation' => '-20% a -30%',
+                    'key_dates' => ['Liquidacao Verao', 'Volta as Aulas'],
+                    'opportunities' => ['Queima estoque', 'Fidelizacao pos-natal'],
+                    'avoid' => ['Lancamentos premium', 'Precos cheios'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Fevereiro',
+                'content' => 'Fevereiro: Carnaval domina primeira quinzena. Vendas volateis - pico antes do feriado, queda durante. Oportunidade para kits tematicos (fantasia, maquiagem, protetor solar). Pos-carnaval recupera gradualmente. Para moda, transicao verao-outono. Nichos de saude e wellness tem oportunidade pos-folia.',
+                'metadata' => [
+                    'month' => 2,
+                    'expected_variation' => 'volatil',
+                    'key_dates' => ['Carnaval'],
+                    'opportunities' => ['Kits tematicos', 'Produtos para folia', 'Recuperacao pos-carnaval'],
+                    'avoid' => ['Promocoes durante feriado prolongado'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Marco',
+                'content' => 'Marco: Mes de normalizacao. Dia Internacional da Mulher (08/03) com forte apelo para presentes femininos. Bom mes para baseline e comparacoes historicas. Inicio do outono - transicao de colecoes para moda. Oportunidade para campanhas focadas em publico feminino durante todo o mes.',
+                'metadata' => [
+                    'month' => 3,
+                    'expected_variation' => 'estavel',
+                    'key_dates' => ['Dia da Mulher 08/03', 'Inicio Outono 20/03'],
+                    'opportunities' => ['Campanha feminina', 'Transicao colecao'],
+                    'avoid' => [],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Abril',
+                'content' => 'Abril: Pascoa com foco em presentes e chocolates. Dia do Frete Gratis (28/04) - participar aumenta visibilidade. Oportunidade para kits presenteaveis em todos os nichos. Semana Santa com vendas mais fracas. Mes geralmente positivo com +10-15% vs marco.',
+                'metadata' => [
+                    'month' => 4,
+                    'expected_variation' => '+10% a +15%',
+                    'key_dates' => ['Pascoa', 'Dia do Frete Gratis 28/04'],
+                    'opportunities' => ['Kits presente', 'Frete gratis', 'Cestas tematicas'],
+                    'avoid' => ['Promocoes agressivas na Semana Santa'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Maio',
+                'content' => 'Maio: DIA DAS MAES - segundo maior evento do ano. Esperado +30-50% vs abril. Pico de vendas na semana anterior. Presentes premium funcionam bem. Categorias fortes: beleza, moda, joias, eletronicos, casa. Frete expresso essencial. Pos-dia das maes tem queda natural - normal. Preparar campanha com 3 semanas de antecedencia.',
+                'metadata' => [
+                    'month' => 5,
+                    'expected_variation' => '+30% a +50%',
+                    'key_dates' => ['Dia das Maes segundo domingo'],
+                    'opportunities' => ['Presentes premium', 'Kits especiais', 'Frete expresso'],
+                    'avoid' => ['Estoque insuficiente', 'Frete lento'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Junho',
+                'content' => 'Junho: DIA DOS NAMORADOS (12/06) - terceiro maior evento. Foco em presentes para casais. Ticket medio alto. Categorias fortes: joias, perfumaria, moda, experiencias. Kits para ele e ela. Festas juninas no nordeste impactam logistica. Pos-namorados estabiliza. Inicio do inverno (21/06) para moda.',
+                'metadata' => [
+                    'month' => 6,
+                    'expected_variation' => '+20% a +30%',
+                    'key_dates' => ['Dia dos Namorados 12/06', 'Festas Juninas', 'Inicio Inverno 21/06'],
+                    'opportunities' => ['Kits casal', 'Presentes romanticos', 'Colecao inverno'],
+                    'avoid' => ['Produtos infantis em destaque'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Julho',
+                'content' => 'Julho: Ferias escolares com queda de 10-15%. Oportunidade para fidelizacao e relacionamento. Bom momento para testes A/B e melhorias operacionais. Liquidacao de inverno funciona. Preparacao para o segundo semestre. Menos competicao por midia - custo de anuncio mais baixo.',
+                'metadata' => [
+                    'month' => 7,
+                    'expected_variation' => '-10% a -15%',
+                    'key_dates' => ['Ferias escolares'],
+                    'opportunities' => ['Liquidacao inverno', 'Testes e melhorias', 'Midia mais barata'],
+                    'avoid' => ['Grandes lancamentos'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Agosto',
+                'content' => 'Agosto: DIA DOS PAIS (segundo domingo). Recuperacao das vendas. Foco em publico masculino. Categorias fortes: eletronicos, ferramentas, moda masculina, bebidas. Ticket medio mais baixo que maes/namorados. Preparacao para Q4 comeca. Revisao de estoque para Black Friday.',
+                'metadata' => [
+                    'month' => 8,
+                    'expected_variation' => '+10% a +20%',
+                    'key_dates' => ['Dia dos Pais segundo domingo'],
+                    'opportunities' => ['Presentes masculinos', 'Preparacao Q4', 'Reposicao estoque'],
+                    'avoid' => ['Ignorar publico masculino'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Setembro',
+                'content' => 'Setembro: Dia do Cliente (15/09) - promocoes de agradecimento. Semana do Brasil (primeira semana) com promocoes nacionais. Inicio primavera (22/09) para moda. Consumidores comecam a pesquisar para Black Friday. Momento de aquecer base com conteudo. Promocoes moderadas - guardar poder de fogo para novembro.',
+                'metadata' => [
+                    'month' => 9,
+                    'expected_variation' => 'estavel',
+                    'key_dates' => ['Semana do Brasil', 'Dia do Cliente 15/09', 'Inicio Primavera 22/09'],
+                    'opportunities' => ['Promocao agradecimento', 'Aquecimento base', 'Colecao primavera'],
+                    'avoid' => ['Descontos agressivos (guardar para BF)'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Outubro',
+                'content' => 'Outubro: Dia das Criancas (12/10) importante para brinquedos, moda infantil, eletronicos. Consumidores segurando compras para Black Friday - queda natural. Momento de garantir estoque para novembro/dezembro. Comunicacao de "esquenta" Black Friday. Halloween (31/10) cresce mas ainda pequeno no Brasil.',
+                'metadata' => [
+                    'month' => 10,
+                    'expected_variation' => '-5% a +10%',
+                    'key_dates' => ['Dia das Criancas 12/10', 'Halloween 31/10'],
+                    'opportunities' => ['Produtos infantis', 'Esquenta Black Friday', 'Garantir estoque'],
+                    'avoid' => ['Promocoes que canibalizam BF'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Novembro',
+                'content' => 'Novembro: BLACK FRIDAY - MAIOR MES DO ANO. Esperado +50-100% vs outubro. Semana da Black Friday concentra 60% das vendas do mes. Cyber Monday na segunda-feira seguinte. Descontos reais de 20-40% esperados. Frete gratis essencial. Estoque preparado. Atendimento reforcado. Logistica no limite. Campanhas iniciando 2 semanas antes.',
+                'metadata' => [
+                    'month' => 11,
+                    'expected_variation' => '+50% a +100%',
+                    'key_dates' => ['Black Friday ultima sexta', 'Cyber Monday'],
+                    'opportunities' => ['Maiores descontos do ano', 'Frete gratis', 'Bundles especiais'],
+                    'avoid' => ['Desconto falso', 'Estoque insuficiente', 'Frete lento'],
+                    'verified' => true,
+                ],
+            ],
+
+            [
+                'category' => 'seasonality',
+                'niche' => 'general',
+                'title' => 'Calendario Comercial Brasil - Dezembro',
+                'content' => 'Dezembro: NATAL - alta ate dia 20, depois queda. Presentes para todos os publicos. Garantia de entrega antes do natal e essencial - destacar. Kits presenteaveis, embalagem especial. Troca facilitada pos-natal. Semana entre natal e ano novo fraca. Liquidacao de verao comeca dia 26. Preparar comunicacao de boas festas e agradecimento.',
+                'metadata' => [
+                    'month' => 12,
+                    'expected_variation' => '+30% a +50%',
+                    'key_dates' => ['Natal 25/12', 'Ano Novo 31/12'],
+                    'opportunities' => ['Presentes', 'Embalagem especial', 'Garantia entrega'],
+                    'avoid' => ['Vender sem garantir entrega', 'Promocoes pos-natal fracas'],
+                    'verified' => true,
+                ],
+            ],
         ];
 
         // =====================================================

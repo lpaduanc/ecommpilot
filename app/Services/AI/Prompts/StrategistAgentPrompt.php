@@ -149,6 +149,24 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 
 ---
 
+## PRODUTOS MAIS VENDIDOS (Top 10)
+
+{{best_sellers_section}}
+
+---
+
+## PRODUTOS SEM ESTOQUE
+
+{{out_of_stock_section}}
+
+---
+
+## ANOMALIAS DETECTADAS
+
+{{anomalies_section}}
+
+---
+
 ## OBJETIVOS DA LOJA (PRIORIDADE)
 
 {{store_goals}}
@@ -170,6 +188,18 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 ## DADOS DE MERCADO
 
 {{market_data}}
+
+---
+
+## ESTRATÉGIAS RECOMENDADAS (BASE DE CONHECIMENTO)
+
+{{rag_strategies}}
+
+---
+
+## BENCHMARKS DO SETOR
+
+{{rag_benchmarks}}
 
 ---
 
@@ -591,6 +621,16 @@ PROMPT;
         // Learning Context (feedback/aprendizado)
         $learningContext = $context['learning_context'] ?? [];
 
+        // RAG Data (estratégias e benchmarks da base de conhecimento)
+        $ragStrategies = $context['rag_strategies'] ?? [];
+        $ragBenchmarks = $context['structured_benchmarks'] ?? $context['benchmarks'] ?? [];
+
+        // Dados granulares da loja
+        $bestSellers = $context['best_sellers'] ?? [];
+        $outOfStockList = $context['out_of_stock_list'] ?? [];
+        $anomalies = $context['anomalies'] ?? [];
+        $ticketMedio = $context['ticket_medio'] ?? 0;
+
         $replacements = [
             '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($allSuggestions),
             '{{saturated_themes}}' => self::identifySaturatedThemes($allSuggestions),
@@ -601,9 +641,14 @@ PROMPT;
             '{{platform_resources}}' => self::getPlatformResources(),
             '{{store_context}}' => is_array($storeContext) ? json_encode($storeContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $storeContext,
             '{{store_goals}}' => self::formatStoreGoals($storeGoals),
+            '{{best_sellers_section}}' => self::formatBestSellers($bestSellers, $ticketMedio),
+            '{{out_of_stock_section}}' => self::formatOutOfStock($outOfStockList),
+            '{{anomalies_section}}' => self::formatAnomalies($anomalies),
             '{{analyst_analysis}}' => is_array($analystAnalysis) ? json_encode($analystAnalysis, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $analystAnalysis,
             '{{competitor_data}}' => self::extractCompetitorInsights($competitorData),
             '{{market_data}}' => is_array($marketData) ? json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $marketData,
+            '{{rag_strategies}}' => self::formatRagStrategies($ragStrategies),
+            '{{rag_benchmarks}}' => self::formatRagBenchmarks($ragBenchmarks),
         ];
 
         foreach ($replacements as $k => $v) {
@@ -735,6 +780,292 @@ PROMPT;
         }
 
         return $output ?: "Histórico de feedback ainda em construção.";
+    }
+
+    /**
+     * Formata os produtos mais vendidos para o prompt.
+     */
+    private static function formatBestSellers(array $bestSellers, float $ticketMedio = 0): string
+    {
+        if (empty($bestSellers)) {
+            return "Nenhum dado de produtos mais vendidos disponível para este período.";
+        }
+
+        $totalRevenue = array_sum(array_column($bestSellers, 'revenue'));
+        $totalQty = array_sum(array_column($bestSellers, 'quantity_sold'));
+
+        $output = "**Resumo:** {$totalQty} unidades vendidas gerando R$ ".number_format($totalRevenue, 2, ',', '.')."\n\n";
+        $output .= "| # | Produto | Qtd | Receita | Estoque | Preço |\n";
+        $output .= "|---|---------|-----|---------|---------|-------|\n";
+
+        foreach ($bestSellers as $i => $product) {
+            $rank = $i + 1;
+            $name = mb_substr($product['name'] ?? 'Sem nome', 0, 40);
+            $qty = $product['quantity_sold'] ?? 0;
+            $revenue = number_format($product['revenue'] ?? 0, 2, ',', '.');
+            $stock = $product['current_stock'] ?? 0;
+            $price = number_format($product['price'] ?? 0, 2, ',', '.');
+
+            $stockWarning = '';
+            if ($stock <= 0) {
+                $stockWarning = ' ⚠️';
+            } elseif ($stock < 10) {
+                $stockWarning = ' ⚡';
+            }
+
+            $output .= "| {$rank} | {$name} | {$qty} | R$ {$revenue} | {$stock}{$stockWarning} | R$ {$price} |\n";
+        }
+
+        $output .= "\n**Legenda:** ⚠️ = Sem estoque, ⚡ = Estoque baixo (<10 unidades)\n";
+
+        // Insights para sugestões
+        $lowStockTopSellers = array_filter($bestSellers, fn ($p) => ($p['current_stock'] ?? 0) < 10);
+        if (! empty($lowStockTopSellers)) {
+            $output .= "\n**⚠️ ALERTA:** ".count($lowStockTopSellers)." dos top sellers têm estoque baixo ou zerado. Priorize reposição!\n";
+        }
+
+        return $output;
+    }
+
+    /**
+     * Formata produtos sem estoque para o prompt.
+     */
+    private static function formatOutOfStock(array $outOfStock): string
+    {
+        if (empty($outOfStock)) {
+            return "✅ Nenhum produto sem estoque identificado. Bom trabalho de gestão!";
+        }
+
+        $output = "**Total sem estoque:** ".count($outOfStock)." produtos\n\n";
+        $output .= "| Produto | Preço | Última Atualização |\n";
+        $output .= "|---------|-------|--------------------|\n";
+
+        foreach ($outOfStock as $product) {
+            $name = mb_substr($product['name'] ?? 'Sem nome', 0, 45);
+            $price = number_format($product['price'] ?? 0, 2, ',', '.');
+            $lastUpdated = $product['last_updated'] ?? 'N/A';
+
+            $output .= "| {$name} | R$ {$price} | {$lastUpdated} |\n";
+        }
+
+        $output .= "\n**AÇÃO SUGERIDA:** Verifique se estes produtos devem ser repostos ou desativados.\n";
+
+        return $output;
+    }
+
+    /**
+     * Formata anomalias detectadas para o prompt.
+     */
+    private static function formatAnomalies(array $anomalies): string
+    {
+        if (empty($anomalies)) {
+            return "✅ Nenhuma anomalia crítica detectada na operação.";
+        }
+
+        $output = "**Total de anomalias:** ".count($anomalies)."\n\n";
+
+        // Agrupar por severidade
+        $bySeverity = ['high' => [], 'medium' => [], 'low' => []];
+        foreach ($anomalies as $anomaly) {
+            $severity = $anomaly['severity'] ?? 'medium';
+            $bySeverity[$severity][] = $anomaly;
+        }
+
+        // Mostrar high primeiro
+        if (! empty($bySeverity['high'])) {
+            $output .= "### 🔴 Severidade Alta\n\n";
+            foreach ($bySeverity['high'] as $a) {
+                $output .= self::formatSingleAnomaly($a);
+            }
+        }
+
+        if (! empty($bySeverity['medium'])) {
+            $output .= "### 🟡 Severidade Média\n\n";
+            foreach ($bySeverity['medium'] as $a) {
+                $output .= self::formatSingleAnomaly($a);
+            }
+        }
+
+        if (! empty($bySeverity['low'])) {
+            $output .= "### 🟢 Severidade Baixa\n\n";
+            foreach ($bySeverity['low'] as $a) {
+                $output .= self::formatSingleAnomaly($a);
+            }
+        }
+
+        return $output;
+    }
+
+    /**
+     * Formata uma única anomalia.
+     */
+    private static function formatSingleAnomaly(array $anomaly): string
+    {
+        $type = $anomaly['type'] ?? 'geral';
+        $description = $anomaly['description'] ?? 'Anomalia não especificada';
+        $metric = $anomaly['metric'] ?? null;
+        $expected = $anomaly['expected'] ?? null;
+        $actual = $anomaly['actual'] ?? null;
+        $variation = $anomaly['variation_percent'] ?? null;
+        $affectedItems = $anomaly['affected_items'] ?? [];
+
+        $output = "- **{$type}:** {$description}\n";
+
+        if ($metric && ($expected !== null || $actual !== null)) {
+            $output .= "  - Métrica: {$metric}";
+            if ($expected !== null) {
+                $output .= " | Esperado: {$expected}";
+            }
+            if ($actual !== null) {
+                $output .= " | Atual: {$actual}";
+            }
+            if ($variation !== null) {
+                $output .= " | Variação: {$variation}%";
+            }
+            $output .= "\n";
+        }
+
+        if (! empty($affectedItems)) {
+            $itemsList = is_array($affectedItems) ? implode(', ', array_slice($affectedItems, 0, 5)) : $affectedItems;
+            $output .= "  - Itens afetados: {$itemsList}\n";
+        }
+
+        return $output;
+    }
+
+    /**
+     * Formata estratégias do RAG para o prompt.
+     */
+    private static function formatRagStrategies(array $strategies): string
+    {
+        if (empty($strategies)) {
+            return "Nenhuma estratégia específica do nicho disponível. Use práticas gerais de e-commerce.";
+        }
+
+        $output = "As seguintes estratégias são recomendadas para este nicho/segmento:\n\n";
+
+        foreach ($strategies as $strategy) {
+            $title = $strategy['title'] ?? 'Estratégia';
+            $content = $strategy['content'] ?? '';
+            $relevance = $strategy['relevance'] ?? null;
+            $metadata = $strategy['metadata'] ?? [];
+
+            $output .= "### {$title}\n\n";
+
+            if ($content) {
+                $output .= "{$content}\n\n";
+            }
+
+            // Adicionar métricas se disponíveis
+            if (! empty($metadata['expected_impact'])) {
+                $output .= "- **Impacto esperado:** {$metadata['expected_impact']}\n";
+            }
+            if (! empty($metadata['difficulty'])) {
+                $output .= "- **Dificuldade:** {$metadata['difficulty']}\n";
+            }
+            if (! empty($metadata['implementation_time'])) {
+                $output .= "- **Tempo de implementação:** {$metadata['implementation_time']}\n";
+            }
+            if ($relevance !== null) {
+                $relevancePercent = round($relevance * 100);
+                $output .= "- **Relevância para esta loja:** {$relevancePercent}%\n";
+            }
+
+            $output .= "\n";
+        }
+
+        $output .= "**IMPORTANTE:** Use estas estratégias como base, mas adapte para os dados específicos da loja.\n";
+
+        return $output;
+    }
+
+    /**
+     * Formata benchmarks do RAG para o prompt.
+     */
+    private static function formatRagBenchmarks(array $benchmarks): string
+    {
+        if (empty($benchmarks)) {
+            return "Nenhum benchmark específico do nicho disponível.";
+        }
+
+        $output = "Benchmarks do setor para comparação:\n\n";
+
+        // Primeiro, verificar se é estrutura de benchmarks estruturados
+        if (isset($benchmarks['ticket_medio']) || isset($benchmarks['taxa_conversao'])) {
+            // Formato estruturado
+            if (isset($benchmarks['ticket_medio'])) {
+                $tm = $benchmarks['ticket_medio'];
+                if (is_array($tm)) {
+                    $output .= "**Ticket Médio:**\n";
+                    $output .= "- Mínimo: R$ ".number_format($tm['min'] ?? 0, 2, ',', '.')."\n";
+                    $output .= "- Média: R$ ".number_format($tm['media'] ?? $tm['avg'] ?? 0, 2, ',', '.')."\n";
+                    $output .= "- Máximo: R$ ".number_format($tm['max'] ?? 0, 2, ',', '.')."\n\n";
+                } else {
+                    $output .= "**Ticket Médio:** R$ ".number_format($tm, 2, ',', '.')."\n\n";
+                }
+            }
+
+            if (isset($benchmarks['taxa_conversao'])) {
+                $tc = $benchmarks['taxa_conversao'];
+                if (is_array($tc)) {
+                    $output .= "**Taxa de Conversão:**\n";
+                    $output .= "- Mínimo: {$tc['min']}%\n";
+                    $output .= "- Média: {$tc['media']}%\n";
+                    $output .= "- Máximo: {$tc['max']}%\n\n";
+                } else {
+                    $output .= "**Taxa de Conversão:** {$tc}%\n\n";
+                }
+            }
+
+            if (isset($benchmarks['abandono_carrinho'])) {
+                $output .= "**Abandono de Carrinho:** {$benchmarks['abandono_carrinho']}%\n\n";
+            }
+
+            if (isset($benchmarks['trafego_mobile'])) {
+                $output .= "**Tráfego Mobile:** {$benchmarks['trafego_mobile']}%\n\n";
+            }
+
+            if (isset($benchmarks['crescimento_setor'])) {
+                $output .= "**Crescimento do Setor:** {$benchmarks['crescimento_setor']}% ao ano\n\n";
+            }
+
+            return $output;
+        }
+
+        // Formato de lista de resultados de busca
+        foreach ($benchmarks as $benchmark) {
+            $title = $benchmark['title'] ?? 'Benchmark';
+            $content = $benchmark['content'] ?? '';
+            $metadata = $benchmark['metadata'] ?? [];
+
+            $output .= "### {$title}\n\n";
+
+            if ($content) {
+                $output .= "{$content}\n\n";
+            }
+
+            // Extrair métricas do metadata
+            if (! empty($metadata['metrics'])) {
+                $output .= "**Métricas:**\n";
+                foreach ($metadata['metrics'] as $metric => $value) {
+                    if (is_array($value)) {
+                        $output .= "- {$metric}: ".json_encode($value)."\n";
+                    } else {
+                        $output .= "- {$metric}: {$value}\n";
+                    }
+                }
+                $output .= "\n";
+            }
+
+            if (! empty($metadata['sources'])) {
+                $sources = is_array($metadata['sources']) ? implode(', ', $metadata['sources']) : $metadata['sources'];
+                $output .= "**Fontes:** {$sources}\n\n";
+            }
+        }
+
+        $output .= "**USE ESTES BENCHMARKS** para comparar com os dados da loja e identificar gaps.\n";
+
+        return $output;
     }
 
     /**

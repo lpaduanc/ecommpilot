@@ -478,6 +478,8 @@ class StoreAnalysisService
                 'structured_benchmarks' => $structuredBenchmarks,
                 'store_goals' => $storeGoals,
                 'external_data' => $externalMarketData,
+                // V5: Learning context para feedback de análises anteriores
+                'learning_context' => $learningContext,
             ]);
 
             // Coletar prompt para logging no final
@@ -1365,6 +1367,8 @@ class StoreAnalysisService
                 'id' => $p->external_id,
                 'name' => $p->name,
                 'price' => $p->price ?? 0,
+                'last_updated' => $p->external_updated_at?->format('Y-m-d') ?? null,
+                'sku' => $p->sku ?? null,
             ])
             ->values()
             ->toArray();
@@ -1837,6 +1841,8 @@ class StoreAnalysisService
                 'metric' => $a['metric'] ?? null,
                 'expected' => $a['expected'] ?? null,
                 'actual' => $a['actual'] ?? null,
+                'affected_items' => $a['affected_items'] ?? $a['items'] ?? [],
+                'variation_percent' => $a['variation_percent'] ?? $a['variacao'] ?? null,
             ])
             ->toArray();
     }
