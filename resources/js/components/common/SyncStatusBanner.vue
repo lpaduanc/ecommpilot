@@ -34,7 +34,8 @@ const bannerVariant = computed(() => {
 // Banner message
 const bannerMessage = computed(() => {
     if (isActiveStoreTokenExpired.value) {
-        return 'O token da sua loja expirou. Por favor, reconecte para continuar sincronizando.';
+        const storeName = activeStore.value?.name || 'Sua loja';
+        return `A conexão com ${storeName} foi perdida. Clique em "Reconectar" para restaurar em segundos.`;
     }
     if (isActiveStoreFailed.value) {
         return 'A sincronização da sua loja falhou. Tente novamente ou entre em contato com o suporte.';
@@ -52,7 +53,7 @@ const bannerIcon = computed(() => {
 
 // Action button label
 const actionLabel = computed(() => {
-    if (isActiveStoreTokenExpired.value) return 'Reconectar Agora';
+    if (isActiveStoreTokenExpired.value) return 'Reconectar em 1 Clique';
     if (isActiveStoreFailed.value) return 'Tentar Novamente';
     return null;
 });
@@ -60,7 +61,13 @@ const actionLabel = computed(() => {
 // Handle action button click
 async function handleAction() {
     if (isActiveStoreTokenExpired.value) {
-        router.push({ name: 'integrations' });
+        // Reconnect in one click - goes directly to OAuth
+        if (activeStore.value?.id) {
+            await integrationStore.reconnectStore(activeStore.value.id);
+        } else {
+            // Fallback to integrations page if no active store
+            router.push({ name: 'integrations' });
+        }
     } else if (isActiveStoreFailed.value && activeStore.value?.id) {
         await integrationStore.syncStore(activeStore.value.id);
     }
