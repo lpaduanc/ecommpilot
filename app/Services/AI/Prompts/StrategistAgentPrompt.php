@@ -474,22 +474,25 @@ PROMPT;
 
             // Preços
             if (! empty($faixa)) {
-                $output .= "- Preço: R$ {$faixa['min']} - R$ {$faixa['max']} (média: R$ {$faixa['media']})\n";
+                $min = $faixa['min'] ?? 0;
+                $max = $faixa['max'] ?? 0;
+                $media = $faixa['media'] ?? 0;
+                $output .= "- Preço: R$ {$min} - R$ {$max} (média: R$ {$media})\n";
             }
 
             // Avaliações (NOVO)
             $avaliacoes = $dadosRicos['avaliacoes'] ?? [];
-            if (! empty($avaliacoes['nota_media'])) {
-                $nota = $avaliacoes['nota_media'];
+            $notaMedia = $avaliacoes['nota_media'] ?? null;
+            if ($notaMedia !== null && $notaMedia > 0) {
                 $total = $avaliacoes['total_avaliacoes'] ?? 0;
-                $output .= "- Avaliação: {$nota}/5";
+                $output .= "- Avaliação: {$notaMedia}/5";
                 if ($total > 0) {
                     $output .= " ({$total} reviews)";
                 }
                 $output .= "\n";
 
-                if ($nota > $bestRating['nota']) {
-                    $bestRating = ['nome' => $nome, 'nota' => $nota, 'total' => $total];
+                if ($notaMedia > $bestRating['nota']) {
+                    $bestRating = ['nome' => $nome, 'nota' => $notaMedia, 'total' => $total];
                 }
             }
 
@@ -511,13 +514,16 @@ PROMPT;
                     $allPromos[$tipo] = ($allPromos[$tipo] ?? 0) + 1;
 
                     if ($tipo === 'desconto_percentual') {
-                        $promosFormatted[] = "Desconto {$promo['valor']}";
+                        $valor = $promo['valor'] ?? '';
+                        $promosFormatted[] = "Desconto {$valor}";
                     } elseif ($tipo === 'cupom') {
-                        $promosFormatted[] = "Cupom: {$promo['codigo']}";
+                        $codigo = $promo['codigo'] ?? '';
+                        $promosFormatted[] = "Cupom: {$codigo}";
                     } elseif ($tipo === 'frete_gratis') {
                         $promosFormatted[] = 'Frete grátis';
                     } elseif ($tipo === 'promocao_especial') {
-                        $promosFormatted[] = $promo['descricao'] ?? 'Promoção especial';
+                        $descricao = $promo['descricao'] ?? 'Promoção especial';
+                        $promosFormatted[] = $descricao;
                     }
                 }
                 if (! empty($promosFormatted)) {
@@ -584,15 +590,21 @@ PROMPT;
         }
 
         // Melhor avaliado
-        if ($bestRating['nota'] > 0) {
-            $output .= "**Melhor avaliado:** {$bestRating['nome']} com {$bestRating['nota']}/5 ({$bestRating['total']} reviews)\n\n";
+        if (($bestRating['nota'] ?? 0) > 0) {
+            $nome = $bestRating['nome'] ?? '';
+            $nota = $bestRating['nota'] ?? 0;
+            $total = $bestRating['total'] ?? 0;
+            $output .= "**Melhor avaliado:** {$nome} com {$nota}/5 ({$total} reviews)\n\n";
         }
 
         // Produtos destaque no mercado
         if (! empty($allProducts)) {
             $output .= "**Produtos destaque no mercado (para benchmarking):**\n";
             foreach (array_slice($allProducts, 0, 10) as $prod) {
-                $output .= "- {$prod['nome']} @ R$ ".number_format($prod['preco'], 2, ',', '.')." ({$prod['concorrente']})\n";
+                $nomeProd = $prod['nome'] ?? 'Produto';
+                $precoProd = $prod['preco'] ?? 0;
+                $concorrente = $prod['concorrente'] ?? '';
+                $output .= "- {$nomeProd} @ R$ ".number_format($precoProd, 2, ',', '.')." ({$concorrente})\n";
             }
         }
 
@@ -996,10 +1008,13 @@ PROMPT;
             if (isset($benchmarks['ticket_medio'])) {
                 $tm = $benchmarks['ticket_medio'];
                 if (is_array($tm)) {
+                    $min = $tm['min'] ?? 0;
+                    $media = $tm['media'] ?? $tm['avg'] ?? 0;
+                    $max = $tm['max'] ?? 0;
                     $output .= "**Ticket Médio:**\n";
-                    $output .= "- Mínimo: R$ ".number_format($tm['min'] ?? 0, 2, ',', '.')."\n";
-                    $output .= "- Média: R$ ".number_format($tm['media'] ?? $tm['avg'] ?? 0, 2, ',', '.')."\n";
-                    $output .= "- Máximo: R$ ".number_format($tm['max'] ?? 0, 2, ',', '.')."\n\n";
+                    $output .= "- Mínimo: R$ ".number_format($min, 2, ',', '.')."\n";
+                    $output .= "- Média: R$ ".number_format($media, 2, ',', '.')."\n";
+                    $output .= "- Máximo: R$ ".number_format($max, 2, ',', '.')."\n\n";
                 } else {
                     $output .= "**Ticket Médio:** R$ ".number_format($tm, 2, ',', '.')."\n\n";
                 }
@@ -1008,10 +1023,13 @@ PROMPT;
             if (isset($benchmarks['taxa_conversao'])) {
                 $tc = $benchmarks['taxa_conversao'];
                 if (is_array($tc)) {
+                    $min = $tc['min'] ?? 0;
+                    $media = $tc['media'] ?? 0;
+                    $max = $tc['max'] ?? 0;
                     $output .= "**Taxa de Conversão:**\n";
-                    $output .= "- Mínimo: {$tc['min']}%\n";
-                    $output .= "- Média: {$tc['media']}%\n";
-                    $output .= "- Máximo: {$tc['max']}%\n\n";
+                    $output .= "- Mínimo: {$min}%\n";
+                    $output .= "- Média: {$media}%\n";
+                    $output .= "- Máximo: {$max}%\n\n";
                 } else {
                     $output .= "**Taxa de Conversão:** {$tc}%\n\n";
                 }
