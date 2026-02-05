@@ -38,9 +38,10 @@ class CollectorAgentPrompt
         $tendencia = $trendsData['tendencia'] ?? 'nao_disponivel';
         $interesseBusca = $trendsData['interesse_busca'] ?? 0;
 
-        $precoMedioMercado = $marketData['faixa_preco']['media'] ?? 0;
-        $precoMinMercado = $marketData['faixa_preco']['min'] ?? 0;
-        $precoMaxMercado = $marketData['faixa_preco']['max'] ?? 0;
+        $faixaPreco = $marketData['faixa_preco'] ?? [];
+        $precoMedioMercado = $faixaPreco['media'] ?? 0;
+        $precoMinMercado = $faixaPreco['min'] ?? 0;
+        $precoMaxMercado = $faixaPreco['max'] ?? 0;
 
         // Formatar concorrentes
         $concorrentesFormatados = self::formatCompetitors($competitors);
@@ -347,9 +348,10 @@ PROMPT;
                 continue;
             }
             $nome = $c['nome'] ?? 'Concorrente';
-            $preco = $c['faixa_preco']['media'] ?? 0;
-            $precoMin = $c['faixa_preco']['min'] ?? 0;
-            $precoMax = $c['faixa_preco']['max'] ?? 0;
+            $faixa = $c['faixa_preco'] ?? [];
+            $preco = $faixa['media'] ?? 0;
+            $precoMin = $faixa['min'] ?? 0;
+            $precoMax = $faixa['max'] ?? 0;
             $difs = implode(', ', $c['diferenciais'] ?? []) ?: 'nenhum';
 
             // Check if has rich data
@@ -387,10 +389,11 @@ PROMPT;
             }
 
             // Avaliações (DADOS RICOS)
-            if (! empty($dadosRicos['avaliacoes']['nota_media'])) {
-                $nota = $dadosRicos['avaliacoes']['nota_media'];
-                $total = $dadosRicos['avaliacoes']['total_avaliacoes'] ?? 'N/A';
-                $output .= "  → ⭐ **Avaliações**: {$nota}/5 ({$total} avaliações)\n";
+            $avaliacoes = $dadosRicos['avaliacoes'] ?? [];
+            $notaMedia = $avaliacoes['nota_media'] ?? null;
+            if ($notaMedia !== null && $notaMedia > 0) {
+                $total = $avaliacoes['total_avaliacoes'] ?? 'N/A';
+                $output .= "  → ⭐ **Avaliações**: {$notaMedia}/5 ({$total} avaliações)\n";
             }
 
             // Quantidade de produtos
@@ -438,8 +441,12 @@ PROMPT;
     {
         $prices = [];
         foreach ($competitors as $c) {
-            if (($c['sucesso'] ?? false) && isset($c['faixa_preco']['media'])) {
-                $prices[] = $c['faixa_preco']['media'];
+            if (($c['sucesso'] ?? false)) {
+                $faixa = $c['faixa_preco'] ?? [];
+                $media = $faixa['media'] ?? null;
+                if ($media !== null && $media > 0) {
+                    $prices[] = $media;
+                }
             }
         }
 

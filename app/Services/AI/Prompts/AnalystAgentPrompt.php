@@ -354,9 +354,10 @@ PROMPT;
         $tendencia = $trends['tendencia'] ?? 'não disponível';
         $interesse = $trends['interesse_busca'] ?? 0;
 
-        $precoMin = $precos['faixa_preco']['min'] ?? 0;
-        $precoMax = $precos['faixa_preco']['max'] ?? 0;
-        $precoMedio = $precos['faixa_preco']['media'] ?? 0;
+        $faixaPreco = $precos['faixa_preco'] ?? [];
+        $precoMin = $faixaPreco['min'] ?? 0;
+        $precoMax = $faixaPreco['max'] ?? 0;
+        $precoMedio = $faixaPreco['media'] ?? 0;
 
         $posicao = 'não calculado';
         if ($precoMedio > 0 && $ticketLoja > 0) {
@@ -403,8 +404,11 @@ MARKET;
 
             // Preços
             if (! empty($faixa)) {
-                $output .= "- Preço: R$ {$faixa['min']} - R$ {$faixa['max']} (média R$ {$faixa['media']})\n";
-                $totalPreco += $faixa['media'];
+                $min = $faixa['min'] ?? 0;
+                $max = $faixa['max'] ?? 0;
+                $media = $faixa['media'] ?? 0;
+                $output .= "- Preço: R$ {$min} - R$ {$max} (média R$ {$media})\n";
+                $totalPreco += $media;
                 $count++;
             }
 
@@ -441,13 +445,16 @@ MARKET;
                     $allPromos[$tipo] = ($allPromos[$tipo] ?? 0) + 1;
 
                     if ($tipo === 'desconto_percentual') {
-                        $promosFormatted[] = "Desconto {$promo['valor']}";
+                        $valor = $promo['valor'] ?? '';
+                        $promosFormatted[] = "Desconto {$valor}";
                     } elseif ($tipo === 'cupom') {
-                        $promosFormatted[] = "Cupom: {$promo['codigo']}";
+                        $codigo = $promo['codigo'] ?? '';
+                        $promosFormatted[] = "Cupom: {$codigo}";
                     } elseif ($tipo === 'frete_gratis') {
                         $promosFormatted[] = 'Frete grátis';
                     } elseif ($tipo === 'promocao_especial') {
-                        $promosFormatted[] = $promo['descricao'] ?? 'Promoção especial';
+                        $descricao = $promo['descricao'] ?? 'Promoção especial';
+                        $promosFormatted[] = $descricao;
                     }
                 }
                 if (! empty($promosFormatted)) {
@@ -559,6 +566,8 @@ MARKET;
                         $output .= "- **Loja vs Benchmark:** {$posicao}\n";
                     }
                     $output .= "\n";
+                } else {
+                    $output .= "**Ticket Médio do Setor:** R$ ".number_format($tm, 2, ',', '.')."\n\n";
                 }
             }
 
@@ -566,10 +575,13 @@ MARKET;
             if (isset($structured['taxa_conversao'])) {
                 $tc = $structured['taxa_conversao'];
                 if (is_array($tc)) {
+                    $min = $tc['min'] ?? 0;
+                    $media = $tc['media'] ?? 0;
+                    $max = $tc['max'] ?? 0;
                     $output .= "**Taxa de Conversão do Setor:**\n";
-                    $output .= "- Mínimo: ".($tc['min'] ?? 0)."%\n";
-                    $output .= "- Média: ".($tc['media'] ?? 0)."%\n";
-                    $output .= "- Máximo: ".($tc['max'] ?? 0)."%\n\n";
+                    $output .= "- Mínimo: {$min}%\n";
+                    $output .= "- Média: {$media}%\n";
+                    $output .= "- Máximo: {$max}%\n\n";
                 } else {
                     $output .= "**Taxa de Conversão do Setor:** {$tc}%\n\n";
                 }
@@ -639,19 +651,21 @@ MARKET;
 
         foreach ($competitorsValidos as $c) {
             $faixa = $c['faixa_preco'] ?? [];
-            if (! empty($faixa['media'])) {
+            $media = $faixa['media'] ?? null;
+            if ($media !== null && $media > 0) {
                 $ticketsConcorrentes[] = [
                     'nome' => $c['nome'] ?? 'Concorrente',
-                    'ticket' => $faixa['media'],
+                    'ticket' => $media,
                 ];
             }
 
             $dadosRicos = $c['dados_ricos'] ?? [];
             $avaliacoes = $dadosRicos['avaliacoes'] ?? [];
-            if (! empty($avaliacoes['nota_media'])) {
+            $notaMedia = $avaliacoes['nota_media'] ?? null;
+            if ($notaMedia !== null && $notaMedia > 0) {
                 $avaliacoesConcorrentes[] = [
                     'nome' => $c['nome'] ?? 'Concorrente',
-                    'nota' => $avaliacoes['nota_media'],
+                    'nota' => $notaMedia,
                     'total' => $avaliacoes['total_avaliacoes'] ?? 0,
                 ];
             }
@@ -691,9 +705,12 @@ MARKET;
             $output .= "### Avaliações\n\n";
             $output .= "| Concorrente | Nota | Reviews |\n";
             $output .= "|-------------|------|--------|\n";
-            usort($avaliacoesConcorrentes, fn ($a, $b) => $b['nota'] <=> $a['nota']);
+            usort($avaliacoesConcorrentes, fn ($a, $b) => ($b['nota'] ?? 0) <=> ($a['nota'] ?? 0));
             foreach ($avaliacoesConcorrentes as $av) {
-                $output .= "| {$av['nome']} | {$av['nota']}/5 | {$av['total']} |\n";
+                $nome = $av['nome'] ?? '';
+                $nota = $av['nota'] ?? 0;
+                $total = $av['total'] ?? 0;
+                $output .= "| {$nome} | {$nota}/5 | {$total} |\n";
             }
             $output .= "\n**INSIGHT:** Se sua loja não tem programa de reviews, considere implementar.\n\n";
         }
