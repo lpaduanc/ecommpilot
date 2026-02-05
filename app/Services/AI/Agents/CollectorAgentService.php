@@ -18,10 +18,15 @@ class CollectorAgentService
     /**
      * Log full data as formatted JSON without truncation.
      */
-    private function logFullData(string $title, array $data): void
+    private function logFullData(string $title, mixed $data): void
     {
-        if (empty($data)) {
+        // Normalize data to be JSON-serializable
+        if (is_null($data) || (is_array($data) && empty($data))) {
             return;
+        } elseif (is_scalar($data)) {
+            $data = ['value' => $data];
+        } elseif (is_object($data)) {
+            $data = (array) $data;
         }
 
         $separator = '═══════════════════════════════════════════════════════════════════';

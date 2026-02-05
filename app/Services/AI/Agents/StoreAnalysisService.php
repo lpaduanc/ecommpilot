@@ -59,12 +59,24 @@ class StoreAnalysisService
      * Log full data as formatted JSON without truncation.
      *
      * @param  string  $title  Title/header for the log section
-     * @param  array  $data  Data to log
+     * @param  mixed  $data  Data to log (array, object, scalar, or null)
      * @param  string  $level  Log level (info, debug, warning)
      */
-    private function logFullData(string $title, array $data, string $level = 'info'): void
+    private function logFullData(string $title, mixed $data, string $level = 'info'): void
     {
         $separator = '═══════════════════════════════════════════════════════════════════';
+
+        // Normalize data to be JSON-serializable
+        if (is_null($data)) {
+            $data = [];
+        } elseif (is_scalar($data)) {
+            // Convert scalar (int, string, bool, float) to array with value
+            $data = ['value' => $data];
+        } elseif (is_object($data)) {
+            // Convert object to array
+            $data = (array) $data;
+        }
+
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         Log::channel($this->logChannel)->$level($separator);
@@ -525,7 +537,8 @@ class StoreAnalysisService
             // ═══════════════════════════════════════════════════════════════════
             $this->logFullData('BEST SELLERS (Top 10)', $storeData['products']['best_sellers'] ?? []);
             $this->logFullData('PRODUTOS SEM ESTOQUE', $storeData['products']['out_of_stock_list'] ?? []);
-            $this->logFullData('PRODUTOS SEM VENDAS NO PERIODO', $storeData['products']['no_sales_period'] ?? []);
+            // no_sales_period é um contador (int), não array - logar como info simples
+            Log::channel($this->logChannel)->info('PRODUTOS SEM VENDAS NO PERIODO: '.($storeData['products']['no_sales_period'] ?? 0).' produtos');
             $this->logFullData('DADOS DE CUPONS', $storeData['coupons'] ?? []);
             $this->logFullData('PEDIDOS POR DIA', $storeData['orders']['by_day'] ?? []);
             $this->logFullData('PEDIDOS POR STATUS DE PAGAMENTO', $storeData['orders']['by_payment_status'] ?? []);
