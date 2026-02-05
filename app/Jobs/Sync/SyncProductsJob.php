@@ -41,6 +41,20 @@ class SyncProductsJob implements ShouldQueue
             return;
         }
 
+        // Refresh store model to get latest state
+        $this->store->refresh();
+
+        // Check if store requires reconnection (token expired/invalid)
+        if ($this->store->token_requires_reconnection) {
+            Log::channel('sync')->warning('>>> [PRODUCTS] Sync ignorado - loja requer reconexão OAuth', [
+                'store_id' => $this->store->id,
+                'store_name' => $this->store->name,
+                'sync_status' => $this->store->sync_status->value,
+            ]);
+
+            return;
+        }
+
         $startTime = microtime(true);
 
         Log::channel('sync')->info('>>> [PARALLEL] Iniciando sync de PRODUTOS', [

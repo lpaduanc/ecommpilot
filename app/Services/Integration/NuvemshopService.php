@@ -760,6 +760,20 @@ class NuvemshopService
 
                 // Para qualquer outro erro ou sucesso, processa normalmente
                 if (! $response->successful()) {
+                    // Handle 404 "Last page is 0" - This is Nuvemshop's way of saying "no more pages"
+                    if ($response->status() === 404) {
+                        $bodyData = $response->json();
+                        if (isset($bodyData['description']) && str_contains($bodyData['description'], 'Last page is')) {
+                            Log::channel('sync')->info('[API] Fim de paginação detectado (404 Last page)', [
+                                'store_id' => $store->id,
+                                'endpoint' => $endpoint,
+                                'description' => $bodyData['description'],
+                            ]);
+                            // Return empty array - this is not an error, it's end of pagination
+                            return [];
+                        }
+                    }
+
                     $this->handleApiError($response, $store, $endpoint);
                 }
 

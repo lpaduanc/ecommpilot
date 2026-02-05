@@ -117,6 +117,28 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         NotificationService $notificationService
     ): void {
         $startTime = microtime(true);
+
+        // Refresh store model to get latest state
+        $this->store->refresh();
+
+        // Check if store requires reconnection (token expired/invalid)
+        if ($this->store->token_requires_reconnection) {
+            $this->safeLog('warning', 'Sync ignorado - loja requer reconexão OAuth', [
+                'store_id' => $this->store->id,
+                'store_name' => $this->store->name,
+                'sync_status' => $this->store->sync_status->value,
+            ]);
+
+            // Notify user that reconnection is required
+            $notificationService->notifySyncFailed(
+                $this->store,
+                'all',
+                'A loja precisa ser reconectada. Por favor, reconecte sua conta Nuvemshop.'
+            );
+
+            return;
+        }
+
         $this->store->markAsSyncing();
 
         // Determine if this is an incremental sync (not the first sync)
