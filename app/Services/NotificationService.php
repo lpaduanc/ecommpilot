@@ -77,12 +77,19 @@ class NotificationService
         try {
             $typeLabel = $this->getSyncTypeLabel($syncType);
 
+            // Use custom error message if it contains specific keywords (like reconnection request)
+            // Otherwise use the generic message
+            $isCustomMessage = str_contains($error, 'reconect') || str_contains($error, 'reconex');
+            $message = $isCustomMessage
+                ? $error
+                : "A sincronização de {$typeLabel} da loja {$store->name} falhou. Por favor, tente novamente.";
+
             $this->createNotification(
                 user: $store->user,
                 store: $store,
                 type: NotificationType::Sync,
                 title: 'Erro na Sincronização',
-                message: "A sincronização de {$typeLabel} da loja {$store->name} falhou. Por favor, tente novamente.",
+                message: $message,
                 data: [
                     'sync_type' => $syncType,
                     'store_name' => $store->name,
