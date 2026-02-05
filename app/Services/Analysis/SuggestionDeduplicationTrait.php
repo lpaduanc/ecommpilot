@@ -47,10 +47,10 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
-     * Identifica temas saturados (sugeridos 1+ vezes)
+     * Identifica temas saturados (sugeridos 2+ vezes)
      *
-     * Threshold reduzido de 2 para 1: qualquer tema já sugerido é considerado saturado
-     * para forçar máxima diversidade entre análises consecutivas.
+     * V5: Threshold aumentado para 2 - permite re-sugerir tema 1x antes de bloquear.
+     * Considera também sugestões rejeitadas como fator de saturação.
      */
     protected function identifySaturatedThemes(array $suggestions): array
     {
@@ -87,26 +87,59 @@ trait SuggestionDeduplicationTrait
         ];
 
         $counts = [];
+        $rejectedThemes = [];
 
         foreach ($suggestions as $suggestion) {
             // Verificar título E descrição para maior precisão
             $text = mb_strtolower(($suggestion['title'] ?? '').(' '.($suggestion['description'] ?? '')));
+            $status = $suggestion['status'] ?? 'pending';
+            $isRejected = in_array($status, ['rejected', 'ignored']);
+
             foreach ($themeKeywords as $theme => $keywords) {
                 foreach ($keywords as $keyword) {
                     if (str_contains($text, $keyword)) {
                         $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+
+                        // Rastrear temas rejeitados
+                        if ($isRejected) {
+                            $rejectedThemes[$theme] = ($rejectedThemes[$theme] ?? 0) + 1;
+                        }
                         break;
                     }
                 }
             }
         }
 
-        // Threshold reduzido: qualquer ocorrência conta como saturado
-        // Isso força diversidade máxima entre análises
-        $saturated = array_filter($counts, fn ($count) => $count >= 1);
+        // V5: Threshold aumentado para 2
+        // OU se foi rejeitado pelo menos 1x (penaliza temas que o cliente não gostou)
+        $saturated = array_filter($counts, function ($count) use ($rejectedThemes) {
+            return $count >= 2;
+        });
+
+        // Adicionar temas rejeitados mesmo que apareçam só 1x
+        foreach ($rejectedThemes as $theme => $rejectCount) {
+            if (! isset($saturated[$theme]) && $rejectCount >= 1) {
+                $saturated[$theme] = $counts[$theme] ?? 1;
+            }
+        }
+
         arsort($saturated);
 
         return $saturated;
+    }
+
+    /**
+     * Obtém categorias bloqueadas por múltiplas rejeições (3+)
+     */
+    protected function getBlockedCategoriesByRejection(int $storeId): array
+    {
+        return Suggestion::where('store_id', $storeId)
+            ->whereIn('status', ['rejected', 'ignored'])
+            ->selectRaw('category, count(*) as reject_count')
+            ->groupBy('category')
+            ->havingRaw('count(*) >= 3')
+            ->pluck('reject_count', 'category')
+            ->toArray();
     }
 
     /**

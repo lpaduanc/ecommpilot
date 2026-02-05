@@ -264,6 +264,29 @@ Retorne APENAS o JSON abaixo:
     }
   ],
 
+  "comparativo_concorrentes": {
+    "ticket_medio": {
+      "loja": 0,
+      "concorrentes_media": 0,
+      "gap": "+X% ou -X%",
+      "insight": "Loja está acima/abaixo porque..."
+    },
+    "categorias": {
+      "loja_foco": ["categoria1", "categoria2"],
+      "concorrentes_foco": ["categoria1", "categoria2"],
+      "oportunidade": "Categoria que concorrentes têm e loja não"
+    },
+    "promocoes": {
+      "loja_tipos": ["tipo1", "tipo2"],
+      "concorrentes_tipos": ["tipo1", "tipo2", "tipo3"],
+      "gap": "Concorrentes usam X tipos de promoção que loja não usa"
+    },
+    "avaliacoes": {
+      "melhor_concorrente": "Nome (nota/5)",
+      "insight": "Se loja deve investir em programa de reviews"
+    }
+  },
+
   "briefing_strategist": {
     "problema_1": "Principal problema a resolver",
     "problema_2": "Segundo problema",
@@ -289,6 +312,7 @@ Retorne APENAS o JSON abaixo:
 - [ ] Máximo 5 alertas, cada um com dados específicos (números)?
 - [ ] Exatamente 5 oportunidades, cada uma com potencial em R$?
 - [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
+- [ ] Comparativo de concorrentes preenchido (ticket, categorias, promoções, avaliações)?
 - [ ] Briefing para Strategist com 3 problemas e restrições?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
@@ -327,7 +351,7 @@ MARKET;
     }
 
     /**
-     * Resumo dos concorrentes
+     * Resumo dos concorrentes (versão expandida com todos os dados)
      */
     private static function summarizeCompetitors(array $competitors): string
     {
@@ -338,6 +362,8 @@ MARKET;
         $output = '';
         $totalPreco = 0;
         $count = 0;
+        $allCategories = [];
+        $allPromos = [];
 
         foreach ($competitors as $c) {
             if (! ($c['sucesso'] ?? false)) {
@@ -351,43 +377,94 @@ MARKET;
 
             $output .= "**{$nome}:**\n";
 
+            // Preços
             if (! empty($faixa)) {
                 $output .= "- Preço: R$ {$faixa['min']} - R$ {$faixa['max']} (média R$ {$faixa['media']})\n";
                 $totalPreco += $faixa['media'];
                 $count++;
             }
 
+            // Avaliações (NOVO - dados que estavam sendo ignorados)
+            $avaliacoes = $dadosRicos['avaliacoes'] ?? [];
+            if (! empty($avaliacoes['nota_media'])) {
+                $notaMedia = $avaliacoes['nota_media'];
+                $totalAvaliacoes = $avaliacoes['total_avaliacoes'] ?? 0;
+                $output .= "- Avaliação: {$notaMedia}/5";
+                if ($totalAvaliacoes > 0) {
+                    $output .= " ({$totalAvaliacoes} reviews)";
+                }
+                $output .= "\n";
+            }
+
+            // Categorias
             if (! empty($dadosRicos['categorias'])) {
                 $topCats = array_slice($dadosRicos['categorias'], 0, 3);
                 $catsStr = implode(', ', array_map(fn ($cat) => "{$cat['nome']} ({$cat['mencoes']}x)", $topCats));
                 $output .= "- Categorias foco: {$catsStr}\n";
+
+                // Agregar categorias para análise geral
+                foreach ($dadosRicos['categorias'] as $cat) {
+                    $catNome = $cat['nome'] ?? 'outros';
+                    $allCategories[$catNome] = ($allCategories[$catNome] ?? 0) + ($cat['mencoes'] ?? 1);
+                }
             }
 
+            // Promoções detalhadas (NOVO - antes só pegava maior desconto)
             if (! empty($dadosRicos['promocoes'])) {
-                $maxDesc = 0;
+                $promosFormatted = [];
                 foreach ($dadosRicos['promocoes'] as $promo) {
-                    if (($promo['tipo'] ?? '') === 'desconto_percentual') {
-                        $val = (int) filter_var($promo['valor'] ?? '0', FILTER_SANITIZE_NUMBER_INT);
-                        if ($val > $maxDesc) {
-                            $maxDesc = $val;
-                        }
+                    $tipo = $promo['tipo'] ?? 'outro';
+                    $allPromos[$tipo] = ($allPromos[$tipo] ?? 0) + 1;
+
+                    if ($tipo === 'desconto_percentual') {
+                        $promosFormatted[] = "Desconto {$promo['valor']}";
+                    } elseif ($tipo === 'cupom') {
+                        $promosFormatted[] = "Cupom: {$promo['codigo']}";
+                    } elseif ($tipo === 'frete_gratis') {
+                        $promosFormatted[] = 'Frete grátis';
+                    } elseif ($tipo === 'promocao_especial') {
+                        $promosFormatted[] = $promo['descricao'] ?? 'Promoção especial';
                     }
                 }
-                if ($maxDesc > 0) {
-                    $output .= "- Maior desconto: {$maxDesc}%\n";
+                if (! empty($promosFormatted)) {
+                    $output .= '- Promoções: '.implode(', ', array_slice($promosFormatted, 0, 4))."\n";
                 }
             }
 
+            // Diferenciais
             if (! empty($diferenciais)) {
-                $output .= '- Diferenciais: '.implode(', ', array_slice($diferenciais, 0, 3))."\n";
+                $output .= '- Diferenciais: '.implode(', ', array_slice($diferenciais, 0, 4))."\n";
+            }
+
+            // Produtos estimados
+            if (! empty($c['produtos_estimados'])) {
+                $output .= "- Produtos no catálogo: ~{$c['produtos_estimados']}\n";
             }
 
             $output .= "\n";
         }
 
+        // Resumo agregado
         if ($count > 0) {
             $mediaConcorrentes = round($totalPreco / $count, 2);
-            $output .= "**Média de preços dos concorrentes:** R$ {$mediaConcorrentes}\n";
+            $output .= "---\n";
+            $output .= "**RESUMO AGREGADO ({$count} concorrentes):**\n";
+            $output .= "- Ticket médio: R$ {$mediaConcorrentes}\n";
+
+            // Top categorias do mercado
+            if (! empty($allCategories)) {
+                arsort($allCategories);
+                $topMarketCats = array_slice($allCategories, 0, 5, true);
+                $catsMarket = implode(', ', array_map(fn ($k, $v) => "{$k} ({$v})", array_keys($topMarketCats), $topMarketCats));
+                $output .= "- Categorias mais fortes no mercado: {$catsMarket}\n";
+            }
+
+            // Tipos de promoção mais usados
+            if (! empty($allPromos)) {
+                arsort($allPromos);
+                $promosMarket = implode(', ', array_map(fn ($k, $v) => "{$k} ({$v}x)", array_keys($allPromos), $allPromos));
+                $output .= "- Tipos de promoção: {$promosMarket}\n";
+            }
         }
 
         return $output ?: 'Dados limitados.';

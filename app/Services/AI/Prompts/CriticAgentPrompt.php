@@ -69,27 +69,33 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 
 ---
 
-## VALIDAÇÃO OBRIGATÓRIA: CITAÇÕES DE CONCORRENTES
+## VALIDAÇÃO: CITAÇÕES DE CONCORRENTES (CONDICIONAL)
 
-**REGRA CRÍTICA:** No mínimo **3 sugestões** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
+### SE houver dados de concorrentes disponíveis nas sugestões:
+
+**REGRA:** No mínimo **3 sugestões HIGH/MEDIUM** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
 
 ✅ **Dados específicos aceitos:**
 - Preços reais: "Hidratei oferece ticket médio de R$ 259"
 - Diferenciais únicos: "Noma Beauty usa quiz personalizado com 15 perguntas"
 - Promoções ativas: "Forever Liss oferece frete grátis acima de R$130"
 - Categorias em destaque: "Hidratei tem 168 kits no catálogo"
+- Avaliações: "Concorrente X tem 4.8/5 com 3200 reviews"
+- Produtos destaque: "Concorrente Y vende Kit Premium a R$ 249"
 
 ❌ **NÃO ACEITO (genérico demais):**
 - "Concorrentes oferecem frete grátis"
 - "Outras lojas têm programa de fidelidade"
 - "O mercado está fazendo X"
 
-**Se menos de 3 sugestões citam concorrentes com dados específicos:**
-1. Identificar sugestões sem `competitor_reference`
-2. Adicionar dados de concorrentes disponíveis OU
-3. Criar sugestões substitutas que usem dados de concorrentes
+**Prioridade:** Citar concorrentes DIFERENTES quando possível.
 
-**Prioridade:** As 3 sugestões devem citar concorrentes DIFERENTES quando possível
+### SE NÃO houver dados de concorrentes:
+
+- **competitor_reference pode ser null** para todas as sugestões
+- Foque em dados internos da loja (métricas, histórico, benchmarks)
+- Use práticas padrão do setor como referência
+- **NÃO invente dados de concorrentes**
 
 ---
 
@@ -293,8 +299,8 @@ Retorne APENAS o JSON abaixo:
 - [ ] Todas viáveis na Nuvemshop?
 - [ ] Toda sugestão tem `expected_result` com número?
 - [ ] Toda HIGH tem dado específico no `problem`?
-- [ ] **MÍNIMO 3 sugestões com competitor_reference preenchido com dados ESPECÍFICOS?** ← OBRIGATÓRIO
-- [ ] **As 3 citações usam dados reais (preços, categorias, diferenciais)?** ← OBRIGATÓRIO
+- [ ] **SE houver dados de concorrentes:** mínimo 3 sugestões com competitor_reference específico
+- [ ] **SE NÃO houver dados de concorrentes:** competitor_reference pode ser null, foque em dados internos
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;

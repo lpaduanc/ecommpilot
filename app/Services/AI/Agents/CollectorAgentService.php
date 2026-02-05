@@ -16,6 +16,25 @@ class CollectorAgentService
     ) {}
 
     /**
+     * Log full data as formatted JSON without truncation.
+     */
+    private function logFullData(string $title, array $data): void
+    {
+        if (empty($data)) {
+            return;
+        }
+
+        $separator = '═══════════════════════════════════════════════════════════════════';
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info("█ {$title}");
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info($json);
+        Log::channel($this->logChannel)->info($separator);
+    }
+
+    /**
      * Execute the collector agent.
      */
     public function execute(array $context): array
@@ -26,7 +45,7 @@ class CollectorAgentService
         Log::channel($this->logChannel)->info('    │ Gerando contexto historico e benchmarks                   │');
         Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────┘');
 
-        // Log das variáveis usadas (sem dados reais)
+        // Log das variáveis usadas (resumo)
         Log::channel($this->logChannel)->info('    [COLLECTOR] Variaveis do contexto:', [
             'platform' => $context['platform'] ?? 'desconhecida',
             'niche' => $context['niche'] ?? 'geral',
@@ -34,9 +53,19 @@ class CollectorAgentService
             'previous_analyses_count' => count($context['previous_analyses'] ?? []),
             'previous_suggestions_count' => count($context['previous_suggestions'] ?? []),
             'benchmarks_count' => count($context['benchmarks'] ?? []),
+            'has_external_data' => ! empty($context['external_data']),
         ]);
 
-        // Log do template do prompt (sem dados do banco)
+        // ═══════════════════════════════════════════════════════════════════
+        // LOG COMPLETO: Contexto recebido pelo Collector
+        // ═══════════════════════════════════════════════════════════════════
+        $this->logFullData('COLLECTOR INPUT - Store Stats', $context['store_stats'] ?? []);
+        $this->logFullData('COLLECTOR INPUT - External Data (Concorrentes)', $context['external_data'] ?? []);
+        $this->logFullData('COLLECTOR INPUT - Benchmarks', $context['benchmarks'] ?? []);
+        $this->logFullData('COLLECTOR INPUT - Previous Analyses', $context['previous_analyses'] ?? []);
+        $this->logFullData('COLLECTOR INPUT - Store Goals', $context['store_goals'] ?? []);
+
+        // Log do template do prompt
         Log::channel($this->logChannel)->info('    [COLLECTOR] PROMPT TEMPLATE:');
         Log::channel($this->logChannel)->info(CollectorAgentPrompt::getTemplate());
 

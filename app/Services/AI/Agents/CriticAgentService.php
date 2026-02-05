@@ -16,6 +16,25 @@ class CriticAgentService
     ) {}
 
     /**
+     * Log full data as formatted JSON without truncation.
+     */
+    private function logFullData(string $title, array $data): void
+    {
+        if (empty($data)) {
+            return;
+        }
+
+        $separator = '═══════════════════════════════════════════════════════════════════';
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info("█ {$title}");
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info($json);
+        Log::channel($this->logChannel)->info($separator);
+    }
+
+    /**
      * Execute the critic agent.
      */
     public function execute(array $data): array
@@ -26,14 +45,23 @@ class CriticAgentService
         Log::channel($this->logChannel)->info('    │ Revisando e validando sugestoes geradas                      │');
         Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────────┘');
 
-        // Log das variáveis usadas (sem dados reais)
+        // Log das variáveis usadas (resumo)
         Log::channel($this->logChannel)->info('    [CRITIC] Variaveis do contexto:', [
             'suggestions_count' => count($data['suggestions'] ?? []),
             'previous_suggestions_count' => count($data['previous_suggestions'] ?? []),
             'store_context_keys' => array_keys($data['store_context'] ?? []),
+            'has_external_data' => ! empty($data['external_data']),
         ]);
 
-        // Log do template do prompt (sem dados do banco)
+        // ═══════════════════════════════════════════════════════════════════
+        // LOG COMPLETO: Contexto recebido pelo Critic
+        // ═══════════════════════════════════════════════════════════════════
+        $this->logFullData('CRITIC INPUT - Sugestões para Revisar', $data['suggestions'] ?? []);
+        $this->logFullData('CRITIC INPUT - Sugestões Anteriores', $data['previous_suggestions'] ?? []);
+        $this->logFullData('CRITIC INPUT - External Data (Concorrentes)', $data['external_data'] ?? []);
+        $this->logFullData('CRITIC INPUT - Store Context', $data['store_context'] ?? []);
+
+        // Log do template do prompt
         Log::channel($this->logChannel)->info('    [CRITIC] PROMPT TEMPLATE:');
         Log::channel($this->logChannel)->info(CriticAgentPrompt::getTemplate());
 

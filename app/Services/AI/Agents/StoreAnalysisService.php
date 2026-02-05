@@ -56,6 +56,25 @@ class StoreAnalysisService
     ) {}
 
     /**
+     * Log full data as formatted JSON without truncation.
+     *
+     * @param  string  $title  Title/header for the log section
+     * @param  array  $data  Data to log
+     * @param  string  $level  Log level (info, debug, warning)
+     */
+    private function logFullData(string $title, array $data, string $level = 'info'): void
+    {
+        $separator = '═══════════════════════════════════════════════════════════════════';
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        Log::channel($this->logChannel)->$level($separator);
+        Log::channel($this->logChannel)->$level("█ {$title}");
+        Log::channel($this->logChannel)->$level($separator);
+        Log::channel($this->logChannel)->$level($json);
+        Log::channel($this->logChannel)->$level($separator);
+    }
+
+    /**
      * Execute a stage with retry logic and progress saving.
      *
      * @param  callable  $stageCallback  The callback to execute for this stage
@@ -264,7 +283,10 @@ class StoreAnalysisService
             $previousSuggestions = $this->getPreviousSuggestionsDetailed($store->id, 50);
             $saturatedThemes = $this->identifySaturatedThemes($previousSuggestions['all']);
 
-            Log::channel($this->logChannel)->info('<<< Contexto historico carregado (V4)', [
+            // V5: Buscar categorias bloqueadas por múltiplas rejeições
+            $blockedCategories = $this->getBlockedCategoriesByRejection($store->id);
+
+            Log::channel($this->logChannel)->info('<<< Contexto historico carregado (V5)', [
                 'previous_analyses_count' => count($previousAnalyses),
                 'previous_suggestions_count' => count($previousSuggestions['all']),
                 'accepted_count' => count($previousSuggestions['accepted_titles']),
@@ -272,15 +294,42 @@ class StoreAnalysisService
                 'saturated_themes' => $saturatedThemes,
             ]);
 
+            // V5: Buscar dados de feedback para aprendizado
+            $successCases = $this->getSuccessCasesForStore($store, 5);
+            $failureCases = $this->getFailureCasesForStore($store, 5);
+            $categorySuccessRates = $this->getCategorySuccessRates();
+
+            // Agrupar sugestões por status para contexto detalhado
+            $suggestionsByStatus = $this->groupSuggestionsByStatus($previousSuggestions['all']);
+
+            $learningContext = [
+                'success_cases' => $successCases,
+                'failure_cases' => $failureCases,
+                'category_success_rates' => $categorySuccessRates,
+                'suggestions_by_status' => $suggestionsByStatus,
+                'blocked_categories' => $blockedCategories,
+            ];
+
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Contexto de Aprendizado (feedback system)
+            // ═══════════════════════════════════════════════════════════════════
+            $this->logFullData('LEARNING CONTEXT COMPLETO', $learningContext);
+            $this->logFullData('SUGESTÕES ANTERIORES (todas)', $previousSuggestions['all']);
+            $this->logFullData('TEMAS SATURADOS', $saturatedThemes);
+
             Log::channel($this->logChannel)->info('<<< Contexto historico carregado', [
                 'previous_analyses_count' => count($previousAnalyses),
                 'previous_suggestions_count' => count($previousSuggestions['all']),
+                'success_cases_count' => count($successCases),
+                'failure_cases_count' => count($failureCases),
+                'blocked_categories' => array_keys($blockedCategories),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
 
             $this->logService->completeStage($analysis, 2, [
                 'previous_analyses_count' => count($previousAnalyses),
                 'previous_suggestions_count' => count($previousSuggestions['all']),
+                'has_feedback_data' => ! empty($successCases) || ! empty($failureCases),
             ]);
         } catch (\Exception $e) {
             $this->logService->failStage($analysis, 2, $e->getMessage());
@@ -306,6 +355,16 @@ class StoreAnalysisService
                 'strategies_count' => count($nicheStrategies),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Benchmarks e Estratégias do RAG
+            // ═══════════════════════════════════════════════════════════════════
+            if (! empty($benchmarks)) {
+                $this->logFullData('RAG - BENCHMARKS DO NICHO', $benchmarks);
+            }
+            if (! empty($nicheStrategies)) {
+                $this->logFullData('RAG - ESTRATÉGIAS DO NICHO', $nicheStrategies);
+            }
 
             $this->logService->completeStage($analysis, 3, [
                 'benchmarks_count' => count($benchmarks),
@@ -358,6 +417,18 @@ class StoreAnalysisService
                 'total_concorrentes' => count($externalMarketData['concorrentes'] ?? []),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Dados de Concorrentes (para debugging de qualidade)
+            // ═══════════════════════════════════════════════════════════════════
+            if (! empty($externalMarketData['concorrentes'])) {
+                $this->logFullData('DADOS COMPLETOS DOS CONCORRENTES', $externalMarketData['concorrentes']);
+            }
+
+            // Log dados de mercado (Google Trends e preços)
+            if (! empty($externalMarketData['dados_mercado'])) {
+                $this->logFullData('DADOS DE MERCADO (Trends + Preços)', $externalMarketData['dados_mercado']);
+            }
 
             $this->logService->completeStage($analysis, 4, [
                 'trends_sucesso' => $externalMarketData['dados_mercado']['google_trends']['sucesso'] ?? false,
@@ -447,6 +518,16 @@ class StoreAnalysisService
                 'products_out_of_stock' => $storeData['products']['out_of_stock'],
             ]);
 
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Dados da Loja (para debugging de qualidade)
+            // ═══════════════════════════════════════════════════════════════════
+            $this->logFullData('BEST SELLERS (Top 10)', $storeData['products']['best_sellers'] ?? []);
+            $this->logFullData('PRODUTOS SEM ESTOQUE', $storeData['products']['out_of_stock_list'] ?? []);
+            $this->logFullData('PRODUTOS SEM VENDAS NO PERIODO', $storeData['products']['no_sales_period'] ?? []);
+            $this->logFullData('DADOS DE CUPONS', $storeData['coupons'] ?? []);
+            $this->logFullData('PEDIDOS POR DIA', $storeData['orders']['by_day'] ?? []);
+            $this->logFullData('PEDIDOS POR STATUS DE PAGAMENTO', $storeData['orders']['by_payment_status'] ?? []);
+
             // Se v2, usar HistorySummaryService para resumo de histórico otimizado
             $historySummary = null;
             if ($formatVersion === 'v2' && SystemSetting::get('analysis.v2.use_history_summary', true)) {
@@ -497,6 +578,16 @@ class StoreAnalysisService
                 'patterns_count' => count($analysisResult['identified_patterns'] ?? []),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Resultado do Analyst (anomalias, patterns, health)
+            // ═══════════════════════════════════════════════════════════════════
+            $this->logFullData('ANALYST - OVERALL HEALTH', $analysisResult['overall_health'] ?? []);
+            $this->logFullData('ANALYST - ANOMALIAS DETECTADAS', $analysisResult['anomalies'] ?? []);
+            $this->logFullData('ANALYST - PATTERNS IDENTIFICADOS', $analysisResult['identified_patterns'] ?? []);
+            if (isset($analysisResult['comparativo_concorrentes'])) {
+                $this->logFullData('ANALYST - COMPARATIVO LOJA x CONCORRENTES', $analysisResult['comparativo_concorrentes']);
+            }
 
             $this->logService->completeStage($analysis, 6, [
                 'health_score' => $analysisResult['overall_health']['score'] ?? null,
@@ -561,10 +652,18 @@ class StoreAnalysisService
                 'active_products' => $storeData['products']['active'] ?? 0,
                 'out_of_stock' => $storeData['products']['out_of_stock'] ?? 0,
                 'out_of_stock_pct' => $outOfStockPct,
+                'out_of_stock_list' => $storeData['products']['out_of_stock_list'] ?? [],
+                'best_sellers' => $storeData['products']['best_sellers'] ?? [],
                 'coupon_rate' => $storeData['coupons']['usage_rate'] ?? 0,
                 'coupon_impact' => $storeData['coupons']['ticket_impact'] ?? 0,
+                'top_coupons' => $storeData['coupons']['top_coupons'] ?? [],
                 'anomalies_list' => $this->formatAnomaliesList($analysisResult['anomalies'] ?? []),
+                'anomalies' => $this->formatAnomaliesArray($analysisResult['anomalies'] ?? []),
                 'patterns_list' => $this->formatPatternsList($analysisResult['identified_patterns'] ?? []),
+                'patterns' => $analysisResult['identified_patterns'] ?? [],
+
+                // V5: Dados de feedback/aprendizado
+                'learning_context' => $learningContext ?? [],
             ]);
 
             // Coletar prompt para logging no final
@@ -575,6 +674,11 @@ class StoreAnalysisService
                 'suggestions_generated' => count($generatedSuggestions['suggestions'] ?? []),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Sugestões do Strategist (antes do Critic)
+            // ═══════════════════════════════════════════════════════════════════
+            $this->logFullData('STRATEGIST - SUGESTÕES GERADAS', $generatedSuggestions['suggestions'] ?? []);
 
             $this->logService->completeStage($analysis, 7, [
                 'suggestions_generated' => count($generatedSuggestions['suggestions'] ?? []),
@@ -628,6 +732,17 @@ class StoreAnalysisService
                 'average_quality' => $criticizedSuggestions['general_analysis']['average_quality'] ?? 'N/A',
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
+
+            // ═══════════════════════════════════════════════════════════════════
+            // LOG COMPLETO: Sugestões do Critic (finais, após revisão)
+            // ═══════════════════════════════════════════════════════════════════
+            $this->logFullData('CRITIC - SUGESTÕES APROVADAS (FINAIS)', $criticizedSuggestions['approved_suggestions'] ?? []);
+            if (! empty($criticizedSuggestions['removed_suggestions'])) {
+                $this->logFullData('CRITIC - SUGESTÕES REMOVIDAS', $criticizedSuggestions['removed_suggestions']);
+            }
+            if (isset($criticizedSuggestions['general_analysis'])) {
+                $this->logFullData('CRITIC - ANÁLISE GERAL', $criticizedSuggestions['general_analysis']);
+            }
 
             $this->logService->completeStage($analysis, 8, [
                 'suggestions_approved' => count($criticizedSuggestions['approved_suggestions'] ?? []),
@@ -726,6 +841,11 @@ class StoreAnalysisService
 
         $this->saveAnalysis($analysis, $analysisResult, $niche);
         $this->saveSuggestions($analysis, $finalSuggestions);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // LOG COMPLETO: Sugestões Finais Salvas no Banco
+        // ═══════════════════════════════════════════════════════════════════
+        $this->logFullData('SUGESTÕES FINAIS SALVAS NO BANCO', $finalSuggestions);
 
         Log::channel($this->logChannel)->info('<<< Dados salvos no banco', [
             'analysis_id' => $analysis->id,
@@ -1142,6 +1262,7 @@ class StoreAnalysisService
                 'total' => $products->count(),
                 'active' => $activeProducts->count(),
                 'out_of_stock' => $products->filter(fn ($p) => $p->isOutOfStock())->count(),
+                'out_of_stock_list' => $this->getOutOfStockProducts($products),
                 'best_sellers' => $this->getBestSellers($store, $paidOrders),
                 'no_sales_period' => $this->getNoSalesProducts($store, $periodDays),
                 'gifts_filtered' => $giftsFiltered,
@@ -1156,25 +1277,55 @@ class StoreAnalysisService
     }
 
     /**
-     * Get best selling products.
+     * Get best selling products with details.
      */
     private function getBestSellers(Store $store, $paidOrders, int $limit = 10): array
     {
-        $productCounts = [];
+        $productStats = [];
 
         foreach ($paidOrders as $order) {
             $items = is_array($order->items) ? $order->items : [];
             foreach ($items as $item) {
                 $productId = $item['product_id'] ?? null;
                 if ($productId) {
-                    $productCounts[$productId] = ($productCounts[$productId] ?? 0) + ($item['quantity'] ?? 1);
+                    if (! isset($productStats[$productId])) {
+                        $productStats[$productId] = [
+                            'quantity' => 0,
+                            'revenue' => 0,
+                        ];
+                    }
+                    $productStats[$productId]['quantity'] += ($item['quantity'] ?? 1);
+                    $productStats[$productId]['revenue'] += ($item['price'] ?? 0) * ($item['quantity'] ?? 1);
                 }
             }
         }
 
-        arsort($productCounts);
+        // Sort by quantity sold
+        uasort($productStats, fn ($a, $b) => $b['quantity'] <=> $a['quantity']);
+        $topProductIds = array_slice(array_keys($productStats), 0, $limit);
 
-        return array_slice($productCounts, 0, $limit, true);
+        // Get product details
+        $products = $store->products()
+            ->whereIn('external_id', $topProductIds)
+            ->get()
+            ->keyBy('external_id');
+
+        $result = [];
+        foreach ($topProductIds as $productId) {
+            $product = $products->get($productId);
+            if ($product) {
+                $result[] = [
+                    'id' => $productId,
+                    'name' => $product->name,
+                    'quantity_sold' => $productStats[$productId]['quantity'],
+                    'revenue' => round($productStats[$productId]['revenue'], 2),
+                    'current_stock' => $product->stock_quantity ?? 0,
+                    'price' => $product->price ?? 0,
+                ];
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -1200,6 +1351,23 @@ class StoreAnalysisService
             ->where('stock_quantity', '>', 0)
             ->whereNotIn('external_id', $soldProductIds)
             ->count();
+    }
+
+    /**
+     * Get out of stock products with details.
+     */
+    private function getOutOfStockProducts($products, int $limit = 10): array
+    {
+        return $products
+            ->filter(fn ($p) => $p->isOutOfStock())
+            ->take($limit)
+            ->map(fn ($p) => [
+                'id' => $p->external_id,
+                'name' => $p->name,
+                'price' => $p->price ?? 0,
+            ])
+            ->values()
+            ->toArray();
     }
 
     /**
@@ -1639,7 +1807,7 @@ class StoreAnalysisService
     }
 
     /**
-     * Format anomalies list for Strategist prompt.
+     * Format anomalies list for Strategist prompt (legacy string format).
      */
     private function formatAnomaliesList(array $anomalies): string
     {
@@ -1650,6 +1818,27 @@ class StoreAnalysisService
         return collect($anomalies)
             ->map(fn ($a) => '- '.($a['description'] ?? 'Anomalia não especificada').' (Severidade: '.($a['severity'] ?? 'medium').')')
             ->implode("\n");
+    }
+
+    /**
+     * Format anomalies as structured array for Strategist prompt.
+     */
+    private function formatAnomaliesArray(array $anomalies): array
+    {
+        if (empty($anomalies)) {
+            return [];
+        }
+
+        return collect($anomalies)
+            ->map(fn ($a) => [
+                'type' => $a['type'] ?? $a['tipo'] ?? 'general',
+                'description' => $a['description'] ?? $a['descricao'] ?? 'Anomalia não especificada',
+                'severity' => $a['severity'] ?? 'medium',
+                'metric' => $a['metric'] ?? null,
+                'expected' => $a['expected'] ?? null,
+                'actual' => $a['actual'] ?? null,
+            ])
+            ->toArray();
     }
 
     /**
@@ -1664,6 +1853,49 @@ class StoreAnalysisService
         return collect($patterns)
             ->map(fn ($p) => '- '.($p['type'] ?? 'pattern').': '.($p['description'] ?? $p['opportunity'] ?? 'Padrão não especificado'))
             ->implode("\n");
+    }
+
+    /**
+     * Group suggestions by status for detailed learning context.
+     */
+    private function groupSuggestionsByStatus(array $suggestions): array
+    {
+        $grouped = [
+            'accepted_successful' => [],
+            'accepted_failed' => [],
+            'rejected' => [],
+            'in_progress' => [],
+            'pending' => [],
+        ];
+
+        foreach ($suggestions as $s) {
+            $status = $s['status'] ?? 'pending';
+            $wasSuccessful = $s['was_successful'] ?? null;
+
+            $item = [
+                'title' => $s['title'] ?? 'Sem título',
+                'category' => $s['category'] ?? 'general',
+                'expected_impact' => $s['expected_impact'] ?? 'medium',
+            ];
+
+            if ($status === 'completed') {
+                if ($wasSuccessful === true) {
+                    $item['impact'] = $s['metrics_impact'] ?? null;
+                    $grouped['accepted_successful'][] = $item;
+                } else {
+                    $item['failure_reason'] = $s['feedback'] ?? 'Não informado';
+                    $grouped['accepted_failed'][] = $item;
+                }
+            } elseif ($status === 'rejected') {
+                $grouped['rejected'][] = $item;
+            } elseif ($status === 'in_progress') {
+                $grouped['in_progress'][] = $item;
+            } else {
+                $grouped['pending'][] = $item;
+            }
+        }
+
+        return $grouped;
     }
 
     /**

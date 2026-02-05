@@ -16,6 +16,25 @@ class AnalystAgentService
     ) {}
 
     /**
+     * Log full data as formatted JSON without truncation.
+     */
+    private function logFullData(string $title, array $data): void
+    {
+        if (empty($data)) {
+            return;
+        }
+
+        $separator = '═══════════════════════════════════════════════════════════════════';
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info("█ {$title}");
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info($json);
+        Log::channel($this->logChannel)->info($separator);
+    }
+
+    /**
      * Execute the analyst agent.
      */
     public function execute(array $data): array
@@ -26,7 +45,7 @@ class AnalystAgentService
         Log::channel($this->logChannel)->info('    │ Analisando metricas, anomalias e padroes                     │');
         Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────────┘');
 
-        // Log das variáveis usadas (sem dados reais)
+        // Log das variáveis usadas (resumo)
         Log::channel($this->logChannel)->info('    [ANALYST] Variaveis do contexto:', [
             'orders_summary_keys' => array_keys($data['orders_summary'] ?? []),
             'products_summary_keys' => array_keys($data['products_summary'] ?? []),
@@ -35,6 +54,17 @@ class AnalystAgentService
             'benchmarks_count' => count($data['benchmarks'] ?? []),
             'has_external_data' => isset($data['external_data']),
         ]);
+
+        // ═══════════════════════════════════════════════════════════════════
+        // LOG COMPLETO: Contexto recebido pelo Analyst
+        // ═══════════════════════════════════════════════════════════════════
+        $this->logFullData('ANALYST INPUT - Orders Summary', $data['orders_summary'] ?? []);
+        $this->logFullData('ANALYST INPUT - Products Summary', $data['products_summary'] ?? []);
+        $this->logFullData('ANALYST INPUT - Inventory Summary', $data['inventory_summary'] ?? []);
+        $this->logFullData('ANALYST INPUT - Coupons Summary', $data['coupons_summary'] ?? []);
+        $this->logFullData('ANALYST INPUT - External Data (Concorrentes)', $data['external_data'] ?? []);
+        $this->logFullData('ANALYST INPUT - Benchmarks', $data['benchmarks'] ?? []);
+        $this->logFullData('ANALYST INPUT - Historical Metrics', $data['historical_metrics'] ?? []);
 
         // Log do template do prompt
         Log::channel($this->logChannel)->info('    [ANALYST] PROMPT TEMPLATE:');

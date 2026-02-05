@@ -16,6 +16,25 @@ class StrategistAgentService
     ) {}
 
     /**
+     * Log full data as formatted JSON without truncation.
+     */
+    private function logFullData(string $title, array $data): void
+    {
+        if (empty($data)) {
+            return;
+        }
+
+        $separator = '═══════════════════════════════════════════════════════════════════';
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info("█ {$title}");
+        Log::channel($this->logChannel)->info($separator);
+        Log::channel($this->logChannel)->info($json);
+        Log::channel($this->logChannel)->info($separator);
+    }
+
+    /**
      * Execute the strategist agent.
      */
     public function execute(array $context): array
@@ -26,15 +45,27 @@ class StrategistAgentService
         Log::channel($this->logChannel)->info('    │ Gerando sugestoes estrategicas baseadas na analise          │');
         Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────────┘');
 
-        // Log das variáveis usadas (sem dados reais)
+        // Log das variáveis usadas (resumo)
         Log::channel($this->logChannel)->info('    [STRATEGIST] Variaveis do contexto:', [
             'collector_context_keys' => array_keys($context['collector_context'] ?? []),
             'analysis_keys' => array_keys($context['analysis'] ?? []),
             'previous_suggestions_count' => count($context['previous_suggestions'] ?? []),
             'rag_strategies_count' => count($context['rag_strategies'] ?? []),
+            'has_external_data' => ! empty($context['external_data']),
+            'has_learning_context' => ! empty($context['learning_context']),
         ]);
 
-        // Log do template do prompt (sem dados do banco)
+        // ═══════════════════════════════════════════════════════════════════
+        // LOG COMPLETO: Contexto recebido pelo Strategist
+        // ═══════════════════════════════════════════════════════════════════
+        $this->logFullData('STRATEGIST INPUT - External Data (Concorrentes)', $context['external_data'] ?? []);
+        $this->logFullData('STRATEGIST INPUT - Learning Context', $context['learning_context'] ?? []);
+        $this->logFullData('STRATEGIST INPUT - Best Sellers', $context['best_sellers'] ?? []);
+        $this->logFullData('STRATEGIST INPUT - Out of Stock List', $context['out_of_stock_list'] ?? []);
+        $this->logFullData('STRATEGIST INPUT - Anomalies', $context['anomalies'] ?? []);
+        $this->logFullData('STRATEGIST INPUT - Store Goals', $context['store_goals'] ?? []);
+
+        // Log do template do prompt
         Log::channel($this->logChannel)->info('    [STRATEGIST] PROMPT TEMPLATE:');
         Log::channel($this->logChannel)->info(StrategistAgentPrompt::getTemplate());
 
@@ -126,8 +157,11 @@ class StrategistAgentService
             'total_invalidas' => count($suggestions) - count($validatedSuggestions),
         ]);
 
+        // Validar qualidade das sugestões HIGH (rebaixar se não tiverem dados específicos)
+        $finalSuggestions = $this->validateHighPrioritySuggestions($validatedSuggestions);
+
         return [
-            'suggestions' => $validatedSuggestions,
+            'suggestions' => $finalSuggestions,
             'general_observations' => $json['general_observations'] ?? '',
         ];
     }
@@ -214,5 +248,59 @@ class StrategistAgentService
         }
 
         return 'low';
+    }
+
+    /**
+     * Validate HIGH priority suggestions have specific data.
+     *
+     * Suggestions marked as HIGH must contain specific data like:
+     * - Monetary values (R$ X.XXX)
+     * - Percentages (X%)
+     * - Product/SKU/order counts
+     *
+     * If a HIGH suggestion lacks specific data, it's downgraded to MEDIUM.
+     */
+    private function validateHighPrioritySuggestions(array $suggestions): array
+    {
+        $downgraded = 0;
+
+        $validated = collect($suggestions)->map(function ($suggestion) use (&$downgraded) {
+            if (($suggestion['expected_impact'] ?? '') !== 'high') {
+                return $suggestion;
+            }
+
+            // Combine problem/description + action/recommended_action for validation
+            $textToCheck = ($suggestion['description'] ?? '')
+                .' '.($suggestion['recommended_action'] ?? '');
+
+            // Check for specific data patterns:
+            // - R$ values: R$ 1.234 or R$ 1.234,56 or R$1234
+            // - Percentages: 15% or 15,5%
+            // - Counts: 10 produtos, 5 SKUs, 100 pedidos
+            $hasSpecificData = preg_match(
+                '/R\$\s*[\d.,]+|\d+[,.]?\d*\s*%|\d+\s*(produtos?|SKUs?|pedidos?|itens?|clientes?|unidades?)/iu',
+                $textToCheck
+            );
+
+            if (! $hasSpecificData) {
+                $suggestion['expected_impact'] = 'medium';
+                $suggestion['_downgraded_from'] = 'high';
+                $downgraded++;
+
+                Log::channel($this->logChannel)->warning('    [STRATEGIST] Sugestao HIGH rebaixada para MEDIUM (falta dados especificos)', [
+                    'title' => $suggestion['title'] ?? 'N/A',
+                ]);
+            }
+
+            return $suggestion;
+        })->toArray();
+
+        if ($downgraded > 0) {
+            Log::channel($this->logChannel)->info('    [STRATEGIST] Validacao de qualidade HIGH concluida', [
+                'total_downgraded' => $downgraded,
+            ]);
+        }
+
+        return $validated;
     }
 }

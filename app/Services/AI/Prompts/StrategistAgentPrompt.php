@@ -126,6 +126,12 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 
 ---
 
+## APRENDIZADO DE ANÁLISES ANTERIORES
+
+{{learning_context}}
+
+---
+
 ## CONTEXTO
 
 **Período:** {{seasonality_period}}
@@ -140,6 +146,12 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 {{store_context}}
 
 **NOTA:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis. Não crie sugestões de reposição de estoque para produtos gratuitos.
+
+---
+
+## OBJETIVOS DA LOJA (PRIORIDADE)
+
+{{store_goals}}
 
 ---
 
@@ -404,6 +416,9 @@ PROMPT;
         return $out;
     }
 
+    /**
+     * Extrai insights dos concorrentes para o Strategist (versão expandida com todos os dados).
+     */
     public static function extractCompetitorInsights(array $competitors): string
     {
         if (empty($competitors)) {
@@ -412,7 +427,9 @@ PROMPT;
 
         $output = '';
         $allCategories = [];
-        $maxDiscount = 0;
+        $allPromos = [];
+        $allProducts = [];
+        $bestRating = ['nome' => '', 'nota' => 0, 'total' => 0];
 
         foreach ($competitors as $c) {
             if (! ($c['sucesso'] ?? false)) {
@@ -425,49 +442,127 @@ PROMPT;
 
             $output .= "**{$nome}:**\n";
 
+            // Preços
             if (! empty($faixa)) {
                 $output .= "- Preço: R$ {$faixa['min']} - R$ {$faixa['max']} (média: R$ {$faixa['media']})\n";
             }
 
+            // Avaliações (NOVO)
+            $avaliacoes = $dadosRicos['avaliacoes'] ?? [];
+            if (! empty($avaliacoes['nota_media'])) {
+                $nota = $avaliacoes['nota_media'];
+                $total = $avaliacoes['total_avaliacoes'] ?? 0;
+                $output .= "- Avaliação: {$nota}/5";
+                if ($total > 0) {
+                    $output .= " ({$total} reviews)";
+                }
+                $output .= "\n";
+
+                if ($nota > $bestRating['nota']) {
+                    $bestRating = ['nome' => $nome, 'nota' => $nota, 'total' => $total];
+                }
+            }
+
+            // Categorias
             if (! empty($dadosRicos['categorias'])) {
                 $topCats = array_slice($dadosRicos['categorias'], 0, 3);
                 $catsStr = implode(', ', array_map(fn ($cat) => "{$cat['nome']} ({$cat['mencoes']}x)", $topCats));
                 $output .= "- Categorias foco: {$catsStr}\n";
-                foreach ($topCats as $cat) {
-                    $allCategories[$cat['nome']] = ($allCategories[$cat['nome']] ?? 0) + $cat['mencoes'];
+                foreach ($dadosRicos['categorias'] as $cat) {
+                    $allCategories[$cat['nome']] = ($allCategories[$cat['nome']] ?? 0) + ($cat['mencoes'] ?? 1);
                 }
             }
 
+            // Promoções detalhadas (NOVO - antes só pegava maior desconto)
             if (! empty($dadosRicos['promocoes'])) {
+                $promosFormatted = [];
                 foreach ($dadosRicos['promocoes'] as $promo) {
-                    if (($promo['tipo'] ?? '') === 'desconto_percentual') {
-                        $valor = (int) filter_var($promo['valor'] ?? '0', FILTER_SANITIZE_NUMBER_INT);
-                        if ($valor > $maxDiscount) {
-                            $maxDiscount = $valor;
-                        }
+                    $tipo = $promo['tipo'] ?? 'outro';
+                    $allPromos[$tipo] = ($allPromos[$tipo] ?? 0) + 1;
+
+                    if ($tipo === 'desconto_percentual') {
+                        $promosFormatted[] = "Desconto {$promo['valor']}";
+                    } elseif ($tipo === 'cupom') {
+                        $promosFormatted[] = "Cupom: {$promo['codigo']}";
+                    } elseif ($tipo === 'frete_gratis') {
+                        $promosFormatted[] = 'Frete grátis';
+                    } elseif ($tipo === 'promocao_especial') {
+                        $promosFormatted[] = $promo['descricao'] ?? 'Promoção especial';
                     }
                 }
-                if ($maxDiscount > 0) {
-                    $output .= "- Maior desconto: {$maxDiscount}%\n";
+                if (! empty($promosFormatted)) {
+                    $output .= '- Promoções: '.implode(', ', array_slice($promosFormatted, 0, 4))."\n";
                 }
             }
 
+            // Diferenciais
             if (! empty($c['diferenciais'])) {
-                $output .= '- Diferenciais: '.implode(', ', $c['diferenciais'])."\n";
+                $output .= '- Diferenciais: '.implode(', ', array_slice($c['diferenciais'], 0, 4))."\n";
+            }
+
+            // Top 5 produtos do concorrente (NOVO - dados que estavam sendo ignorados)
+            if (! empty($dadosRicos['produtos'])) {
+                $topProdutos = array_slice($dadosRicos['produtos'], 0, 5);
+                if (! empty($topProdutos)) {
+                    $output .= "- Top produtos:\n";
+                    foreach ($topProdutos as $i => $produto) {
+                        $nomeProd = $produto['nome'] ?? 'Produto';
+                        $precoProd = $produto['preco'] ?? 0;
+                        $output .= "  ".($i + 1).". {$nomeProd} (R$ ".number_format($precoProd, 2, ',', '.').
+")\n";
+                        $allProducts[] = ['nome' => $nomeProd, 'preco' => $precoProd, 'concorrente' => $nome];
+                    }
+                }
             }
 
             $output .= "\n";
         }
 
+        // Resumo agregado do mercado
+        $output .= "---\n";
+        $output .= "**ANÁLISE AGREGADA DO MERCADO:**\n\n";
+
+        // Categorias mais fortes
         if (! empty($allCategories)) {
             arsort($allCategories);
-            $output .= "**Categorias mais fortes no mercado:**\n";
+            $output .= "**Categorias mais fortes:**\n";
             $count = 0;
             foreach ($allCategories as $cat => $mentions) {
-                if ($count++ >= 3) {
+                if ($count++ >= 5) {
                     break;
                 }
                 $output .= "- {$cat}: {$mentions} menções\n";
+            }
+            $output .= "\n";
+        }
+
+        // Tipos de promoção mais usados
+        if (! empty($allPromos)) {
+            arsort($allPromos);
+            $output .= "**Estratégias de promoção:**\n";
+            foreach ($allPromos as $tipo => $quantidade) {
+                $tipoFormatado = match ($tipo) {
+                    'desconto_percentual' => 'Descontos %',
+                    'cupom' => 'Cupons',
+                    'frete_gratis' => 'Frete grátis',
+                    'promocao_especial' => 'Promoções especiais',
+                    default => ucfirst($tipo),
+                };
+                $output .= "- {$tipoFormatado}: usado por {$quantidade} concorrente(s)\n";
+            }
+            $output .= "\n";
+        }
+
+        // Melhor avaliado
+        if ($bestRating['nota'] > 0) {
+            $output .= "**Melhor avaliado:** {$bestRating['nome']} com {$bestRating['nota']}/5 ({$bestRating['total']} reviews)\n\n";
+        }
+
+        // Produtos destaque no mercado
+        if (! empty($allProducts)) {
+            $output .= "**Produtos destaque no mercado (para benchmarking):**\n";
+            foreach (array_slice($allProducts, 0, 10) as $prod) {
+                $output .= "- {$prod['nome']} @ R$ ".number_format($prod['preco'], 2, ',', '.')." ({$prod['concorrente']})\n";
             }
         }
 
@@ -490,14 +585,22 @@ PROMPT;
         $acceptedTitles = $previousSuggestions['accepted_titles'] ?? [];
         $rejectedTitles = $previousSuggestions['rejected_titles'] ?? [];
 
+        // Store Goals
+        $storeGoals = $context['store_goals'] ?? [];
+
+        // Learning Context (feedback/aprendizado)
+        $learningContext = $context['learning_context'] ?? [];
+
         $replacements = [
             '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($allSuggestions),
             '{{saturated_themes}}' => self::identifySaturatedThemes($allSuggestions),
             '{{accepted_rejected}}' => self::formatAcceptedAndRejected($acceptedTitles, $rejectedTitles),
+            '{{learning_context}}' => self::formatLearningContext($learningContext),
             '{{seasonality_period}}' => $season['periodo'],
             '{{seasonality_focus}}' => $season['foco'],
             '{{platform_resources}}' => self::getPlatformResources(),
             '{{store_context}}' => is_array($storeContext) ? json_encode($storeContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $storeContext,
+            '{{store_goals}}' => self::formatStoreGoals($storeGoals),
             '{{analyst_analysis}}' => is_array($analystAnalysis) ? json_encode($analystAnalysis, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $analystAnalysis,
             '{{competitor_data}}' => self::extractCompetitorInsights($competitorData),
             '{{market_data}}' => is_array($marketData) ? json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $marketData,
@@ -508,6 +611,130 @@ PROMPT;
         }
 
         return $template;
+    }
+
+    /**
+     * Formata os objetivos da loja para o prompt.
+     */
+    private static function formatStoreGoals(array $goals): string
+    {
+        if (empty($goals)) {
+            return "Nenhum objetivo específico definido pela loja. Foque em:\n- Aumentar faturamento\n- Aumentar ticket médio\n- Melhorar conversão";
+        }
+
+        $output = "A loja definiu os seguintes objetivos:\n\n";
+        foreach ($goals as $goal) {
+            if (is_array($goal)) {
+                $nome = $goal['goal'] ?? $goal['name'] ?? $goal['objetivo'] ?? 'Objetivo';
+                $meta = $goal['target'] ?? $goal['meta'] ?? '';
+                $output .= "- **{$nome}**";
+                if ($meta) {
+                    $output .= ": {$meta}";
+                }
+                $output .= "\n";
+            } else {
+                $output .= "- {$goal}\n";
+            }
+        }
+
+        $output .= "\n**IMPORTANTE:** Priorize sugestões que ajudem a atingir esses objetivos. Sugestões alinhadas aos objetivos devem ser HIGH ou MEDIUM.";
+
+        return $output;
+    }
+
+    /**
+     * Formata o contexto de aprendizado de análises anteriores.
+     */
+    private static function formatLearningContext(array $learningContext): string
+    {
+        if (empty($learningContext)) {
+            return "Nenhum histórico de feedback disponível. Esta é uma das primeiras análises.";
+        }
+
+        $output = '';
+
+        // Taxa de sucesso por categoria
+        $categoryRates = $learningContext['category_success_rates'] ?? [];
+        if (! empty($categoryRates)) {
+            $output .= "### Taxas de Sucesso por Categoria\n\n";
+            $output .= "| Categoria | Taxa de Sucesso | Total |\n";
+            $output .= "|-----------|-----------------|-------|\n";
+            foreach ($categoryRates as $category => $stats) {
+                $rate = $stats['success_rate'] ?? 0;
+                $total = $stats['total_implemented'] ?? 0;
+                $output .= "| {$category} | {$rate}% | {$total} |\n";
+            }
+            $output .= "\n**REGRA DE PRIORIZAÇÃO:**\n";
+            $output .= "- Categorias com >70% sucesso: podem ser HIGH\n";
+            $output .= "- Categorias com 40-70% sucesso: MEDIUM\n";
+            $output .= "- Categorias com <40% sucesso: rebaixar para LOW ou evitar\n\n";
+        }
+
+        // Casos de sucesso
+        $successCases = $learningContext['success_cases'] ?? [];
+        if (! empty($successCases)) {
+            $output .= "### Casos de Sucesso Recentes\n\n";
+            $output .= "Sugestões que funcionaram bem para este cliente:\n\n";
+            foreach ($successCases as $case) {
+                $title = $case['title'] ?? 'Sem título';
+                $category = $case['category'] ?? 'geral';
+                $impact = $case['metrics_impact'] ?? null;
+                $impactStr = $impact ? ' - Impacto: '.json_encode($impact) : '';
+                $output .= "- ✅ **{$title}** ({$category}){$impactStr}\n";
+            }
+            $output .= "\n**INSIGHT:** Esses temas funcionam bem. Considere variações ou evoluções.\n\n";
+        }
+
+        // Casos de falha
+        $failureCases = $learningContext['failure_cases'] ?? [];
+        if (! empty($failureCases)) {
+            $output .= "### Padrões de Falha (EVITAR)\n\n";
+            $output .= "Sugestões que NÃO funcionaram:\n\n";
+            foreach ($failureCases as $case) {
+                $title = $case['title'] ?? 'Sem título';
+                $category = $case['category'] ?? 'geral';
+                $reason = $case['failure_reason'] ?? 'Não informado';
+                $output .= "- ❌ **{$title}** ({$category}): {$reason}\n";
+            }
+            $output .= "\n**INSIGHT:** Evitar temas similares ou abordar de forma completamente diferente.\n\n";
+        }
+
+        // Sugestões por status
+        $byStatus = $learningContext['suggestions_by_status'] ?? [];
+
+        // Em andamento
+        $inProgress = $byStatus['in_progress'] ?? [];
+        if (! empty($inProgress)) {
+            $output .= "### Sugestões Em Andamento\n\n";
+            $output .= "O cliente está trabalhando nestas sugestões:\n\n";
+            foreach ($inProgress as $s) {
+                $output .= "- 🔄 {$s['title']} ({$s['category']})\n";
+            }
+            $output .= "\n**REGRA:** NÃO sugerir nada similar até conclusão.\n\n";
+        }
+
+        // Rejeitadas
+        $rejected = $byStatus['rejected'] ?? [];
+        if (! empty($rejected)) {
+            $output .= "### Sugestões Rejeitadas pelo Cliente\n\n";
+            foreach (array_slice($rejected, 0, 5) as $s) {
+                $output .= "- ⛔ {$s['title']} ({$s['category']})\n";
+            }
+            $output .= "\n**INSIGHT:** Cliente não se interessou. Evitar temas similares.\n\n";
+        }
+
+        // Categorias bloqueadas por múltiplas rejeições
+        $blockedCategories = $learningContext['blocked_categories'] ?? [];
+        if (! empty($blockedCategories)) {
+            $output .= "### ⛔ CATEGORIAS BLOQUEADAS (3+ rejeições)\n\n";
+            $output .= "**REGRA CRÍTICA:** As seguintes categorias foram rejeitadas 3+ vezes pelo cliente. NÃO gerar sugestões nestas categorias:\n\n";
+            foreach ($blockedCategories as $category => $count) {
+                $output .= "- 🚫 **{$category}** ({$count} rejeições)\n";
+            }
+            $output .= "\n";
+        }
+
+        return $output ?: "Histórico de feedback ainda em construção.";
     }
 
     /**
