@@ -90,8 +90,8 @@ return [
 
             // Gemini Embedding Configuration
             'gemini' => [
-                'model' => env('GEMINI_EMBEDDING_MODEL', 'text-embedding-004'),
-                'dimensions' => 768, // Gemini text-embedding-004 outputs 768 dimensions
+                'model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-001'),
+                'dimensions' => 768, // gemini-embedding-001 with outputDimensionality=768
             ],
 
             // OpenAI Embedding Configuration (fallback)
