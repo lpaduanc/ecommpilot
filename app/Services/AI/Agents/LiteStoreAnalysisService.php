@@ -143,7 +143,6 @@ class LiteStoreAnalysisService
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
-            'temperature' => 0.2,
             'max_tokens' => 4096, // Reduced from 8192
         ]);
 
@@ -175,7 +174,6 @@ class LiteStoreAnalysisService
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
-            'temperature' => 0.7,
             'max_tokens' => 6144, // Reduced from 8192
         ]);
 

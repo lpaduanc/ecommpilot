@@ -73,7 +73,7 @@ class CriticAgentService
         $prompt = CriticAgentPrompt::get($data);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 0.3,
+            'temperature' => 'from_settings',
             'prompt_chars' => strlen($prompt),
         ]);
 
@@ -81,7 +81,6 @@ class CriticAgentService
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
-            'temperature' => 0.3, // Lower temperature for consistent evaluation
             'max_tokens' => 32768, // Increased to prevent JSON truncation
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
@@ -222,7 +221,7 @@ class CriticAgentService
             'total_removidas' => count($removedSuggestions),
         ]);
 
-        // Enforce 3-3-3 distribution
+        // Enforce flexible distribution (max 3 per category, total 5-9)
         $approvedSuggestions = $this->enforceDistribution($approvedSuggestions);
 
         // V5 has review_summary, V4 has general_analysis
@@ -312,7 +311,7 @@ class CriticAgentService
     }
 
     /**
-     * Enforce 3-3-3 distribution of suggestions.
+     * Enforce flexible distribution of suggestions (max 3 per category, total 5-9).
      */
     private function enforceDistribution(array $suggestions): array
     {
@@ -342,8 +341,27 @@ class CriticAgentService
             'low' => count($low),
         ]);
 
-        // Rebalance if needed
-        $result = $this->rebalanceDistribution($high, $medium, $low);
+        // Cap each category at max 3
+        $high = array_slice($high, 0, 3);
+        $medium = array_slice($medium, 0, 4);
+        $low = array_slice($low, 0, 3);
+
+        // Ensure at least 1 HIGH and 1 LOW if we have enough suggestions
+        $total = count($high) + count($medium) + count($low);
+        if ($total >= 3) {
+            if (empty($high) && count($medium) > 1) {
+                $item = array_shift($medium);
+                $item['final_version']['expected_impact'] = 'high';
+                $high[] = $item;
+            }
+            if (empty($low) && count($medium) > 1) {
+                $item = array_pop($medium);
+                $item['final_version']['expected_impact'] = 'low';
+                $low[] = $item;
+            }
+        }
+
+        $result = array_merge($high, $medium, $low);
 
         // Reassign priorities
         $priority = 1;
@@ -361,56 +379,6 @@ class CriticAgentService
             'low' => $finalLow,
             'total' => count($result),
         ]);
-
-        return $result;
-    }
-
-    /**
-     * Rebalance arrays to achieve 3-3-3 distribution.
-     */
-    private function rebalanceDistribution(array $high, array $medium, array $low): array
-    {
-        $targetPerCategory = 3;
-
-        // If we have excess in high, redistribute to medium or low
-        while (count($high) > $targetPerCategory && (count($medium) < $targetPerCategory || count($low) < $targetPerCategory)) {
-            $item = array_pop($high);
-            if (count($medium) < $targetPerCategory) {
-                $item['final_version']['expected_impact'] = 'medium';
-                $medium[] = $item;
-            } else {
-                $item['final_version']['expected_impact'] = 'low';
-                $low[] = $item;
-            }
-        }
-
-        // If we have excess in medium, redistribute to low
-        while (count($medium) > $targetPerCategory && count($low) < $targetPerCategory) {
-            $item = array_pop($medium);
-            $item['final_version']['expected_impact'] = 'low';
-            $low[] = $item;
-        }
-
-        // If we have shortages in high, promote from medium
-        while (count($high) < $targetPerCategory && count($medium) > $targetPerCategory) {
-            $item = array_shift($medium);
-            $item['final_version']['expected_impact'] = 'high';
-            $high[] = $item;
-        }
-
-        // If we have shortages in medium, promote from low
-        while (count($medium) < $targetPerCategory && count($low) > $targetPerCategory) {
-            $item = array_shift($low);
-            $item['final_version']['expected_impact'] = 'medium';
-            $medium[] = $item;
-        }
-
-        // Take exactly 3 from each (or all if less than 3)
-        $result = array_merge(
-            array_slice($high, 0, $targetPerCategory),
-            array_slice($medium, 0, $targetPerCategory),
-            array_slice($low, 0, $targetPerCategory)
-        );
 
         return $result;
     }

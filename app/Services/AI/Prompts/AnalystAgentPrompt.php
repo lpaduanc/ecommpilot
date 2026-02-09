@@ -168,17 +168,33 @@ Analisar os dados da loja e produzir um diagnóstico estruturado com:
 | Saúde de cupons | 15 pts | uso <50% E impacto <15% = 15, senão proporcional |
 | Tendência vendas | 20 pts | crescendo = 20, estável = 15, queda leve = 10, queda forte = 5 |
 
-### OVERRIDE (aplicar após calcular)
+### OVERRIDE (aplicar após calcular — gradual)
 
-**FORÇAR CRÍTICO (máx 25 pts):**
-- Estoque zerado > 45%
-- Cancelamento > 15%
-- Queda vendas > 40%
+**PENALIZAÇÃO GRADUAL (ao invés de cortes abruptos):**
 
-**LIMITAR A ATENÇÃO (máx 50 pts):**
-- Estoque zerado > 35%
-- Cancelamento > 10%
-- Cupons > 85% das vendas
+Estoque zerado:
+- 20-30%: penalizar -10 pontos do score calculado
+- 30-40%: penalizar -20 pontos (mínimo 30)
+- 40-50%: penalizar -30 pontos (mínimo 20)
+- >50%: forçar máximo 15 pontos (crítico)
+
+Taxa de cancelamento:
+- 8-12%: penalizar -10 pontos
+- 12-18%: penalizar -20 pontos (mínimo 25)
+- >18%: forçar máximo 15 pontos (crítico)
+
+Queda de vendas vs histórico:
+- 20-30%: penalizar -5 pontos
+- 30-45%: penalizar -15 pontos (mínimo 25)
+- >45%: forçar máximo 20 pontos (crítico)
+
+Dependência de cupons:
+- 60-75% das vendas com cupom: penalizar -5 pontos
+- 75-90%: penalizar -15 pontos (mínimo 30)
+- >90%: penalizar -25 pontos (mínimo 20)
+
+**IMPORTANTE:** Aplique TODAS as penalizações acumuladas, mas nunca abaixo do mínimo mais restritivo.
+**Exemplo:** Score calculado = 65, estoque zerado 35% (-20), cancelamento 11% (-10) → 65 - 20 - 10 = 35, classificação: atenção.
 
 ---
 
@@ -332,7 +348,7 @@ Retorne APENAS o JSON abaixo:
 ## CHECKLIST ANTES DE ENVIAR
 
 - [ ] Health Score calculado com os 5 componentes e classificação correta (critico 0-25, atencao 26-50, saudavel 51-75, excelente 76-100)?
-- [ ] Override aplicado se situação crítica (estoque >45%, cancelamento >15%, queda >40%)?
+- [ ] Penalizações graduais aplicadas conforme OVERRIDE (estoque, cancelamento, queda de vendas, dependência de cupons)?
 - [ ] Máximo 5 alertas, cada um com dados específicos (números)?
 - [ ] Exatamente 5 oportunidades, cada uma com potencial em R$?
 - [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
