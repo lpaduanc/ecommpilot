@@ -77,15 +77,13 @@ class CollectorAgentService
         $prompt = CollectorAgentPrompt::get($context);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 0.3,
+            'temperature' => 'from_settings',
             'prompt_chars' => strlen($prompt),
         ]);
 
         $apiStart = microtime(true);
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
-        ], [
-            'temperature' => 0.3,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
