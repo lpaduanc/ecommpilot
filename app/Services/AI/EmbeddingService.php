@@ -38,7 +38,7 @@ class EmbeddingService
         $provider = $this->getProvider();
 
         return match ($provider) {
-            'gemini' => SystemSetting::get('ai.embeddings.gemini.model') ?? 'text-embedding-004',
+            'gemini' => SystemSetting::get('ai.embeddings.gemini.model') ?? 'gemini-embedding-001',
             'openai' => SystemSetting::get('ai.embeddings.openai.model') ?? 'text-embedding-3-small',
             default => throw new RuntimeException("Unsupported embedding provider: {$provider}"),
         };
@@ -93,7 +93,7 @@ class EmbeddingService
     private function generateWithGemini(string $text, string $apiKey): array
     {
         $model = $this->getModel();
-        $url = "https://generativelanguage.googleapis.com/v1/models/{$model}:embedContent";
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:embedContent";
 
         Log::channel('embeddings')->debug('Gemini API Request - Iniciando chamada', [
             'url' => $url,
@@ -105,6 +105,8 @@ class EmbeddingService
 
         $startTime = microtime(true);
 
+        $dimensions = $this->getDimensions();
+
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
         ])->post($url.'?key='.$apiKey, [
@@ -115,6 +117,7 @@ class EmbeddingService
                 ],
             ],
             'taskType' => 'RETRIEVAL_DOCUMENT',
+            'outputDimensionality' => $dimensions,
         ]);
 
         $responseTime = round((microtime(true) - $startTime) * 1000, 2);
@@ -211,7 +214,8 @@ class EmbeddingService
         }
 
         $model = $this->getModel();
-        $url = "https://generativelanguage.googleapis.com/v1/models/{$model}:embedContent";
+        $dimensions = $this->getDimensions();
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:embedContent";
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
@@ -223,6 +227,7 @@ class EmbeddingService
                 ],
             ],
             'taskType' => 'RETRIEVAL_QUERY',
+            'outputDimensionality' => $dimensions,
         ]);
 
         if ($response->failed()) {
