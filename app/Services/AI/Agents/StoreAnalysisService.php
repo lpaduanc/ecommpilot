@@ -298,11 +298,15 @@ class StoreAnalysisService
             // V5: Buscar categorias bloqueadas por múltiplas rejeições
             $blockedCategories = $this->getBlockedCategoriesByRejection($store->id);
 
-            Log::channel($this->logChannel)->info('<<< Contexto historico carregado (V5)', [
+            // V6: Buscar sugestões ativas para carry-over (persistentes entre análises)
+            $carriedOverSuggestions = $this->getActiveSuggestionsForCarryOver($store->id);
+
+            Log::channel($this->logChannel)->info('<<< Contexto historico carregado (V6)', [
                 'previous_analyses_count' => count($previousAnalyses),
                 'previous_suggestions_count' => count($previousSuggestions['all']),
                 'accepted_count' => count($previousSuggestions['accepted_titles']),
                 'rejected_count' => count($previousSuggestions['rejected_titles']),
+                'carried_over_count' => count($carriedOverSuggestions),
                 'saturated_themes' => $saturatedThemes,
             ]);
 
@@ -679,6 +683,13 @@ class StoreAnalysisService
 
                 // V5: Dados de feedback/aprendizado
                 'learning_context' => $learningContext ?? [],
+
+                // V6: Sugestões ativas sendo mantidas (carry-over)
+                'carried_over_count' => count($carriedOverSuggestions ?? []),
+                'carried_over_titles' => array_map(
+                    fn ($s) => $s['final_version']['title'] ?? '',
+                    $carriedOverSuggestions ?? []
+                ),
             ]);
 
             // Coletar prompt para logging no final
@@ -818,8 +829,8 @@ class StoreAnalysisService
             $previousSuggestions['all'] ?? []
         );
 
-        // Garantir mínimo de 9 sugestões APÓS o filtro de similaridade
-        // (O fallback usa apenas sugestões já validadas contra o histórico)
+        // Garantir mínimo de 5 sugestões (máximo 9) APÓS o filtro de similaridade
+        // Sem fallbacks genéricos - só recupera do Strategist se necessário
         $finalSuggestions = $this->ensureMinimumSuggestions(
             $filteredSuggestions,
             $validatedStrategistSuggestions,
@@ -834,7 +845,29 @@ class StoreAnalysisService
             $previousSuggestions['all'] ?? []
         );
 
-        // V5: Não precisa mais validar depois, pois já foi feito antes
+        // V6: Merge carried-over suggestions with new pipeline suggestions
+        if (! empty($carriedOverSuggestions)) {
+            $maxNew = 9 - count($carriedOverSuggestions);
+            $newSuggestions = array_slice($finalSuggestions, 0, max(3, $maxNew));
+
+            $allSuggestions = array_merge($carriedOverSuggestions, $newSuggestions);
+
+            // Reassign priorities: carried-over first, then new
+            $priority = 1;
+            foreach ($allSuggestions as &$suggestion) {
+                $suggestion['final_priority'] = $priority++;
+            }
+            unset($suggestion);
+
+            $finalSuggestions = array_slice($allSuggestions, 0, 9);
+
+            Log::channel($this->logChannel)->info('V6: Merge com sugestoes persistentes', [
+                'carried_over' => count($carriedOverSuggestions),
+                'new_from_pipeline' => count($newSuggestions),
+                'total_final' => count($finalSuggestions),
+            ]);
+        }
+
         $beforeValidation = count($finalSuggestions);
 
         // Logar estatísticas de deduplicação
@@ -842,6 +875,7 @@ class StoreAnalysisService
             'from_strategist' => count($generatedSuggestions['suggestions'] ?? []),
             'from_critic' => count($criticizedSuggestions['approved_suggestions'] ?? []),
             'after_similarity' => $beforeValidation,
+            'carried_over' => count($carriedOverSuggestions ?? []),
             'final_count' => count($finalSuggestions),
             'saturated_themes' => $saturatedThemes ?? [],
         ]);
@@ -1960,6 +1994,7 @@ class StoreAnalysisService
     {
         foreach ($suggestions as $index => $suggestion) {
             $finalVersion = $suggestion['final_version'] ?? [];
+            $isCarriedOver = $suggestion['carried_over'] ?? false;
 
             $suggestionModel = Suggestion::create([
                 'analysis_id' => $analysis->id,
@@ -1970,7 +2005,7 @@ class StoreAnalysisService
                 'recommended_action' => $finalVersion['recommended_action'] ?? '',
                 'expected_impact' => $finalVersion['expected_impact'] ?? 'medium',
                 'priority' => $suggestion['final_priority'] ?? ($index + 1),
-                'status' => 'pending',
+                'status' => $isCarriedOver ? ($suggestion['original_status'] ?? 'pending') : 'pending',
                 'target_metrics' => $finalVersion['target_metrics'] ?? null,
                 'specific_data' => $finalVersion['specific_data'] ?? null,
                 'data_justification' => $finalVersion['data_justification'] ?? null,
@@ -2046,9 +2081,8 @@ class StoreAnalysisService
      */
     private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context, array $previousSuggestions = []): array
     {
-        // REGRA DE NEGÓCIO CRÍTICA: SEMPRE 9 sugestões com distribuição 3-3-3
-        $required = 9;
-        $perCategory = 3;
+        $minRequired = 5;
+        $maxAllowed = 9;
 
         // Contar distribuição atual
         $distribution = ['high' => [], 'medium' => [], 'low' => []];
@@ -2060,14 +2094,37 @@ class StoreAnalysisService
             $distribution[$impact][] = $suggestion;
         }
 
+        $totalApproved = count($approved);
+
         Log::channel($this->logChannel)->info('Distribuicao atual de sugestoes aprovadas', [
             'high' => count($distribution['high']),
             'medium' => count($distribution['medium']),
             'low' => count($distribution['low']),
-            'total' => count($approved),
+            'total' => $totalApproved,
         ]);
 
-        // Identificar títulos já aprovados para não duplicar (usando normalização)
+        // Se já temos o mínimo, apenas garantir limites por categoria
+        if ($totalApproved >= $minRequired) {
+            $result = [];
+            $priority = 1;
+            foreach (['high', 'medium', 'low'] as $impact) {
+                foreach (array_slice($distribution[$impact], 0, 3) as $suggestion) {
+                    $suggestion['final_priority'] = $priority++;
+                    $result[] = $suggestion;
+                }
+            }
+
+            Log::channel($this->logChannel)->info('Distribuicao final de sugestoes (acima do minimo)', [
+                'high' => count(array_filter($result, fn ($s) => $s['final_version']['expected_impact'] === 'high')),
+                'medium' => count(array_filter($result, fn ($s) => $s['final_version']['expected_impact'] === 'medium')),
+                'low' => count(array_filter($result, fn ($s) => $s['final_version']['expected_impact'] === 'low')),
+                'total' => count($result),
+            ]);
+
+            return $result;
+        }
+
+        // Abaixo do mínimo: tentar recuperar do Strategist (sem fallbacks genéricos)
         $approvedTitles = array_map(
             fn ($s) => strtolower(trim($s['final_version']['title'] ?? '')),
             $approved
@@ -2077,22 +2134,15 @@ class StoreAnalysisService
             $approved
         );
 
-        // Agrupar sugestões do Strategist por impact para preencher lacunas
-        $strategistByImpact = ['high' => [], 'medium' => [], 'low' => []];
+        $strategistAvailable = [];
         foreach ($allGenerated as $suggestion) {
-            $impact = $suggestion['expected_impact'] ?? 'medium';
-            if (! isset($strategistByImpact[$impact])) {
-                $impact = 'medium';
-            }
             $title = strtolower(trim($suggestion['title'] ?? ''));
             $normalizedTitle = $this->normalizeTitle($suggestion['title'] ?? '');
 
-            // Check for exact duplicate
             if (in_array($title, $approvedTitles)) {
                 continue;
             }
 
-            // Check for semantically similar title
             $isSimilar = false;
             foreach ($approvedNormalizedTitles as $approvedNormalized) {
                 if ($this->calculateTitleSimilarity($normalizedTitle, $approvedNormalized) >= 0.75) {
@@ -2102,65 +2152,61 @@ class StoreAnalysisService
             }
 
             if (! $isSimilar) {
-                $strategistByImpact[$impact][] = $suggestion;
+                $strategistAvailable[] = $suggestion;
             }
         }
 
-        // Preencher cada categoria para atingir exatamente 3
-        $priority = count($approved) + 1;
-        foreach (['high', 'medium', 'low'] as $impact) {
-            $needed = $perCategory - count($distribution[$impact]);
+        // Recuperar do Strategist até atingir o mínimo
+        $needed = $minRequired - $totalApproved;
+        $priority = $totalApproved + 1;
+
+        foreach ($strategistAvailable as $suggestion) {
             if ($needed <= 0) {
+                break;
+            }
+
+            $impact = $suggestion['expected_impact'] ?? 'medium';
+            if (! isset($distribution[$impact])) {
+                $impact = 'medium';
+            }
+
+            // Cap each category at 3
+            if (count($distribution[$impact]) >= 3) {
                 continue;
             }
 
-            // Primeiro tentar do Strategist
-            foreach ($strategistByImpact[$impact] as $suggestion) {
-                if ($needed <= 0) {
-                    break;
-                }
+            $converted = [
+                'final_version' => [
+                    'category' => $suggestion['category'] ?? 'general',
+                    'title' => $suggestion['title'] ?? '',
+                    'description' => $suggestion['description'] ?? '',
+                    'recommended_action' => $suggestion['recommended_action'] ?? '',
+                    'expected_impact' => $impact,
+                    'target_metrics' => $suggestion['target_metrics'] ?? [],
+                    'specific_data' => $suggestion['specific_data'] ?? $suggestion['roi_estimate'] ?? [],
+                    'data_justification' => $suggestion['data_justification'] ?? '',
+                ],
+                'quality_score' => 6.0,
+                'final_priority' => $priority++,
+                'recovered_from_filter' => true,
+            ];
 
-                $converted = [
-                    'final_version' => [
-                        'category' => $suggestion['category'] ?? 'general',
-                        'title' => $suggestion['title'] ?? '',
-                        'description' => $suggestion['description'] ?? '',
-                        'recommended_action' => $suggestion['recommended_action'] ?? '',
-                        'expected_impact' => $impact,
-                        'target_metrics' => $suggestion['target_metrics'] ?? [],
-                        'specific_data' => $suggestion['specific_data'] ?? $suggestion['roi_estimate'] ?? [],
-                        'data_justification' => $suggestion['data_justification'] ?? '',
-                    ],
-                    'quality_score' => 6.0,
-                    'final_priority' => $priority++,
-                    'recovered_from_filter' => true,
-                ];
+            $distribution[$impact][] = $converted;
+            $approvedTitles[] = strtolower(trim($suggestion['title'] ?? ''));
+            $approvedNormalizedTitles[] = $this->normalizeTitle($suggestion['title'] ?? '');
+            $needed--;
 
-                $distribution[$impact][] = $converted;
-                $approvedTitles[] = strtolower(trim($suggestion['title'] ?? ''));
-                $approvedNormalizedTitles[] = $this->normalizeTitle($suggestion['title'] ?? '');
-                $needed--;
-
-                Log::channel($this->logChannel)->info('Sugestao recuperada do Strategist para '.$impact, [
-                    'title' => $suggestion['title'] ?? 'N/A',
-                ]);
-            }
-
-            // Se ainda falta, usar fallbacks
-            if ($needed > 0) {
-                $fallbacks = $this->generateFallbackSuggestionsForImpact($needed, $impact, $context, $priority);
-                foreach ($fallbacks as $fallback) {
-                    $distribution[$impact][] = $fallback;
-                    $priority++;
-                }
-            }
+            Log::channel($this->logChannel)->info('Sugestao recuperada do Strategist', [
+                'title' => $suggestion['title'] ?? 'N/A',
+                'impact' => $impact,
+            ]);
         }
 
         // Combinar e reassinar prioridades
         $result = [];
         $priority = 1;
         foreach (['high', 'medium', 'low'] as $impact) {
-            foreach (array_slice($distribution[$impact], 0, $perCategory) as $suggestion) {
+            foreach (array_slice($distribution[$impact], 0, 3) as $suggestion) {
                 $suggestion['final_priority'] = $priority++;
                 $result[] = $suggestion;
             }
@@ -2177,149 +2223,42 @@ class StoreAnalysisService
     }
 
     /**
-     * Generate fallback suggestions for a specific impact level.
+     * V6: Get active suggestions from the store's latest analysis for carry-over.
+     * Active = accepted or in_progress (user is working on them).
+     * New/pending suggestions are NOT carried over — they'll be regenerated if still relevant.
      */
-    private function generateFallbackSuggestionsForImpact(int $count, string $impact, array $context, int $startPriority): array
+    private function getActiveSuggestionsForCarryOver(int $storeId): array
     {
-        $fallbacks = $this->generateFallbackSuggestions($count * 3, $context, $startPriority);
+        $activeSuggestions = Suggestion::where('store_id', $storeId)
+            ->whereIn('status', ['accepted', 'in_progress'])
+            ->orderBy('priority')
+            ->limit(6)
+            ->get();
 
-        // Filtrar pelo impact desejado e pegar apenas o necessário
-        $filtered = array_filter($fallbacks, fn ($s) => ($s['final_version']['expected_impact'] ?? 'medium') === $impact);
-
-        // Se não tiver suficientes do impact desejado, forçar o impact
-        if (count($filtered) < $count) {
-            $filtered = array_slice($fallbacks, 0, $count);
-            foreach ($filtered as &$f) {
-                $f['final_version']['expected_impact'] = $impact;
-            }
+        if ($activeSuggestions->isEmpty()) {
+            return [];
         }
 
-        return array_slice($filtered, 0, $count);
-    }
+        Log::channel($this->logChannel)->info('V6: Sugestoes ativas para carry-over', [
+            'count' => $activeSuggestions->count(),
+            'statuses' => $activeSuggestions->pluck('status')->countBy()->toArray(),
+        ]);
 
-    /**
-     * Generate fallback suggestions when not enough were generated/approved.
-     */
-    private function generateFallbackSuggestions(int $count, array $context, int $startPriority): array
-    {
-        $niche = $context['niche'] ?? 'general';
-        $subcategory = $context['subcategory'] ?? 'geral';
-        $platformName = $context['platform_name'] ?? 'Nuvemshop';
-        $ticketMedio = $context['ticket_medio'] ?? 100;
-        $pedidosMes = $context['pedidos_mes'] ?? 50;
-
-        // 9 sugestões fallback universais (funcionam para qualquer nicho)
-        // IMPORTANTE: Manter pelo menos 9 templates para garantir o mínimo exigido
-        $fallbackTemplates = [
-            [
-                'category' => 'customer',
-                'title' => 'Criar programa de indicação com benefício duplo',
-                'description' => 'Implementar um sistema onde clientes indicam amigos e ambos ganham desconto. Isso gera novos clientes com custo de aquisição muito baixo.',
-                'recommended_action' => "1. Definir desconto de 10-15% para indicador e indicado\n2. Criar cupom único por cliente para rastreamento\n3. Comunicar programa em emails pós-compra\n4. Limitar a 1 indicação por mês para evitar abuso",
-                'expected_impact' => 'high',
-                'target_metrics' => ['novos_clientes', 'cac'],
+        return $activeSuggestions->map(fn (Suggestion $s) => [
+            'final_version' => [
+                'category' => $s->category,
+                'title' => $s->title,
+                'description' => $s->description,
+                'recommended_action' => $s->recommended_action,
+                'expected_impact' => $s->expected_impact,
+                'target_metrics' => $s->target_metrics ?? [],
+                'specific_data' => $s->specific_data ?? [],
+                'data_justification' => $s->data_justification ?? '',
             ],
-            [
-                'category' => 'marketing',
-                'title' => 'Implementar automação de email por comportamento',
-                'description' => 'Criar sequência automatizada de emails baseada no comportamento do cliente: boas-vindas, carrinho abandonado, pós-compra e reativação.',
-                'recommended_action' => "1. Configurar email de boas-vindas com cupom de primeira compra\n2. Criar sequência de carrinho abandonado (1h, 24h, 72h)\n3. Implementar email pós-compra pedindo avaliação\n4. Segmentar base por data da última compra",
-                'expected_impact' => 'high',
-                'target_metrics' => ['conversao', 'recompra', 'ticket_medio'],
-            ],
-            [
-                'category' => 'marketing',
-                'title' => 'Otimizar páginas de produto para buscadores',
-                'description' => 'Melhorar títulos, descrições e imagens dos produtos para aumentar tráfego orgânico e reduzir dependência de mídia paga.',
-                'recommended_action' => "1. Revisar títulos incluindo palavras-chave relevantes\n2. Expandir descrições com benefícios e especificações\n3. Adicionar alt-text em todas as imagens\n4. Criar FAQ nos produtos mais vendidos",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['trafego_organico', 'conversao'],
-            ],
-            [
-                'category' => 'product',
-                'title' => 'Revisar e otimizar catálogo de produtos',
-                'description' => 'Revisar catálogo para identificar produtos de baixo giro que ocupam estoque e capital. Focar em produtos com melhor margem e velocidade de venda.',
-                'recommended_action' => "1. Listar produtos sem venda nos últimos 90 dias\n2. Calcular margem líquida por produto\n3. Definir estratégia para produtos encalhados (promoção ou descontinuação)\n4. Reforçar estoque dos 20% que geram 80% das vendas",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['margem', 'giro_estoque'],
-            ],
-            [
-                'category' => 'conversion',
-                'title' => 'Reduzir fricção no processo de compra',
-                'description' => 'Reduzir fricção no checkout para diminuir abandono de carrinho. Cada campo removido aumenta a taxa de conversão.',
-                'recommended_action' => "1. Remover campos não essenciais do formulário\n2. Oferecer opção de checkout como visitante\n3. Mostrar resumo do pedido sempre visível\n4. Garantir que frete seja calculado antes do checkout",
-                'expected_impact' => 'high',
-                'target_metrics' => ['conversao', 'abandono_carrinho'],
-            ],
-            [
-                'category' => 'pricing',
-                'title' => 'Criar estratégia de kits e combos',
-                'description' => 'Agrupar produtos complementares em kits com desconto para aumentar o ticket médio e facilitar a decisão de compra do cliente.',
-                'recommended_action' => "1. Identificar produtos frequentemente comprados juntos\n2. Criar 3-5 kits com desconto de 10-15% vs compra separada\n3. Destacar economia na página do kit\n4. Posicionar kits em destaque na home e categorias",
-                'expected_impact' => 'high',
-                'target_metrics' => ['ticket_medio', 'itens_por_pedido'],
-            ],
-            [
-                'category' => 'customer',
-                'title' => 'Implementar programa de fidelidade simples',
-                'description' => 'Criar sistema de pontos ou cashback para incentivar recompra e aumentar o lifetime value dos clientes.',
-                'recommended_action' => "1. Definir mecânica simples (ex: 5% de cashback em pontos)\n2. Criar níveis de benefício por volume de compras\n3. Comunicar saldo em todos os emails transacionais\n4. Oferecer bônus de pontos em datas especiais",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['recompra', 'ltv', 'retencao'],
-            ],
-            [
-                'category' => 'inventory',
-                'title' => 'Ativar notificação de produto disponível',
-                'description' => 'Implementar funcionalidade "Avise-me quando chegar" para produtos sem estoque, capturando demanda e recuperando vendas perdidas.',
-                'recommended_action' => "1. Ativar botão de avise-me em produtos sem estoque\n2. Configurar email automático quando produto voltar\n3. Oferecer cupom exclusivo no email de disponibilidade\n4. Monitorar taxa de conversão dos alertas",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['vendas_recuperadas', 'conversao'],
-            ],
-            [
-                'category' => 'marketing',
-                'title' => 'Criar conteúdo educativo sobre os produtos',
-                'description' => 'Desenvolver guias, tutoriais e conteúdo que eduque o cliente sobre como usar e escolher os produtos, aumentando confiança e conversão.',
-                'recommended_action' => "1. Criar guia de escolha para principais categorias\n2. Produzir vídeos curtos de demonstração de uso\n3. Publicar artigos respondendo dúvidas frequentes\n4. Adicionar seção de dicas nas páginas de produto",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['conversao', 'tempo_no_site', 'autoridade'],
-            ],
-        ];
-
-        $fallbacks = [];
-        $priority = $startPriority;
-
-        for ($i = 0; $i < $count && $i < count($fallbackTemplates); $i++) {
-            $template = $fallbackTemplates[$i];
-
-            // Calcular ROI estimado conservador
-            $roiBase = round($ticketMedio * $pedidosMes * 0.03, 2); // 3% de impacto conservador
-
-            $fallbacks[] = [
-                'final_version' => [
-                    'category' => $template['category'],
-                    'title' => $template['title'],
-                    'description' => $template['description'],
-                    'recommended_action' => $template['recommended_action'],
-                    'expected_impact' => $template['expected_impact'],
-                    'target_metrics' => $template['target_metrics'],
-                    'specific_data' => [
-                        'roi_estimado' => 'R$ '.number_format($roiBase, 2, ',', '.').'/mês (conservador)',
-                        'base_calculo' => "Ticket médio R$ {$ticketMedio} × {$pedidosMes} pedidos × 3%",
-                    ],
-                    'data_justification' => "Sugestão baseada em melhores práticas de e-commerce para o nicho {$niche}/{$subcategory} na {$platformName}.",
-                ],
-                'quality_score' => 5.0,
-                'final_priority' => $priority++,
-                'forced_approval' => true,
-                'is_generic_fallback' => true,
-            ];
-
-            Log::channel($this->logChannel)->info('Sugestao generica de fallback gerada', [
-                'title' => $template['title'],
-                'priority' => $priority - 1,
-            ]);
-        }
-
-        return $fallbacks;
+            'quality_score' => 8.0,
+            'final_priority' => $s->priority,
+            'carried_over' => true,
+            'original_status' => $s->status,
+        ])->toArray();
     }
 }

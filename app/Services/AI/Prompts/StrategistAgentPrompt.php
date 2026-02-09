@@ -77,6 +77,33 @@ RESOURCES;
         return $output ?: "Nenhuma sugestão aceita ou rejeitada anteriormente.\n";
     }
 
+    /**
+     * V6: Format carried-over suggestions section for the prompt.
+     */
+    public static function formatCarriedOverSection(int $count, array $titles): string
+    {
+        if ($count === 0 || empty($titles)) {
+            return '';
+        }
+
+        $maxNew = max(3, 9 - $count);
+
+        $output = "---\n\n";
+        $output .= "## SUGESTÕES ATIVAS (MANTIDAS DA ANÁLISE ANTERIOR)\n\n";
+        $output .= "As seguintes {$count} sugestões estão em andamento pelo lojista e serão mantidas automaticamente:\n\n";
+
+        foreach ($titles as $title) {
+            if (! empty($title)) {
+                $output .= "- {$title}\n";
+            }
+        }
+
+        $output .= "\n**IMPORTANTE:** Estas sugestões já estão sendo trabalhadas. NÃO gere sugestões sobre os mesmos temas.\n";
+        $output .= "**Gere no máximo {$maxNew} sugestões NOVAS e COMPLEMENTARES.**\n";
+
+        return $output;
+    }
+
     public static function getTemplate(): string
     {
         return <<<'PROMPT'
@@ -94,12 +121,22 @@ Seu objetivo é transformar dados em ações concretas que aumentem receita.
 ---
 
 ## TAREFA
-Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatória: 3 HIGH, 3 MEDIUM, 3 LOW.
+Gerar entre 5 e 9 sugestões acionáveis para a loja, proporcionais aos dados disponíveis.
+
+**QUALIDADE > QUANTIDADE:** Gere APENAS sugestões que os dados da loja sustentam. Se há dados para 5 boas sugestões, gere 5. Não preencha com sugestões genéricas para atingir um número.
+
+**Distribuição proporcional:**
+- HIGH: 1-3 (APENAS se houver dado específico da loja que justifique)
+- MEDIUM: 2-4 (baseadas em análise dos dados)
+- LOW: 1-3 (quick wins simples)
+
+**Regra de ouro:** Cada sugestão DEVE referenciar um dado real e específico desta loja (nome de produto, valor em R$, percentual, quantidade de pedidos, etc). Se você não consegue citar um dado real, NÃO gere a sugestão.
 
 ---
 
 ## REGRAS OBRIGATÓRIAS (em ordem de prioridade)
 
+0. **PROIBIDO SUGESTÕES GENÉRICAS:** Uma sugestão é genérica quando poderia ser aplicada a QUALQUER loja sem alteração. Exemplos de PROIBIDO: "Crie kits de produtos", "Melhore seu SEO", "Implemente email marketing". Exemplos de ACEITO: "Monte kit com Shampoo X (R$45) + Condicionador Y (R$38) com 12% de desconto — esses 2 produtos aparecem juntos em 23% dos pedidos", "Adicione descrições SEO nos 5 produtos sem descrição que geraram R$1.200 em vendas"
 1. **NUNCA repetir** tema de sugestão anterior (veja ZONAS PROIBIDAS)
 2. **HIGH (prioridades 1-3):** Obrigatório citar dado específico (número) da loja ou concorrente
 3. **CITE NOMES DE PRODUTOS:** Ao sugerir kits, combos, reposição ou otimização, SEMPRE mencione os nomes reais dos produtos da seção "PRODUTOS MAIS VENDIDOS" ou "PRODUTOS SEM ESTOQUE". NUNCA diga "crie kits premium" sem especificar quais produtos usar.
@@ -124,6 +161,8 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 {{saturated_themes}}
 
 {{accepted_rejected}}
+
+{{carried_over_section}}
 
 ---
 
@@ -315,13 +354,14 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
 
 Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrija antes de enviar:
 
-1. **Contagem:** Conte as sugestões. SE não forem exatamente 9, adicione ou remova até ter 9.
-2. **Distribuição:** Conte por impacto. SE não forem 3 HIGH + 3 MEDIUM + 3 LOW, ajuste os expected_impact.
+1. **Contagem:** Conte as sugestões. SE forem menos de 5, adicione mais baseando-se nos dados. SE forem mais de 9, remova as mais fracas.
+2. **Distribuição:** Verifique que tem pelo menos 1 HIGH e 1 LOW. O resto distribua conforme a qualidade dos dados sustenta.
 3. **Zonas proibidas:** Compare cada título com ZONAS PROIBIDAS. SE houver overlap temático, substitua a sugestão.
 4. **Dados em HIGH:** Para cada HIGH, verifique se problem contém número específico. SE não contiver, rebaixe para MEDIUM.
 5. **Resultados quantificados:** Para cada sugestão, verifique se expected_result contém R$ ou %. SE não contiver, adicione estimativa.
 6. **Viabilidade:** Para cada sugestão, verifique se é possível na Nuvemshop. SE não for, substitua por alternativa viável.
 7. **Referências a concorrentes:** SE houver dados em DADOS DE CONCORRENTES, verifique se pelo menos 3 sugestões têm competitor_reference preenchido.
+8. **Teste de genericidade:** Para cada sugestão, pergunte: "Eu poderia dar esta mesma sugestão para qualquer loja sem mudar nada?" SE SIM → reescreva com dados específicos ou REMOVA.
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
@@ -641,6 +681,10 @@ PROMPT;
         // Learning Context (feedback/aprendizado)
         $learningContext = $context['learning_context'] ?? [];
 
+        // V6: Carried-over suggestions (persistent between analyses)
+        $carriedOverCount = $context['carried_over_count'] ?? 0;
+        $carriedOverTitles = $context['carried_over_titles'] ?? [];
+
         // RAG Data (estratégias e benchmarks da base de conhecimento)
         $ragStrategies = $context['rag_strategies'] ?? [];
         $ragBenchmarks = $context['structured_benchmarks'] ?? $context['benchmarks'] ?? [];
@@ -669,6 +713,7 @@ PROMPT;
             '{{market_data}}' => is_array($marketData) ? json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $marketData,
             '{{rag_strategies}}' => self::formatRagStrategies($ragStrategies),
             '{{rag_benchmarks}}' => self::formatRagBenchmarks($ragBenchmarks),
+            '{{carried_over_section}}' => self::formatCarriedOverSection($carriedOverCount, $carriedOverTitles),
         ];
 
         foreach ($replacements as $k => $v) {
