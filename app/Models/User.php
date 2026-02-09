@@ -81,6 +81,19 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Store::class);
     }
 
+    /**
+     * Get stores accessible to this user.
+     * Employees access their parent's stores, clients access their own.
+     */
+    public function accessibleStores(): HasMany
+    {
+        $query = $this->isEmployee()
+            ? $this->getOwnerUser()->stores()
+            : $this->stores();
+
+        return $query->where('sync_status', '!=', \App\Enums\SyncStatus::Disconnected);
+    }
+
     public function activeStore(): BelongsTo
     {
         return $this->belongsTo(Store::class, 'active_store_id');
@@ -93,7 +106,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return $this->getRelationValue('activeStore');
         }
 
-        return $this->stores()->latest()->first();
+        return $this->accessibleStores()->latest()->first();
     }
 
     public function analyses(): HasMany
@@ -136,6 +149,20 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === UserRole::Client;
     }
 
+    public function isEmployee(): bool
+    {
+        return $this->parent_user_id !== null;
+    }
+
+    public function getOwnerUser(): self
+    {
+        if ($this->isEmployee()) {
+            return $this->parent ?? $this->parent()->first();
+        }
+
+        return $this;
+    }
+
     public function recordLogin(): void
     {
         $this->update(['last_login_at' => now()]);
@@ -143,7 +170,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Check if user has access to a specific store.
-     * Admins have access to all stores, clients only to their own.
+     * Admins have access to all stores, clients to their own, employees to their parent's stores.
      */
     public function hasAccessToStore(?int $storeId): bool
     {
@@ -156,7 +183,19 @@ class User extends Authenticatable implements MustVerifyEmail
             return true;
         }
 
-        // Regular users only have access to their own stores
+        // Admins have access to all stores
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // Employees: check if parent user owns the store
+        if ($this->isEmployee()) {
+            $owner = $this->getOwnerUser();
+
+            return $owner->stores()->where('id', $storeId)->exists();
+        }
+
+        // Regular clients: only access to their own stores
         return $this->stores()->where('id', $storeId)->exists();
     }
 

@@ -89,9 +89,10 @@ class AppServiceProvider extends ServiceProvider
         Horizon::auth(function ($request) {
             // Allow access if user is authenticated and has admin or super_admin role
             $user = $request->user();
-            if (!$user) {
+            if (! $user) {
                 return false;
             }
+
             return $user->hasRole('admin') || $user->hasRole('super_admin');
         });
     }

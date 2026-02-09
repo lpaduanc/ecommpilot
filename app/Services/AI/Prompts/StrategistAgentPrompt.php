@@ -552,7 +552,7 @@ PROMPT;
                     foreach ($topProdutos as $i => $produto) {
                         $nomeProd = $produto['nome'] ?? 'Produto';
                         $precoProd = $produto['preco'] ?? 0;
-                        $output .= "  ".($i + 1).". {$nomeProd} (R$ ".number_format($precoProd, 2, ',', '.').
+                        $output .= '  '.($i + 1).". {$nomeProd} (R$ ".number_format($precoProd, 2, ',', '.').
 ")\n";
                         $allProducts[] = ['nome' => $nomeProd, 'preco' => $precoProd, 'concorrente' => $nome];
                     }
@@ -732,7 +732,7 @@ PROMPT;
     private static function formatLearningContext(array $learningContext): string
     {
         if (empty($learningContext)) {
-            return "Nenhum histórico de feedback disponível. Esta é uma das primeiras análises.";
+            return 'Nenhum histórico de feedback disponível. Esta é uma das primeiras análises.';
         }
 
         $output = '';
@@ -818,7 +818,7 @@ PROMPT;
             $output .= "\n";
         }
 
-        return $output ?: "Histórico de feedback ainda em construção.";
+        return $output ?: 'Histórico de feedback ainda em construção.';
     }
 
     /**
@@ -827,7 +827,7 @@ PROMPT;
     private static function formatBestSellers(array $bestSellers, float $ticketMedio = 0): string
     {
         if (empty($bestSellers)) {
-            return "Nenhum dado de produtos mais vendidos disponível para este período.";
+            return 'Nenhum dado de produtos mais vendidos disponível para este período.';
         }
 
         $totalRevenue = array_sum(array_column($bestSellers, 'revenue'));
@@ -872,10 +872,10 @@ PROMPT;
     private static function formatOutOfStock(array $outOfStock): string
     {
         if (empty($outOfStock)) {
-            return "✅ Nenhum produto sem estoque identificado. Bom trabalho de gestão!";
+            return '✅ Nenhum produto sem estoque identificado. Bom trabalho de gestão!';
         }
 
-        $output = "**Total sem estoque:** ".count($outOfStock)." produtos\n\n";
+        $output = '**Total sem estoque:** '.count($outOfStock)." produtos\n\n";
         $output .= "| Produto | Preço | Última Atualização |\n";
         $output .= "|---------|-------|--------------------|\n";
 
@@ -898,10 +898,10 @@ PROMPT;
     private static function formatAnomalies(array $anomalies): string
     {
         if (empty($anomalies)) {
-            return "✅ Nenhuma anomalia crítica detectada na operação.";
+            return '✅ Nenhuma anomalia crítica detectada na operação.';
         }
 
-        $output = "**Total de anomalias:** ".count($anomalies)."\n\n";
+        $output = '**Total de anomalias:** '.count($anomalies)."\n\n";
 
         // Agrupar por severidade
         // Mapear 'tipo' (positiva/negativa) para severity se necessário
@@ -1015,7 +1015,7 @@ PROMPT;
     private static function formatRagStrategies(array $strategies): string
     {
         if (empty($strategies)) {
-            return "Nenhuma estratégia específica do nicho disponível. Use práticas gerais de e-commerce.";
+            return 'Nenhuma estratégia específica do nicho disponível. Use práticas gerais de e-commerce.';
         }
 
         $output = "As seguintes estratégias são recomendadas para este nicho/segmento:\n\n";
@@ -1061,7 +1061,7 @@ PROMPT;
     private static function formatRagBenchmarks(array $benchmarks): string
     {
         if (empty($benchmarks)) {
-            return "Nenhum benchmark específico do nicho disponível.";
+            return 'Nenhum benchmark específico do nicho disponível.';
         }
 
         $output = "Benchmarks do setor para comparação:\n\n";
@@ -1076,11 +1076,11 @@ PROMPT;
                     $media = $tm['media'] ?? $tm['avg'] ?? 0;
                     $max = $tm['max'] ?? 0;
                     $output .= "**Ticket Médio:**\n";
-                    $output .= "- Mínimo: R$ ".number_format($min, 2, ',', '.')."\n";
-                    $output .= "- Média: R$ ".number_format($media, 2, ',', '.')."\n";
-                    $output .= "- Máximo: R$ ".number_format($max, 2, ',', '.')."\n\n";
+                    $output .= '- Mínimo: R$ '.number_format($min, 2, ',', '.')."\n";
+                    $output .= '- Média: R$ '.number_format($media, 2, ',', '.')."\n";
+                    $output .= '- Máximo: R$ '.number_format($max, 2, ',', '.')."\n\n";
                 } else {
-                    $output .= "**Ticket Médio:** R$ ".number_format($tm, 2, ',', '.')."\n\n";
+                    $output .= '**Ticket Médio:** R$ '.number_format($tm, 2, ',', '.')."\n\n";
                 }
             }
 

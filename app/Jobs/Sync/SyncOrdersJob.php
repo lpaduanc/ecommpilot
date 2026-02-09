@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Sync;
 
+use App\Exceptions\TokenExpiredException;
 use App\Models\Store;
 use App\Services\Integration\NuvemshopService;
 use Carbon\Carbon;
@@ -212,6 +213,24 @@ class SyncOrdersJob implements ShouldBeUnique, ShouldQueue
                     gc_collect_cycles();
                 }
 
+            } catch (TokenExpiredException $e) {
+                // Token expirado - cancela batch imediatamente (sem retry com sleep)
+                Log::channel('sync')->warning('[ORDERS] Token expirado - cancelando batch', [
+                    'store_id' => $this->store->id,
+                    'page' => $currentPage,
+                    'total_synced' => $totalSynced,
+                ]);
+
+                // Cancela o batch para evitar processamento de outros jobs
+                if ($this->batch()) {
+                    $this->batch()->cancel();
+                }
+
+                // Limpa checkpoint
+                Cache::forget($checkpointKey);
+
+                // Lança exceção para falhar o job (mas batch já foi cancelado)
+                throw $e;
             } catch (\Exception $e) {
                 $consecutiveErrors++;
 
@@ -219,6 +238,7 @@ class SyncOrdersJob implements ShouldBeUnique, ShouldQueue
                     'store_id' => $this->store->id,
                     'page' => $currentPage,
                     'error' => $e->getMessage(),
+                    'exception_class' => get_class($e),
                     'consecutive_errors' => $consecutiveErrors,
                     'total_synced' => $totalSynced,
                 ]);
@@ -233,7 +253,7 @@ class SyncOrdersJob implements ShouldBeUnique, ShouldQueue
                     throw $e;
                 }
 
-                // Backoff exponencial antes de retry
+                // Backoff exponencial antes de retry (apenas para erros não-token)
                 $sleepSeconds = min(30 * $consecutiveErrors, 300); // Max 5 minutos
                 Log::channel('sync')->warning('[ORDERS] Aguardando antes de retry', [
                     'store_id' => $this->store->id,

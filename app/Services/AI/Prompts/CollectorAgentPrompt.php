@@ -459,7 +459,7 @@ PROMPT;
     private static function formatLearningContext(array $learningContext): string
     {
         if (empty($learningContext)) {
-            return "Nenhum histórico de feedback disponível. Esta é uma das primeiras análises desta loja.";
+            return 'Nenhum histórico de feedback disponível. Esta é uma das primeiras análises desta loja.';
         }
 
         $output = '';
@@ -520,7 +520,7 @@ PROMPT;
             $output .= "\n**REGRA CRÍTICA:** NÃO gerar sugestões nestas categorias.\n\n";
         }
 
-        return $output ?: "Histórico de feedback ainda em construção.";
+        return $output ?: 'Histórico de feedback ainda em construção.';
     }
 
     private static function extractUniqueFeatures(array $competitors): string

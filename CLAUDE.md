@@ -57,17 +57,36 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 
 ### Backend (`app/`)
 
-**Services Layer** (`app/Services/`)
+**Services Layer** (`app/Services/`) - ~50 services
 - `AI/AIManager` - Strategy pattern para providers (OpenAI, Gemini, Anthropic)
-- `AI/Agents/StoreAnalysisService` - Orquestra pipeline de análise com stage-based progress
+- `AI/Agents/StoreAnalysisService` - Orquestra pipeline de análise com stage-based progress (9 estágios, resumable)
 - `AI/Agents/LiteStoreAnalysisService` - Versão simplificada para análises rápidas
 - `AI/Agents/*AgentService` - Collector, Analyst, Strategist, Critic
 - `AI/Memory/` - HistoryService, HistorySummaryService, FeedbackLoopService
 - `AI/RAG/KnowledgeBaseService` - Base de conhecimento com embeddings
 - `AI/Prompts/` - 7 prompts (incluindo Lite variants e SimilarityCheckPrompt)
-- `Analysis/` - Traits: SuggestionDeduplicationTrait, FeedbackLoopTrait, HistoricalMetricsTrait
-- `Integration/NuvemshopService` - API Nuvemshop + adapters (Product, Order, Coupon)
-- `ExternalData/` - CompetitorAnalysisService, MarketDataService, GoogleTrendsService
+- `AI/Utilities/` - JsonExtractor, EmbeddingService, PlatformContextService, ProductTableFormatter
+- `Analysis/` - AnalysisService, AnalysisLogService, SuggestionImpactAnalysisService
+- `Analysis/Traits` - SuggestionDeduplicationTrait, FeedbackLoopTrait, HistoricalMetricsTrait
+- `Integration/NuvemshopService` - API Nuvemshop + adapters (Product, Order, Coupon), token reconnection
+- `ExternalData/` - ExternalDataAggregator, CompetitorAnalysisService, MarketDataService, GoogleTrendsService, DecodoProxyService, DecodoParserService
+- `Business/` - DashboardService, ProductAnalyticsService, DiscountAnalyticsService, ChatbotService, NotificationService, PlanLimitService, SettingsService, EmailConfigurationService, BrazilLocationsService
+
+**Policies** (`app/Policies/`)
+- `StorePolicy` - Autorização de acesso (view, create, update, delete, sync, viewAnalytics, requestAnalysis)
+
+**Middleware** (`app/Http/Middleware/`)
+- `SanitizeSearchInput` - Prevenção SQL injection para ILIKE
+- `SecurityHeaders` - Headers de segurança (CSP, X-Frame-Options)
+
+**Traits** (`app/Models/Traits/`)
+- `SafeILikeSearch` - Proteção SQL injection para buscas PostgreSQL ILIKE
+
+**Resources** (`app/Http/Resources/`) - 11 resources
+- `UserResource`, `UserManagementResource` (com `is_employee`, `role`)
+- `StoreResource`, `ProductResource`, `OrderResource`, `CouponResource`
+- `AnalysisResource`, `AdminAnalysisResource`, `AdminAnalysisDetailResource`
+- `SuggestionResource`, `NotificationResource`
 
 **Jobs** (`app/Jobs/`)
 - `ProcessAnalysisJob` - Análise AI assíncrona (timeout: 600s, tries: 3)
@@ -75,10 +94,10 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 - `Sync/SyncProductsJob`, `SyncOrdersJob`, `SyncCustomersJob`, `SyncCouponsJob`
 - `Sync/SyncBrazilLocationsJob` - Localizações brasileiras
 
-**Models** (23 modelos em `app/Models/`)
-- **Auth:** `User` (multi-store, roles via Spatie), `Subscription`, `Plan`
-- **Store:** `Store`, `SyncedProduct`, `SyncedOrder`, `SyncedCustomer`, `SyncedCoupon`
-- **Analysis:** `Analysis` (stage-based), `Suggestion`, `SuggestionResult`, `AnalysisExecutionLog`, `AnalysisUsage`
+**Models** (26 modelos em `app/Models/`)
+- **Auth:** `User` (multi-store, roles via Spatie, parent/child hierarchy), `Subscription`, `Plan`
+- **Store:** `Store` (SoftDeletes, token reconnection), `SyncedProduct`, `SyncedOrder`, `SyncedCustomer`, `SyncedCoupon`
+- **Analysis:** `Analysis` (stage-based, resumable), `Suggestion`, `SuggestionStep`, `SuggestionTask`, `SuggestionComment`, `SuggestionResult`, `AnalysisExecutionLog`, `AnalysisUsage`
 - **Chat:** `ChatConversation`, `ChatMessage`
 - **Sistema:** `Notification`, `ActivityLog`, `SystemSetting`, `EmailConfiguration`
 - **ML/RAG:** `KnowledgeEmbedding`, `CategoryStats`, `SuccessCase`, `FailureCase`
@@ -87,32 +106,37 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 
 **Contracts** (`app/Contracts/`) - 7 interfaces para serviços e adapters
 
-**Enums** - `SyncStatus`, `AnalysisStatus`, `OrderStatus`, `PaymentStatus`, `Platform`, `UserRole`, `NotificationType`, `SubscriptionStatus`
+**Exceptions** (`app/Exceptions/`) - `TokenExpiredException` (OAuth token expirado com context)
+
+**Enums** - `SyncStatus` (inclui TokenExpired), `AnalysisStatus`, `OrderStatus`, `PaymentStatus`, `Platform`, `UserRole`, `NotificationType`, `SubscriptionStatus`
 
 ### Frontend (`resources/js/`)
 
-**Stores Pinia** (`stores/`) - 14 stores
-- `authStore` - Auth, permissões, `hasPermission()`
-- `dashboardStore` - Stats, filtros, loja ativa
-- `analysisStore` - Análise AI, sugestões por prioridade
-- `chatStore` - Estado do chat com IA
-- `discountStore` - Cupons e descontos
-- `integrationStore` - Integrações (Nuvemshop)
-- `notificationStore`, `systemNotificationStore` - Notificações
-- `userManagementStore`, `adminAnalysesStore` - Admin
-- `sidebarStore`, `themeStore` - UI state
+**Stores Pinia** (`stores/`) - 12 stores
+- `authStore` - Auth, permissões, plan limits, `hasPermission()`
+- `dashboardStore` - Stats, filtros, bulk API (7→1 requests), impact dashboard
+- `analysisStore` - Análise AI, sugestões por prioridade, polling, workflow (steps/tasks/comments)
+- `chatStore` - Chat com IA, suggestion-specific chats
+- `discountStore` - Cupons e descontos com filtros avançados
+- `integrationStore` - Integrações Nuvemshop, sync polling com timeout safety (5min)
+- `notificationStore` - Toast notifications (client-side)
+- `systemNotificationStore` - Notificações backend com polling (60s)
+- `userManagementStore` - CRUD usuários/employees com paginação
+- `adminAnalysesStore` - Admin análises com filtros
+- `sidebarStore`, `themeStore` - UI state (dark/light/system)
 
-**Components** (`components/`) - 47 componentes em 8 pastas
-- `common/` - BaseButton, BaseCard, BaseInput, BaseModal, LoadingSpinner, ConfirmDialog
+**Components** (`components/`) - 52 componentes em 10 pastas
+- `common/` - BaseButton, BaseCard, BaseInput, BaseModal, LoadingSpinner, ConfirmDialog, SyncStatusBanner, AnalysisStatusBanner, ThemeToggle, NotificationToast, PreviewModeBanner, UpgradeBanner
 - `layout/` - TheSidebar, TheHeader, StoreSelector
-- `dashboard/` - StatCard, RevenueChart, OrdersStatusChart, TopProductsChart, DashboardFilters
-- `analysis/` - SuggestionCard, SuggestionDetailModal, HealthScore, OpportunitiesPanel
+- `dashboard/` - StatCard, RevenueChart, OrdersStatusChart, TopProductsChart, DashboardFilters, EmptyStoreState, LazyChart, LowStockAlert, ProductDetailPanel, SuggestionImpactCard
+- `analysis/` - SuggestionCard, SuggestionDetailModal, HealthScore, OpportunitiesPanel, OpportunityDetailModal, SuggestionChatPanel, SuggestionComments, SuggestionStepItem, SuggestionStepsPanel, SuggestionTaskItem, SuggestionTasksPanel, AnalysisAlerts
 - `chat/` - ChatContainer, ChatInput, ChatMessage, ChatModal
 - `admin/` - AnalysisDetailModal
 - `notifications/` - NotificationDropdown, NotificationItem
-- `shared/ui/` - LoadingState, ErrorBoundary, OptimizedImage
+- `shared/ui/` - LoadingState, ErrorBoundary, OptimizedImage, ProductCardSkeleton, TableRowSkeleton
+- `users/` - PermissionCheckbox, UserFormModal
 
-**Composables** (`composables/`) - 12 composables
+**Composables** (`composables/`) - 13 composables
 - `useFormatters` - Formatação de dados (moeda, datas)
 - `useValidation` - Validação de formulários
 - `useLoadingState` - Estados de loading
@@ -120,14 +144,19 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 - `useSanitize` - Sanitização HTML (XSS)
 - `useAsyncComponent` - Carregamento lazy
 - `useKeyboard`, `useScroll` - Eventos DOM
+- `usePreviewMode` - Estado de preview mode
+- `useRelativeTime` - Formatação tempo relativo
+- `useTracking` - Analytics tracking
+- `useIntegration` - Helpers de integração
 
 **Types** (`types/`) - 11 arquivos TypeScript
 - `analysis.ts`, `api.ts`, `chat.ts`, `customer.ts`, `dashboard.ts`
 - `notification.ts`, `order.ts`, `product.ts`, `store.ts`, `user.ts`
 
-**Views** (`views/`) - 25 views
-- **Principal:** Dashboard, Analysis, Chat, Suggestions, Products, Orders, Discounts, Settings
-- **Admin:** AdminDashboard, Analyses, Clients, Users, Plans, Settings, Integrations
+**Views** (`views/`) - 30 views
+- **Principal (16):** Dashboard, Analysis, Chat, Suggestions, SuggestionWorkflow, ImpactDashboard, Products, Orders, Discounts, Integrations, StoreConfig, Settings, UsersManagement, Notifications, TrackingSettings, NotFound
+- **Auth (5):** Login, Register, ForgotPassword, ResetPassword, ChangePassword
+- **Admin (9):** AdminDashboard, Analyses, Clients, ClientDetail, Users, UserDetail, Plans, Settings, Integrations
 
 ## Módulo de Análise AI
 
@@ -269,26 +298,33 @@ private const STAGE_RETRY_DELAYS = [30, 60, 120];  // segundos
 
 ## API Controllers
 
-**Controllers** (`app/Http/Controllers/Api/`) - 21 controllers
+**Controllers** (`app/Http/Controllers/Api/`) - 25 controllers
 
 **Auth & Admin:**
-- `AuthController` - Login, register, logout, reset password
-- `AdminController` - Dashboard admin
-- `UserManagementController` - CRUD de usuários
+- `AuthController` - Login, register, logout, reset password, profile
+- `AdminController` - Dashboard admin, clients CRUD, impersonate, toggle status
+- `UserManagementController` - CRUD de usuários/employees (hierarchy-aware)
 
 **Core:**
-- `DashboardController` - Stats e métricas
-- `AnalysisController` - CRUD de análises AI
-- `ChatController` - Chat com IA
+- `DashboardController` - Stats, charts (revenue, orders, top products, payment methods, categories, low stock)
+- `AnalysisController` - CRUD de análises AI, sugestões accept/reject
+- `ChatController` - Chat com IA, suggestion-specific chats
 - `ProductController`, `OrderController`, `DiscountController` - Dados sync
+
+**Suggestion Workflow:**
+- `SuggestionStepController` - CRUD steps (workflow legado)
+- `SuggestionTaskController` - CRUD tasks (workflow novo)
+- `SuggestionCommentController` - CRUD comentários
+- `SuggestionImpactDashboardController` - Impact dashboard, feedback
 
 **Admin Específico:**
 - `AdminAnalysesController`, `AdminPlanController`, `AdminSettingsController`
 - `AdminEmailConfigurationController`, `AdminIntegrationsController`
 
-**Integração:**
-- `IntegrationController` - Connect/disconnect Nuvemshop
-- `StoreConfigController`, `StoreSettingsController`
+**Integração & Config:**
+- `IntegrationController` - Connect/authorize/disconnect Nuvemshop, OAuth callback
+- `StoreConfigController`, `StoreSettingsController`, `UserStoreSettingsController`
+- `TrackingSettingsController` - Pixels (GA, Meta, Clarity, Hotjar)
 - `NotificationController`, `LocationController`
 
 ## Integração Nuvemshop
@@ -301,6 +337,35 @@ Http::withHeaders(['Authentication' => 'bearer ' . $token]);
 **Rate Limit:** 60 requests/minuto por loja
 
 **Tokens:** Não expiram, mas podem ser invalidados. Sem refresh_token.
+
+### Token Expiration & Reconnection
+
+Fluxo de reconexão quando token é invalidado:
+- `Store::markAsTokenExpired()` → seta `sync_status = TokenExpired`, `token_requires_reconnection = true`
+- `Store::requiresReconnection()` → verifica flag
+- `TokenExpiredException` → exception customizada com `storeId` e `storeName`
+- Sync jobs verificam `requiresReconnection()` antes de executar
+- OAuth reconnection: `authorization_code` (encrypted) salvo na store, `access_token` nullable
+- `AutoAnalysisCommand` e `SyncAllStoresCommand` pulam stores que requerem reconexão
+
+## Hierarquia de Usuários
+
+- **Admin** (`admin@plataforma.com`) → cria Clients (donos de loja)
+- **Client** (role: `client`, `parent_user_id: null`) → cria Employees
+- **Employee** (role: `client`, `parent_user_id: {client_id}`) → subordinado
+- `User::isEmployee()` e `User::getOwnerUser()` para navegação
+- `PlanLimitService::resolveOwnerUser()` → employees herdam plano do parent
+- Admin queries filtram `whereNull('parent_user_id')` para excluir employees
+- `UserManagementResource` retorna `is_employee` e `role`
+
+## Commands (Console)
+
+- `AutoAnalysisCommand` - Auto-análise pós-sync (distribui em 120 min)
+- `SyncAllStoresCommand` - Sync de todas as lojas (distribui em 240 min)
+- `ForceResyncStoreCommand` - Force resync de loja específica
+- `FixStuckSyncStatus` - Corrige syncs travados
+- `SyncBrazilLocationsCommand` - Sync localizações brasileiras
+- `SafeMigrateCommand` - Migrate wrapper seguro
 
 ## Guidelines de UI
 

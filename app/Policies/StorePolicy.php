@@ -34,8 +34,8 @@ class StorePolicy
             return true;
         }
 
-        // Usuário só pode ver suas próprias lojas
-        return $user->id === $store->user_id;
+        // Usuário pode ver lojas que tem acesso (próprias ou do cliente pai)
+        return $user->hasAccessToStore($store->id);
     }
 
     /**
@@ -57,8 +57,8 @@ class StorePolicy
             return true;
         }
 
-        // Usuário só pode atualizar suas próprias lojas
-        return $user->id === $store->user_id;
+        // Usuário pode atualizar lojas que tem acesso (próprias ou do cliente pai)
+        return $user->hasAccessToStore($store->id);
     }
 
     /**
@@ -71,7 +71,7 @@ class StorePolicy
             return true;
         }
 
-        // Usuário só pode deletar suas próprias lojas
+        // Apenas donos podem deletar lojas (funcionários não podem)
         return $user->id === $store->user_id;
     }
 

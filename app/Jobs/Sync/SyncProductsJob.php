@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Sync;
 
+use App\Exceptions\TokenExpiredException;
 use App\Models\Store;
 use App\Services\Integration\NuvemshopService;
 use Carbon\Carbon;
@@ -73,10 +74,22 @@ class SyncProductsJob implements ShouldQueue
                 'time_ms' => $elapsed,
                 'products_count' => $this->store->products()->count(),
             ]);
+        } catch (TokenExpiredException $e) {
+            // Token expirado - cancela batch imediatamente
+            Log::channel('sync')->warning('[PRODUCTS] Token expirado - cancelando batch', [
+                'store_id' => $this->store->id,
+            ]);
+
+            if ($this->batch()) {
+                $this->batch()->cancel();
+            }
+
+            throw $e;
         } catch (\Exception $e) {
             Log::channel('sync')->error('!!! [PARALLEL] Erro no sync de PRODUTOS', [
                 'store_id' => $this->store->id,
                 'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
             ]);
             throw $e;
         }

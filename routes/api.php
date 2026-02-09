@@ -132,7 +132,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('nuvemshop/connect', [IntegrationController::class, 'connectNuvemshop']);
             Route::post('nuvemshop/authorize', [IntegrationController::class, 'authorizeNuvemshop']);
             Route::post('stores/{store}/sync', [IntegrationController::class, 'sync']);
-            Route::delete('stores/{store}', [IntegrationController::class, 'disconnect']);
+            Route::delete('stores/{store}', [IntegrationController::class, 'disconnect'])->withTrashed();
         });
     });
 

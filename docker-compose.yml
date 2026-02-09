@@ -34,34 +34,14 @@ services:
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     command: ["php-fpm"]
     environment:
-      - APP_ENV=${APP_ENV:-local}
-      - APP_DEBUG=${APP_DEBUG:-true}
-      - APP_KEY=${APP_KEY:-}
-      - APP_URL=${APP_URL:-http://localhost:8000}
-      - DB_CONNECTION=pgsql
+      # Apenas variáveis de infraestrutura Docker (hosts internos da rede)
+      # Todas as demais variáveis são lidas do .env pelo Laravel
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-laravel}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-root}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
-      - REDIS_CLIENT=predis
-      - REDIS_DB=0
-      - REDIS_CACHE_DB=1
-      - REDIS_QUEUE_DB=2
-      - CACHE_STORE=redis
-      - QUEUE_CONNECTION=redis
-      - SESSION_DRIVER=database
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
       - RUN_SEEDERS=${RUN_SEEDERS:-false}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - NUVEMSHOP_CLIENT_ID=${NUVEMSHOP_CLIENT_ID:-}
-      - NUVEMSHOP_CLIENT_SECRET=${NUVEMSHOP_CLIENT_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

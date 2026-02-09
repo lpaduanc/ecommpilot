@@ -9,6 +9,7 @@ enum SyncStatus: string
     case Completed = 'completed';
     case Failed = 'failed';
     case TokenExpired = 'token_expired';
+    case Disconnected = 'disconnected';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum SyncStatus: string
             self::Completed => 'Sincronizado',
             self::Failed => 'Falhou',
             self::TokenExpired => 'Token Expirado - Reconectar',
+            self::Disconnected => 'Desconectada',
         };
     }
 

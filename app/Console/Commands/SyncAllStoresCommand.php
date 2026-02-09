@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\SyncStatus;
 use App\Jobs\SyncStoreDataJob;
 use App\Models\Store;
 use Illuminate\Console\Command;
@@ -48,11 +47,8 @@ class SyncAllStoresCommand extends Command
 
         $useDelay = ! $this->option('no-delay');
 
-        // Busca todas as lojas que NÃO precisam de reconexão
-        $stores = Store::query()
-            ->where('token_requires_reconnection', false)
-            ->where('sync_status', '!=', SyncStatus::TokenExpired->value)
-            ->get();
+        // Busca todas as lojas
+        $stores = Store::query()->get();
 
         if ($stores->isEmpty()) {
             $this->warn('Nenhuma loja encontrada para sincronização.');

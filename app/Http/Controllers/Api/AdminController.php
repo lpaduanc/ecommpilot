@@ -22,8 +22,8 @@ class AdminController extends Controller
 
     public function dashboardStats(): JsonResponse
     {
-        $totalClients = User::where('role', UserRole::Client)->count();
-        $activeClients = User::where('role', UserRole::Client)->where('is_active', true)->count();
+        $totalClients = User::where('role', UserRole::Client)->whereNull('parent_user_id')->count();
+        $activeClients = User::where('role', UserRole::Client)->whereNull('parent_user_id')->where('is_active', true)->count();
         $totalStores = Store::count();
 
         // Calculate MRR (mock calculation - in real app, this would come from subscription data)
@@ -40,6 +40,7 @@ class AdminController extends Controller
 
         // New clients this month
         $newClientsThisMonth = User::where('role', UserRole::Client)
+            ->whereNull('parent_user_id')
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->count();
@@ -58,6 +59,7 @@ class AdminController extends Controller
     public function clients(Request $request): JsonResponse
     {
         $query = User::where('role', UserRole::Client)
+            ->whereNull('parent_user_id')
             ->with(['stores' => function ($q) {
                 $q->select('id', 'user_id', 'name', 'platform', 'sync_status', 'last_sync_at');
             }]);
@@ -274,10 +276,16 @@ class AdminController extends Controller
             'users.create',
             'users.edit',
             'users.delete',
+            'dashboard.view',
+            'products.view',
+            'orders.view',
             'integrations.manage',
-            'analytics.view',
-            'analytics.request',
+            'analysis.view',
+            'analysis.request',
             'chat.use',
+            'marketing.access',
+            'settings.view',
+            'settings.edit',
         ])->pluck('name')->toArray();
 
         $client->syncPermissions($clientPermissions);

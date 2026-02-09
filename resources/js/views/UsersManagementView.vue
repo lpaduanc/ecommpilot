@@ -212,8 +212,8 @@ onMounted(() => {
                                     <div class="min-w-0 flex-1">
                                         <p class="font-bold text-gray-900 dark:text-gray-100 truncate">{{ user.name }}</p>
                                         <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
-                                        <p v-if="user.role" class="text-xs text-gray-400 mt-0.5">
-                                            {{ user.role === 'admin' ? 'Administrador' : 'Cliente' }}
+                                        <p class="text-xs text-gray-400 mt-0.5">
+                                            {{ user.is_employee ? 'Funcionário' : (user.is_first_user ? 'Proprietário' : 'Usuário') }}
                                         </p>
                                     </div>
                                 </div>
@@ -291,8 +291,8 @@ onMounted(() => {
                                             </div>
                                             <div>
                                                 <p class="font-medium text-gray-900 dark:text-gray-100">{{ user.name }}</p>
-                                                <p v-if="user.role" class="text-xs text-gray-500 dark:text-gray-400">
-                                                    {{ user.role === 'admin' ? 'Administrador' : 'Cliente' }}
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                    {{ user.is_employee ? 'Funcionário' : (user.is_first_user ? 'Proprietário' : 'Usuário') }}
                                                 </p>
                                             </div>
                                         </div>

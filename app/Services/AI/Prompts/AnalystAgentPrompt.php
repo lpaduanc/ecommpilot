@@ -555,9 +555,9 @@ MARKET;
                     $media = $tm['media'] ?? $tm['avg'] ?? 0;
                     $max = $tm['max'] ?? 0;
                     $output .= "**Ticket Médio do Setor:**\n";
-                    $output .= "- Mínimo: R$ ".number_format($min, 2, ',', '.')."\n";
-                    $output .= "- Média: R$ ".number_format($media, 2, ',', '.')."\n";
-                    $output .= "- Máximo: R$ ".number_format($max, 2, ',', '.')."\n";
+                    $output .= '- Mínimo: R$ '.number_format($min, 2, ',', '.')."\n";
+                    $output .= '- Média: R$ '.number_format($media, 2, ',', '.')."\n";
+                    $output .= '- Máximo: R$ '.number_format($max, 2, ',', '.')."\n";
 
                     // Comparação com a loja
                     if ($media > 0 && $ticketLoja > 0) {
@@ -567,7 +567,7 @@ MARKET;
                     }
                     $output .= "\n";
                 } else {
-                    $output .= "**Ticket Médio do Setor:** R$ ".number_format($tm, 2, ',', '.')."\n\n";
+                    $output .= '**Ticket Médio do Setor:** R$ '.number_format($tm, 2, ',', '.')."\n\n";
                 }
             }
 
@@ -689,8 +689,8 @@ MARKET;
             $output .= "### Ticket Médio\n\n";
             $output .= "| | Valor |\n";
             $output .= "|---|------|\n";
-            $output .= "| **Sua Loja** | R$ ".number_format($ticketLoja, 2, ',', '.')." |\n";
-            $output .= "| **Média Concorrentes** | R$ ".number_format($ticketMediaConcorrentes, 2, ',', '.')." |\n";
+            $output .= '| **Sua Loja** | R$ '.number_format($ticketLoja, 2, ',', '.')." |\n";
+            $output .= '| **Média Concorrentes** | R$ '.number_format($ticketMediaConcorrentes, 2, ',', '.')." |\n";
             $output .= "| **Diferença** | {$diffStr} |\n\n";
 
             if ($diffTicket < -20) {
@@ -731,7 +731,7 @@ MARKET;
             $catsLoja = is_array($categoriasFoco) ? array_keys($categoriasFoco) : [];
             $oportunidades = array_diff($catsConcorrentes, $catsLoja);
             if (! empty($oportunidades)) {
-                $output .= "**Oportunidade:** Concorrentes focam em categorias que você não tem: ".implode(', ', array_slice($oportunidades, 0, 3))."\n\n";
+                $output .= '**Oportunidade:** Concorrentes focam em categorias que você não tem: '.implode(', ', array_slice($oportunidades, 0, 3))."\n\n";
             }
         }
 

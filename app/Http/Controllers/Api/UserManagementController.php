@@ -90,6 +90,13 @@ class UserManagementController extends Controller
             ], 403);
         }
 
+        // Funcionários não podem criar sub-usuários
+        if ($parentUser->parent_user_id !== null) {
+            return response()->json([
+                'message' => 'Funcionários não podem criar outros usuários.',
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -111,11 +118,19 @@ class UserManagementController extends Controller
             if (empty($permissions)) {
                 $permissions = [
                     'integrations.manage',
-                    'analytics.view',
-                    'analytics.request',
+                    'analysis.view',
+                    'analysis.request',
                     'chat.use',
                 ];
             }
+
+            // Filtrar permissões proibidas para funcionários
+            $forbiddenPermissions = ['admin.access'];
+            $permissions = array_diff($permissions, $forbiddenPermissions);
+
+            // Garantir que funcionário só recebe permissões que o cliente pai tem
+            $parentPermissions = $parentUser->getAllPermissions()->pluck('name')->toArray();
+            $permissions = array_intersect($permissions, $parentPermissions);
 
             $user->syncPermissions($permissions);
 
@@ -211,6 +226,15 @@ class UserManagementController extends Controller
 
             // Update permissions
             $permissions = $request->input('permissions', []);
+
+            // Filtrar permissões proibidas para funcionários
+            $forbiddenPermissions = ['admin.access'];
+            $permissions = array_diff($permissions, $forbiddenPermissions);
+
+            // Garantir que funcionário só recebe permissões que o cliente pai tem
+            $parentPermissions = $parentUser->getAllPermissions()->pluck('name')->toArray();
+            $permissions = array_intersect($permissions, $parentPermissions);
+
             $user->syncPermissions($permissions);
 
             DB::commit();

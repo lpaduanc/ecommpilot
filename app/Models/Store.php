@@ -40,6 +40,7 @@ class Store extends Model
         'website_url',
         'email',
         'access_token',
+        'authorization_code',
         'refresh_token',
         'token_requires_reconnection',
         'sync_status',
@@ -59,6 +60,7 @@ class Store extends Model
 
     protected $hidden = [
         'access_token',
+        'authorization_code',
         'refresh_token',
     ];
 
@@ -72,6 +74,7 @@ class Store extends Model
             'last_sync_at' => 'datetime',
             'metadata' => 'array',
             'access_token' => 'encrypted',
+            'authorization_code' => 'encrypted',
             'refresh_token' => 'encrypted',
             'monthly_goal' => 'decimal:2',
             'annual_goal' => 'decimal:2',

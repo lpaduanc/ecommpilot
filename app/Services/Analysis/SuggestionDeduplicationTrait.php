@@ -112,7 +112,7 @@ trait SuggestionDeduplicationTrait
 
         // V5: Threshold aumentado para 2
         // OU se foi rejeitado pelo menos 1x (penaliza temas que o cliente não gostou)
-        $saturated = array_filter($counts, function ($count) use ($rejectedThemes) {
+        $saturated = array_filter($counts, function ($count) {
             return $count >= 2;
         });
 

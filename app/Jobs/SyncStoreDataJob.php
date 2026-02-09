@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\SyncStatus;
+use App\Exceptions\TokenExpiredException;
 use App\Jobs\Sync\SyncCouponsJob;
 use App\Jobs\Sync\SyncCustomersJob;
 use App\Jobs\Sync\SyncOrdersJob;
@@ -103,11 +104,12 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Tempo que o lock de unicidade deve ser mantido (5 minutos)
+     * Tempo que o lock de unicidade deve ser mantido (30 minutos)
+     * Aumentado de 300 para 1800 para evitar duplicação de batches em syncs longas
      */
     public function uniqueFor(): int
     {
-        return 300;
+        return 1800;
     }
 
     public function handle(
@@ -121,22 +123,35 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         // Refresh store model to get latest state
         $this->store->refresh();
 
-        // Check if store requires reconnection (token expired/invalid)
+        // Se a loja requer reconexão, tenta reconectar automaticamente via OAuth
         if ($this->store->token_requires_reconnection) {
-            $this->safeLog('warning', 'Sync ignorado - loja requer reconexão OAuth', [
+            $this->safeLog('info', 'Loja requer reconexão - tentando reconexão automática via OAuth', [
                 'store_id' => $this->store->id,
                 'store_name' => $this->store->name,
                 'sync_status' => $this->store->sync_status->value,
             ]);
 
-            // Notify user that reconnection is required
-            $notificationService->notifySyncFailed(
-                $this->store,
-                'all',
-                'A loja precisa ser reconectada. Por favor, reconecte sua conta Nuvemshop.'
-            );
+            if ($nuvemshopService->attemptReconnection($this->store)) {
+                // Reconexão bem-sucedida, refresh e continua com sync
+                $this->store->refresh();
+                $this->safeLog('info', 'Reconexão automática bem-sucedida, continuando sync', [
+                    'store_id' => $this->store->id,
+                ]);
+            } else {
+                // Reconexão falhou, notifica e cancela
+                $this->safeLog('warning', 'Reconexão automática falhou - sync cancelada', [
+                    'store_id' => $this->store->id,
+                    'store_name' => $this->store->name,
+                ]);
 
-            return;
+                $notificationService->notifySyncFailed(
+                    $this->store,
+                    'all',
+                    'Não foi possível reconectar automaticamente. Reconecte a loja manualmente.'
+                );
+
+                return;
+            }
         }
 
         $this->store->markAsSyncing();
@@ -171,6 +186,28 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                 // MODO SEQUENCIAL: Executa jobs um após o outro (compatibilidade)
                 $this->executeSequentialSync($nuvemshopService, $ordersUpdatedSince, $dashboardService, $productAnalyticsService, $notificationService, $startTime);
             }
+        } catch (TokenExpiredException $e) {
+            // Token expirado - já foi marcado no makeRequest(), apenas loga e cancela
+            $totalTime = round((microtime(true) - $startTime), 2);
+
+            Log::channel($this->logChannel)->warning('!!! TOKEN EXPIRADO - SYNC CANCELADA', [
+                'store_id' => $this->store->id,
+                'store_name' => $this->store->name,
+                'error' => $e->getMessage(),
+                'total_time_seconds' => $totalTime,
+            ]);
+
+            $this->clearCheckpoint();
+
+            // Notificar usuario sobre token expirado
+            $notificationService->notifySyncFailed(
+                $this->store,
+                'all',
+                'Token OAuth expirado. Clique em "Reconectar" para autorizar a loja novamente.'
+            );
+
+            // NÃO relança exceção - token expirado não é erro de execução, é estado esperado
+            return;
         } catch (\Exception $e) {
             $totalTime = round((microtime(true) - $startTime), 2);
 
@@ -221,6 +258,18 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         $store = $this->store;
         $logChannel = $this->logChannel;
         $notificationServiceRef = $notificationService; // Captura para closures
+
+        // PROTEÇÃO: Verifica se já existe batch ativo antes de criar novo
+        // Isso previne duplicação de batches (Bug que criou 12 batches idênticos)
+        $batchLockKey = "sync_batch_active:{$store->id}";
+        if (! Cache::add($batchLockKey, 1, 1800)) {
+            Log::channel($logChannel)->warning('>>> [PARALLEL MODE] Batch já ativo para esta loja - cancelando duplicata', [
+                'store_id' => $store->id,
+                'lock_key' => $batchLockKey,
+            ]);
+
+            return; // Cancela criação de batch duplicado
+        }
 
         Log::channel($logChannel)->info('>>> [PARALLEL MODE] Iniciando batch de sincronizacao', [
             'store_id' => $store->id,
@@ -313,17 +362,22 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                     'error' => $e->getMessage(),
                 ]);
             })
-            ->finally(function (Batch $batch) use ($store, $logChannel) {
+            ->finally(function (Batch $batch) use ($store, $logChannel, $batchLockKey) {
                 // Executado sempre, independente de sucesso ou falha
                 try {
+                    // Libera o lock do batch
+                    Cache::forget($batchLockKey);
+
                     Log::channel($logChannel)->info('<<< [PARALLEL MODE] Batch finalizado', [
                         'store_id' => $store->id,
                         'batch_id' => $batch->id,
                         'cancelled' => $batch->cancelled(),
                         'finished' => $batch->finished(),
+                        'lock_released' => true,
                     ]);
                 } catch (\Exception $e) {
                     // Fallback se houver erro de log
+                    Cache::forget($batchLockKey); // Garante liberação do lock
                     Log::info('[SYNC FALLBACK] Batch finalizado', [
                         'store_id' => $store->id,
                         'batch_id' => $batch->id,

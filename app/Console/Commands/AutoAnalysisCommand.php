@@ -220,7 +220,7 @@ class AutoAnalysisCommand extends Command
         $this->newLine();
         $this->info("Total elegíveis: {$stores->count()}");
         $this->info("Seriam enfileiradas: {$wouldDispatch}");
-        $this->info("Seriam puladas: ".($stores->count() - $wouldDispatch));
+        $this->info('Seriam puladas: '.($stores->count() - $wouldDispatch));
 
         Log::channel('analysis')->info('Comando analyses:auto dry-run executado', [
             'total_eligible' => $stores->count(),

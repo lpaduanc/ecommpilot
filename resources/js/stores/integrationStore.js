@@ -63,10 +63,6 @@ export const useIntegrationStore = defineStore('integration', () => {
         activeStore.value?.sync_status === 'failed'
     );
 
-    const isActiveStoreTokenExpired = computed(() =>
-        activeStore.value?.sync_status === 'token_expired'
-    );
-
     // Actions
 
     /**
@@ -367,57 +363,6 @@ export const useIntegrationStore = defineStore('integration', () => {
     }
 
     /**
-     * Reconnect an expired store in one click
-     * Finds the store's domain and redirects directly to OAuth
-     */
-    async function reconnectStore(storeId) {
-        try {
-            // Find store by UUID
-            const store = stores.value.find(s => s.id === storeId);
-
-            if (!store) {
-                logger.error('Store not found for reconnection', { storeId });
-                return {
-                    success: false,
-                    message: 'Loja não encontrada'
-                };
-            }
-
-            // Extract domain from store (could be in domain field or metadata)
-            const storeDomain = store.domain || store.metadata?.original_domain;
-
-            if (!storeDomain) {
-                logger.error('Store domain not available for reconnection', {
-                    storeId,
-                    storeName: store.name
-                });
-                return {
-                    success: false,
-                    message: 'Domínio da loja não encontrado. Por favor, reconecte manualmente.'
-                };
-            }
-
-            logger.info('Reconnecting store', {
-                storeId,
-                storeName: store.name,
-                domain: storeDomain
-            });
-
-            // Use existing connectPlatform method which handles OAuth redirect
-            return await connectPlatform('nuvemshop', storeDomain);
-        } catch (error) {
-            logger.error('Error reconnecting store', {
-                storeId,
-                error: error.message
-            });
-            return {
-                success: false,
-                message: 'Erro ao reconectar loja. Tente novamente.'
-            };
-        }
-    }
-
-    /**
      * Helper to check if sync is in progress
      */
     function isSyncInProgress(status) {
@@ -466,7 +411,6 @@ export const useIntegrationStore = defineStore('integration', () => {
         activeStore,
         isActiveStoreSyncing,
         isActiveStoreFailed,
-        isActiveStoreTokenExpired,
 
         // Actions
         fetchStores,
@@ -474,7 +418,6 @@ export const useIntegrationStore = defineStore('integration', () => {
         processOAuthCode,
         syncStore,
         disconnectStore,
-        reconnectStore,
         fetchNuvemshopConfig,
         updateNuvemshopConfig,
         setCurrentStore,

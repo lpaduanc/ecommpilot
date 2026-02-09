@@ -28,7 +28,7 @@ class IntegrationController extends Controller
     public function stores(Request $request): JsonResponse
     {
         $stores = $request->user()
-            ->stores()
+            ->accessibleStores()
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -317,12 +317,15 @@ class IntegrationController extends Controller
             $user = $request->user();
 
             // Check if this would be a NEW store (not reconnecting an existing one)
-            $existingStore = Store::where('platform', Platform::Nuvemshop)
+            // Include soft-deleted and disconnected stores to prevent unique constraint violations
+            $existingStore = Store::withTrashed()
+                ->where('platform', Platform::Nuvemshop)
                 ->where('external_store_id', (string) ($data['user_id'] ?? ''))
                 ->first();
 
             // SECURITY: Prevent store takeover - verify existing store belongs to current user
-            if ($existingStore && $existingStore->user_id !== $user->id) {
+            $ownerUser = $user->getOwnerUser();
+            if ($existingStore && $existingStore->user_id !== $ownerUser->id) {
                 Log::warning('Store takeover attempt blocked', [
                     'attacker_user_id' => $user->id,
                     'attacker_email' => $user->email,
@@ -341,16 +344,26 @@ class IntegrationController extends Controller
             // Skip plan limits in local/dev environment
             $isLocalEnv = app()->isLocal() || app()->environment('testing', 'dev', 'development');
 
-            // If it's a new store, check plan limits
+            // If it's a new store (not reconnecting), check plan limits
+            // Reconnecting stores (soft-deleted or disconnected) don't count against the limit
             if (! $existingStore && ! $isLocalEnv && ! $this->planLimitService->canAddStore($user)) {
-                $plan = $user->currentPlan();
+                $ownerPlan = $ownerUser->currentPlan();
 
                 return response()->json([
                     'message' => 'Você atingiu o limite de lojas do seu plano.',
-                    'stores_limit' => $plan?->stores_limit ?? 0,
-                    'current_stores' => $user->stores()->count(),
+                    'stores_limit' => $ownerPlan?->stores_limit ?? 0,
+                    'current_stores' => $ownerUser->stores()->count(),
                     'upgrade_required' => true,
                 ], 403);
+            }
+
+            // Restore soft-deleted store if reconnecting
+            if ($existingStore && $existingStore->trashed()) {
+                $existingStore->restore();
+                Log::info('Restored soft-deleted store during reconnection', [
+                    'store_id' => $existingStore->id,
+                    'external_store_id' => $data['user_id'],
+                ]);
             }
 
             $store = Store::updateOrCreate(
@@ -359,14 +372,26 @@ class IntegrationController extends Controller
                     'external_store_id' => (string) ($data['user_id'] ?? ''),
                 ],
                 [
-                    'user_id' => $user->id,
+                    'user_id' => $ownerUser->id,
                     'name' => 'Loja Nuvemshop',
                     'access_token' => $data['access_token'],
+                    'authorization_code' => $code,
                     'refresh_token' => $data['refresh_token'] ?? null,
                     'sync_status' => SyncStatus::Pending,
                     'token_requires_reconnection' => false,
                 ]
             );
+
+            // Log se foi uma reconexão ou uma nova conexão
+            if ($existingStore) {
+                Log::info('Store reconnected successfully', [
+                    'store_id' => $store->id,
+                    'external_store_id' => $data['user_id'],
+                    'had_products' => $store->products()->count(),
+                    'had_orders' => $store->orders()->count(),
+                    'had_analyses' => $store->analyses()->count(),
+                ]);
+            }
 
             // Try to get store details from Nuvemshop API
             if (isset($data['user_id']) && isset($data['access_token'])) {
@@ -436,21 +461,20 @@ class IntegrationController extends Controller
     public function sync(Request $request, Store $store): JsonResponse
     {
         // Verify store ownership
-        if ($store->user_id !== $request->user()->id) {
+        if (! $request->user()->hasAccessToStore($store->id)) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
-        }
-
-        if ($store->requiresReconnection()) {
-            return response()->json([
-                'message' => 'O token de acesso da loja está inválido. Por favor, reconecte a loja.',
-                'requires_reconnection' => true,
-            ], 401);
         }
 
         if ($store->isSyncing()) {
             return response()->json([
                 'message' => 'A sincronização já está em andamento.',
             ], 409);
+        }
+
+        // Se o token expirou, a reconexão automática será tentada pelo SyncStoreDataJob
+        // Reset sync_status para permitir nova tentativa
+        if ($store->sync_status === SyncStatus::TokenExpired) {
+            $store->update(['sync_status' => SyncStatus::Pending]);
         }
 
         SyncStoreDataJob::dispatch($store);
@@ -465,46 +489,52 @@ class IntegrationController extends Controller
 
     public function disconnect(Request $request, Store $store): JsonResponse
     {
-        // Verify store ownership
-        if ($store->user_id !== $request->user()->id) {
+        // Apenas donos podem desconectar lojas (funcionários não podem)
+        if ($store->user_id !== $request->user()->getOwnerUser()->id) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
+        }
+
+        // Funcionários não podem desconectar lojas
+        if ($request->user()->isEmployee()) {
+            return response()->json(['message' => 'Apenas o proprietário pode desconectar lojas.'], 403);
         }
 
         $storeName = $store->name;
 
         ActivityLog::log('store.disconnected', $store);
 
-        // Delete related data first
-        $store->products()->delete();
-        $store->orders()->delete();
-        $store->customers()->delete();
-        $store->analyses()->delete();
-
-        // Permanently delete the store (not soft delete)
-        $store->forceDelete();
+        // Limpa os tokens e marca como desconectada
+        // Os dados de produtos, pedidos, clientes e análises são preservados
+        $store->update([
+            'access_token' => null,
+            'authorization_code' => null,
+            'refresh_token' => null,
+            'token_requires_reconnection' => false,
+            'sync_status' => SyncStatus::Disconnected,
+        ]);
 
         // Update user's active store if this was the active one
         $user = $request->user();
         if ($user->active_store_id === $store->id) {
-            $newActiveStore = $user->stores()->first();
+            $newActiveStore = $user->accessibleStores()->first();
             $user->update(['active_store_id' => $newActiveStore?->id]);
         }
 
-        Log::info('Store disconnected and deleted', [
+        Log::info('Store disconnected (data preserved)', [
             'store_id' => $store->id,
             'store_name' => $storeName,
             'user_id' => $user->id,
         ]);
 
         return response()->json([
-            'message' => 'Loja desconectada com sucesso.',
+            'message' => 'Loja desconectada com sucesso. Seus dados foram preservados e estarão disponíveis quando reconectar.',
         ]);
     }
 
     public function myStores(Request $request): JsonResponse
     {
         $user = $request->user();
-        $stores = $user->stores()
+        $stores = $user->accessibleStores()
             ->select('id', 'uuid', 'name', 'platform', 'domain', 'email', 'sync_status', 'last_sync_at')
             ->orderBy('name')
             ->get();
@@ -555,7 +585,7 @@ class IntegrationController extends Controller
         $user = $request->user();
 
         // Verify store ownership
-        if ($store->user_id !== $user->id) {
+        if (! $user->hasAccessToStore($store->id)) {
             return response()->json(['message' => 'Loja não encontrada.'], 404);
         }
 

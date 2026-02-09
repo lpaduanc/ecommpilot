@@ -7,6 +7,7 @@ use App\Contracts\OrderAdapterInterface;
 use App\Contracts\ProductAdapterInterface;
 use App\Enums\Platform;
 use App\Enums\SyncStatus;
+use App\Exceptions\TokenExpiredException;
 use App\Models\Store;
 use App\Models\SyncedCoupon;
 use App\Models\SyncedCustomer;
@@ -92,10 +93,9 @@ class NuvemshopService
     {
         $state = $this->encodeState($userId, $storeUrl);
 
+        // Nuvemshop OAuth only requires 'state' as query param.
+        // redirect_uri and scope are configured in the app settings on the partner portal.
         $params = http_build_query([
-            'response_type' => 'code',
-            'scope' => 'read_products write_products read_orders read_customers read_coupons',
-            'redirect_uri' => $this->redirectUri,
             'state' => $state,
         ]);
 
@@ -108,7 +108,7 @@ class NuvemshopService
         }
 
         // Fallback to generic Nuvemshop auth URL
-        return "{$this->authUrl}?{$params}";
+        return "{$this->authUrl}/{$this->clientId}/authorize?{$params}";
     }
 
     /**
@@ -242,17 +242,34 @@ class NuvemshopService
         // Use provided storeUrl as primary domain (user typed URL), fallback to API domain
         $domain = $storeUrl ?? $storeInfo['domain'] ?? null;
 
+        // Check if store is being reconnected (soft-deleted or disconnected)
+        $existingStore = Store::withTrashed()
+            ->where('platform', Platform::Nuvemshop)
+            ->where('external_store_id', $data['user_id'])
+            ->first();
+
         Log::info('Creating/updating store from Nuvemshop callback', [
             'user_id' => $userId,
             'external_store_id' => $data['user_id'],
             'store_url_provided' => $storeUrl,
             'domain_from_api' => $storeInfo['domain'] ?? null,
             'final_domain' => $domain,
+            'is_reconnection' => $existingStore !== null,
+            'was_soft_deleted' => $existingStore?->trashed() ?? false,
         ]);
+
+        // Restore soft-deleted store if reconnecting
+        if ($existingStore && $existingStore->trashed()) {
+            $existingStore->restore();
+            Log::info('Restored soft-deleted store during reconnection', [
+                'store_id' => $existingStore->id,
+                'external_store_id' => $data['user_id'],
+            ]);
+        }
 
         // Create or update store
         // When reconnecting, clear token_requires_reconnection flag and reset sync_status
-        return Store::updateOrCreate(
+        $store = Store::updateOrCreate(
             [
                 'platform' => Platform::Nuvemshop,
                 'external_store_id' => $data['user_id'],
@@ -263,12 +280,26 @@ class NuvemshopService
                 'domain' => $domain,
                 'email' => $storeInfo['email'] ?? null,
                 'access_token' => $data['access_token'],
+                'authorization_code' => $code,
                 'refresh_token' => $data['refresh_token'] ?? null,
                 'token_requires_reconnection' => false,
                 'sync_status' => SyncStatus::Pending,
                 'metadata' => $storeInfo,
             ]
         );
+
+        // Log se foi uma reconexão ou uma nova conexão
+        if ($existingStore) {
+            Log::info('Store reconnected successfully', [
+                'store_id' => $store->id,
+                'external_store_id' => $data['user_id'],
+                'had_products' => $store->products()->count(),
+                'had_orders' => $store->orders()->count(),
+                'had_analyses' => $store->analyses()->count(),
+            ]);
+        }
+
+        return $store;
     }
 
     /**
@@ -743,19 +774,34 @@ class NuvemshopService
                     }, throw: false)
                     ->{strtolower($method)}("{$this->apiBaseUrl}{$endpoint}", $params);
 
-                // Se recebeu 401 e ainda tem tentativas, tenta refresh do token
-                if ($response->status() === 401 && $attempt < $maxAttempts) {
-                    Log::info("Token expirado para loja {$store->id}, tentando renovar...");
+                // Se recebeu 401, tenta reconexão automática antes de falhar
+                if ($response->status() === 401) {
+                    if ($attempt < $maxAttempts) {
+                        Log::warning("Token expirado para loja {$store->id}, tentando reconexão automática", [
+                            'store_id' => $store->id,
+                            'store_name' => $store->name,
+                            'endpoint' => $endpoint,
+                            'attempt' => $attempt,
+                        ]);
 
-                    if ($this->refreshAccessToken($store)) {
-                        Log::info("Token renovado com sucesso para loja {$store->id}, retentando requisição...");
-
-                        continue; // Retry the request with new token
+                        if ($this->refreshAccessToken($store)) {
+                            continue; // Retry com novo token
+                        }
                     }
 
-                    // Se falhou o refresh, não adianta tentar novamente
-                    Log::error("Falha ao renovar token para loja {$store->id}");
-                    break;
+                    // Reconexão falhou ou última tentativa
+                    Log::warning("Reconexão falhou para loja {$store->id}, marcando token como expirado", [
+                        'store_id' => $store->id,
+                        'store_name' => $store->name,
+                        'endpoint' => $endpoint,
+                    ]);
+
+                    $store->update([
+                        'token_requires_reconnection' => true,
+                        'sync_status' => SyncStatus::TokenExpired,
+                    ]);
+
+                    throw new TokenExpiredException($store->id, $store->name);
                 }
 
                 // Para qualquer outro erro ou sucesso, processa normalmente
@@ -769,6 +815,7 @@ class NuvemshopService
                                 'endpoint' => $endpoint,
                                 'description' => $bodyData['description'],
                             ]);
+
                             // Return empty array - this is not an error, it's end of pagination
                             return [];
                         }
@@ -827,41 +874,109 @@ class NuvemshopService
     }
 
     /**
-     * Handles token invalidation according to Nuvemshop's OAuth model.
+     * Tenta reconectar a loja automaticamente via OAuth.
      *
-     * IMPORTANT: According to Nuvemshop's official documentation, access tokens
-     * DO NOT EXPIRE. They only become invalid when:
-     * 1. A new token is generated (invalidates the previous one)
-     * 2. The user uninstalls the app
+     * Segue o mesmo fluxo de conexão inicial:
+     * 1. Gera URL de autorização
+     * 2. Segue cadeia de redirects buscando o code
+     * 3. Troca o code por novo access_token
+     */
+    public function attemptReconnection(Store $store): bool
+    {
+        Log::info('[RECONNECT] Tentando reconexão automática da loja', [
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+        ]);
+
+        return $this->refreshAccessToken($store);
+    }
+
+    /**
+     * Tenta obter novo access_token usando o authorization_code permanente.
      *
-     * Since Nuvemshop does not support refresh_token grant type, when we receive
-     * a 401 error, it means the user needs to reconnect the app through the full
-     * OAuth flow. This method marks the store as requiring reconnection.
-     *
-     * @param  Store  $store  The store whose token has been invalidated
-     * @return bool Always returns false to indicate automatic refresh is not possible
+     * O code retornado pela Nuvemshop durante OAuth é permanente e reutilizável.
+     * Podemos trocar o mesmo code por um novo access_token múltiplas vezes.
      */
     private function refreshAccessToken(Store $store): bool
     {
-        Log::warning('Token invalidado detectado para loja. Nuvemshop requer reconexão completa via OAuth.', [
-            'store_id' => $store->id,
-            'store_name' => $store->name,
-            'platform' => $store->platform->value,
-        ]);
+        try {
+            // Verifica se temos o authorization_code salvo
+            if (empty($store->authorization_code)) {
+                Log::warning('[RECONNECT] Store não possui authorization_code salvo', [
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                ]);
 
-        // Mark store as requiring reconnection
-        // This will trigger UI notification for the user to reconnect
-        $store->markAsTokenExpired();
+                return false;
+            }
 
-        Log::info('Loja marcada como token_expired. Usuário precisa reconectar.', [
-            'store_id' => $store->id,
-            'sync_status' => $store->sync_status->value,
-            'token_requires_reconnection' => $store->token_requires_reconnection,
-        ]);
+            Log::info('[RECONNECT] Usando authorization_code salvo para obter novo token', [
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+            ]);
 
-        // Return false to indicate that automatic token refresh is not possible
-        // The calling code should stop attempting the request
-        return false;
+            // Troca o authorization_code por novo access_token
+            $response = Http::asForm()
+                ->timeout(30)
+                ->post('https://www.tiendanube.com/apps/authorize/token', [
+                    'client_id' => $this->clientId,
+                    'client_secret' => $this->clientSecret,
+                    'grant_type' => 'authorization_code',
+                    'code' => $store->authorization_code,
+                ]);
+
+            if (! $response->successful()) {
+                $errorData = $response->json();
+                $errorMessage = $errorData['error_description']
+                    ?? $errorData['error']
+                    ?? $errorData['message']
+                    ?? 'Falha ao renovar token.';
+
+                Log::error('[RECONNECT] Falha ao trocar authorization_code por novo token', [
+                    'store_id' => $store->id,
+                    'status' => $response->status(),
+                    'error' => $errorMessage,
+                    'body' => $response->body(),
+                ]);
+
+                return false;
+            }
+
+            $data = $response->json();
+
+            // Validate required fields exist
+            if (! isset($data['access_token'])) {
+                Log::error('[RECONNECT] Resposta não contém access_token', [
+                    'store_id' => $store->id,
+                    'response_keys' => array_keys($data ?? []),
+                ]);
+
+                return false;
+            }
+
+            // Atualiza apenas o access_token (mantém o authorization_code!)
+            $store->update([
+                'access_token' => $data['access_token'],
+                'token_requires_reconnection' => false,
+                'sync_status' => SyncStatus::Pending,
+            ]);
+
+            Log::info('[RECONNECT] Reconexão automática bem-sucedida', [
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('[RECONNECT] Falha na reconexão automática', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return false;
+        }
     }
 
     /**

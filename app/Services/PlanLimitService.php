@@ -9,11 +9,21 @@ use App\Models\User;
 class PlanLimitService
 {
     /**
+     * Resolve o usuário dono para verificações de plano.
+     * Funcionários herdam o plano do cliente pai.
+     */
+    private function resolveOwnerUser(User $user): User
+    {
+        return $user->getOwnerUser();
+    }
+
+    /**
      * Verifica se o usuário pode adicionar uma nova loja.
      */
     public function canAddStore(User $user): bool
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan) {
             return false;
@@ -24,7 +34,7 @@ class PlanLimitService
             return true;
         }
 
-        $currentStores = $user->stores()->count();
+        $currentStores = $owner->stores()->count();
 
         return $currentStores < $plan->stores_limit;
     }
@@ -34,14 +44,15 @@ class PlanLimitService
      */
     public function canRequestAnalysis(User $user, ?Store $store = null): bool
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan) {
             return false;
         }
 
         // Verificar se ainda tem análises disponíveis hoje
-        return $this->getRemainingAnalysesToday($user, $store) > 0;
+        return $this->getRemainingAnalysesToday($owner, $store) > 0;
     }
 
     /**
@@ -49,12 +60,14 @@ class PlanLimitService
      */
     public function canAccessChat(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre têm acesso
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_ai_chat ?? false;
     }
@@ -64,12 +77,14 @@ class PlanLimitService
      */
     public function canAccessAnalysis(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre têm acesso
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_ai_analysis ?? false;
     }
@@ -79,12 +94,14 @@ class PlanLimitService
      */
     public function canAccessCustomDashboards(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre têm acesso
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_custom_dashboards ?? false;
     }
@@ -94,12 +111,14 @@ class PlanLimitService
      */
     public function canAccessExternalIntegrations(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre têm acesso
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_external_integrations ?? false;
     }
@@ -109,12 +128,14 @@ class PlanLimitService
      */
     public function canDiscussSuggestion(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre têm acesso
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_suggestion_discussion ?? false;
     }
@@ -124,12 +145,14 @@ class PlanLimitService
      */
     public function shouldPersistSuggestionHistory(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre persistem
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_suggestion_history ?? false;
     }
@@ -139,12 +162,14 @@ class PlanLimitService
      */
     public function canAccessImpactDashboard(User $user): bool
     {
+        $owner = $this->resolveOwnerUser($user);
+
         // Admins sempre têm acesso
-        if ($user->isAdmin()) {
+        if ($owner->isAdmin()) {
             return true;
         }
 
-        $plan = $user->currentPlan();
+        $plan = $owner->currentPlan();
 
         return $plan?->has_impact_dashboard ?? false;
     }
@@ -154,7 +179,8 @@ class PlanLimitService
      */
     public function canAddExternalIntegration(User $user): bool
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan || ! $plan->has_external_integrations) {
             return false;
@@ -165,7 +191,7 @@ class PlanLimitService
             return true;
         }
 
-        $currentIntegrations = $this->getExternalIntegrationsCount($user);
+        $currentIntegrations = $this->getExternalIntegrationsCount($owner);
 
         return $currentIntegrations < $plan->external_integrations_limit;
     }
@@ -175,7 +201,8 @@ class PlanLimitService
      */
     public function getExternalIntegrationsLimit(User $user): int
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         return $plan?->external_integrations_limit ?? 0;
     }
@@ -195,7 +222,8 @@ class PlanLimitService
      */
     public function getOrdersLimit(User $user): int
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         return $plan?->orders_limit ?? 0;
     }
@@ -205,7 +233,8 @@ class PlanLimitService
      */
     public function getStoresLimit(User $user): int
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         return $plan?->stores_limit ?? 0;
     }
@@ -215,7 +244,8 @@ class PlanLimitService
      */
     public function getAnalysisHistoryLimit(User $user): int
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         return $plan?->analysis_history_limit ?? 0;
     }
@@ -225,7 +255,8 @@ class PlanLimitService
      */
     public function getDataRetentionMonths(User $user): int
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         return $plan?->data_retention_months ?? 12;
     }
@@ -235,7 +266,8 @@ class PlanLimitService
      */
     public function getRemainingAnalysesToday(User $user, ?Store $store = null): int
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan) {
             return 0;
@@ -247,7 +279,7 @@ class PlanLimitService
             return 0;
         }
 
-        $todayUsage = AnalysisUsage::getTodayUsage($user->id, $storeId);
+        $todayUsage = AnalysisUsage::getTodayUsage($owner->id, $storeId);
         $dailyLimit = $plan->analysis_per_day;
 
         return max(0, $dailyLimit - $todayUsage);
@@ -258,13 +290,14 @@ class PlanLimitService
      */
     public function getAnalysesUsedToday(User $user, ?Store $store = null): int
     {
+        $owner = $this->resolveOwnerUser($user);
         $storeId = $store?->id ?? $user->active_store_id;
 
         if (! $storeId) {
             return 0;
         }
 
-        return AnalysisUsage::getTodayUsage($user->id, $storeId);
+        return AnalysisUsage::getTodayUsage($owner->id, $storeId);
     }
 
     /**
@@ -272,7 +305,8 @@ class PlanLimitService
      */
     public function recordAnalysisUsage(User $user, Store $store): void
     {
-        $usage = AnalysisUsage::getOrCreateForToday($user->id, $store->id);
+        $owner = $this->resolveOwnerUser($user);
+        $usage = AnalysisUsage::getOrCreateForToday($owner->id, $store->id);
         $usage->incrementCount();
     }
 
@@ -281,7 +315,8 @@ class PlanLimitService
      */
     public function getUserLimits(User $user): array
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan) {
             return $this->getDefaultLimits();
@@ -334,13 +369,14 @@ class PlanLimitService
      */
     public function hasExceededOrdersLimit(User $user): bool
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan || $plan->isUnlimited('orders_limit')) {
             return false;
         }
 
-        $monthlyOrders = $this->getMonthlyOrdersCount($user);
+        $monthlyOrders = $this->getMonthlyOrdersCount($owner);
 
         return $monthlyOrders >= $plan->orders_limit;
     }
@@ -350,7 +386,9 @@ class PlanLimitService
      */
     public function getMonthlyOrdersCount(User $user): int
     {
-        return $user->stores()
+        $owner = $this->resolveOwnerUser($user);
+
+        return $owner->stores()
             ->withCount(['orders' => function ($query) {
                 $query->whereMonth('external_created_at', now()->month)
                     ->whereYear('external_created_at', now()->year);
@@ -364,7 +402,8 @@ class PlanLimitService
      */
     public function getUserUsage(User $user): array
     {
-        $plan = $user->currentPlan();
+        $owner = $this->resolveOwnerUser($user);
+        $plan = $owner->currentPlan();
 
         if (! $plan) {
             return [
@@ -373,12 +412,12 @@ class PlanLimitService
             ];
         }
 
-        $storesCount = $user->stores()->count();
-        $monthlyOrders = $this->getMonthlyOrdersCount($user);
+        $storesCount = $owner->stores()->count();
+        $monthlyOrders = $this->getMonthlyOrdersCount($owner);
 
         $store = $user->activeStore;
         $analysesToday = $store ? $this->getAnalysesUsedToday($user, $store) : 0;
-        $externalIntegrations = $this->getExternalIntegrationsCount($user);
+        $externalIntegrations = $this->getExternalIntegrationsCount($owner);
 
         return [
             'has_plan' => true,
