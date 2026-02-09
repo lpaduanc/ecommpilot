@@ -56,6 +56,8 @@ class CriticAgentService
             'previous_suggestions_count' => count($data['previous_suggestions'] ?? []),
             'store_context_keys' => array_keys($data['store_context'] ?? []),
             'has_external_data' => ! empty($data['external_data']),
+            'has_analyst_briefing' => ! empty($data['analyst_briefing']),
+            'has_anomalies' => ! empty($data['anomalies']),
         ]);
 
         // ═══════════════════════════════════════════════════════════════════

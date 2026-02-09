@@ -728,6 +728,8 @@ class StoreAnalysisService
                 'faturamento_estimado' => $faturamentoEstimado,
                 'out_of_stock_pct' => $outOfStockPct,
                 'external_data' => $externalMarketData,
+                'analyst_briefing' => $analysisResult['alertas_para_strategist'] ?? $analysisResult['briefing_strategist'] ?? [],
+                'anomalies' => $analysisResult['anomalies'] ?? [],
                 'store_context' => [
                     'niche' => $niche,
                     'subcategory' => $subcategory,
@@ -791,6 +793,15 @@ class StoreAnalysisService
                 $store->id
             );
 
+            if (count($filteredSuggestions) < 9) {
+                Log::channel($this->logChannel)->warning('>>> ALERTA: Filtro de similaridade removeu sugestoes abaixo do minimo de 9', [
+                    'analysis_id' => $analysis->id,
+                    'input' => count($criticizedSuggestions['approved_suggestions'] ?? []),
+                    'output' => count($filteredSuggestions),
+                    'removed' => count($criticizedSuggestions['approved_suggestions'] ?? []) - count($filteredSuggestions),
+                ]);
+            }
+
             Log::channel($this->logChannel)->info('<<< Filtro de similaridade concluido', [
                 'input_count' => count($criticizedSuggestions['approved_suggestions'] ?? []),
                 'output_count' => count($filteredSuggestions),
@@ -836,6 +847,9 @@ class StoreAnalysisService
 
         // V5: Não precisa mais validar depois, pois já foi feito antes
         $beforeValidation = count($finalSuggestions);
+
+        // Enforcement programático: max 2 sugestões por categoria
+        $finalSuggestions = $this->enforceCategoryDiversification($finalSuggestions, $validatedStrategistSuggestions);
 
         // Logar estatísticas de deduplicação
         $this->logDeduplicationStats($analysis->id, [
@@ -1486,9 +1500,9 @@ class StoreAnalysisService
                 ];
 
                 // Check similarity with existing suggestions in DB
-                // Threshold de 0.75 = sugestões com 75%+ de similaridade são filtradas
+                // Threshold de 0.85 = sugestões com 85%+ de similaridade são filtradas
                 // Isso evita sugestões muito parecidas entre análises consecutivas
-                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.75)) {
+                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.85)) {
                     $suggestion['embedding'] = $embedding;
                     $filteredSuggestions[] = $suggestion;
                 } else {
@@ -1533,7 +1547,7 @@ class StoreAnalysisService
             $isDuplicate = false;
             foreach ($seenNormalizedTitles as $seenNormalized => $seenOriginal) {
                 $similarity = $this->calculateTitleSimilarity($normalizedTitle, $seenNormalized);
-                if ($similarity >= 0.75) { // 75% similarity threshold for titles
+                if ($similarity >= 0.85) { // 85% similarity threshold for titles
                     Log::channel($this->logChannel)->info('Intra-batch: Similar title filtered', [
                         'title' => $title,
                         'similar_to' => $seenOriginal,
@@ -1961,6 +1975,18 @@ class StoreAnalysisService
         foreach ($suggestions as $index => $suggestion) {
             $finalVersion = $suggestion['final_version'] ?? [];
 
+            // Merge competitor_reference and implementation into specific_data
+            $specificData = $finalVersion['specific_data'] ?? [];
+            if (! is_array($specificData)) {
+                $specificData = [];
+            }
+            if (! empty($finalVersion['competitor_reference'])) {
+                $specificData['competitor_reference'] = $finalVersion['competitor_reference'];
+            }
+            if (! empty($finalVersion['implementation'])) {
+                $specificData['implementation'] = $finalVersion['implementation'];
+            }
+
             $suggestionModel = Suggestion::create([
                 'analysis_id' => $analysis->id,
                 'store_id' => $analysis->store_id,
@@ -1972,7 +1998,7 @@ class StoreAnalysisService
                 'priority' => $suggestion['final_priority'] ?? ($index + 1),
                 'status' => 'pending',
                 'target_metrics' => $finalVersion['target_metrics'] ?? null,
-                'specific_data' => $finalVersion['specific_data'] ?? null,
+                'specific_data' => ! empty($specificData) ? $specificData : null,
                 'data_justification' => $finalVersion['data_justification'] ?? null,
             ]);
 
@@ -2012,7 +2038,7 @@ class StoreAnalysisService
             $isSimilarToHistory = false;
             foreach ($historicalTitles as $histTitle) {
                 $similarity = $this->calculateTitleSimilarity($normalizedTitle, $histTitle);
-                if ($similarity >= 0.75) {
+                if ($similarity >= 0.85) {
                     Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered (similar to history)', [
                         'title' => $title,
                         'similarity' => round($similarity * 100, 1).'%',
@@ -2034,6 +2060,143 @@ class StoreAnalysisService
         ]);
 
         return $validated;
+    }
+
+    /**
+     * Enforce category diversification: max 2 suggestions per category.
+     * If a category has 3+ suggestions, remove excess and try to replace from pool.
+     */
+    private function enforceCategoryDiversification(array $suggestions, array $pool = []): array
+    {
+        $maxPerCategory = 2;
+
+        // Count by category
+        $categoryCounts = [];
+        foreach ($suggestions as $i => $s) {
+            $cat = $s['final_version']['category'] ?? 'general';
+            $categoryCounts[$cat][] = $i;
+        }
+
+        // Find categories over limit
+        $overLimit = array_filter($categoryCounts, fn ($indices) => count($indices) > $maxPerCategory);
+
+        if (empty($overLimit)) {
+            Log::channel($this->logChannel)->info('[DIVERSIFICATION] Todas categorias dentro do limite de 2');
+
+            return $suggestions;
+        }
+
+        Log::channel($this->logChannel)->warning('[DIVERSIFICATION] Categorias acima do limite de 2:', array_map('count', $overLimit));
+
+        // Build pool of candidates from different categories (not already in suggestions)
+        $usedTitles = array_map(fn ($s) => mb_strtolower($s['final_version']['title'] ?? ''), $suggestions);
+        $usedCategories = array_keys($categoryCounts);
+
+        $replacementPool = [];
+        foreach ($pool as $candidate) {
+            $candidateTitle = mb_strtolower($candidate['title'] ?? '');
+            $candidateCategory = $candidate['category'] ?? 'general';
+
+            // Only consider candidates from categories NOT over limit
+            if (isset($overLimit[$candidateCategory])) {
+                continue;
+            }
+            // Don't use if title is too similar to existing
+            $isDuplicate = false;
+            foreach ($usedTitles as $usedTitle) {
+                similar_text($candidateTitle, $usedTitle, $percent);
+                if ($percent >= 75) {
+                    $isDuplicate = true;
+                    break;
+                }
+            }
+            if (! $isDuplicate) {
+                $replacementPool[] = $candidate;
+            }
+        }
+
+        // Remove excess from over-limit categories (keep first 2, remove rest)
+        $indicesToRemove = [];
+        foreach ($overLimit as $cat => $indices) {
+            $excess = array_slice($indices, $maxPerCategory);
+            $indicesToRemove = array_merge($indicesToRemove, $excess);
+            Log::channel($this->logChannel)->info("[DIVERSIFICATION] Categoria '{$cat}': ".count($indices).' sugestoes → removendo '.count($excess).' excedente(s)');
+        }
+
+        // Sort indices descending so we can remove without shifting
+        rsort($indicesToRemove);
+
+        $removed = [];
+        foreach ($indicesToRemove as $idx) {
+            $removed[] = $suggestions[$idx];
+            array_splice($suggestions, $idx, 1);
+        }
+
+        // Try to fill gaps with pool candidates
+        $poolIdx = 0;
+        while (count($suggestions) < 9 && $poolIdx < count($replacementPool)) {
+            $candidate = $replacementPool[$poolIdx++];
+
+            // Determine needed impact level
+            $currentDistribution = ['high' => 0, 'medium' => 0, 'low' => 0];
+            foreach ($suggestions as $s) {
+                $impact = $s['final_version']['expected_impact'] ?? 'medium';
+                $currentDistribution[$impact] = ($currentDistribution[$impact] ?? 0) + 1;
+            }
+
+            $neededImpact = 'medium';
+            if ($currentDistribution['high'] < 3) {
+                $neededImpact = 'high';
+            } elseif ($currentDistribution['low'] < 3) {
+                $neededImpact = 'low';
+            }
+
+            // Convert pool candidate to approved suggestion format
+            $suggestions[] = [
+                'final_version' => [
+                    'category' => $candidate['category'] ?? 'general',
+                    'title' => $candidate['title'] ?? '',
+                    'description' => $candidate['description'] ?? $candidate['problem'] ?? '',
+                    'recommended_action' => $candidate['recommended_action'] ?? $candidate['action'] ?? '',
+                    'expected_impact' => $neededImpact,
+                    'target_metrics' => $candidate['target_metrics'] ?? [],
+                    'specific_data' => $candidate['specific_data'] ?? [],
+                    'data_justification' => $candidate['data_justification'] ?? $candidate['data_source'] ?? '',
+                    'implementation' => $candidate['implementation'] ?? [],
+                    'competitor_reference' => $candidate['competitor_reference'] ?? null,
+                ],
+                'quality_score' => 6.0,
+                'final_priority' => count($suggestions) + 1,
+            ];
+
+            Log::channel($this->logChannel)->info('[DIVERSIFICATION] Substituicao adicionada', [
+                'category' => $candidate['category'] ?? 'general',
+                'title' => $candidate['title'] ?? '',
+                'impact' => $neededImpact,
+            ]);
+        }
+
+        // Re-number priorities
+        foreach ($suggestions as $i => &$s) {
+            $s['final_priority'] = $i + 1;
+        }
+
+        // Final category distribution log
+        $finalCounts = [];
+        foreach ($suggestions as $s) {
+            $cat = $s['final_version']['category'] ?? 'general';
+            $finalCounts[$cat] = ($finalCounts[$cat] ?? 0) + 1;
+        }
+
+        Log::channel($this->logChannel)->info('[DIVERSIFICATION] Distribuicao final por categoria', [
+            'categories' => $finalCounts,
+            'unique_categories' => count($finalCounts),
+            'total' => count($suggestions),
+            'removed' => count($removed),
+            'replaced' => count($suggestions) - (9 - count($removed)),
+        ]);
+
+        return $suggestions;
     }
 
     /**
@@ -2095,7 +2258,7 @@ class StoreAnalysisService
             // Check for semantically similar title
             $isSimilar = false;
             foreach ($approvedNormalizedTitles as $approvedNormalized) {
-                if ($this->calculateTitleSimilarity($normalizedTitle, $approvedNormalized) >= 0.75) {
+                if ($this->calculateTitleSimilarity($normalizedTitle, $approvedNormalized) >= 0.85) {
                     $isSimilar = true;
                     break;
                 }
@@ -2144,6 +2307,53 @@ class StoreAnalysisService
                 Log::channel($this->logChannel)->info('Sugestao recuperada do Strategist para '.$impact, [
                     'title' => $suggestion['title'] ?? 'N/A',
                 ]);
+            }
+
+            // Se ainda falta e não tem do Strategist no mesmo nível, promover do nível adjacente
+            if ($needed > 0) {
+                $adjacentLevels = match ($impact) {
+                    'high' => ['medium', 'low'],
+                    'medium' => ['high', 'low'],
+                    'low' => ['medium', 'high'],
+                };
+
+                foreach ($adjacentLevels as $adjLevel) {
+                    if ($needed <= 0) {
+                        break;
+                    }
+                    foreach ($strategistByImpact[$adjLevel] as $key => $suggestion) {
+                        if ($needed <= 0) {
+                            break;
+                        }
+
+                        $converted = [
+                            'final_version' => [
+                                'category' => $suggestion['category'] ?? 'general',
+                                'title' => $suggestion['title'] ?? '',
+                                'description' => $suggestion['description'] ?? '',
+                                'recommended_action' => $suggestion['recommended_action'] ?? '',
+                                'expected_impact' => $impact, // Forcar o nivel correto
+                                'target_metrics' => $suggestion['target_metrics'] ?? [],
+                                'specific_data' => $suggestion['specific_data'] ?? $suggestion['roi_estimate'] ?? [],
+                                'data_justification' => $suggestion['data_justification'] ?? '',
+                            ],
+                            'quality_score' => 5.5,
+                            'final_priority' => $priority++,
+                            'recovered_from_filter' => true,
+                            'promoted_from' => $adjLevel,
+                        ];
+
+                        $distribution[$impact][] = $converted;
+                        $approvedTitles[] = strtolower(trim($suggestion['title'] ?? ''));
+                        $approvedNormalizedTitles[] = $this->normalizeTitle($suggestion['title'] ?? '');
+                        unset($strategistByImpact[$adjLevel][$key]);
+                        $needed--;
+
+                        Log::channel($this->logChannel)->info('Sugestao promovida de '.$adjLevel.' para '.$impact, [
+                            'title' => $suggestion['title'] ?? 'N/A',
+                        ]);
+                    }
+                }
             }
 
             // Se ainda falta, usar fallbacks

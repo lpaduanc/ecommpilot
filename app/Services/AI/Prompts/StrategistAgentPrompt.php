@@ -113,6 +113,13 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 8. **Formato do campo competitor_reference:**
    - Para HIGH: obrigatório se houver dados de concorrente relevantes, senão use dados da própria loja
    - Para MEDIUM/LOW: opcional, preencha se houver dado relevante disponível
+9. **DIVERSIFICAÇÃO OBRIGATÓRIA:** As 9 sugestões devem cobrir no mínimo 5 categorias diferentes. Máximo 2 sugestões da mesma categoria. Se um problema domina (ex: estoque), aborde-o em 1 sugestão HIGH abrangente e varie as demais.
+10. **DATA-DRIVEN PRIMEIRO:** Mínimo 6 de 9 sugestões devem citar dados específicos da loja (números, produtos, métricas reais dos dados fornecidos). Máximo 3 podem ser best-practices de mercado, e estas devem ser MEDIUM ou LOW.
+11. **CÁLCULO DE IMPACTO OBRIGATÓRIO para HIGH:** Cada HIGH deve ter em expected_result:
+    - Base: valor atual (ex: "Ticket atual R$160")
+    - Premissa: % de melhoria realista com fonte (ex: "benchmark: kits aumentam ticket em 50%")
+    - Cálculo: base × premissa = resultado (ex: "R$160 × 1.20 × 4.800 pedidos = R$921.600/mês")
+    - Contribuição: quanto isso aproxima da meta (ex: "cobre 15% do gap para R$800k")
 
 ---
 
@@ -181,9 +188,15 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 
 ---
 
-## ANÁLISE DO ANALYST
+## DIAGNÓSTICO DO ANALYST (VINCULAR AS 3 HIGH A ESTES PROBLEMAS)
+
+{{analyst_briefing}}
+
+### Análise Completa:
 
 {{analyst_analysis}}
+
+**REGRA CRÍTICA:** Cada uma das 3 sugestões HIGH DEVE resolver diretamente um dos problemas identificados acima pelo Analyst. NÃO desperdice slots HIGH com best-practices genéricas. Exemplo: Se o Analyst identifica "51% sem estoque" como problema #1, a HIGH #1 deve abordar a reposição de estoque com dados específicos.
 
 ---
 
@@ -223,8 +236,8 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
   "title": "Reativar 8 SKUs parados há 60+ dias que vendiam R$ 3.200/mês",
   "problem": "8 produtos com histórico de venda (R$ 3.200/mês combinado) estão com estoque mas sem vendas há 60 dias. Representam 12% do catálogo ativo.",
   "action": "1. Identificar os 8 SKUs no painel (filtro: estoque > 0, vendas = 0, 60 dias)\n2. Criar banner 'Volta por Demanda' na home\n3. Enviar email para clientes que compraram itens similares\n4. Aplicar desconto progressivo: 10% semana 1, 15% semana 2",
-  "expected_result": "Recuperar 60% do histórico = R$ 1.920/mês em receita reativada",
-  "data_source": "Dados da loja: 8 SKUs identificados pelo Analyst com vendas zeradas",
+  "expected_result": "Base: 8 SKUs vendiam R$ 3.200/mês combinado. Premissa: recuperar 60% com ativação via desconto progressivo (benchmark do setor). Cálculo: R$ 3.200 × 60% = R$ 1.920/mês. Contribuição: cobre 0.24% da meta mensal.",
+  "data_source": "Dados da loja: 8 SKUs identificados pelo Analyst com vendas zeradas há 60+ dias",
   "implementation": {
     "type": "nativo",
     "complexity": "baixa",
@@ -322,6 +335,8 @@ Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrij
 5. **Resultados quantificados:** Para cada sugestão, verifique se expected_result contém R$ ou %. SE não contiver, adicione estimativa.
 6. **Viabilidade:** Para cada sugestão, verifique se é possível na Nuvemshop. SE não for, substitua por alternativa viável.
 7. **Referências a concorrentes:** SE houver dados em DADOS DE CONCORRENTES, verifique se pelo menos 3 sugestões têm competitor_reference preenchido.
+8. **Diversificação:** Conte categorias únicas. SE menos de 5 categorias diferentes, substitua sugestões de categorias repetidas por categorias diferentes.
+9. **Data-driven:** Conte sugestões com dados reais da loja (números específicos em problem ou expected_result). SE menos de 6, reescreva best-practices adicionando dados concretos.
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
@@ -664,6 +679,7 @@ PROMPT;
             '{{best_sellers_section}}' => self::formatBestSellers($bestSellers, $ticketMedio),
             '{{out_of_stock_section}}' => self::formatOutOfStock($outOfStockList),
             '{{anomalies_section}}' => self::formatAnomalies($anomalies),
+            '{{analyst_briefing}}' => self::formatAnalystBriefing($analystAnalysis),
             '{{analyst_analysis}}' => is_array($analystAnalysis) ? json_encode($analystAnalysis, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $analystAnalysis,
             '{{competitor_data}}' => self::extractCompetitorInsights($competitorData),
             '{{market_data}}' => is_array($marketData) ? json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $marketData,
@@ -721,7 +737,90 @@ PROMPT;
             $output .= "- **{$label}:** {$formattedValue}\n";
         }
 
+        // Calcular gap para meta se dados disponíveis
+        if (! empty($goals['monthly_goal']) && ! empty($goals['monthly_revenue'])) {
+            $gap = (float) $goals['monthly_goal'] - (float) $goals['monthly_revenue'];
+            if ($gap > 0) {
+                $gapPct = round(($gap / (float) $goals['monthly_revenue']) * 100);
+                $formattedGap = 'R$ '.number_format($gap, 2, ',', '.');
+                $output .= "\n**GAP PARA META:** {$formattedGap} ({$gapPct}% de aumento necessário)\n";
+                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 9 sugestões deve cobrir pelo menos 50% deste gap.\n";
+            }
+        }
+
         $output .= "\n**IMPORTANTE:** Priorize sugestões que ajudem a atingir esses objetivos. Sugestões alinhadas aos objetivos devem ser HIGH ou MEDIUM.";
+
+        return $output;
+    }
+
+    /**
+     * Formata o briefing do Analyst para vincular as 3 HIGH aos 3 problemas prioritarios.
+     */
+    private static function formatAnalystBriefing(array|string $analystAnalysis): string
+    {
+        if (is_string($analystAnalysis)) {
+            return 'Briefing do Analyst não disponível em formato estruturado.';
+        }
+
+        // O AnalystAgentService normaliza briefing_strategist → alertas_para_strategist
+        $briefing = $analystAnalysis['alertas_para_strategist']
+            ?? $analystAnalysis['briefing_strategist']
+            ?? [];
+
+        if (empty($briefing)) {
+            return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
+        }
+
+        // Extrair problemas: formato do Analyst usa problema_1, problema_2, problema_3
+        $problems = [];
+        if (! empty($briefing['problema_1'])) {
+            $problems[] = $briefing['problema_1'];
+        }
+        if (! empty($briefing['problema_2'])) {
+            $problems[] = $briefing['problema_2'];
+        }
+        if (! empty($briefing['problema_3'])) {
+            $problems[] = $briefing['problema_3'];
+        }
+
+        // Fallback: tentar formato de array
+        if (empty($problems)) {
+            $problems = $briefing['top_3_problems'] ?? $briefing['main_problems'] ?? [];
+        }
+
+        if (empty($problems)) {
+            return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
+        }
+
+        $output = "### TOP 3 PROBLEMAS PRIORITÁRIOS (cada HIGH deve resolver um destes):\n\n";
+        foreach ($problems as $i => $problem) {
+            $n = $i + 1;
+            $output .= "**HIGH #{$n} deve resolver:** {$problem}\n";
+        }
+
+        // Dados-chave do briefing
+        $dadosChave = $briefing['dados_chave'] ?? [];
+        if (! empty($dadosChave)) {
+            $output .= "\n### DADOS-CHAVE DO ANALYST:\n";
+            foreach ($dadosChave as $key => $value) {
+                $output .= "- **{$key}:** {$value}\n";
+            }
+        }
+
+        // Oportunidade principal
+        if (! empty($briefing['oportunidade_principal'])) {
+            $output .= "\n### OPORTUNIDADE PRINCIPAL:\n";
+            $output .= "- {$briefing['oportunidade_principal']}\n";
+        }
+
+        // Restrições
+        $restricoes = $briefing['restricoes'] ?? [];
+        if (! empty($restricoes)) {
+            $output .= "\n### RESTRIÇÕES:\n";
+            foreach ($restricoes as $r) {
+                $output .= "- {$r}\n";
+            }
+        }
 
         return $output;
     }

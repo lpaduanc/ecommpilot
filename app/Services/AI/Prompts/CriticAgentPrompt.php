@@ -40,6 +40,36 @@ RESOURCES;
         $pedidosMes = $data['pedidos_mes'] ?? 0;
         $faturamentoMes = $ticketMedio * $pedidosMes;
 
+        // Dados adicionais para validação
+        $outOfStockPct = $data['out_of_stock_pct'] ?? 'N/D';
+        $analystBriefing = $data['analyst_briefing'] ?? [];
+        $anomalies = $data['anomalies'] ?? [];
+
+        // Extrair top 3 problemas: Analyst usa problema_1, problema_2, problema_3
+        $topProblems = '';
+        $problems = [];
+        if (! empty($analystBriefing['problema_1'])) {
+            $problems[] = $analystBriefing['problema_1'];
+        }
+        if (! empty($analystBriefing['problema_2'])) {
+            $problems[] = $analystBriefing['problema_2'];
+        }
+        if (! empty($analystBriefing['problema_3'])) {
+            $problems[] = $analystBriefing['problema_3'];
+        }
+        // Fallback: formato array
+        if (empty($problems)) {
+            $problems = $analystBriefing['top_3_problems'] ?? $analystBriefing['main_problems'] ?? [];
+        }
+        if (! empty($problems)) {
+            foreach ($problems as $i => $problem) {
+                $n = $i + 1;
+                $topProblems .= "  {$n}. {$problem}\n";
+            }
+        } else {
+            $topProblems = "  (Briefing não disponível)\n";
+        }
+
         // Sugestões para revisar
         $suggestions = json_encode($data['suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
@@ -65,7 +95,12 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 3. **REJEITAR** se: repetição de tema anterior, impossível na plataforma, completamente genérica
 4. **SUBSTITUIR** toda sugestão rejeitada por uma nova original
 
-**Filosofia:** Melhorar > Rejeitar (exceto repetições e impossíveis)
+**Filosofia por nível:**
+- **HIGH:** Exigência MÁXIMA. Se não tem dado específico da loja + cálculo de impacto + ação em passos + vinculação com problema do Analyst → REJEITAR e substituir.
+- **MEDIUM:** Melhorar > Rejeitar. Aceitar com correções se tiver potencial.
+- **LOW:** Aceitar se acionável. Rejeitar APENAS se completamente genérica.
+
+**TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar para LOW e tornar específica com dados da loja.
 
 ---
 
@@ -105,6 +140,13 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 - **Ticket Médio:** R$ {$ticketMedio}
 - **Pedidos/Mês:** {$pedidosMes}
 - **Faturamento:** R$ {$faturamentoMes}/mês
+
+## DADOS-CHAVE PARA VALIDAÇÃO
+
+- **Produtos sem estoque:** {$outOfStockPct}% dos ativos
+- **Top 3 problemas identificados pelo Analyst:**
+{$topProblems}
+**REGRA DE VINCULAÇÃO:** As 3 sugestões HIGH devem resolver os 3 problemas acima. Se alguma HIGH não endereçar nenhum dos 3 problemas do Analyst, REJEITAR e substituir por sugestão que endereça.
 
 ---
 
@@ -301,6 +343,9 @@ Retorne APENAS o JSON abaixo:
 - [ ] Toda HIGH tem dado específico no `problem`?
 - [ ] **SE houver dados de concorrentes:** mínimo 3 sugestões com competitor_reference específico
 - [ ] **SE NÃO houver dados de concorrentes:** competitor_reference pode ser null, foque em dados internos
+- [ ] As 3 HIGH resolvem os 3 problemas do Analyst?
+- [ ] Mínimo 5 categorias diferentes nas 9 sugestões?
+- [ ] Cada HIGH tem cálculo de impacto (base × premissa = resultado)?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
