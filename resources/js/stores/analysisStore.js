@@ -132,12 +132,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
                 // Check if analysis completed
                 if (!response.data.pending_analysis && pendingAnalysis.value) {
-                    // Analysis completed!
-                    currentAnalysis.value = response.data.analysis;
-                    pendingAnalysis.value = null;
-                    nextAvailableAt.value = response.data.next_available_at;
+                    // Analysis completed! Fetch full analysis data with suggestions
                     stopPolling();
+                    await fetchCurrentAnalysis();
                 } else {
+                    // Still processing, update pending analysis progress
                     pendingAnalysis.value = response.data.pending_analysis;
                 }
             } catch (err) {
@@ -203,15 +202,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
     
     async function getAnalysisById(id) {
-        isLoading.value = true;
-        
         try {
             const response = await api.get(`/analysis/${id}`);
             return response.data;
         } catch {
             return null;
-        } finally {
-            isLoading.value = false;
         }
     }
     

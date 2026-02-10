@@ -112,13 +112,14 @@ const completedSuggestions = computed(() =>
     suggestions.value.filter(s => s.is_done).length
 );
 
-// Últimas 3 análises anteriores (excluindo a atual)
+// Lista estável de análises (não muda baseado na seleção)
 const recentAnalyses = computed(() => {
     const history = analysisStore.analysisHistory || [];
-    const currentId = currentAnalysis.value?.id;
+
+    // Mostra todas as análises completas, sempre a mesma lista
     return history
-        .filter(a => a.id !== currentId && a.status === 'completed')
-        .slice(0, 3);
+        .filter(a => a.status === 'completed')
+        .slice(0, 4);  // Mostra todas até 4 análises
 });
 
 async function handleRequestAnalysis() {
@@ -260,17 +261,6 @@ async function handleResendEmail() {
 function formatAnalysisDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    const now = new Date();
-
-    // Normalizar para início do dia (meia-noite) para comparar apenas datas do calendário
-    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    const diffDays = Math.round((nowOnly - dateOnly) / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Hoje';
-    if (diffDays === 1) return 'Ontem';
-    if (diffDays < 7) return `Há ${diffDays} dias`;
     return date.toLocaleDateString('pt-BR');
 }
 
@@ -288,6 +278,17 @@ function getScoreLabel(score) {
     if (score >= 60) return 'Saudável';
     if (score >= 40) return 'Atenção';
     return 'Crítico';
+}
+
+function selectAnalysis(analysisId, index) {
+    // First in list = current analysis
+    if (index === 0) {
+        if (isViewingHistorical.value) {
+            returnToCurrentAnalysis();
+        }
+        return;
+    }
+    viewHistoricalAnalysis(analysisId);
 }
 
 async function viewHistoricalAnalysis(analysisId) {
@@ -559,6 +560,12 @@ onUnmounted(() => {
                         >
                             #{{ currentAnalysis.id }}
                         </span>
+                        <span
+                            v-if="isViewingHistorical"
+                            class="px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 rounded border border-amber-300 dark:border-amber-700"
+                        >
+                            Visualizando Histórico
+                        </span>
                     </div>
                     <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
@@ -568,6 +575,10 @@ onUnmounted(() => {
                         <span class="flex items-center gap-1">
                             <ChartBarIcon class="w-3.5 h-3.5" />
                             {{ completedSuggestions }} implementadas
+                        </span>
+                        <span v-if="currentAnalysis?.created_at" class="flex items-center gap-1">
+                            <CalendarIcon class="w-3.5 h-3.5" />
+                            {{ formatAnalysisDate(currentAnalysis.created_at) }}
                         </span>
                     </div>
                 </div>
@@ -598,84 +609,80 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- Previous Analyses Section -->
-        <div v-if="recentAnalyses.length > 0 && !isLoading" class="relative">
+        <!-- Análises Section -->
+        <div v-if="currentAnalysis || recentAnalyses.length > 0" class="relative">
             <!-- Section Header -->
-            <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-2">
-                    <ClockIcon class="w-4 h-4 text-gray-400" />
-                    <h2 class="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        Análises Anteriores
+                    <ClockIcon class="w-5 h-5 text-gray-400" />
+                    <h2 class="text-base font-semibold text-gray-700 dark:text-gray-300">
+                        Histórico de Análises
                     </h2>
                 </div>
                 <button
                     v-if="isViewingHistorical"
                     @click="returnToCurrentAnalysis"
-                    class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
+                    class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors shadow-sm"
                 >
-                    <ArrowLeftIcon class="w-3.5 h-3.5" />
-                    Voltar para atual
+                    <ArrowLeftIcon class="w-4 h-4" />
+                    Voltar para análise atual
                 </button>
             </div>
 
-            <!-- Horizontal Cards Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <!-- Analyses List -->
+            <div v-if="recentAnalyses.length > 0" class="space-y-3">
                 <button
-                    v-for="analysis in recentAnalyses"
+                    v-for="(analysis, index) in recentAnalyses"
                     :key="analysis.id"
-                    @click="viewHistoricalAnalysis(analysis.id)"
+                    @click="selectAnalysis(analysis.id, index)"
                     :class="[
-                        'group relative text-left p-4 rounded-xl border transition-all duration-200',
-                        selectedHistoricalId === analysis.id
-                            ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700 ring-2 ring-primary-500/20'
-                            : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-primary-200 dark:hover:border-primary-800 hover:shadow-md'
+                        'relative w-full text-left p-4 rounded-xl border',
+                        ((!isViewingHistorical && index === 0) || selectedHistoricalId === analysis.id)
+                            ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-400 dark:border-primary-600'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                     ]"
                 >
-                    <!-- Active Indicator -->
-                    <div
-                        v-if="selectedHistoricalId === analysis.id"
-                        class="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse"
-                    ></div>
-
-                    <!-- Date and ID -->
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <CalendarIcon class="w-3.5 h-3.5" />
-                            {{ formatAnalysisDate(analysis.created_at) }}
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <CalendarIcon class="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                            <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                {{ formatAnalysisDate(analysis.created_at) }}
+                            </span>
+                            <span v-if="index === 0" class="px-2 py-0.5 text-xs font-semibold text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/50 rounded-full border border-primary-300 dark:border-primary-700">
+                                Atual
+                            </span>
                         </div>
                         <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
                             #{{ analysis.id }}
                         </span>
                     </div>
 
-                    <!-- Health Score Mini -->
-                    <div class="flex items-center gap-3 mb-2">
-                        <div
-                            :class="[
-                                'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold',
-                                getScoreColorClasses(analysis.summary?.health_score)
-                            ]"
-                        >
-                            {{ analysis.summary?.health_score || '-' }}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
-                                Saúde da Loja
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="flex items-center gap-2">
+                            <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold', getScoreColorClasses(analysis.summary?.health_score)]">
+                                {{ analysis.summary?.health_score || '-' }}
                             </div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
                                 {{ getScoreLabel(analysis.summary?.health_score) }}
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Suggestions Count -->
-                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                        <BoltIcon class="w-3.5 h-3.5" />
-                        {{ analysis.suggestions?.length || 0 }} sugestões
-                    </div>
+                        <div class="flex items-center gap-2">
+                            <BoltIcon class="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ analysis.suggestions?.length || 0 }}
+                                <span class="text-xs text-gray-500 dark:text-gray-400 ml-0.5">sugestões</span>
+                            </div>
+                        </div>
 
-                    <!-- Hover Effect -->
-                    <div class="absolute inset-0 rounded-xl bg-gradient-to-t from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                        <div class="flex items-center gap-2">
+                            <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ analysis.alerts?.length || 0 }}
+                                <span class="text-xs text-gray-500 dark:text-gray-400 ml-0.5">alertas</span>
+                            </div>
+                        </div>
+                    </div>
                 </button>
             </div>
         </div>
