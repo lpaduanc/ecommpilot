@@ -19,8 +19,13 @@ import {
     PlusIcon,
     Cog6ToothIcon,
     BuildingStorefrontIcon,
+    ChevronDownIcon,
+    ChartBarIcon,
+    SignalIcon,
 } from '@heroicons/vue/24/outline';
 import { mockIntegrationStore } from '../mocks/previewMocks';
+import api from '../services/api';
+import BaseInput from '../components/common/BaseInput.vue';
 
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
@@ -62,6 +67,22 @@ const showConnectModal = ref(false);
 const selectedStore = ref(null);
 const storeUrl = ref('');
 const storeUrlError = ref('');
+
+// Accordion state - map de store.id -> boolean
+const expandedStores = ref({});
+
+// Active section inside accordion - map de store.id -> section key
+const activeStoreSection = ref({});
+
+// Tracking state - map de store.id -> tracking settings
+const trackingSettings = ref({});
+const trackingLoading = ref({});
+const trackingSaving = ref({});
+
+// Seções disponíveis dentro do accordion de cada loja
+const storeSections = [
+    { id: 'tracking', name: 'Tracking & Analytics', icon: SignalIcon, gradient: 'from-cyan-500 to-blue-600' },
+];
 
 const platforms = [
     {
@@ -203,6 +224,75 @@ function formatDate(date) {
     return new Date(date).toLocaleString('pt-BR');
 }
 
+// Toggle accordion
+function toggleAccordion(storeId) {
+    expandedStores.value[storeId] = !expandedStores.value[storeId];
+
+    if (expandedStores.value[storeId]) {
+        // Inicializa seção ativa se não existir
+        if (!activeStoreSection.value[storeId]) {
+            activeStoreSection.value[storeId] = 'tracking';
+        }
+        // Carrega tracking se necessário
+        if (!trackingSettings.value[storeId]) {
+            loadTrackingSettings(storeId);
+        }
+    }
+}
+
+function setStoreSection(storeId, sectionId) {
+    activeStoreSection.value[storeId] = sectionId;
+    // Carrega dados da seção se necessário
+    if (sectionId === 'tracking' && !trackingSettings.value[storeId]) {
+        loadTrackingSettings(storeId);
+    }
+}
+
+// Carregar tracking settings de uma loja específica
+async function loadTrackingSettings(storeId) {
+    trackingLoading.value[storeId] = true;
+    try {
+        const response = await api.get(`/settings/tracking/edit?store_id=${storeId}`);
+        if (response.data?.data) {
+            trackingSettings.value[storeId] = {
+                ga: {
+                    enabled: response.data.data.ga?.enabled || false,
+                    measurement_id: response.data.data.ga?.measurement_id || '',
+                },
+                meta_pixel: {
+                    enabled: response.data.data.meta_pixel?.enabled || false,
+                    pixel_id: response.data.data.meta_pixel?.pixel_id || '',
+                },
+                clarity: {
+                    enabled: response.data.data.clarity?.enabled || false,
+                    project_id: response.data.data.clarity?.project_id || '',
+                },
+                hotjar: {
+                    enabled: response.data.data.hotjar?.enabled || false,
+                    site_id: response.data.data.hotjar?.site_id || '',
+                },
+            };
+        }
+    } catch (error) {
+        notificationStore.error('Erro ao carregar configurações de tracking');
+    } finally {
+        trackingLoading.value[storeId] = false;
+    }
+}
+
+// Salvar tracking settings de uma loja específica
+async function saveTrackingSettings(storeId) {
+    trackingSaving.value[storeId] = true;
+    try {
+        await api.put(`/settings/tracking?store_id=${storeId}`, trackingSettings.value[storeId]);
+        notificationStore.success('Configurações de tracking salvas com sucesso!');
+    } catch (error) {
+        notificationStore.error(error.response?.data?.message || 'Erro ao salvar configurações de tracking');
+    } finally {
+        trackingSaving.value[storeId] = false;
+    }
+}
+
 onBeforeUnmount(() => {
     // Desabilita preview mode ao sair
     if (isInPreviewMode.value) {
@@ -324,67 +414,296 @@ onBeforeUnmount(() => {
                                     <div
                                         v-for="store in group.stores"
                                         :key="store.id"
-                                        class="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50"
+                                        class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 overflow-hidden"
                                     >
-                                        <div class="flex items-center justify-between gap-4">
-                                            <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                <div :class="['w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-xl shadow-md flex-shrink-0', group.platform.gradient]">
-                                                    {{ group.platform.logo }}
-                                                </div>
-                                                <div class="min-w-0 flex-1">
-                                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ store.name }}</h3>
-                                                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ store.domain }}</p>
-                                                    <div class="flex items-center gap-2 mt-1">
-                                                        <span
-                                                            :class="[
-                                                                'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-                                                                getSyncStatusColor(store.sync_status)
-                                                            ]"
-                                                        >
-                                                            <ArrowPathIcon
-                                                                v-if="store.sync_status === 'syncing'"
-                                                                class="w-3 h-3 animate-spin"
-                                                            />
-                                                            <CheckCircleIcon
-                                                                v-else-if="store.sync_status === 'completed'"
-                                                                class="w-3 h-3"
-                                                            />
-                                                            <ExclamationCircleIcon
-                                                                v-else-if="store.sync_status === 'failed'"
-                                                                class="w-3 h-3"
-                                                            />
-                                                            {{ getSyncStatusLabel(store.sync_status) }}
-                                                        </span>
-                                                        <span class="text-xs text-gray-400">{{ formatDate(store.last_sync_at) }}</span>
+                                        <!-- Store Header (accordion toggle) -->
+                                        <div
+                                            @click="toggleAccordion(store.id)"
+                                            class="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                                        >
+                                            <div class="flex items-center justify-between gap-4">
+                                                <div class="flex items-center gap-3 flex-1 min-w-0">
+                                                    <div :class="['w-12 h-12 rounded-lg bg-gradient-to-br flex items-center justify-center text-xl shadow-md flex-shrink-0', group.platform.gradient]">
+                                                        {{ group.platform.logo }}
+                                                    </div>
+                                                    <div class="min-w-0 flex-1">
+                                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ store.name }}</h3>
+                                                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ store.domain }}</p>
+                                                        <div class="flex items-center gap-2 mt-1">
+                                                            <span
+                                                                :class="[
+                                                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                                                                    getSyncStatusColor(store.sync_status)
+                                                                ]"
+                                                            >
+                                                                <ArrowPathIcon
+                                                                    v-if="store.sync_status === 'syncing'"
+                                                                    class="w-3 h-3 animate-spin"
+                                                                />
+                                                                <CheckCircleIcon
+                                                                    v-else-if="store.sync_status === 'completed'"
+                                                                    class="w-3 h-3"
+                                                                />
+                                                                <ExclamationCircleIcon
+                                                                    v-else-if="store.sync_status === 'failed'"
+                                                                    class="w-3 h-3"
+                                                                />
+                                                                {{ getSyncStatusLabel(store.sync_status) }}
+                                                            </span>
+                                                            <span class="text-xs text-gray-400">{{ formatDate(store.last_sync_at) }}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
+
+                                                <div class="flex items-center gap-2 flex-shrink-0">
+                                                    <!-- Actions (inline no header) -->
+                                                    <template v-if="authStore.hasPermission('integrations.manage')">
+                                                        <router-link
+                                                            :to="{ name: 'settings-store-info' }"
+                                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
+                                                            @click.stop
+                                                        >
+                                                            <Cog6ToothIcon class="w-4 h-4" />
+                                                            Configurar
+                                                        </router-link>
+                                                        <BaseButton
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            @click.stop="handleSyncStore(store)"
+                                                            :disabled="isSyncing || ['syncing', 'pending'].includes(store.sync_status)"
+                                                        >
+                                                            <ArrowPathIcon :class="['w-4 h-4', ['syncing', 'pending'].includes(store.sync_status) ? 'animate-spin' : '']" />
+                                                            {{ ['syncing', 'pending'].includes(store.sync_status) ? 'Sincronizando...' : 'Sincronizar' }}
+                                                        </BaseButton>
+                                                        <BaseButton
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            @click.stop="confirmDisconnect(store)"
+                                                        >
+                                                            <TrashIcon class="w-4 h-4 text-danger-500" />
+                                                        </BaseButton>
+                                                    </template>
+
+                                                    <!-- Chevron -->
+                                                    <ChevronDownIcon
+                                                        :class="[
+                                                            'w-5 h-5 text-gray-400 transition-transform duration-200',
+                                                            expandedStores[store.id] ? 'rotate-180' : ''
+                                                        ]"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Accordion Body -->
+                                        <div
+                                            v-show="expandedStores[store.id]"
+                                            class="border-t border-gray-200 dark:border-gray-700"
+                                        >
+                                            <!-- Section Tabs -->
+                                            <div class="flex gap-1 px-5 pt-4 pb-0 border-b border-gray-200 dark:border-gray-700">
+                                                <button
+                                                    v-for="section in storeSections"
+                                                    :key="section.id"
+                                                    @click="setStoreSection(store.id, section.id)"
+                                                    :class="[
+                                                        'flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors -mb-px',
+                                                        activeStoreSection[store.id] === section.id
+                                                            ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/20'
+                                                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                                                    ]"
+                                                >
+                                                    <component :is="section.icon" class="w-4 h-4" />
+                                                    {{ section.name }}
+                                                </button>
                                             </div>
 
-                                            <!-- Actions -->
-                                            <div v-if="authStore.hasPermission('integrations.manage')" class="flex items-center gap-2 flex-shrink-0">
-                                                <router-link
-                                                    :to="{ name: 'store-config', params: { id: store.id } }"
-                                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
-                                                >
-                                                    <Cog6ToothIcon class="w-4 h-4" />
-                                                    Configurar
-                                                </router-link>
-                                                <BaseButton
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    @click.stop.prevent="handleSyncStore(store)"
-                                                    :disabled="isSyncing || ['syncing', 'pending'].includes(store.sync_status)"
-                                                >
-                                                    <ArrowPathIcon :class="['w-4 h-4', ['syncing', 'pending'].includes(store.sync_status) ? 'animate-spin' : '']" />
-                                                    {{ ['syncing', 'pending'].includes(store.sync_status) ? 'Sincronizando...' : 'Sincronizar' }}
-                                                </BaseButton>
-                                                <BaseButton
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    @click="confirmDisconnect(store)"
-                                                >
-                                                    <TrashIcon class="w-4 h-4 text-danger-500" />
-                                                </BaseButton>
+                                            <!-- Section Content -->
+                                            <div class="p-5">
+                                                <!-- Tracking & Analytics Section -->
+                                                <div v-if="activeStoreSection[store.id] === 'tracking'">
+                                                    <div class="max-w-4xl">
+                                                        <!-- Loading State -->
+                                                        <div v-if="trackingLoading[store.id]" class="flex items-center justify-center py-12">
+                                                            <LoadingSpinner size="lg" />
+                                                        </div>
+
+                                                        <template v-else-if="trackingSettings[store.id]">
+                                                            <!-- Info Banner -->
+                                                            <div class="mb-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                                                                <div class="flex items-start gap-3">
+                                                                    <ChartBarIcon class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                                                    <div>
+                                                                        <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                                                                            Sobre as Integrações de Tracking
+                                                                        </h3>
+                                                                        <p class="text-sm text-blue-700 dark:text-blue-300">
+                                                                            Configure os códigos de rastreamento das principais ferramentas de analytics e marketing.
+                                                                            Os códigos serão automaticamente inseridos na sua loja quando habilitados.
+                                                                            <strong class="block mt-2">Certifique-se de usar os IDs corretos para evitar perda de dados.</strong>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Tracking Services Grid -->
+                                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                                                <!-- Google Analytics 4 -->
+                                                                <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                                                    <div class="flex items-start justify-between mb-4">
+                                                                        <div class="flex items-center gap-3">
+                                                                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                                                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                                                    <path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/>
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div>
+                                                                                <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Google Analytics 4</h3>
+                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">Métricas e conversão</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                v-model="trackingSettings[store.id].ga.enabled"
+                                                                                :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                                class="sr-only peer"
+                                                                            />
+                                                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div v-if="trackingSettings[store.id].ga.enabled">
+                                                                        <BaseInput
+                                                                            v-model="trackingSettings[store.id].ga.measurement_id"
+                                                                            label="Measurement ID"
+                                                                            placeholder="G-XXXXXXXXXX"
+                                                                            hint="Google Analytics > Administrador > Fluxo de dados"
+                                                                            :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Meta Pixel -->
+                                                                <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                                                    <div class="flex items-start justify-between mb-4">
+                                                                        <div class="flex items-center gap-3">
+                                                                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                                                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                                                    <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96C18.34 21.21 22 17.06 22 12.06C22 6.53 17.5 2.04 12 2.04Z"/>
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div>
+                                                                                <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Meta Pixel</h3>
+                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">Facebook & Instagram Ads</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                v-model="trackingSettings[store.id].meta_pixel.enabled"
+                                                                                :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                                class="sr-only peer"
+                                                                            />
+                                                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div v-if="trackingSettings[store.id].meta_pixel.enabled">
+                                                                        <BaseInput
+                                                                            v-model="trackingSettings[store.id].meta_pixel.pixel_id"
+                                                                            label="Pixel ID"
+                                                                            placeholder="123456789012345"
+                                                                            hint="Meta Business Suite > Gerenciador de Eventos"
+                                                                            :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Microsoft Clarity -->
+                                                                <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                                                    <div class="flex items-start justify-between mb-4">
+                                                                        <div class="flex items-center gap-3">
+                                                                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                                                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                                                    <path d="M21.17 3.25H2.83c-.46 0-.83.37-.83.83v15.84c0 .46.37.83.83.83h18.34c.46 0 .83-.37.83-.83V4.08c0-.46-.37-.83-.83-.83zM12 18.25c-3.45 0-6.25-2.8-6.25-6.25S8.55 5.75 12 5.75s6.25 2.8 6.25 6.25-2.8 6.25-6.25 6.25z"/>
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div>
+                                                                                <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Microsoft Clarity</h3>
+                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">Heatmaps e sessões (gratuito)</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                v-model="trackingSettings[store.id].clarity.enabled"
+                                                                                :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                                class="sr-only peer"
+                                                                            />
+                                                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div v-if="trackingSettings[store.id].clarity.enabled">
+                                                                        <BaseInput
+                                                                            v-model="trackingSettings[store.id].clarity.project_id"
+                                                                            label="Project ID"
+                                                                            placeholder="abcdefghij"
+                                                                            hint="clarity.microsoft.com > Configurações > Setup"
+                                                                            :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Hotjar -->
+                                                                <div class="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
+                                                                    <div class="flex items-start justify-between mb-4">
+                                                                        <div class="flex items-center gap-3">
+                                                                            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                                                                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div>
+                                                                                <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100">Hotjar</h3>
+                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">Heatmaps e feedback</p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                v-model="trackingSettings[store.id].hotjar.enabled"
+                                                                                :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                                class="sr-only peer"
+                                                                            />
+                                                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div v-if="trackingSettings[store.id].hotjar.enabled">
+                                                                        <BaseInput
+                                                                            v-model="trackingSettings[store.id].hotjar.site_id"
+                                                                            label="Site ID"
+                                                                            placeholder="1234567"
+                                                                            hint="insights.hotjar.com > Sites & Organizations"
+                                                                            :disabled="!authStore.hasPermission('integrations.manage')"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Save Button -->
+                                                            <BaseButton
+                                                                v-if="authStore.hasPermission('integrations.manage')"
+                                                                @click="saveTrackingSettings(store.id)"
+                                                                :loading="trackingSaving[store.id]"
+                                                            >
+                                                                <CheckCircleIcon class="w-5 h-5" />
+                                                                Salvar Configurações de Tracking
+                                                            </BaseButton>
+                                                            <p v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
+                                                                Você não possui permissão para editar as configurações de tracking.
+                                                            </p>
+                                                        </template>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

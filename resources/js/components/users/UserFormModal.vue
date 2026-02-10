@@ -312,7 +312,7 @@ watch(() => props.show, async (newVal) => {
 
 onMounted(async () => {
     // Carrega a lista de permissões disponíveis se necessário
-    if (userStore.permissions.length === 0) {
+    if (!userStore.permissions || userStore.permissions.length === 0) {
         isLoadingPermissions.value = true;
         await userStore.fetchPermissions();
         isLoadingPermissions.value = false;

@@ -69,7 +69,7 @@ function handleSearch() {
 
 function goToSettings() {
     closeMenus();
-    router.push({ name: 'settings' });
+    router.push({ name: 'settings-profile' });
 }
 
 async function handleLogout() {

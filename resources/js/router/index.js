@@ -156,20 +156,33 @@ const routes = [
         meta: { requiresAuth: true, permission: 'integrations.manage' },
     },
     {
-        path: '/stores/:id/config',
-        name: 'store-config',
-        component: () => import(
-            /* webpackChunkName: "store-config" */
-            '../views/StoreConfigView.vue'
-        ),
-        meta: { requiresAuth: true, permission: 'integrations.manage' },
+        path: '/settings',
+        redirect: { name: 'settings-profile' }
     },
     {
-        path: '/settings',
-        name: 'settings',
+        path: '/settings/profile',
+        name: 'settings-profile',
         component: () => import(
             /* webpackChunkName: "settings" */
-            '../views/SettingsView.vue'
+            '../views/settings/ProfileView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'settings.view' },
+    },
+    {
+        path: '/settings/notifications',
+        name: 'settings-notifications',
+        component: () => import(
+            /* webpackChunkName: "settings" */
+            '../views/settings/NotificationsView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'settings.view' },
+    },
+    {
+        path: '/settings/store-info',
+        name: 'settings-store-info',
+        component: () => import(
+            /* webpackChunkName: "settings" */
+            '../views/settings/StoreInfoView.vue'
         ),
         meta: { requiresAuth: true, permission: 'settings.view' },
     },

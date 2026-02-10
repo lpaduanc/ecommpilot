@@ -133,7 +133,7 @@ export const useUserManagementStore = defineStore('userManagement', () => {
 
         try {
             const response = await api.get('/users/permissions');
-            permissions.value = response.data.permissions;
+            permissions.value = response.data.data || response.data.permissions || [];
             return { success: true };
         } catch (err) {
             error.value = err.response?.data?.message || 'Erro ao carregar permissões';

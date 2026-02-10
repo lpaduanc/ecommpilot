@@ -46,6 +46,7 @@ const notificationStore = useSystemNotificationStore();
 // Submenu states
 const isAIAssistantsOpen = ref(true); // Aberto por padrão
 const isMarketingOpen = ref(false);
+const isSettingsOpen = ref(false);
 
 // Close mobile sidebar on route change
 watch(() => route.name, () => {
@@ -148,8 +149,28 @@ const menuItems = computed(() => [
         name: 'Configurações',
         label: 'Configurações',
         icon: Cog6ToothIcon,
-        route: 'settings',
         permission: 'settings.view',
+        submenuKey: 'settings',
+        submenu: [
+            {
+                name: 'Perfil',
+                label: 'Perfil',
+                route: 'settings-profile',
+                permission: 'settings.view',
+            },
+            {
+                name: 'Notificações',
+                label: 'Notificações',
+                route: 'settings-notifications',
+                permission: 'settings.view',
+            },
+            {
+                name: 'Informações da Loja',
+                label: 'Informações da Loja',
+                route: 'settings-store-info',
+                permission: 'settings.view',
+            },
+        ],
     },
 ]);
 
@@ -199,9 +220,24 @@ const adminMenuItems = computed(() => [
 ]);
 
 const visibleMenuItems = computed(() =>
-    menuItems.value.filter(item => 
+    menuItems.value.filter(item =>
         !item.permission || authStore.hasPermission(item.permission)
-    )
+    ).map(item => {
+        // Se for o submenu de configurações, adiciona "Usuários" apenas para clients não-admin
+        if (item.submenuKey === 'settings' && item.submenu) {
+            const submenu = [...item.submenu];
+            if (!authStore.isAdmin && authStore.hasPermission('users.view')) {
+                submenu.push({
+                    name: 'Usuários',
+                    label: 'Usuários',
+                    route: 'users-management',
+                    permission: 'users.view',
+                });
+            }
+            return { ...item, submenu };
+        }
+        return item;
+    })
 );
 
 const visibleAdminItems = computed(() =>
@@ -225,12 +261,15 @@ function toggleSubmenu(submenuKey) {
         isAIAssistantsOpen.value = !isAIAssistantsOpen.value;
     } else if (submenuKey === 'marketing') {
         isMarketingOpen.value = !isMarketingOpen.value;
+    } else if (submenuKey === 'settings') {
+        isSettingsOpen.value = !isSettingsOpen.value;
     }
 }
 
 function isSubmenuOpen(submenuKey) {
     if (submenuKey === 'ai') return isAIAssistantsOpen.value;
     if (submenuKey === 'marketing') return isMarketingOpen.value;
+    if (submenuKey === 'settings') return isSettingsOpen.value;
     return false;
 }
 

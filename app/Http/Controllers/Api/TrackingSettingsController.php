@@ -9,17 +9,17 @@ use Illuminate\Http\Request;
 class TrackingSettingsController extends Controller
 {
     /**
-     * Retorna as configurações de tracking da loja ativa do usuário
+     * Retorna as configurações de tracking da loja ativa ou de uma loja específica
      * (formatadas para uso no frontend)
      */
     public function show(Request $request): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $store = $this->resolveStore($request);
 
         if (! $store) {
             return response()->json([
                 'data' => null,
-                'message' => 'Nenhuma loja ativa encontrada',
+                'message' => 'Nenhuma loja encontrada',
             ], 404);
         }
 
@@ -33,12 +33,12 @@ class TrackingSettingsController extends Controller
      */
     public function edit(Request $request): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $store = $this->resolveStore($request);
 
         if (! $store) {
             return response()->json([
                 'data' => null,
-                'message' => 'Nenhuma loja ativa encontrada',
+                'message' => 'Nenhuma loja encontrada',
             ], 404);
         }
 
@@ -48,19 +48,21 @@ class TrackingSettingsController extends Controller
     }
 
     /**
-     * Atualiza as configurações de tracking da loja ativa
+     * Atualiza as configurações de tracking da loja ativa ou de uma loja específica
      */
     public function update(Request $request): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $store = $this->resolveStore($request);
 
         if (! $store) {
             return response()->json([
-                'message' => 'Nenhuma loja ativa encontrada',
+                'message' => 'Nenhuma loja encontrada',
             ], 404);
         }
 
         $validated = $request->validate([
+            'store_id' => 'nullable|string|exists:stores,uuid',
+
             'ga' => 'nullable|array',
             'ga.enabled' => 'boolean',
             'ga.measurement_id' => 'nullable|string|max:50',
@@ -96,11 +98,11 @@ class TrackingSettingsController extends Controller
      */
     public function updateProvider(Request $request, string $provider): JsonResponse
     {
-        $store = $request->user()->activeStore;
+        $store = $this->resolveStore($request);
 
         if (! $store) {
             return response()->json([
-                'message' => 'Nenhuma loja ativa encontrada',
+                'message' => 'Nenhuma loja encontrada',
             ], 404);
         }
 
@@ -144,5 +146,29 @@ class TrackingSettingsController extends Controller
             'message' => 'Configuração de '.$provider.' atualizada com sucesso',
             'data' => $store->getTrackingSettings()[$provider],
         ]);
+    }
+
+    /**
+     * Resolve a loja a ser usada:
+     * - Se store_id for fornecido no query param, usa essa loja (após validar acesso)
+     * - Caso contrário, usa a loja ativa do usuário
+     */
+    private function resolveStore(Request $request)
+    {
+        $storeId = $request->query('store_id');
+
+        if ($storeId) {
+            // Busca a loja especificada por UUID e valida se o usuário tem acesso
+            $store = $request->user()->stores()->where('uuid', $storeId)->first();
+
+            if (! $store) {
+                return null;
+            }
+
+            return $store;
+        }
+
+        // Usa a loja ativa como fallback
+        return $request->user()->activeStore;
     }
 }

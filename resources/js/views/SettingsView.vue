@@ -658,7 +658,7 @@ onMounted(() => {
                                     <!-- Action Buttons -->
                                     <div class="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                                         <router-link
-                                            :to="{ name: 'store-config', params: { id: storeInfo.id } }"
+                                            :to="{ name: 'settings-store-info' }"
                                             class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 font-medium hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
                                         >
                                             <Cog6ToothIcon class="w-5 h-5" />
