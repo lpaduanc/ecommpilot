@@ -845,8 +845,7 @@ class StoreAnalysisService
             $previousSuggestions['rejected_titles'] ?? []
         );
 
-        // V5: Não precisa mais validar depois, pois já foi feito antes
-        $beforeValidation = count($finalSuggestions);
+        $afterRecovery = count($finalSuggestions);
 
         // Enforcement programático: max 2 sugestões por categoria
         $finalSuggestions = $this->enforceCategoryDiversification($finalSuggestions, $validatedStrategistSuggestions);
@@ -855,7 +854,9 @@ class StoreAnalysisService
         $this->logDeduplicationStats($analysis->id, [
             'from_strategist' => count($generatedSuggestions['suggestions'] ?? []),
             'from_critic' => count($criticizedSuggestions['approved_suggestions'] ?? []),
-            'after_similarity' => $beforeValidation,
+            'after_similarity_filter' => count($filteredSuggestions),
+            'after_recovery' => $afterRecovery,
+            'after_category_diversification' => count($finalSuggestions),
             'final_count' => count($finalSuggestions),
             'saturated_themes' => $saturatedThemes ?? [],
         ]);
@@ -1579,28 +1580,6 @@ class StoreAnalysisService
         }
 
         return $filtered;
-    }
-
-    /**
-     * Calculate similarity between two normalized titles using Jaccard similarity.
-     */
-    private function calculateTitleSimilarity(string $title1, string $title2): float
-    {
-        $words1 = array_unique(preg_split('/\s+/', $title1));
-        $words2 = array_unique(preg_split('/\s+/', $title2));
-
-        if (empty($words1) || empty($words2)) {
-            return 0.0;
-        }
-
-        $intersection = count(array_intersect($words1, $words2));
-        $union = count(array_unique(array_merge($words1, $words2)));
-
-        if ($union === 0) {
-            return 0.0;
-        }
-
-        return $intersection / $union;
     }
 
     /**

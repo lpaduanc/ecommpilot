@@ -232,6 +232,29 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
+     * Calcula similaridade entre dois títulos normalizados usando Jaccard (word-based).
+     * Apropriado para títulos já normalizados com stopwords removidos e palavras ordenadas.
+     */
+    protected function calculateTitleSimilarity(string $title1, string $title2): float
+    {
+        $words1 = array_unique(array_filter(preg_split('/\s+/', $title1)));
+        $words2 = array_unique(array_filter(preg_split('/\s+/', $title2)));
+
+        if (empty($words1) || empty($words2)) {
+            return 0.0;
+        }
+
+        $intersection = count(array_intersect($words1, $words2));
+        $union = count(array_unique(array_merge($words1, $words2)));
+
+        if ($union === 0) {
+            return 0.0;
+        }
+
+        return $intersection / $union;
+    }
+
+    /**
      * Calcula similaridade máxima com lista de títulos
      */
     protected function calculateMaxSimilarity(string $title, array $previousTitles): float
@@ -239,18 +262,7 @@ trait SuggestionDeduplicationTrait
         $maxSimilarity = 0;
 
         foreach ($previousTitles as $prevTitle) {
-            similar_text($title, $prevTitle, $percent);
-            $similarity1 = $percent / 100;
-
-            $maxLen = max(strlen($title), strlen($prevTitle));
-            if ($maxLen > 0) {
-                $levenshtein = levenshtein($title, $prevTitle);
-                $similarity2 = 1 - ($levenshtein / $maxLen);
-            } else {
-                $similarity2 = 0;
-            }
-
-            $similarity = max($similarity1, $similarity2);
+            $similarity = $this->calculateTitleSimilarity($title, $prevTitle);
             $maxSimilarity = max($maxSimilarity, $similarity);
         }
 
