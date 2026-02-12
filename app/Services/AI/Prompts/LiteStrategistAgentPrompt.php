@@ -58,7 +58,7 @@ Gerar EXATAMENTE 6 sugestões acionáveis para aumentar vendas: 2 HIGH, 2 MEDIUM
 {
   "suggestions": [
     {
-      "category": "inventory|coupon|product|marketing|operational|customer|conversion|pricing",
+      "category": "strategy|investment|market|growth|financial|positioning|inventory|pricing|product|customer|conversion|marketing|coupon|operational",
       "title": "Título com número específico (máx 100 chars)",
       "description": "Problema identificado com base nos dados",
       "recommended_action": "1. Passo um\n2. Passo dois\n3. Passo três",

@@ -48,6 +48,12 @@ const statusOptions = [
 
 const categoryOptions = [
     { value: null, label: 'Todas as Categorias' },
+    { value: 'strategy', label: 'Estratégia' },
+    { value: 'investment', label: 'Investimento' },
+    { value: 'market', label: 'Mercado' },
+    { value: 'growth', label: 'Crescimento' },
+    { value: 'financial', label: 'Financeiro' },
+    { value: 'positioning', label: 'Posicionamento' },
     { value: 'marketing', label: 'Marketing' },
     { value: 'pricing', label: 'Precificação' },
     { value: 'inventory', label: 'Estoque' },
@@ -66,12 +72,18 @@ const impactOptions = [
 ];
 
 const categoryConfig = {
+    strategy: { icon: '🎯', label: 'Estratégia', bg: 'bg-rose-50 dark:bg-rose-900/30', text: 'text-rose-700 dark:text-rose-400' },
+    investment: { icon: '💎', label: 'Investimento', bg: 'bg-cyan-50 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-400' },
+    market: { icon: '🌍', label: 'Mercado', bg: 'bg-teal-50 dark:bg-teal-900/30', text: 'text-teal-700 dark:text-teal-400' },
+    growth: { icon: '📈', label: 'Crescimento', bg: 'bg-lime-50 dark:bg-lime-900/30', text: 'text-lime-700 dark:text-lime-400' },
+    financial: { icon: '💵', label: 'Financeiro', bg: 'bg-yellow-50 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
+    positioning: { icon: '🏆', label: 'Posicionamento', bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/30', text: 'text-fuchsia-700 dark:text-fuchsia-400' },
     marketing: { icon: '📣', label: 'Marketing', bg: 'bg-pink-50 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-400' },
     pricing: { icon: '💰', label: 'Precificação', bg: 'bg-amber-50 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400' },
     inventory: { icon: '📦', label: 'Estoque', bg: 'bg-sky-50 dark:bg-sky-900/30', text: 'text-sky-700 dark:text-sky-400' },
     product: { icon: '🛍️', label: 'Produtos', bg: 'bg-violet-50 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-400' },
     customer: { icon: '👥', label: 'Clientes', bg: 'bg-emerald-50 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400' },
-    conversion: { icon: '🎯', label: 'Conversão', bg: 'bg-orange-50 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400' },
+    conversion: { icon: '🔄', label: 'Conversão', bg: 'bg-orange-50 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400' },
     coupon: { icon: '🏷️', label: 'Cupons', bg: 'bg-indigo-50 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-400' },
     operational: { icon: '⚙️', label: 'Operacional', bg: 'bg-slate-50 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-400' },
 };

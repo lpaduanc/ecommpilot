@@ -34,12 +34,18 @@ const showFeedbackModal = ref(false);
 const pendingCompletedStatus = ref(false);
 
 const categoryConfig: Record<string, { icon: string; label: string; color: string }> = {
+    strategy: { icon: '🎯', label: 'Estratégia', color: 'from-rose-500 to-red-500' },
+    investment: { icon: '💎', label: 'Investimento', color: 'from-cyan-500 to-blue-500' },
+    market: { icon: '🌍', label: 'Mercado', color: 'from-teal-500 to-emerald-500' },
+    growth: { icon: '📈', label: 'Crescimento', color: 'from-lime-500 to-green-500' },
+    financial: { icon: '💵', label: 'Financeiro', color: 'from-yellow-500 to-amber-500' },
+    positioning: { icon: '🏆', label: 'Posicionamento', color: 'from-fuchsia-500 to-purple-500' },
     marketing: { icon: '📣', label: 'Marketing', color: 'from-pink-500 to-rose-500' },
     pricing: { icon: '💰', label: 'Precificação', color: 'from-amber-500 to-yellow-500' },
     inventory: { icon: '📦', label: 'Estoque', color: 'from-sky-500 to-cyan-500' },
     product: { icon: '🛍️', label: 'Produtos', color: 'from-violet-500 to-purple-500' },
     customer: { icon: '👥', label: 'Clientes', color: 'from-emerald-500 to-teal-500' },
-    conversion: { icon: '🎯', label: 'Conversão', color: 'from-orange-500 to-red-500' },
+    conversion: { icon: '🔄', label: 'Conversão', color: 'from-orange-500 to-red-500' },
     coupon: { icon: '🏷️', label: 'Cupons', color: 'from-indigo-500 to-blue-500' },
     operational: { icon: '⚙️', label: 'Operacional', color: 'from-slate-500 to-gray-500' },
 };

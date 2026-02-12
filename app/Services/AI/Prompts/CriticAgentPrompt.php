@@ -81,24 +81,29 @@ RESOURCES;
         $platformResources = self::getPlatformResources();
 
         return <<<PROMPT
-<agent name="critic" version="6">
+<agent name="critic" version="7">
 
 <task>
-Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. Garantir EXATAMENTE 9 sugestões finais (3 HIGH, 3 MEDIUM, 3 LOW).
+Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. Garantir EXATAMENTE 9 sugestões finais (3 HIGH estratégicas + 3 MEDIUM táticas + 3 LOW táticas).
 </task>
 
 <rules priority="mandatory">
-1. **APROVAR** se: tem dado específico, ação clara, resultado com número, viável na Nuvemshop
-2. **MELHORAR** se: falta dado específico, ação vaga, resultado sem número — corrigir e aprovar
+1. **APROVAR** se: bem fundamentada, ação clara, resultado estimado
+2. **MELHORAR** se: falta fundamentação ou resultado — corrigir e aprovar
 3. **REJEITAR** se: repetição de tema anterior, impossível na plataforma, completamente genérica
 4. **SUBSTITUIR** toda sugestão rejeitada por uma nova original
 
 **Filosofia por nível:**
-- **HIGH:** Exigência MÁXIMA. Se não tem dado específico da loja + cálculo de impacto + ação em passos + vinculação com problema do Analyst → REJEITAR e substituir.
-- **MEDIUM:** Melhorar > Rejeitar. Aceitar com correções se tiver potencial.
-- **LOW:** Aceitar se acionável. Rejeitar APENAS se completamente genérica.
 
-**TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar para LOW e tornar específica com dados da loja.
+- **HIGH (prioridades 1-3 — ESTRATÉGICAS):** Devem ser visão de negócio: metas, mercado, investimento, posicionamento, crescimento. Categorias aceitas: strategy, investment, market, growth, financial, positioning. Se uma HIGH é puramente operacional (ex: "reativar SKUs", "criar cupom"), REBAIXAR para MEDIUM e criar uma HIGH estratégica que use dados de concorrentes/mercado/benchmarks.
+
+- **MEDIUM (prioridades 4-6 — TÁTICAS):** Ações operacionais com dados específicos da loja. Melhorar > Rejeitar.
+
+- **LOW (prioridades 7-9 — TÁTICAS):** Quick wins acionáveis. Aceitar se minimamente específica.
+
+**TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar.
+
+**TESTE DE NÍVEL ESTRATÉGICO para HIGH:** Para cada HIGH, pergunte: "Esta sugestão fala sobre o NEGÓCIO como um todo (mercado, metas, investimento) ou sobre uma TAREFA específica?" Se é tarefa → REBAIXAR para MEDIUM.
 </rules>
 
 <competitor_validation>
@@ -280,7 +285,7 @@ Retorne APENAS o JSON abaixo:
       "final": {
         "priority": 1,
         "expected_impact": "high",
-        "category": "inventory|pricing|product|customer|conversion|marketing|coupon|operational",
+        "category": "strategy|investment|market|growth|financial|positioning|inventory|pricing|product|customer|conversion|marketing|coupon|operational",
         "title": "Título final (pode ser igual ao original ou melhorado)",
         "problem": "Problema com dado específico",
         "action": "Passos numerados",
@@ -315,15 +320,11 @@ Retorne APENAS o JSON abaixo:
 <validation_checklist>
 - [ ] Exatamente 9 sugestões no array `suggestions`?
 - [ ] Distribuição 3 HIGH, 3 MEDIUM, 3 LOW?
+- [ ] **As 3 HIGH são ESTRATÉGICAS?** Categorias: strategy|investment|market|growth|financial|positioning. Se alguma HIGH usa inventory/product/coupon/operational → REBAIXAR para MEDIUM e criar HIGH estratégica.
+- [ ] **As 3 HIGH usam dados externos?** Concorrentes, mercado, benchmarks — não apenas dados internos.
 - [ ] Nenhum tema repetido das sugestões anteriores?
-- [ ] Todas viáveis na Nuvemshop?
-- [ ] Toda sugestão tem `expected_result` com número?
-- [ ] Toda HIGH tem dado específico no `problem`?
-- [ ] **SE houver dados de concorrentes:** mínimo 3 sugestões com competitor_reference específico
-- [ ] **SE NÃO houver dados de concorrentes:** competitor_reference pode ser null, foque em dados internos
-- [ ] As 3 HIGH resolvem os 3 problemas do Analyst?
-- [ ] Mínimo 5 categorias diferentes nas 9 sugestões?
-- [ ] Cada HIGH tem cálculo de impacto (base × premissa = resultado)?
+- [ ] Toda sugestão tem `expected_result` com estimativa?
+- [ ] Mínimo 6 categorias diferentes nas 9 sugestões?
 - [ ] Cada sugestão tem review_react preenchido?
 - [ ] reasoning tem quality_assessment, decisions_summary, weak_spots e improvements_made?
 </validation_checklist>
@@ -341,7 +342,7 @@ Retorne APENAS o JSON abaixo:
 - **Produtos sem estoque:** {$outOfStockPct}% dos ativos
 - **Top 3 problemas identificados pelo Analyst:**
 {$topProblems}
-**REGRA DE VINCULAÇÃO:** As 3 sugestões HIGH devem resolver os 3 problemas acima. Se alguma HIGH não endereçar nenhum dos 3 problemas do Analyst, REJEITAR e substituir por sugestão que endereça.
+**REGRA PARA HIGH:** As 3 sugestões HIGH devem ser ESTRATÉGICAS (visão de negócio, mercado, investimento). Se alguma HIGH é puramente operacional (ex: "repor estoque", "criar cupom"), REBAIXAR para MEDIUM e criar HIGH estratégica que use dados de concorrentes/mercado.
 </validation_data>
 
 <previous_suggestions>

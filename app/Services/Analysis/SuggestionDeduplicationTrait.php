@@ -110,15 +110,16 @@ trait SuggestionDeduplicationTrait
             }
         }
 
-        // V5: Threshold aumentado para 2
-        // OU se foi rejeitado pelo menos 1x (penaliza temas que o cliente não gostou)
+        // V7: Threshold aumentado para 3 — permite evolução de temas
+        // Um tema pode ser re-sugerido com abordagem diferente até 2x antes de bloquear.
+        // Temas rejeitados 2+ vezes são bloqueados (cliente não quer).
         $saturated = array_filter($counts, function ($count) {
-            return $count >= 2;
+            return $count >= 3;
         });
 
-        // Adicionar temas rejeitados mesmo que apareçam só 1x
+        // Adicionar temas rejeitados 2+ vezes (cliente claramente não quer)
         foreach ($rejectedThemes as $theme => $rejectCount) {
-            if (! isset($saturated[$theme]) && $rejectCount >= 1) {
+            if (! isset($saturated[$theme]) && $rejectCount >= 2) {
                 $saturated[$theme] = $counts[$theme] ?? 1;
             }
         }
@@ -174,8 +175,9 @@ trait SuggestionDeduplicationTrait
             }
 
             // Verificar repetição HISTÓRICA
+            // V7: Threshold relaxado de 0.75 para 0.85 — permite evoluções de temas anteriores
             $maxSimilarity = $this->calculateMaxSimilarity($normalizedTitle, $previousTitles);
-            if ($maxSimilarity > 0.75) {
+            if ($maxSimilarity > 0.85) {
                 Log::warning('Sugestão similar a HISTÓRICA detectada', [
                     'title' => $title,
                     'similarity' => round($maxSimilarity * 100, 1).'%',
