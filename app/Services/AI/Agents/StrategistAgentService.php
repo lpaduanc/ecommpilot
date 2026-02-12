@@ -76,14 +76,22 @@ class StrategistAgentService
 
         $prompt = StrategistAgentPrompt::get($context);
 
+        // V6: Temperature rotation based on analysis count
+        $analysisCount = $context['analysis_count'] ?? 0;
+        $temperatures = [0.5, 0.6, 0.7, 0.65, 0.55];
+        $temperature = $temperatures[$analysisCount % count($temperatures)];
+
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 'from_settings',
+            'temperature' => $temperature,
+            'analysis_count' => $analysisCount,
             'prompt_chars' => strlen($prompt),
         ]);
 
         $apiStart = microtime(true);
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
+        ], [
+            'temperature' => $temperature,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
@@ -137,9 +145,24 @@ class StrategistAgentService
         $suggestions = $json['suggestions'] ?? [];
         $validatedSuggestions = [];
 
+        // V6: Accept 10-15 suggestions, minimum 10
+        $totalFound = count($suggestions);
         Log::channel($this->logChannel)->info('    [STRATEGIST] Validando sugestoes', [
-            'total_encontradas' => count($suggestions),
+            'total_encontradas' => $totalFound,
+            'expected_range' => '10-15',
         ]);
+
+        if ($totalFound < 10) {
+            Log::channel($this->logChannel)->warning('    [STRATEGIST] AVISO: Menos de 10 sugestoes recebidas', [
+                'total' => $totalFound,
+                'expected_min' => 10,
+            ]);
+        } elseif ($totalFound > 15) {
+            Log::channel($this->logChannel)->warning('    [STRATEGIST] AVISO: Mais de 15 sugestoes recebidas', [
+                'total' => $totalFound,
+                'expected_max' => 15,
+            ]);
+        }
 
         foreach ($suggestions as $index => $suggestion) {
             if ($this->isValidSuggestion($suggestion)) {
@@ -233,6 +256,9 @@ class StrategistAgentService
             // V5 additional fields
             'implementation' => $implementation,
             'competitor_reference' => $suggestion['competitor_reference'] ?? null,
+            // Phase 5: Traceability fields
+            'insight_origem' => $suggestion['insight_origem'] ?? 'best_practice',
+            'nivel_confianca' => $suggestion['nivel_confianca'] ?? 'medio',
         ];
     }
 

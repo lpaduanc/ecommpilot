@@ -61,10 +61,11 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 - `AI/AIManager` - Strategy pattern para providers (OpenAI, Gemini, Anthropic)
 - `AI/Agents/StoreAnalysisService` - Orquestra pipeline de análise com stage-based progress (9 estágios, resumable)
 - `AI/Agents/LiteStoreAnalysisService` - Versão simplificada para análises rápidas
-- `AI/Agents/*AgentService` - Collector, Analyst, Strategist, Critic
+- `AI/Agents/*AgentService` - Collector, Analyst, Strategist, Critic, ProfileSynthesizer
+- `AI/AnalysisRouter` - Mapeia AnalysisType → AnalysisModuleConfig (singleton)
 - `AI/Memory/` - HistoryService, HistorySummaryService, FeedbackLoopService
 - `AI/RAG/KnowledgeBaseService` - Base de conhecimento com embeddings
-- `AI/Prompts/` - 7 prompts (incluindo Lite variants e SimilarityCheckPrompt)
+- `AI/Prompts/` - 8 prompts (incluindo Lite variants, SimilarityCheckPrompt e ProfileSynthesizerPrompt)
 - `AI/Utilities/` - JsonExtractor, EmbeddingService, PlatformContextService, ProductTableFormatter
 - `Analysis/` - AnalysisService, AnalysisLogService, SuggestionImpactAnalysisService
 - `Analysis/Traits` - SuggestionDeduplicationTrait, FeedbackLoopTrait, HistoricalMetricsTrait
@@ -102,13 +103,13 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 - **Sistema:** `Notification`, `ActivityLog`, `SystemSetting`, `EmailConfiguration`
 - **ML/RAG:** `KnowledgeEmbedding`, `CategoryStats`, `SuccessCase`, `FailureCase`
 
-**DTOs** (`app/DTOs/`) - `StoreDataDTO`, `StoreInfoDTO`, `MetricsDTO`
+**DTOs** (`app/DTOs/`) - `StoreDataDTO`, `StoreInfoDTO`, `MetricsDTO`, `AnalysisModuleConfig`
 
 **Contracts** (`app/Contracts/`) - 7 interfaces para serviços e adapters
 
 **Exceptions** (`app/Exceptions/`) - `TokenExpiredException` (OAuth token expirado com context)
 
-**Enums** - `SyncStatus` (inclui TokenExpired), `AnalysisStatus`, `OrderStatus`, `PaymentStatus`, `Platform`, `UserRole`, `NotificationType`, `SubscriptionStatus`
+**Enums** - `SyncStatus` (inclui TokenExpired), `AnalysisStatus`, `AnalysisType` (general/financial/conversion/competitors/campaigns/tracking), `OrderStatus`, `PaymentStatus`, `Platform`, `UserRole`, `NotificationType`, `SubscriptionStatus`
 
 ### Frontend (`resources/js/`)
 
@@ -163,10 +164,41 @@ Laravel 12 + Vue 3 SPA para analytics de e-commerce com insights via IA. Integra
 ### Arquitetura do Pipeline
 
 ```
-Store Data → Collector → Analyst → Strategist → Critic → Suggestions
-                ↓                                    ↓
-         [RAG: Benchmarks]                    [Memory: Histórico]
+Store Data → ProfileSynthesizer → Collector → Analyst → Strategist → Critic → Suggestions
+                   ↓                  ↓                                  ↓
+            [Perfil da Loja]   [RAG: Benchmarks]                  [Memory: Histórico]
 ```
+
+### Sistema Modular de Análise (V6)
+
+**Tipos de análise** (`app/Enums/AnalysisType.php`):
+
+| Tipo | Status | Foco |
+|------|--------|------|
+| `general` | Disponível (padrão) | Visão completa |
+| `financial` | Disponível | Margem, ticket médio, CAC, LTV, pricing |
+| `conversion` | Disponível | Funil, checkout, UX, mobile/desktop |
+| `competitors` | Disponível | Posicionamento, diferenciais, gaps |
+| `campaigns` | Não implementado | ROAS, CPC, CTR |
+| `tracking` | Não implementado | Logística, entrega |
+
+**Fluxo:**
+1. `AnalysisController::request()` recebe `analysis_type` (validado contra tipos disponíveis)
+2. `StoreAnalysisService` resolve config via `AnalysisRouter::resolve()`
+3. `AnalysisRouter` retorna `AnalysisModuleConfig` DTO com configs por agente
+4. `ProfileSynthesizerService` gera perfil da loja (porte, maturidade, nicho)
+5. `store_profile` + `module_config` são injetados nos 4 agentes
+
+**Arquivos-chave:**
+- `app/Enums/AnalysisType.php` — Enum com tipos, labels, disponibilidade
+- `app/DTOs/AnalysisModuleConfig.php` — DTO readonly com configs por agente
+- `app/Services/AI/AnalysisRouter.php` — Mapeia tipo → config (singleton)
+- `app/Services/AI/Agents/ProfileSynthesizerService.php` — Gera perfil da loja antes do pipeline
+- `app/Services/AI/Prompts/ProfileSynthesizerPrompt.php` — Prompt do sintetizador
+
+**Feature flag frontend:** `VITE_FEATURE_ANALYSIS_MODULES=true` no `.env`
+
+**API:** `GET /api/analysis/types` retorna tipos disponíveis
 
 ### Configurações Importantes
 
@@ -239,6 +271,7 @@ Todos os prompts (`app/Services/AI/Prompts/`) geram respostas em português bras
 - `CriticAgentPrompt` - Validação e melhoria
 - `LiteAnalystAgentPrompt` - Versão simplificada do Analyst
 - `LiteStrategistAgentPrompt` - Versão simplificada do Strategist
+- `ProfileSynthesizerPrompt` - Perfil da loja (porte, maturidade, nicho)
 - `SimilarityCheckPrompt` - Detecção de sugestões similares
 
 ### JsonExtractor

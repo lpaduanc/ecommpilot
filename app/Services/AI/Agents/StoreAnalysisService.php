@@ -7,6 +7,7 @@ use App\Models\Analysis;
 use App\Models\Store;
 use App\Models\Suggestion;
 use App\Models\SystemSetting;
+use App\Services\AI\AnalysisRouter;
 use App\Services\AI\EmbeddingService;
 use App\Services\AI\Memory\HistoryService;
 use App\Services\AI\Memory\HistorySummaryService;
@@ -43,6 +44,7 @@ class StoreAnalysisService
     private const STAGE_RETRY_DELAYS = [30, 60, 120];
 
     public function __construct(
+        private ProfileSynthesizerService $profileSynthesizer,
         private CollectorAgentService $collector,
         private AnalystAgentService $analyst,
         private StrategistAgentService $strategist,
@@ -52,7 +54,8 @@ class StoreAnalysisService
         private EmbeddingService $embedding,
         private PlatformContextService $platformContext,
         private ExternalDataAggregator $externalData,
-        private AnalysisLogService $logService
+        private AnalysisLogService $logService,
+        private AnalysisRouter $analysisRouter
     ) {}
 
     /**
@@ -210,6 +213,11 @@ class StoreAnalysisService
     {
         $pipelineStart = microtime(true);
 
+        // Resolver configuração do módulo de análise (financial, conversion, etc.)
+        $moduleConfig = $this->analysisRouter->resolve(
+            $analysis->analysis_type?->value ?? 'general'
+        );
+
         Log::channel($this->logChannel)->info('╔══════════════════════════════════════════════════════════════════╗');
         Log::channel($this->logChannel)->info('║     STORE ANALYSIS PIPELINE - INICIO                            ║');
         Log::channel($this->logChannel)->info('╚══════════════════════════════════════════════════════════════════╝');
@@ -217,6 +225,9 @@ class StoreAnalysisService
             'analysis_id' => $analysis->id,
             'store_id' => $store->id,
             'store_name' => $store->name,
+            'analysis_type' => $analysis->analysis_type?->value ?? 'general',
+            'module_specialized' => $moduleConfig->isSpecialized,
+            'module_type' => $moduleConfig->analysisType,
             'timestamp' => now()->toIso8601String(),
         ]);
 
@@ -453,6 +464,51 @@ class StoreAnalysisService
             $externalMarketData = [];
         }
 
+        // Pre-compute store stats (needed by ProfileSynthesizer and Collector)
+        $storeStats = $this->getStoreStats($store);
+        $platform = $store->platform?->value ?? 'nuvemshop';
+        $platformName = $store->platform?->label() ?? 'Nuvemshop';
+
+        // =====================================================
+        // ETAPA 4.5: Sintetizar perfil da loja (ProfileSynthesizer)
+        // =====================================================
+        $stepStart = microtime(true);
+        Log::channel($this->logChannel)->info('┌─────────────────────────────────────────────────────────────────┐');
+        Log::channel($this->logChannel)->info('│ ETAPA 4.5: Executando PROFILE SYNTHESIZER                       │');
+        Log::channel($this->logChannel)->info('└─────────────────────────────────────────────────────────────────┘');
+
+        $storeProfile = [];
+        try {
+            $storeProfile = $this->profileSynthesizer->execute([
+                'store_name' => $store->name,
+                'platform' => $platform,
+                'platform_name' => $platformName,
+                'niche' => $niche,
+                'subcategory' => $subcategory,
+                'store_url' => $store->url ?? '',
+                'store_stats' => $storeStats,
+                'benchmarks' => $benchmarks ?? [],
+                'structured_benchmarks' => $structuredBenchmarks ?? [],
+            ]);
+
+            // Remove internal prompt tracking key
+            unset($storeProfile['_prompt_used']);
+
+            Log::channel($this->logChannel)->info('<<< ProfileSynthesizer concluido', [
+                'profile_keys' => array_keys($storeProfile['store_profile'] ?? []),
+                'porte' => $storeProfile['store_profile']['porte_estimado'] ?? 'N/A',
+                'maturidade' => $storeProfile['store_profile']['maturidade_digital'] ?? 'N/A',
+                'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
+            ]);
+        } catch (\Exception $e) {
+            // Graceful fallback: pipeline continues without store profile
+            Log::channel($this->logChannel)->warning('ProfileSynthesizer falhou, continuando sem perfil', [
+                'error' => $e->getMessage(),
+                'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
+            ]);
+            $storeProfile = [];
+        }
+
         // =====================================================
         // ETAPA 5: Executar Collector Agent
         // =====================================================
@@ -464,8 +520,6 @@ class StoreAnalysisService
         $this->logService->startStage($analysis, 5, 'collector_agent');
 
         try {
-            $storeStats = $this->getStoreStats($store);
-
             Log::channel($this->logChannel)->info('>>> Dados da loja coletados', [
                 'total_orders' => $storeStats['total_orders'],
                 'total_products' => $storeStats['total_products'],
@@ -473,11 +527,9 @@ class StoreAnalysisService
                 'total_revenue' => $storeStats['total_revenue'],
             ]);
 
-            $platform = $store->platform?->value ?? 'nuvemshop';
-            $platformName = $store->platform?->label() ?? 'Nuvemshop';
-
             $collectorContext = $this->collector->execute([
                 'store_name' => $store->name,
+                'store_profile' => $storeProfile,
                 'platform' => $platform,
                 'platform_name' => $platformName,
                 'niche' => $niche,
@@ -492,6 +544,8 @@ class StoreAnalysisService
                 'external_data' => $externalMarketData,
                 // V5: Learning context para feedback de análises anteriores
                 'learning_context' => $learningContext,
+                // V6: Module config para análises especializadas
+                'module_config' => $moduleConfig,
             ]);
 
             // Coletar prompt para logging no final
@@ -562,6 +616,7 @@ class StoreAnalysisService
 
             $analysisResult = $this->analyst->execute([
                 'store_name' => $store->name,
+                'store_profile' => $storeProfile,
                 'platform' => $platform,
                 'platform_name' => $platformName,
                 'niche' => $niche,
@@ -580,6 +635,9 @@ class StoreAnalysisService
                 'history_summary' => $historySummary,
                 'historical_metrics' => $historicalMetrics, // V4: métricas históricas
                 'external_data' => $externalMarketData,
+                'previous_suggestions' => $previousSuggestions, // V6: para anti-repetição de diagnósticos
+                // V6: Module config para análises especializadas
+                'module_config' => $moduleConfig,
             ]);
 
             // Coletar prompt para logging no final
@@ -639,6 +697,7 @@ class StoreAnalysisService
 
             $generatedSuggestions = $this->strategist->execute([
                 'store_name' => $store->name,
+                'store_profile' => $storeProfile,
                 'platform' => $platform,
                 'platform_name' => $platformName,
                 'platform_resources' => $platformResources,
@@ -652,6 +711,7 @@ class StoreAnalysisService
                 'structured_benchmarks' => $structuredBenchmarks,
                 'store_goals' => $storeGoals,
                 'external_data' => $externalMarketData,
+                'analysis_count' => count($previousAnalyses ?? []),
 
                 // Métricas diretas para o Strategist
                 'operation_time' => $storeStats['operation_time'] ?? 'não informado',
@@ -679,6 +739,8 @@ class StoreAnalysisService
 
                 // V5: Dados de feedback/aprendizado
                 'learning_context' => $learningContext ?? [],
+                // V6: Module config para análises especializadas
+                'module_config' => $moduleConfig,
             ]);
 
             // Coletar prompt para logging no final
@@ -716,6 +778,7 @@ class StoreAnalysisService
         try {
             $criticizedSuggestions = $this->critic->execute([
                 'store_name' => $store->name,
+                'store_profile' => $storeProfile,
                 'platform' => $platform,
                 'platform_name' => $platformName,
                 'platform_resources' => $platformResources,
@@ -727,6 +790,11 @@ class StoreAnalysisService
                 'pedidos_mes' => $ordersTotal,
                 'faturamento_estimado' => $faturamentoEstimado,
                 'out_of_stock_pct' => $outOfStockPct,
+                // V7: Dados detalhados para verificação numérica pelo Critic
+                'orders_summary' => $storeData['orders'],
+                'products_summary' => $storeData['products'],
+                'inventory_summary' => $storeData['inventory'],
+                'coupons_summary' => $storeData['coupons'],
                 'external_data' => $externalMarketData,
                 'analyst_briefing' => $analysisResult['alertas_para_strategist'] ?? $analysisResult['briefing_strategist'] ?? [],
                 'anomalies' => $analysisResult['anomalies'] ?? [],
@@ -737,6 +805,8 @@ class StoreAnalysisService
                     'platform_name' => $platformName,
                     'metrics' => $analysisResult['metrics'] ?? [],
                 ],
+                // V6: Module config para análises especializadas
+                'module_config' => $moduleConfig,
             ]);
 
             // Coletar prompt para logging no final
@@ -793,6 +863,9 @@ class StoreAnalysisService
                 $store->id
             );
 
+            // V6: Programmatic enforcement of saturated theme blocking
+            $filteredSuggestions = $this->filterSaturatedThemes($filteredSuggestions, $saturatedThemes ?? []);
+
             if (count($filteredSuggestions) < 9) {
                 Log::channel($this->logChannel)->warning('>>> ALERTA: Filtro de similaridade removeu sugestoes abaixo do minimo de 9', [
                     'analysis_id' => $analysis->id,
@@ -826,7 +899,8 @@ class StoreAnalysisService
         // =====================================================
         $validatedStrategistSuggestions = $this->preValidateStrategistSuggestions(
             $generatedSuggestions['suggestions'] ?? [],
-            $previousSuggestions['all'] ?? []
+            $previousSuggestions['all'] ?? [],
+            $store->id
         );
 
         // Garantir mínimo de 9 sugestões APÓS o filtro de similaridade
@@ -842,7 +916,8 @@ class StoreAnalysisService
                 'ticket_medio' => $ticketMedio,
                 'pedidos_mes' => $ordersTotal,
             ],
-            $previousSuggestions['all'] ?? []
+            $previousSuggestions['all'] ?? [],
+            $store->id
         );
 
         // V5: Não precisa mais validar depois, pois já foi feito antes
@@ -850,6 +925,12 @@ class StoreAnalysisService
 
         // Enforcement programático: max 2 sugestões por categoria
         $finalSuggestions = $this->enforceCategoryDiversification($finalSuggestions, $validatedStrategistSuggestions);
+
+        // V6: Activate historical dedup (was dead code before)
+        $finalSuggestions = $this->validateSuggestionUniqueness(
+            $finalSuggestions,
+            $previousSuggestions['all'] ?? []
+        );
 
         // Logar estatísticas de deduplicação
         $this->logDeduplicationStats($analysis->id, [
@@ -1500,9 +1581,9 @@ class StoreAnalysisService
                 ];
 
                 // Check similarity with existing suggestions in DB
-                // Threshold de 0.85 = sugestões com 85%+ de similaridade são filtradas
+                // Threshold de 0.78 = sugestões com 78%+ de similaridade são filtradas
                 // Isso evita sugestões muito parecidas entre análises consecutivas
-                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.85)) {
+                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
                     $suggestion['embedding'] = $embedding;
                     $filteredSuggestions[] = $suggestion;
                 } else {
@@ -1516,6 +1597,59 @@ class StoreAnalysisService
         }
 
         return $filteredSuggestions;
+    }
+
+    /**
+     * Programmatically filter suggestions about saturated themes (3+ occurrences).
+     * This enforces theme blocking - the prompt tells the AI to avoid these, but this ensures compliance.
+     */
+    private function filterSaturatedThemes(array $suggestions, array $saturatedThemes): array
+    {
+        if (empty($saturatedThemes)) {
+            return $suggestions;
+        }
+
+        // Only enforce for themes with 3+ occurrences
+        $blockedThemes = array_filter($saturatedThemes, fn ($count) => $count >= 3);
+
+        if (empty($blockedThemes)) {
+            return $suggestions;
+        }
+
+        $keywords = \App\Services\Analysis\ThemeKeywords::all();
+        $filtered = [];
+
+        foreach ($suggestions as $suggestion) {
+            $title = mb_strtolower($suggestion['final_version']['title'] ?? '');
+            $description = mb_strtolower($suggestion['final_version']['description'] ?? '');
+            $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title.' '.$description) ?: ($title.' '.$description);
+
+            $matchedTheme = null;
+            foreach ($blockedThemes as $theme => $count) {
+                $themeKeywords = $keywords[$theme] ?? [];
+                foreach ($themeKeywords as $kw) {
+                    $kwNormalized = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $kw) ?: $kw;
+                    if (str_contains($text, $kwNormalized)) {
+                        $matchedTheme = $theme;
+                        break 2;
+                    }
+                }
+            }
+
+            if ($matchedTheme) {
+                Log::channel($this->logChannel)->info('Suggestion filtered by saturated theme enforcement', [
+                    'title' => $suggestion['final_version']['title'] ?? '',
+                    'theme' => $matchedTheme,
+                    'theme_count' => $blockedThemes[$matchedTheme],
+                ]);
+
+                continue;
+            }
+
+            $filtered[] = $suggestion;
+        }
+
+        return $filtered;
     }
 
     /**
@@ -1579,38 +1713,6 @@ class StoreAnalysisService
         }
 
         return $filtered;
-    }
-
-    /**
-     * Normalize a title for comparison.
-     * Removes common words, normalizes whitespace, and extracts key concepts.
-     */
-    private function normalizeTitle(string $title): string
-    {
-        $title = mb_strtolower(trim($title));
-
-        // Remove common stopwords and filler words
-        $stopwords = [
-            'de', 'da', 'do', 'das', 'dos', 'para', 'com', 'em', 'a', 'o', 'as', 'os',
-            'e', 'ou', 'um', 'uma', 'uns', 'umas', 'no', 'na', 'nos', 'nas',
-            'pelo', 'pela', 'pelos', 'pelas', 'ao', 'aos', 'à', 'às',
-            'implementar', 'otimizar', 'criar', 'desenvolver', 'lançar', 'ativar',
-            'configurar', 'melhorar', 'aprimorar', 'revisar', 'analisar', 'oferecer',
-            'estratégia', 'estratégico', 'estratégica', 'estratégicos', 'estratégicas',
-            'gestão', 'gerenciamento', 'sistema', 'programa', 'plano',
-            'produtos', 'produto', 'clientes', 'cliente', 'loja', 'lojas',
-            'haircare', 'beleza', 'cosmético', 'cosméticos', 'capilar', 'cabelo', 'cabelos',
-            'nuvemshop', 'ecommerce', 'e-commerce',
-            'priorizar', 'proativo', 'proativa', 'funcionalidade',
-        ];
-
-        $words = preg_split('/\s+/', $title);
-        $filteredWords = array_filter($words, fn ($w) => ! in_array($w, $stopwords) && strlen($w) > 2);
-
-        // Sort to make comparison order-independent
-        sort($filteredWords);
-
-        return implode(' ', $filteredWords);
     }
 
     /**
@@ -1972,6 +2074,37 @@ class StoreAnalysisService
      */
     private function saveSuggestions(Analysis $analysis, array $suggestions): void
     {
+        // V6: Final dedup guard - prevent exact duplicates in the same analysis
+        $seenTitles = [];
+        $dedupedSuggestions = [];
+
+        foreach ($suggestions as $suggestion) {
+            $title = mb_strtolower(trim($suggestion['final_version']['title'] ?? ''));
+            if (empty($title) || $title === 'untitled suggestion') {
+                $dedupedSuggestions[] = $suggestion;
+
+                continue;
+            }
+            if (in_array($title, $seenTitles)) {
+                Log::channel($this->logChannel)->warning('saveSuggestions: Duplicate title blocked', [
+                    'title' => $title,
+                    'analysis_id' => $analysis->id,
+                ]);
+
+                continue;
+            }
+            $seenTitles[] = $title;
+            $dedupedSuggestions[] = $suggestion;
+        }
+
+        // Re-number priorities after dedup
+        foreach ($dedupedSuggestions as $index => &$s) {
+            $s['final_priority'] = $index + 1;
+        }
+        unset($s);
+
+        $suggestions = $dedupedSuggestions;
+
         foreach ($suggestions as $index => $suggestion) {
             $finalVersion = $suggestion['final_version'] ?? [];
 
@@ -1985,6 +2118,19 @@ class StoreAnalysisService
             }
             if (! empty($finalVersion['implementation'])) {
                 $specificData['implementation'] = $finalVersion['implementation'];
+            }
+            // Phase 5: Traceability and verification metadata
+            if (! empty($finalVersion['insight_origem'])) {
+                $specificData['insight_origem'] = $finalVersion['insight_origem'];
+            }
+            if (! empty($finalVersion['nivel_confianca'])) {
+                $specificData['nivel_confianca'] = $finalVersion['nivel_confianca'];
+            }
+            if (! empty($suggestion['verificacao_status'])) {
+                $specificData['verificacao_status'] = $suggestion['verificacao_status'];
+            }
+            if (isset($suggestion['quality_score'])) {
+                $specificData['score_qualidade'] = $suggestion['quality_score'];
             }
 
             $suggestionModel = Suggestion::create([
@@ -2014,7 +2160,7 @@ class StoreAnalysisService
      * V5: Pre-validate Strategist suggestions against historical suggestions.
      * This ensures that suggestions used for recovery are not similar to past suggestions.
      */
-    private function preValidateStrategistSuggestions(array $strategistSuggestions, array $previousSuggestions): array
+    private function preValidateStrategistSuggestions(array $strategistSuggestions, array $previousSuggestions, int $storeId = 0): array
     {
         if (empty($previousSuggestions)) {
             return $strategistSuggestions;
@@ -2045,6 +2191,22 @@ class StoreAnalysisService
                     ]);
                     $isSimilarToHistory = true;
                     break;
+                }
+            }
+
+            // V6: Also check embeddings for suggestions that pass Jaccard
+            if (! $isSimilarToHistory && $storeId > 0 && $this->embedding->isConfigured()) {
+                try {
+                    $textToEmbed = $title.' '.($suggestion['description'] ?? '');
+                    $embedding = $this->embedding->generate($textToEmbed);
+                    if ($this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                        $isSimilarToHistory = true;
+                        Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered by EMBEDDING (passed Jaccard)', [
+                            'title' => $title,
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Continue without embedding check on failure
                 }
             }
 
@@ -2207,7 +2369,7 @@ class StoreAnalysisService
      *
      * V5: Now also validates against historical suggestions to prevent duplicates.
      */
-    private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context, array $previousSuggestions = []): array
+    private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context, array $previousSuggestions = [], int $storeId = 0): array
     {
         // REGRA DE NEGÓCIO CRÍTICA: SEMPRE 9 sugestões com distribuição 3-3-3
         $required = 9;
@@ -2299,6 +2461,24 @@ class StoreAnalysisService
                     'recovered_from_filter' => true,
                 ];
 
+                // V6: Check embedding similarity before recovering
+                if ($storeId > 0 && $this->embedding->isConfigured()) {
+                    $textToEmbed = ($suggestion['title'] ?? '').' '.($suggestion['description'] ?? '');
+                    try {
+                        $embedding = $this->embedding->generate($textToEmbed);
+                        if ($this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                            Log::channel($this->logChannel)->info('Recovery candidate rejected by embedding check', [
+                                'title' => $suggestion['title'] ?? 'N/A',
+                            ]);
+
+                            continue;
+                        }
+                        $converted['embedding'] = $embedding;
+                    } catch (\Exception $e) {
+                        // On failure, proceed without embedding check
+                    }
+                }
+
                 $distribution[$impact][] = $converted;
                 $approvedTitles[] = strtolower(trim($suggestion['title'] ?? ''));
                 $approvedNormalizedTitles[] = $this->normalizeTitle($suggestion['title'] ?? '');
@@ -2342,6 +2522,24 @@ class StoreAnalysisService
                             'recovered_from_filter' => true,
                             'promoted_from' => $adjLevel,
                         ];
+
+                        // V6: Check embedding similarity before recovering
+                        if ($storeId > 0 && $this->embedding->isConfigured()) {
+                            $textToEmbed = ($suggestion['title'] ?? '').' '.($suggestion['description'] ?? '');
+                            try {
+                                $embedding = $this->embedding->generate($textToEmbed);
+                                if ($this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                                    Log::channel($this->logChannel)->info('Recovery candidate (promoted) rejected by embedding check', [
+                                        'title' => $suggestion['title'] ?? 'N/A',
+                                    ]);
+
+                                    continue;
+                                }
+                                $converted['embedding'] = $embedding;
+                            } catch (\Exception $e) {
+                                // On failure, proceed without embedding check
+                            }
+                        }
 
                         $distribution[$impact][] = $converted;
                         $approvedTitles[] = strtolower(trim($suggestion['title'] ?? ''));
@@ -2412,124 +2610,10 @@ class StoreAnalysisService
      */
     private function generateFallbackSuggestions(int $count, array $context, int $startPriority): array
     {
-        $niche = $context['niche'] ?? 'general';
-        $subcategory = $context['subcategory'] ?? 'geral';
-        $platformName = $context['platform_name'] ?? 'Nuvemshop';
-        $ticketMedio = $context['ticket_medio'] ?? 100;
-        $pedidosMes = $context['pedidos_mes'] ?? 50;
+        Log::channel($this->logChannel)->warning('Fallback suggestions requested but disabled in V6', [
+            'count_requested' => $count,
+        ]);
 
-        // 9 sugestões fallback universais (funcionam para qualquer nicho)
-        // IMPORTANTE: Manter pelo menos 9 templates para garantir o mínimo exigido
-        $fallbackTemplates = [
-            [
-                'category' => 'customer',
-                'title' => 'Criar programa de indicação com benefício duplo',
-                'description' => 'Implementar um sistema onde clientes indicam amigos e ambos ganham desconto. Isso gera novos clientes com custo de aquisição muito baixo.',
-                'recommended_action' => "1. Definir desconto de 10-15% para indicador e indicado\n2. Criar cupom único por cliente para rastreamento\n3. Comunicar programa em emails pós-compra\n4. Limitar a 1 indicação por mês para evitar abuso",
-                'expected_impact' => 'high',
-                'target_metrics' => ['novos_clientes', 'cac'],
-            ],
-            [
-                'category' => 'marketing',
-                'title' => 'Implementar automação de email por comportamento',
-                'description' => 'Criar sequência automatizada de emails baseada no comportamento do cliente: boas-vindas, carrinho abandonado, pós-compra e reativação.',
-                'recommended_action' => "1. Configurar email de boas-vindas com cupom de primeira compra\n2. Criar sequência de carrinho abandonado (1h, 24h, 72h)\n3. Implementar email pós-compra pedindo avaliação\n4. Segmentar base por data da última compra",
-                'expected_impact' => 'high',
-                'target_metrics' => ['conversao', 'recompra', 'ticket_medio'],
-            ],
-            [
-                'category' => 'marketing',
-                'title' => 'Otimizar páginas de produto para buscadores',
-                'description' => 'Melhorar títulos, descrições e imagens dos produtos para aumentar tráfego orgânico e reduzir dependência de mídia paga.',
-                'recommended_action' => "1. Revisar títulos incluindo palavras-chave relevantes\n2. Expandir descrições com benefícios e especificações\n3. Adicionar alt-text em todas as imagens\n4. Criar FAQ nos produtos mais vendidos",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['trafego_organico', 'conversao'],
-            ],
-            [
-                'category' => 'product',
-                'title' => 'Revisar e otimizar catálogo de produtos',
-                'description' => 'Revisar catálogo para identificar produtos de baixo giro que ocupam estoque e capital. Focar em produtos com melhor margem e velocidade de venda.',
-                'recommended_action' => "1. Listar produtos sem venda nos últimos 90 dias\n2. Calcular margem líquida por produto\n3. Definir estratégia para produtos encalhados (promoção ou descontinuação)\n4. Reforçar estoque dos 20% que geram 80% das vendas",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['margem', 'giro_estoque'],
-            ],
-            [
-                'category' => 'conversion',
-                'title' => 'Reduzir fricção no processo de compra',
-                'description' => 'Reduzir fricção no checkout para diminuir abandono de carrinho. Cada campo removido aumenta a taxa de conversão.',
-                'recommended_action' => "1. Remover campos não essenciais do formulário\n2. Oferecer opção de checkout como visitante\n3. Mostrar resumo do pedido sempre visível\n4. Garantir que frete seja calculado antes do checkout",
-                'expected_impact' => 'high',
-                'target_metrics' => ['conversao', 'abandono_carrinho'],
-            ],
-            [
-                'category' => 'pricing',
-                'title' => 'Criar estratégia de kits e combos',
-                'description' => 'Agrupar produtos complementares em kits com desconto para aumentar o ticket médio e facilitar a decisão de compra do cliente.',
-                'recommended_action' => "1. Identificar produtos frequentemente comprados juntos\n2. Criar 3-5 kits com desconto de 10-15% vs compra separada\n3. Destacar economia na página do kit\n4. Posicionar kits em destaque na home e categorias",
-                'expected_impact' => 'high',
-                'target_metrics' => ['ticket_medio', 'itens_por_pedido'],
-            ],
-            [
-                'category' => 'customer',
-                'title' => 'Implementar programa de fidelidade simples',
-                'description' => 'Criar sistema de pontos ou cashback para incentivar recompra e aumentar o lifetime value dos clientes.',
-                'recommended_action' => "1. Definir mecânica simples (ex: 5% de cashback em pontos)\n2. Criar níveis de benefício por volume de compras\n3. Comunicar saldo em todos os emails transacionais\n4. Oferecer bônus de pontos em datas especiais",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['recompra', 'ltv', 'retencao'],
-            ],
-            [
-                'category' => 'inventory',
-                'title' => 'Ativar notificação de produto disponível',
-                'description' => 'Implementar funcionalidade "Avise-me quando chegar" para produtos sem estoque, capturando demanda e recuperando vendas perdidas.',
-                'recommended_action' => "1. Ativar botão de avise-me em produtos sem estoque\n2. Configurar email automático quando produto voltar\n3. Oferecer cupom exclusivo no email de disponibilidade\n4. Monitorar taxa de conversão dos alertas",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['vendas_recuperadas', 'conversao'],
-            ],
-            [
-                'category' => 'marketing',
-                'title' => 'Criar conteúdo educativo sobre os produtos',
-                'description' => 'Desenvolver guias, tutoriais e conteúdo que eduque o cliente sobre como usar e escolher os produtos, aumentando confiança e conversão.',
-                'recommended_action' => "1. Criar guia de escolha para principais categorias\n2. Produzir vídeos curtos de demonstração de uso\n3. Publicar artigos respondendo dúvidas frequentes\n4. Adicionar seção de dicas nas páginas de produto",
-                'expected_impact' => 'medium',
-                'target_metrics' => ['conversao', 'tempo_no_site', 'autoridade'],
-            ],
-        ];
-
-        $fallbacks = [];
-        $priority = $startPriority;
-
-        for ($i = 0; $i < $count && $i < count($fallbackTemplates); $i++) {
-            $template = $fallbackTemplates[$i];
-
-            // Calcular ROI estimado conservador
-            $roiBase = round($ticketMedio * $pedidosMes * 0.03, 2); // 3% de impacto conservador
-
-            $fallbacks[] = [
-                'final_version' => [
-                    'category' => $template['category'],
-                    'title' => $template['title'],
-                    'description' => $template['description'],
-                    'recommended_action' => $template['recommended_action'],
-                    'expected_impact' => $template['expected_impact'],
-                    'target_metrics' => $template['target_metrics'],
-                    'specific_data' => [
-                        'roi_estimado' => 'R$ '.number_format($roiBase, 2, ',', '.').'/mês (conservador)',
-                        'base_calculo' => "Ticket médio R$ {$ticketMedio} × {$pedidosMes} pedidos × 3%",
-                    ],
-                    'data_justification' => "Sugestão baseada em melhores práticas de e-commerce para o nicho {$niche}/{$subcategory} na {$platformName}.",
-                ],
-                'quality_score' => 5.0,
-                'final_priority' => $priority++,
-                'forced_approval' => true,
-                'is_generic_fallback' => true,
-            ];
-
-            Log::channel($this->logChannel)->info('Sugestao generica de fallback gerada', [
-                'title' => $template['title'],
-                'priority' => $priority - 1,
-            ]);
-        }
-
-        return $fallbacks;
+        return [];
     }
 }

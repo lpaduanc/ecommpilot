@@ -24,6 +24,8 @@ class AdminAnalysisResource extends JsonResource
             ],
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
+            'analysis_type' => $this->analysis_type?->value ?? 'general',
+            'analysis_type_label' => $this->analysis_type?->label() ?? 'Análise Geral',
             'health_score' => $this->healthScore(),
             'health_status' => $this->summary['health_status'] ?? null,
             'suggestions_count' => $this->persistent_suggestions_count ?? 0,

@@ -53,28 +53,40 @@ class CollectorAgentPrompt
         $learningContext = $context['learning_context'] ?? [];
         $learningSection = self::formatLearningContext($learningContext);
 
+        // V6: Module config para análises especializadas
+        $moduleConfig = $context['module_config'] ?? null;
+        $focoModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $prioridade = $moduleConfig->collectorFocus['dados_prioridade'] ?? '';
+            $metricas = implode(', ', $moduleConfig->collectorFocus['metricas_obrigatorias'] ?? []);
+            $focoModulo = <<<FOCO
+
+<foco_modulo>
+Esta é uma análise especializada do tipo: {$tipo}
+Priorize a coleta dos seguintes dados: {$prioridade}
+Métricas obrigatórias para este tipo de análise: {$metricas}
+Se alguma métrica obrigatória não estiver disponível, registre em data_quality.missing_data.
+</foco_modulo>
+FOCO;
+        }
+
+        // ProfileSynthesizer store profile
+        $perfilLojaSection = '';
+        if (! empty($context['store_profile'])) {
+            $profileJson = json_encode($context['store_profile'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $perfilLojaSection = <<<SECTION
+<perfil_loja>
+{$profileJson}
+</perfil_loja>
+
+SECTION;
+        }
+
         return <<<PROMPT
 # COLLECTOR — COLETA E ORGANIZAÇÃO DE DADOS
 
-## ROLE
-Você é um Analista de Dados Sênior especializado em e-commerce brasileiro. Seu trabalho é extrair, organizar e sintetizar informações de múltiplas fontes para alimentar o próximo estágio do pipeline de análise.
-
-## TAREFA
-Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
-
----
-
-## REGRAS
-
-1. **NUNCA INVENTE DADOS** — Se não disponível, escreva "NÃO DISPONÍVEL"
-2. **Números específicos** — Valores monetários com 2 decimais (R$ 142.50), percentuais com 1 decimal (4.2%), inteiros sem decimais (1247 pedidos)
-3. **Separar fatos de inferências** — Dados vs interpretações
-4. **Incluir sugestões proibidas** — Para o Strategist não repetir
-
----
-
-## DADOS DA LOJA
-
+{$perfilLojaSection}<dados_loja>
 | Campo | Valor |
 |-------|-------|
 | Nome | {$storeName} |
@@ -95,11 +107,9 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 ```json
 {$benchmarks}
 ```
+</dados_loja>
 
----
-
-## SUGESTÕES ANTERIORES (NÃO REPETIR)
-
+<sugestoes_anteriores>
 **Total:** {$totalSuggestions} sugestões já dadas
 
 ### Temas Saturados:
@@ -107,31 +117,69 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 
 ### Por Categoria:
 {$suggestionsByCategory}
+</sugestoes_anteriores>
 
----
-
-## DADOS DE MERCADO
-
+<dados_mercado>
 **Google Trends:** Tendência {$tendencia}, interesse {$interesseBusca}/100
 
 **Preços:** R$ {$precoMinMercado} - R$ {$precoMaxMercado} (média R$ {$precoMedioMercado})
+</dados_mercado>
 
----
-
-## CONCORRENTES ({$concorrentesSucesso}/{$totalConcorrentes} analisados)
+<concorrentes>
+**Concorrentes Analisados:** {$concorrentesSucesso}/{$totalConcorrentes}
 
 {$concorrentesFormatados}
 
 **Média concorrentes:** R$ {$mediaPrecosConcorrentes}
+</concorrentes>
 
----
-
-## APRENDIZADO DE ANÁLISES ANTERIORES (FEEDBACK)
-
+<aprendizado>
 {$learningSection}
+</aprendizado>
 
 ---
 
+<persona>
+Você é um Analista de Dados Sênior especializado em e-commerce brasileiro. Seu trabalho é extrair, organizar e sintetizar informações de múltiplas fontes para alimentar o próximo estágio do pipeline de análise.
+</persona>
+
+<instrucoes_coleta>
+## TAREFA
+Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
+
+## REGRAS
+
+1. **Baseie-se exclusivamente nos dados fornecidos** em <dados_loja> — Se um dado não estiver disponível, escreva "NÃO DISPONÍVEL" (ou seja, evite inventar ou estimar valores ausentes)
+2. **Números específicos** — Valores monetários com 2 decimais (R$ 142.50), percentuais com 1 decimal (4.2%), inteiros sem decimais (1247 pedidos)
+3. **Separe claramente fatos de inferências** — Identifique o que é dado direto e o que é interpretação
+4. **Inclua todas as sugestões proibidas** listadas em <sugestoes_anteriores> para o Strategist saber o que evitar
+5. **Marque problemas recorrentes:** Se um problema já apareceu em 3+ análises anteriores (conforme <sugestoes_anteriores>), marque-o como `recorrente: true` em `alerts_for_analyst`. Problemas recorrentes indicam que sugestões anteriores não foram efetivas — o Analyst deve buscar abordagens diferentes.
+
+<keywords_foco>
+## INDICADORES PRIORITÁRIOS PARA COLETA
+
+Ao analisar os dados da loja, priorize a coleta destes indicadores:
+- **Estoque:** % produtos sem estoque, produtos ativos com estoque crítico, valor parado em estoque
+- **Vendas:** Ticket médio vs benchmark, tendência de receita, taxa de cancelamento
+- **Cupons:** Taxa de uso, impacto no faturamento, cupons inativos
+- **Produtos:** Best-sellers com risco de ruptura, produtos sem vendas no período, concentração de vendas
+- **Competitividade:** Preço vs concorrentes, diferenciais ausentes, oportunidades de mercado
+- **Recorrência:** Quais problemas já foram identificados antes e quantas vezes
+</keywords_foco>
+</instrucoes_coleta>
+{$focoModulo}
+
+<regras_anti_alucinacao>
+## REGRAS ANTI-ALUCINAÇÃO
+
+1. **Baseie todas as afirmações exclusivamente nos dados fornecidos** em <dados_loja>, <dados_mercado> e <concorrentes>. Quando não houver dados suficientes para uma conclusão, escreva explicitamente: "dados insuficientes para esta análise".
+2. **Separe fatos de interpretações:** Fatos vêm diretamente dos dados fornecidos. Interpretações são inferências suas — identifique-as como tal.
+3. **Quando citar números,** eles devem vir diretamente dos dados fornecidos. Identifique a origem (ex: "conforme dados de pedidos", "segundo benchmarks do setor").
+4. **Se um dado não estiver disponível,** liste-o em `data_not_available` — use "NÃO DISPONÍVEL" em vez de estimar ou inventar.
+5. **Fique à vontade para dizer que não tem informação suficiente** para qualquer seção do JSON de saída.
+</regras_anti_alucinacao>
+
+<exemplos>
 ## FEW-SHOT: EXEMPLOS DE COLETA
 
 ### EXEMPLO 1 — Resumo histórico bem escrito
@@ -169,28 +217,29 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 }
 ```
 
-### EXEMPLO 3 — Alerta bem estruturado
+### EXEMPLO 3 — Alerta bem estruturado (com rastreamento de recorrência)
 
 ```json
 {
   "alerts_for_analyst": {
     "critical": [
-      "42% dos SKUs ativos estão sem estoque (84 de 200)"
+      {"descricao": "42% dos SKUs ativos estão sem estoque (84 de 200)", "dados": "84/200 ativos", "recorrente": true, "vezes_reportado": 4}
     ],
     "warnings": [
-      "Ticket médio caiu 12% nos últimos 30 dias",
-      "3 dos 10 produtos mais vendidos estão esgotados"
+      {"descricao": "Ticket médio caiu 12% nos últimos 30 dias", "dados": "R$ 142 → R$ 125", "recorrente": false, "vezes_reportado": 1},
+      {"descricao": "3 dos 10 produtos mais vendidos estão esgotados", "dados": "Kit Cronograma, Máscara 1kg, Sérum", "recorrente": true, "vezes_reportado": 3}
     ],
     "info": [
-      "Tendência de busca do nicho está em alta (+15%)",
-      "Concorrente principal lançou promoção de 40%"
+      {"descricao": "Tendência de busca do nicho está em alta (+15%)", "dados": "Google Trends", "recorrente": false, "vezes_reportado": 0},
+      {"descricao": "Concorrente principal lançou promoção de 40%", "dados": "Beleza Natural", "recorrente": false, "vezes_reportado": 0}
     ]
   }
 }
 ```
+**Nota:** Alertas com `recorrente: true` indicam que o Analyst deve propor ABORDAGENS DIFERENTES para este problema, pois as anteriores não funcionaram.
+</exemplos>
 
----
-
+<formato_saida>
 ## FORMATO DE SAÍDA
 
 ```json
@@ -242,14 +291,23 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
     "interesse": {$interesseBusca}
   },
   "alerts_for_analyst": {
-    "critical": [],
-    "warnings": [],
-    "info": []
+    "critical": [
+      {"descricao": "string", "dados": "evidência numérica", "recorrente": false, "vezes_reportado": 0}
+    ],
+    "warnings": [
+      {"descricao": "string", "dados": "evidência numérica", "recorrente": false, "vezes_reportado": 0}
+    ],
+    "info": [
+      {"descricao": "string", "dados": "evidência numérica", "recorrente": false, "vezes_reportado": 0}
+    ]
+  },
+  "data_quality": {
+    "completeness": "alta|media|baixa",
+    "missing_data": ["lista de dados que não foram encontrados — deve corresponder a data_not_available"],
+    "confidence_notes": "Observações sobre a qualidade/confiabilidade dos dados coletados"
   }
 }
 ```
-
----
 
 ## CHECKLIST
 
@@ -257,9 +315,10 @@ Coletar, organizar e sintetizar dados da loja e mercado para o Analyst.
 - [ ] Sugestões anteriores listadas para evitar repetição?
 - [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
 - [ ] Alertas categorizados (critical, warnings, info)?
-- [ ] Dados não disponíveis listados?
+- [ ] Dados ausentes listados em data_not_available?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
+</formato_saida>
 PROMPT;
     }
 
@@ -270,30 +329,39 @@ PROMPT;
         }
 
         $keywords = [
-            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado'],
-            'Frete Grátis' => ['frete grátis', 'frete gratuito'],
-            'Fidelidade' => ['fidelidade', 'pontos', 'cashback'],
-            'Kits/Combos' => ['kit', 'combo', 'bundle', 'cronograma'],
-            'Estoque' => ['estoque', 'avise-me', 'reposição'],
-            'Email' => ['email', 'newsletter', 'automação'],
-            'Vídeos' => ['vídeo', 'tutorial'],
-            'Assinatura' => ['assinatura', 'recorrência'],
+            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado', 'personalização'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete gratis'],
+            'Fidelidade' => ['fidelidade', 'pontos', 'cashback', 'recompensa', 'loyalty'],
+            'Kits/Combos' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
+            'Estoque' => ['estoque', 'avise-me', 'reposição', 'inventário'],
+            'Email' => ['email', 'newsletter', 'automação', 'e-mail'],
+            'Vídeos' => ['vídeo', 'video', 'tutorial', 'youtube', 'reels'],
+            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
+            'Cupom' => ['cupom', 'desconto', 'voucher', 'código'],
+            'Checkout' => ['checkout', 'finalização', 'carrinho', 'abandono'],
+            'Reviews' => ['review', 'avaliação', 'avaliações', 'depoimento'],
+            'WhatsApp' => ['whatsapp', 'zap', 'mensagem'],
+            'Influenciador' => ['influenciador', 'influencer', 'parceria', 'afiliado'],
+            'Ticket' => ['ticket', 'ticket médio', 'aov'],
+            'Reativação' => ['reativação', 'reativar', 'inativos', 'dormentes'],
+            'Cross-sell' => ['cross-sell', 'cross sell', 'upsell', 'up-sell', 'venda cruzada'],
         ];
 
         $counts = [];
         foreach ($suggestions as $s) {
-            $title = mb_strtolower($s['title'] ?? '');
+            $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
             foreach ($keywords as $theme => $kws) {
                 foreach ($kws as $kw) {
-                    if (strpos($title, $kw) !== false) {
+                    if (strpos($text, $kw) !== false) {
                         $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+
                         break;
                     }
                 }
             }
         }
 
-        $saturated = array_filter($counts, fn ($c) => $c >= 3);
+        $saturated = array_filter($counts, fn ($c) => $c >= 2);
         arsort($saturated);
 
         if (empty($saturated)) {

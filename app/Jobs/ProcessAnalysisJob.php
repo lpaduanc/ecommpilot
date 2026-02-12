@@ -111,6 +111,7 @@ class ProcessAnalysisJob implements ShouldQueue
             'analysis_id' => $this->analysis->id,
             'store_id' => $this->analysis->store_id,
             'user_id' => $this->analysis->user_id,
+            'analysis_type' => $this->analysis->analysis_type?->value ?? 'general',
             'attempt' => $this->attempts(),
             'timestamp' => now()->toIso8601String(),
         ]);

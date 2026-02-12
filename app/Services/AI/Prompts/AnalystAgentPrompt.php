@@ -56,48 +56,52 @@ class AnalystAgentPrompt
         $structuredBenchmarks = $data['structured_benchmarks'] ?? [];
         $benchmarkSummary = self::summarizeBenchmarks($structuredBenchmarks, $benchmarks, $ticketMedio);
 
+        // ProfileSynthesizer store profile
+        $perfilLojaSection = '';
+        if (! empty($data['store_profile'])) {
+            $profileJson = json_encode($data['store_profile'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $perfilLojaSection = <<<SECTION
+<perfil_loja>
+{$profileJson}
+</perfil_loja>
+
+SECTION;
+        }
+
+        // V6: Sugestões anteriores para anti-repetição de diagnósticos
+        $previousSuggestions = $data['previous_suggestions'] ?? [];
+        $allSuggestions = isset($previousSuggestions['all']) ? $previousSuggestions['all'] : $previousSuggestions;
+        $previousSuggestionsSection = self::formatPreviousSuggestionsForAnalyst($allSuggestions);
+
+        // V6: Module config para análises especializadas
+        $moduleConfig = $data['module_config'] ?? null;
+        $keywordsModulo = '';
+        $exemplosModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $keywords = $moduleConfig->analystKeywords['keywords'] ?? '';
+            $foco = $moduleConfig->analystKeywords['foco_analise'] ?? '';
+            $keywordsModulo = "\n\nKeywords adicionais para análise {$tipo}:\n{$keywords}\n\nDirecionamento específico:\n{$foco}";
+            $exemplosModulo = "\n\nExemplos adicionais específicos para análise {$tipo}:\nAplique o mesmo padrão dos exemplos acima, mas com foco em métricas e indicadores de {$tipo}.";
+        }
+
         return <<<PROMPT
 # ANALYST — DIAGNÓSTICO DA LOJA
 
-## TAREFA
-Analisar os dados da loja e produzir um diagnóstico estruturado com:
-1. Health Score (0-100)
-2. Alertas priorizados
-3. 5 oportunidades com potencial de receita
-4. Briefing para o Strategist
-
----
-
-## REGRAS
-
-1. **Health Score:** Calcular baseado nos 5 componentes. Aplicar OVERRIDE se situação crítica.
-2. **Alertas:** Apenas problemas reais com dados que comprovem. Não inventar alertas. Máximo 5 alertas, priorizados por severidade.
-3. **Oportunidades:** Gerar exatamente 5 oportunidades, cada uma com potencial específico em R$.
-4. **Comparação tripla:** Sempre comparar ticket da loja vs benchmark vs concorrentes.
-5. **Sazonalidade:** Considerar antes de classificar algo como anomalia.
-6. **Classificação Health Score:** critico (0-25), atencao (26-50), saudavel (51-75), excelente (76-100).
-
----
-
-## CONTEXTO DA LOJA
-
+{$perfilLojaSection}<contexto_loja>
 - **Nome:** {$storeName}
 - **Nicho:** {$niche} / {$subcategory}
 - **Ticket Médio:** R$ {$ticketMedio}
 - **Pedidos/Mês:** {$pedidosMes}
 - **Faturamento:** R$ {$faturamentoMes}/mês
 - **Período:** {$periodDays} dias
+</contexto_loja>
 
----
-
-## CONTEXTO SAZONAL
-
+<contexto_sazonal>
 {$sazonalidade}
+</contexto_sazonal>
 
----
-
-## DADOS OPERACIONAIS
-
+<dados_operacionais>
 ### Pedidos
 ```json
 {$orders}
@@ -119,44 +123,74 @@ Analisar os dados da loja e produzir um diagnóstico estruturado com:
 ```json
 {$coupons}
 ```
+</dados_operacionais>
 
----
-
-## HISTÓRICO DA LOJA (para detectar anomalias)
-
+<historico_loja>
 ```json
 {$historicalData}
 ```
 
 **Regra:** Variação > 20% vs média histórica = ANOMALIA
+</historico_loja>
 
----
-
-## DADOS DE MERCADO
-
+<dados_mercado>
 {$marketSummary}
+</dados_mercado>
 
----
-
-## DADOS DE CONCORRENTES
-
+<dados_concorrentes>
 {$competitorSummary}
+</dados_concorrentes>
 
----
-
-## COMPARATIVO LOJA vs CONCORRENTES
-
+<comparativo_concorrentes>
 {$comparativoLojaConcorrentes}
 
 **IMPORTANTE:** Use estes dados para preencher a seção `comparativo_concorrentes` no JSON de saída.
+</comparativo_concorrentes>
 
----
-
-## BENCHMARKS DO SETOR (Base de Conhecimento)
-
+<benchmarks_setor>
 {$benchmarkSummary}
+</benchmarks_setor>
+
+<sugestoes_anteriores>
+{$previousSuggestionsSection}
+</sugestoes_anteriores>
 
 ---
+
+<persona>
+Você é um Analista de Diagnóstico especializado em e-commerce brasileiro, com expertise em identificar problemas, oportunidades e calcular a saúde operacional de lojas online.
+</persona>
+
+<instrucoes_analise>
+## TAREFA
+Analisar os dados da loja e produzir um diagnóstico estruturado com:
+1. Health Score (0-100)
+2. Alertas priorizados
+3. 5 oportunidades com potencial de receita
+4. Briefing para o Strategist com 5 problemas (causas raiz)
+
+## REGRAS
+
+1. **Health Score:** Calcular baseado nos 5 componentes. Aplicar OVERRIDE se situação crítica.
+2. **Alertas:** Gere apenas alertas baseados em problemas reais comprovados com dados numéricos de <dados_operacionais> (ou seja, evite criar alertas sem evidência nos dados). Máximo 5 alertas, priorizados por severidade.
+3. **Oportunidades:** Gerar exatamente 5 oportunidades, cada uma com potencial específico em R$.
+4. **Comparação tripla:** Sempre comparar ticket da loja vs benchmark vs concorrentes.
+5. **Sazonalidade:** Consulte <contexto_sazonal> antes de classificar variações como anomalias.
+6. **Classificação Health Score:** critico (0-25), atencao (26-50), saudavel (51-75), excelente (76-100).
+
+7. **Evitar repetição entre análises:** Consulte <sugestoes_anteriores>.
+   Se os problemas que você identificaria já foram sugeridos 3+ vezes em
+   análises anteriores, APROFUNDE a análise para encontrar CAUSAS RAIZ
+   de segundo nível que ainda não foram abordadas.
+   Exemplo: Se "estoque zerado" já foi reportado 15 vezes, não reporte
+   "estoque zerado" novamente. Em vez disso, investigue POR QUE o estoque
+   continua zerado (falha na previsão? fornecedor? capital? decisão
+   estratégica de descontinuar?) e reporte ESSA causa raiz.
+
+8. **Identificação de causa raiz:** Não liste apenas sintomas no briefing_strategist.
+   - RUIM: "Estoque está baixo" (isso é um sintoma)
+   - BOM: "55% dos produtos ativos estão sem estoque, concentrados em kits de alto valor (R$200+). Isso sugere falha na previsão de demanda para produtos compostos."
+   Os 5 problemas do briefing devem ser CAUSAS RAIZ, não sintomas, e DIFERENTES entre si.
 
 ## CÁLCULO DO HEALTH SCORE
 
@@ -196,8 +230,39 @@ Dependência de cupons:
 **IMPORTANTE:** Aplique TODAS as penalizações acumuladas, mas nunca abaixo do mínimo mais restritivo.
 **Exemplo:** Score calculado = 65, estoque zerado 35% (-20), cancelamento 11% (-10) → 65 - 20 - 10 = 35, classificação: atenção.
 
----
+<keywords_foco>
+Organize sua análise priorizando os seguintes aspectos quando houver dados disponíveis:
+conversão, abandono de carrinho, ticket médio, margem, CAC, funil de vendas,
+tráfego por canal, taxa de recompra, sazonalidade, performance mobile vs desktop{$keywordsModulo}
+</keywords_foco>
+</instrucoes_analise>
 
+<regras_anti_alucinacao>
+## REGRAS ANTI-ALUCINAÇÃO
+
+1. **Baseie todas as afirmações exclusivamente nos dados fornecidos** em <dados_operacionais>, <historico_loja> e <benchmarks_setor>. Quando não houver dados suficientes para uma conclusão, escreva explicitamente: "dados insuficientes para esta análise".
+2. **Separe fatos de interpretações:** Fatos vêm diretamente dos dados fornecidos. Interpretações são inferências suas — identifique-as como tal.
+3. **Quando citar números,** eles devem vir diretamente dos dados fornecidos. Identifique a origem (ex: "conforme dados de pedidos", "segundo benchmarks do setor").
+4. **Se um dado não estiver disponível,** registre a limitação — use campos como `dados_insuficientes` para listar áreas sem dados.
+5. **Fique à vontade para dizer que não tem informação suficiente** para qualquer seção do JSON de saída.
+</regras_anti_alucinacao>
+
+<formato_classificacao>
+## CLASSIFICAÇÃO DE INSIGHTS
+
+Para cada alerta e oportunidade que gerar, inclua internamente a classificação:
+- **fonte:** "dado_direto" (extraído dos dados) | "inferencia" (sua interpretação dos dados) | "benchmark_geral" (comparação com padrões do setor)
+- **confianca:** "alta" (dado direto verificável) | "media" (inferência lógica) | "baixa" (estimativa ou benchmark genérico)
+
+Exemplos de classificação:
+- "42% dos SKUs sem estoque" → fonte: dado_direto, confianca: alta
+- "Isso indica perda estimada de R$ 4.200/mês" → fonte: inferencia, confianca: media
+- "Acima da média do setor de moda (estimada em 65%)" → fonte: benchmark_geral, confianca: media
+
+**REGRA:** Alertas com confianca "baixa" devem ser classificados como severidade máxima "monitorar" (nunca "critico"). Oportunidades com confianca "baixa" devem ter potencial apresentado como faixa (ex: "R$ 1.000-3.000/mês") ao invés de número exato.
+</formato_classificacao>
+
+<exemplos>
 ## FEW-SHOT: EXEMPLOS DE DIAGNÓSTICO
 
 ### EXEMPLO 1 — Alerta crítico bem escrito
@@ -236,11 +301,25 @@ Dependência de cupons:
   "classificacao": "critico"
 }
 ```
+</exemplos>
 
----
+<exemplos_contrastivos>
+## EXEMPLOS CONTRASTIVOS — BOM vs RUIM
 
-## FORMATO DE SAÍDA
+<exemplo_analise_boa>
+"A taxa de conversão da loja é 1.2%, calculada a partir dos dados fornecidos (145 vendas / 12.083 visitantes). Comparando com o benchmark informado para o nicho de moda feminina (~2.5%), a loja opera 52% abaixo do esperado. O principal gargalo identificado nos dados é a página de checkout, onde 73% dos carrinhos são abandonados."
+**Por que é bom:** usa dados reais da loja, faz cálculo verificável, compara com benchmark identificando a fonte, aponta gargalo específico.
+</exemplo_analise_boa>
 
+<exemplo_analise_ruim>
+"A loja tem uma conversão baixa e precisa melhorar. O mercado de e-commerce está em crescimento e a loja deveria aproveitar melhor as oportunidades disponíveis."
+**Por que é ruim:** não cita números, não referencia dados, faz afirmação genérica sobre "o mercado", não aponta causa específica.
+</exemplo_analise_ruim>
+
+Siga o padrão do exemplo bom. Evite o padrão do exemplo ruim.{$exemplosModulo}
+</exemplos_contrastivos>
+
+<formato_saida>
 Retorne APENAS o JSON abaixo:
 
 ```json
@@ -270,7 +349,10 @@ Retorne APENAS o JSON abaixo:
       "titulo": "Descrição curta do problema",
       "dados": "Números específicos que comprovam",
       "impacto": "R$ X/mês ou X% de perda",
-      "acao": "O que fazer"
+      "causa_raiz": "Análise de POR QUE isso está acontecendo, não apenas O QUE",
+      "acao": "O que fazer",
+      "fonte": "dado_direto|inferencia|benchmark_geral",
+      "confianca": "alta|media|baixa"
     }
   ],
 
@@ -281,7 +363,10 @@ Retorne APENAS o JSON abaixo:
       "titulo": "Descrição da oportunidade",
       "dados": "Números que embasam",
       "potencial": "R$ X/mês",
-      "acao": "Como capturar"
+      "acao": "Como capturar",
+      "fonte": "dado_direto|inferencia|benchmark_geral",
+      "confianca": "alta|media|baixa",
+      "ja_sugerido_antes": false
     }
   ],
 
@@ -328,22 +413,25 @@ Retorne APENAS o JSON abaixo:
   },
 
   "briefing_strategist": {
-    "problema_1": "Principal problema a resolver",
-    "problema_2": "Segundo problema",
-    "problema_3": "Terceiro problema",
-    "oportunidade_principal": "Maior oportunidade identificada",
+    "problema_1": "Causa raiz #1 — detalhada, com dados, diferente dos problemas anteriores",
+    "problema_2": "Causa raiz #2 — diferente do problema_1",
+    "problema_3": "Causa raiz #3 — diferente dos dois anteriores",
+    "problema_4": "Causa raiz #4 — diferente dos três anteriores",
+    "problema_5": "Causa raiz #5 — diferente dos quatro anteriores",
+    "oportunidade_principal": "Maior oportunidade não explorada",
     "restricoes": ["O que NÃO fazer ou limitações da loja"],
+    "temas_ja_saturados": ["temas que já foram sugeridos 3+ vezes em análises anteriores"],
     "dados_chave": {
       "faturamento_mes": 0,
       "ticket_medio": 0,
       "taxa_conversao": 0,
-      "estoque_zerado_percent": 0
+      "estoque_zerado_percent": 0,
+      "uso_cupons_percent": 0
     }
-  }
+  },
+  "dados_insuficientes": ["áreas onde não há dados suficientes para análise completa"]
 }
 ```
-
----
 
 ## CHECKLIST ANTES DE ENVIAR
 
@@ -353,9 +441,10 @@ Retorne APENAS o JSON abaixo:
 - [ ] Exatamente 5 oportunidades, cada uma com potencial em R$?
 - [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
 - [ ] Comparativo de concorrentes preenchido (ticket, categorias, promoções, avaliações)?
-- [ ] Briefing para Strategist com 3 problemas e restrições?
+- [ ] Briefing para Strategist com 5 problemas (causas raiz, não sintomas) e restrições?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
+</formato_saida>
 PROMPT;
     }
 
@@ -761,6 +850,81 @@ MARKET;
 
         if ($promocoesAtivas < $mediaPromosConcorrentes * 0.5) {
             $output .= "⚠️ **ALERTA:** Você tem bem menos promoções que a concorrência.\n\n";
+        }
+
+        return $output;
+    }
+
+    /**
+     * Formata sugestões anteriores para o Analyst, destacando temas saturados
+     * para que o diagnóstico evite repetir os mesmos problemas.
+     */
+    private static function formatPreviousSuggestionsForAnalyst(array $suggestions): string
+    {
+        if (empty($suggestions)) {
+            return 'Nenhuma sugestão anterior. Esta é uma das primeiras análises desta loja.';
+        }
+
+        $total = count($suggestions);
+        $output = "**Total:** {$total} sugestões já dadas em análises anteriores\n\n";
+
+        // Identificar temas saturados
+        $keywords = [
+            'Estoque/Reposição' => ['estoque', 'avise-me', 'reposição', 'inventário', 'repor'],
+            'Kits/Combos' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
+            'Cupom/Desconto' => ['cupom', 'desconto', 'voucher', 'código promocional'],
+            'Email Marketing' => ['email', 'newsletter', 'automação', 'e-mail marketing'],
+            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete condicional'],
+            'Fidelidade/Pontos' => ['fidelidade', 'pontos', 'cashback', 'recompensa'],
+            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado'],
+            'Checkout/Conversão' => ['checkout', 'carrinho', 'abandono', 'conversão'],
+            'Ticket Médio' => ['ticket médio', 'aov', 'valor médio'],
+            'Upsell/Cross-sell' => ['upsell', 'cross-sell', 'venda cruzada'],
+            'Reativação' => ['reativação', 'reativar', 'clientes inativos', 'win-back'],
+            'Reviews/Avaliações' => ['review', 'avaliação', 'depoimento', 'prova social'],
+            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
+        ];
+
+        $counts = [];
+        foreach ($suggestions as $s) {
+            $text = mb_strtolower(($s['title'] ?? '').($s['description'] ?? ''));
+            foreach ($keywords as $theme => $kws) {
+                foreach ($kws as $kw) {
+                    if (mb_strpos($text, $kw) !== false) {
+                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        arsort($counts);
+
+        // Temas saturados (3+ vezes)
+        $saturated = array_filter($counts, fn ($c) => $c >= 3);
+        if (! empty($saturated)) {
+            $output .= "### TEMAS SATURADOS (já sugeridos 3+ vezes — NÃO diagnosticar o mesmo problema)\n\n";
+            foreach ($saturated as $theme => $count) {
+                $output .= "- **{$theme}**: {$count}x — APROFUNDE para encontrar a CAUSA RAIZ por trás deste tema\n";
+            }
+            $output .= "\n**REGRA:** Se o problema mais óbvio é um tema saturado acima, NÃO o reporte.\n";
+            $output .= "Em vez disso, investigue POR QUE esse problema persiste apesar de já ter sido\n";
+            $output .= "sugerido múltiplas vezes, e reporte essa causa raiz mais profunda.\n\n";
+        }
+
+        // Temas usados (1-2 vezes)
+        $used = array_filter($counts, fn ($c) => $c >= 1 && $c < 3);
+        if (! empty($used)) {
+            $output .= "### Temas já usados (1-2x — evitar se possível)\n\n";
+            foreach ($used as $theme => $count) {
+                $output .= "- {$theme}: {$count}x\n";
+            }
+            $output .= "\n";
+        }
+
+        if (empty($saturated) && empty($used)) {
+            $output .= "Nenhum tema saturado identificado.\n";
         }
 
         return $output;

@@ -118,6 +118,17 @@ export interface Opportunity {
 }
 
 /**
+ * Analysis type option (from GET /analysis/types)
+ */
+export interface AnalysisTypeOption {
+  key: string;
+  label: string;
+  description: string;
+  available: boolean;
+  is_default: boolean;
+}
+
+/**
  * Analysis interface
  */
 export interface Analysis {
@@ -125,6 +136,8 @@ export interface Analysis {
   user_id: string;  // UUID
   store_id: string;  // UUID
   status: AnalysisStatus;
+  analysis_type?: string;
+  analysis_type_label?: string;
   health_score: number;
   suggestions: Suggestion[];
   alerts: Alert[];
@@ -140,6 +153,7 @@ export interface Analysis {
 export interface AnalysisRequest {
   store_id?: string;  // UUID
   focus_areas?: string[];
+  analysis_type?: string;
 }
 
 /**

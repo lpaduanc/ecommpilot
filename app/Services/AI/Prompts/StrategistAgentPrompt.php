@@ -5,14 +5,15 @@ namespace App\Services\AI\Prompts;
 class StrategistAgentPrompt
 {
     /**
-     * STRATEGIST AGENT V5 - REFATORADO
+     * STRATEGIST AGENT V6 - REFATORADO
      *
      * Mudanças:
-     * - Removida persona fictícia
-     * - Adicionados few-shot examples concretos
-     * - Prompt reduzido (~50%)
-     * - Formato de saída simplificado
-     * - Constraints específicos e mensuráveis
+     * - 12 sugestões (4 HIGH, 4 MEDIUM, 4 LOW) ao invés de 9 (3-3-3)
+     * - Sistema graduado de temas saturados (3+ bloqueado, 2 frequente, 1 já usado)
+     * - 5 problemas do Analyst (escolhe 3 para HIGH)
+     * - ThemeKeywords centralizado
+     * - Min 6 categorias diferentes
+     * - Máximo 4 best-practices
      */
     public static function getSeasonalityContext(): array
     {
@@ -82,81 +83,15 @@ RESOURCES;
         return <<<'PROMPT'
 # STRATEGIST — GERADOR DE SUGESTÕES
 
-## PAPEL
-Você é um consultor sênior de e-commerce especializado em lojas Nuvemshop no Brasil. Sua expertise inclui:
-- Análise de métricas de vendas e conversão
-- Estratégias de pricing e promoções
-- Otimização de catálogo e estoque
-- Benchmarking competitivo no mercado brasileiro
-
-Seu objetivo é transformar dados em ações concretas que aumentem receita.
-
----
-
-## TAREFA
-Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatória: 3 HIGH, 3 MEDIUM, 3 LOW.
-
----
-
-## REGRAS OBRIGATÓRIAS (em ordem de prioridade)
-
-1. **NUNCA repetir** tema de sugestão anterior (veja ZONAS PROIBIDAS)
-2. **HIGH (prioridades 1-3):** Obrigatório citar dado específico (número) da loja ou concorrente
-3. **CITE NOMES DE PRODUTOS:** Ao sugerir kits, combos, reposição ou otimização, SEMPRE mencione os nomes reais dos produtos da seção "PRODUTOS MAIS VENDIDOS" ou "PRODUTOS SEM ESTOQUE". NUNCA diga "crie kits premium" sem especificar quais produtos usar.
-4. **Cada sugestão deve ter:** problema específico + ação específica + resultado esperado com número
-5. **Se não há dado para embasar:** não pode ser HIGH, rebaixe para MEDIUM ou LOW
-6. **Referências a concorrentes (CONDICIONAL):**
-   - SE houver dados em DADOS DE CONCORRENTES: inclua competitor_reference em pelo menos 3 sugestões
-   - SE NÃO houver dados de concorrentes: use dados de mercado ou práticas padrão do setor
-   - NUNCA invente dados de concorrentes - use apenas informações fornecidas
-7. **Comparações diretas:** Ao citar concorrente, compare e sugira ação (ex: "Concorrente X oferece Y, a loja pode oferecer Z")
-8. **Formato do campo competitor_reference:**
-   - Para HIGH: obrigatório se houver dados de concorrente relevantes, senão use dados da própria loja
-   - Para MEDIUM/LOW: opcional, preencha se houver dado relevante disponível
-9. **DIVERSIFICAÇÃO OBRIGATÓRIA:** As 9 sugestões devem cobrir no mínimo 5 categorias diferentes. Máximo 2 sugestões da mesma categoria. Se um problema domina (ex: estoque), aborde-o em 1 sugestão HIGH abrangente e varie as demais.
-10. **DATA-DRIVEN PRIMEIRO:** Mínimo 6 de 9 sugestões devem citar dados específicos da loja (números, produtos, métricas reais dos dados fornecidos). Máximo 3 podem ser best-practices de mercado, e estas devem ser MEDIUM ou LOW.
-11. **CÁLCULO DE IMPACTO OBRIGATÓRIO para HIGH:** Cada HIGH deve ter em expected_result:
-    - Base: valor atual (ex: "Ticket atual R$160")
-    - Premissa: % de melhoria realista com fonte (ex: "benchmark: kits aumentam ticket em 50%")
-    - Cálculo: base × premissa = resultado (ex: "R$160 × 1.20 × 4.800 pedidos = R$921.600/mês")
-    - Contribuição: quanto isso aproxima da meta (ex: "cobre 15% do gap para R$800k")
-
----
-
-## ZONAS PROIBIDAS (NÃO REPETIR)
-
-{{prohibited_suggestions}}
-
-**Temas saturados:**
-{{saturated_themes}}
-
-{{accepted_rejected}}
-
----
-
-## APRENDIZADO DE ANÁLISES ANTERIORES
-
-{{learning_context}}
-
----
-
-## CONTEXTO
-
-**Período:** {{seasonality_period}}
-**Foco sazonal:** {{seasonality_focus}}
-
-{{platform_resources}}
-
----
-
+{{perfil_loja}}<dados_loja>
 ## DADOS DA LOJA
 
 {{store_context}}
 
 **NOTA:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis. Não crie sugestões de reposição de estoque para produtos gratuitos.
+</dados_loja>
 
----
-
+<produtos_vendidos>
 ## PRODUTOS MAIS VENDIDOS (Top 10)
 
 {{best_sellers_section}}
@@ -165,29 +100,29 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 - Para sugestões de kits: "Monte kit com [Produto 1] + [Produto 2] + [Produto 3]"
 - Para reposição: "Reponha [Produto X] e [Produto Y] que estão sem estoque"
 - Para otimização: "Melhore a página do [Produto Z] que tem alta visualização"
+</produtos_vendidos>
 
----
-
+<produtos_sem_estoque>
 ## PRODUTOS SEM ESTOQUE
 
 {{out_of_stock_section}}
 
 **INSTRUÇÃO CRÍTICA:** Se sugerir reposição, cite os NOMES dos produtos acima, não apenas "47 SKUs".
+</produtos_sem_estoque>
 
----
-
+<anomalias>
 ## ANOMALIAS DETECTADAS
 
 {{anomalies_section}}
+</anomalias>
 
----
-
+<objetivos_loja>
 ## OBJETIVOS DA LOJA (PRIORIDADE)
 
 {{store_goals}}
+</objetivos_loja>
 
----
-
+<diagnostico_analyst>
 ## DIAGNÓSTICO DO ANALYST (VINCULAR AS 3 HIGH A ESTES PROBLEMAS)
 
 {{analyst_briefing}}
@@ -196,34 +131,139 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
 
 {{analyst_analysis}}
 
-**REGRA CRÍTICA:** Cada uma das 3 sugestões HIGH DEVE resolver diretamente um dos problemas identificados acima pelo Analyst. NÃO desperdice slots HIGH com best-practices genéricas. Exemplo: Se o Analyst identifica "51% sem estoque" como problema #1, a HIGH #1 deve abordar a reposição de estoque com dados específicos.
+**REGRA CRÍTICA:** Reserve cada slot HIGH exclusivamente para resolver um dos 5 problemas identificados pelo Analyst em <diagnostico_analyst>. Escolha os 4 mais críticos para as 4 HIGH.
+</diagnostico_analyst>
 
----
-
+<dados_concorrentes>
 ## DADOS DE CONCORRENTES
 
 {{competitor_data}}
+</dados_concorrentes>
 
----
-
+<dados_mercado>
 ## DADOS DE MERCADO
 
 {{market_data}}
+</dados_mercado>
 
----
-
+<estrategias_rag>
 ## ESTRATÉGIAS RECOMENDADAS (BASE DE CONHECIMENTO)
 
 {{rag_strategies}}
+</estrategias_rag>
 
----
-
+<benchmarks_setor>
 ## BENCHMARKS DO SETOR
 
 {{rag_benchmarks}}
+</benchmarks_setor>
+
+<zonas_proibidas>
+## ZONAS PROIBIDAS (NÃO REPETIR)
+
+{{prohibited_suggestions}}
+
+**Temas saturados:**
+{{saturated_themes}}
+
+{{accepted_rejected}}
+</zonas_proibidas>
+
+<aprendizado>
+## APRENDIZADO DE ANÁLISES ANTERIORES
+
+{{learning_context}}
+</aprendizado>
+
+<contexto_sazonal>
+## CONTEXTO SAZONAL
+
+**Período:** {{seasonality_period}}
+**Foco sazonal:** {{seasonality_focus}}
+</contexto_sazonal>
+
+<recursos_plataforma>
+## RECURSOS DA PLATAFORMA
+
+{{platform_resources}}
+</recursos_plataforma>
 
 ---
 
+<persona>
+## PAPEL
+
+Você é um consultor sênior de e-commerce especializado em lojas Nuvemshop no Brasil. Sua expertise inclui:
+- Análise de métricas de vendas e conversão
+- Estratégias de pricing e promoções
+- Otimização de catálogo e estoque
+- Benchmarking competitivo no mercado brasileiro
+
+Seu objetivo é transformar dados em ações concretas que aumentem receita.
+</persona>
+
+<instrucoes_estrategia>
+## TAREFA
+
+Gerar EXATAMENTE 12 sugestões acionáveis para a loja. Distribuição obrigatória: 4 HIGH, 4 MEDIUM, 4 LOW.
+
+## REGRAS OBRIGATÓRIAS (em ordem de prioridade)
+
+1. **Gere apenas sugestões com temas inéditos** que não constem em <zonas_proibidas>
+2. **HIGH (prioridades 1-4):** Obrigatório citar dado específico (número) da loja ou concorrente
+3. **CITE NOMES DE PRODUTOS:** Ao sugerir kits, combos, reposição ou otimização, sempre mencione os nomes reais dos produtos das seções <produtos_vendidos> ou <produtos_sem_estoque>.
+4. **Cada sugestão deve ter:** problema específico + ação específica + resultado esperado com número
+5. **Sugestões HIGH devem obrigatoriamente conter dados específicos.** Sugestões sem dados concretos devem ser MEDIUM ou LOW.
+6. **Referências a concorrentes (CONDICIONAL):**
+   - SE houver dados em <dados_concorrentes>: inclua competitor_reference em pelo menos 4 sugestões
+   - SE NÃO houver dados de concorrentes: use dados de mercado ou práticas padrão do setor
+   - Use exclusivamente dados de concorrentes fornecidos em <dados_concorrentes> (ou seja, evite criar dados fictícios).
+7. **Comparações diretas:** Ao citar concorrente, compare e sugira ação (ex: "Concorrente X oferece Y, a loja pode oferecer Z")
+8. **Formato do campo competitor_reference:**
+   - Para HIGH: obrigatório se houver dados de concorrente relevantes, senão use dados da própria loja
+   - Para MEDIUM/LOW: opcional, preencha se houver dado relevante disponível
+9. **DIVERSIFICAÇÃO OBRIGATÓRIA:** As 12 sugestões devem cobrir no mínimo 6 categorias diferentes. Máximo 2 sugestões da mesma categoria. Se um problema domina (ex: estoque), aborde-o em 1 sugestão HIGH abrangente e varie as demais.
+10. **DATA-DRIVEN PRIMEIRO:** Mínimo 8 de 12 sugestões devem citar dados específicos da loja (números, produtos, métricas reais dos dados fornecidos). Máximo 4 podem ser best-practices de mercado, e estas devem ser MEDIUM ou LOW.
+11. **CÁLCULO DE IMPACTO OBRIGATÓRIO para HIGH:** Cada HIGH deve ter em expected_result:
+    - Base: valor atual (ex: "Ticket atual R$160")
+    - Premissa: % de melhoria realista com fonte (ex: "benchmark: kits aumentam ticket em 50%")
+    - Cálculo: base × premissa = resultado (ex: "R$160 × 1.20 × 4.800 pedidos = R$921.600/mês")
+    - Contribuição: quanto isso aproxima da meta (ex: "cobre 15% do gap para R$800k")
+
+<keywords_foco>
+Direcione suas sugestões priorizando impacto nos seguintes indicadores:
+faturamento, conversão, ticket médio, retenção, custo de aquisição,
+experiência do cliente, automação de processos, diferenciação competitiva{{keywords_modulo}}
+</keywords_foco>
+{{foco_modulo}}
+</instrucoes_estrategia>
+
+<regras_anti_alucinacao>
+## REGRAS ANTI-ALUCINAÇÃO
+
+1. **Baseie todas as afirmações exclusivamente nos dados fornecidos** em <dados_loja>, <diagnostico_analyst>, <dados_concorrentes> e <dados_mercado>. Quando não houver dados suficientes para uma sugestão, use dados de mercado ou best practices e identifique explicitamente como tal.
+2. **Separe fatos de interpretações:** Ao descrever o problema de uma sugestão, indique o que é dado direto (ex: "ticket médio atual R$ 160") e o que é inferência (ex: "estimamos que kits aumentariam 20%").
+3. **Quando citar números,** eles devem vir diretamente dos dados fornecidos. Se usar estimativas, identifique com "estimado:" ou "benchmark:".
+4. **Dados de concorrentes:** Use exclusivamente dados presentes em <dados_concorrentes>. Se não houver dados de concorrentes, use null em competitor_reference — não invente dados fictícios.
+5. **Cálculos de impacto:** Sempre mostre a base (dado real), a premissa (% estimada com fonte) e o resultado. O leitor deve poder verificar o cálculo.
+</regras_anti_alucinacao>
+
+<classificacao_sugestao>
+## CLASSIFICAÇÃO OBRIGATÓRIA POR SUGESTÃO
+
+Para cada sugestão, o campo `data_source` deve indicar a classificação:
+- **"dado_direto"** — Sugestão baseada em número específico dos dados da loja (ex: "8 SKUs sem venda há 60 dias")
+- **"inferencia"** — Sugestão baseada em interpretação dos dados (ex: "tendência de queda sugere necessidade de promoção")
+- **"best_practice_geral"** — Sugestão baseada em boas práticas do setor, sem dado específico da loja
+
+**REGRAS DE PRIORIDADE:**
+- Sugestões HIGH devem ser obrigatoriamente "dado_direto"
+- Sugestões MEDIUM podem ser "dado_direto" ou "inferencia"
+- Sugestões LOW podem ser qualquer classificação, incluindo "best_practice_geral"
+- Máximo 4 sugestões "best_practice_geral" nas 12 totais
+</classificacao_sugestao>
+
+<exemplos>
 ## FEW-SHOT: EXEMPLOS DE SUGESTÕES BEM ESCRITAS
 
 ### EXEMPLO 1 — HIGH (com dado específico)
@@ -286,9 +326,26 @@ Gerar EXATAMENTE 9 sugestões acionáveis para a loja. Distribuição obrigatór
   }
 }
 ```
+</exemplos>
 
----
+<exemplos_contrastivos>
+## EXEMPLOS CONTRASTIVOS — BOM vs RUIM
 
+<exemplo_sugestao_boa>
+"Implemente exit-intent popup com oferta de frete grátis para carrinhos acima de R$150. Sua taxa de abandono é 73% e o ticket médio atual é R$185. Passos: 1) Configure popup no checkout quando mouse sair da janela 2) Ofereça frete grátis (custo estimado: R$15/pedido) 3) Meta: reduzir abandono para 60% = ~18 vendas adicionais/mês = R$3.330 receita adicional."
+**Por que é bom:** específico, usa dados da loja, calcula impacto, dá passos de implementação, estima resultado.
+</exemplo_sugestao_boa>
+
+<exemplo_sugestao_ruim>
+"Melhore a experiência de checkout para reduzir o abandono de carrinho. Uma boa experiência de compra aumenta as conversões."
+**Por que é ruim:** genérico, sem dados, sem passos concretos, sem estimativa de impacto, serve para qualquer loja do mundo.
+</exemplo_sugestao_ruim>
+
+Suas sugestões devem seguir o padrão do exemplo bom. Se uma sugestão se parecer com o exemplo ruim, refaça antes de incluir.
+{{exemplos_modulo}}
+</exemplos_contrastivos>
+
+<formato_saida>
 ## FORMATO DE SAÍDA
 
 Retorne APENAS o JSON abaixo, sem texto adicional:
@@ -316,29 +373,31 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
         "complexity": "baixa|media|alta",
         "cost": "R$ X/mês ou R$ 0"
       },
-      "competitor_reference": "Se HIGH: qual dado de concorrente ou mercado embasa isso. Se não há: null"
+      "competitor_reference": "Se HIGH: qual dado de concorrente ou mercado embasa isso. Se não há: null",
+      "insight_origem": "problema_1|problema_2|problema_3|problema_4|problema_5|best_practice (qual problema do Analyst esta sugestão resolve)",
+      "nivel_confianca": "alto|medio|baixo"
     }
   ]
 }
 ```
 
----
-
 ## VALIDAÇÃO OBRIGATÓRIA
 
 Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrija antes de enviar:
 
-1. **Contagem:** Conte as sugestões. SE não forem exatamente 9, adicione ou remova até ter 9.
-2. **Distribuição:** Conte por impacto. SE não forem 3 HIGH + 3 MEDIUM + 3 LOW, ajuste os expected_impact.
+1. **Contagem:** Conte as sugestões. SE não forem exatamente 12, adicione ou remova até ter 12.
+2. **Distribuição:** Conte por impacto. SE não forem 4 HIGH + 4 MEDIUM + 4 LOW, ajuste os expected_impact.
 3. **Zonas proibidas:** Compare cada título com ZONAS PROIBIDAS. SE houver overlap temático, substitua a sugestão.
 4. **Dados em HIGH:** Para cada HIGH, verifique se problem contém número específico. SE não contiver, rebaixe para MEDIUM.
 5. **Resultados quantificados:** Para cada sugestão, verifique se expected_result contém R$ ou %. SE não contiver, adicione estimativa.
 6. **Viabilidade:** Para cada sugestão, verifique se é possível na Nuvemshop. SE não for, substitua por alternativa viável.
-7. **Referências a concorrentes:** SE houver dados em DADOS DE CONCORRENTES, verifique se pelo menos 3 sugestões têm competitor_reference preenchido.
-8. **Diversificação:** Conte categorias únicas. SE menos de 5 categorias diferentes, substitua sugestões de categorias repetidas por categorias diferentes.
-9. **Data-driven:** Conte sugestões com dados reais da loja (números específicos em problem ou expected_result). SE menos de 6, reescreva best-practices adicionando dados concretos.
+7. **Referências a concorrentes:** SE houver dados em DADOS DE CONCORRENTES, verifique se pelo menos 4 sugestões têm competitor_reference preenchido.
+8. **Diversificação:** Conte categorias únicas. SE menos de 6 categorias diferentes, substitua sugestões de categorias repetidas por categorias diferentes.
+9. **Data-driven:** Conte sugestões com dados reais da loja (números específicos em problem ou expected_result). SE menos de 8, reescreva best-practices adicionando dados concretos.
+10. **Rastreabilidade:** Cada sugestão HIGH deve ter insight_origem apontando para problema_1, problema_2, problema_3, problema_4 ou problema_5 do Analyst. Escolha os 4 mais críticos dos 5 problemas para as 4 HIGH. Sugestões MEDIUM/LOW podem usar "best_practice" se não vinculadas a um problema específico.
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
+</formato_saida>
 PROMPT;
     }
 
@@ -374,23 +433,9 @@ PROMPT;
      */
     private static function extractProhibitedKeywords(array $suggestions): array
     {
-        $patterns = [
-            'kits' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
-            'cupom' => ['cupom', 'desconto', 'voucher', 'código', 'coupon'],
-            'frete' => ['frete', 'entrega', 'shipping', 'envio'],
-            'fidelidade' => ['fidelidade', 'pontos', 'recompensa', 'loyalty', 'cashback'],
-            'cancelamento' => ['cancelamento', 'abandono', 'desistência', 'carrinho abandonado'],
-            'checkout' => ['checkout', 'finalização', 'carrinho', 'conversão'],
-            'estoque' => ['estoque', 'reposição', 'inventário', 'avise-me'],
-            'email' => ['email', 'newsletter', 'automação', 'e-mail'],
-            'quiz' => ['quiz', 'questionário', 'personalização', 'teste'],
-            'ticket' => ['ticket médio', 'ticket', 'aov', 'valor médio'],
-            'upsell' => ['upsell', 'cross-sell', 'venda cruzada', 'produtos relacionados'],
-            'reativacao' => ['reativação', 'reativar', 'clientes inativos', 'win-back'],
-            'reviews' => ['review', 'avaliação', 'depoimento', 'prova social'],
-            'conteudo' => ['conteúdo', 'blog', 'seo', 'redes sociais'],
-            'assinatura' => ['assinatura', 'recorrência', 'subscription'],
-        ];
+        // V6: Use ThemeKeywords centralizado
+        $patterns = \App\Services\Analysis\ThemeKeywords::all();
+        $labels = \App\Services\Analysis\ThemeKeywords::labels();
 
         $foundKeywords = [];
         foreach ($suggestions as $s) {
@@ -401,72 +446,95 @@ PROMPT;
             foreach ($patterns as $theme => $words) {
                 foreach ($words as $word) {
                     if (mb_strpos($text, $word) !== false) {
-                        $foundKeywords[$theme] = true;
+                        $foundKeywords[$theme] = $labels[$theme] ?? $theme;
                         break;
                     }
                 }
             }
         }
 
-        return array_keys($foundKeywords);
+        return array_values($foundKeywords);
     }
 
     public static function identifySaturatedThemes(array $previousSuggestions): string
     {
         if (empty($previousSuggestions)) {
-            return 'Nenhum.';
+            return 'Nenhum tema foi usado anteriormente. Todos os temas estão disponíveis.';
         }
 
-        // V5: Keywords expandidas para capturar mais variações
-        $keywords = [
-            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado', 'teste de'],
-            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete condicional'],
-            'Fidelidade/Pontos' => ['fidelidade', 'pontos', 'cashback', 'recompensa', 'loyalty'],
-            'Kits/Combos' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
-            'Estoque/Reposição' => ['estoque', 'avise-me', 'reposição', 'inventário'],
-            'Email Marketing' => ['email', 'newsletter', 'automação', 'e-mail marketing'],
-            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
-            'Cupom/Desconto' => ['cupom', 'desconto', 'voucher', 'código promocional'],
-            'Checkout/Conversão' => ['checkout', 'carrinho', 'abandono', 'conversão'],
-            'Cancelamento' => ['cancelamento', 'taxa de cancelamento', 'desistência'],
-            'Ticket Médio' => ['ticket médio', 'aov', 'valor médio', 'ticket'],
-            'Upsell/Cross-sell' => ['upsell', 'cross-sell', 'venda cruzada', 'produtos relacionados'],
-            'Reativação' => ['reativação', 'clientes inativos', 'win-back', 'reativar'],
-            'Reviews/Avaliações' => ['review', 'avaliação', 'depoimento', 'prova social'],
-            'SEO/Conteúdo' => ['seo', 'conteúdo', 'blog', 'descrição de produto'],
-            'Redes Sociais' => ['instagram', 'facebook', 'redes sociais', 'social'],
-            'WhatsApp' => ['whatsapp', 'zap', 'atendimento'],
-            'Pós-Venda' => ['pós-venda', 'pós compra', 'acompanhamento', 'feedback'],
-        ];
+        // V6: Use ThemeKeywords centralizado
+        $keywords = \App\Services\Analysis\ThemeKeywords::all();
+        $labels = \App\Services\Analysis\ThemeKeywords::labels();
 
         $counts = [];
         foreach ($previousSuggestions as $s) {
             $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
-            foreach ($keywords as $theme => $kws) {
+            foreach ($keywords as $themeKey => $kws) {
                 foreach ($kws as $kw) {
                     if (mb_strpos($text, $kw) !== false) {
-                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+                        $counts[$themeKey] = ($counts[$themeKey] ?? 0) + 1;
                         break;
                     }
                 }
             }
         }
 
-        // V5: Threshold baixado de 2 para 1 - qualquer tema já usado é considerado saturado
-        $saturated = array_filter($counts, fn ($c) => $c >= 1);
-        arsort($saturated);
+        // V6: Sistema graduado de saturação
+        $blocked = array_filter($counts, fn ($c) => $c >= 3);      // 3+ = BLOQUEADO
+        $frequent = array_filter($counts, fn ($c) => $c === 2);    // 2 = FREQUENTE
+        $used = array_filter($counts, fn ($c) => $c === 1);        // 1 = JÁ USADO
+        $unused = array_diff_key($keywords, $counts);               // 0 = NUNCA USADO
 
-        if (empty($saturated)) {
-            return 'Nenhum.';
-        }
+        arsort($blocked);
+        arsort($frequent);
+        arsort($used);
 
         $out = '';
-        foreach ($saturated as $t => $c) {
-            $label = $c >= 2 ? 'MUITO USADO' : 'JÁ USADO';
-            $out .= "- {$t} ({$c}x) — {$label}, EVITAR\n";
+
+        // Temas bloqueados (3+)
+        if (! empty($blocked)) {
+            $out .= "### 🔴 BLOQUEADO (PROIBIDO) - 3+ ocorrências:\n\n";
+            foreach ($blocked as $themeKey => $c) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $out .= "- {$label} ({$c}x) — NÃO SUGERIR\n";
+            }
+            $out .= "\n";
         }
 
-        return $out;
+        // Temas frequentes (2)
+        if (! empty($frequent)) {
+            $out .= "### 🟡 FREQUENTE (usar apenas com ângulo completamente novo) - 2 ocorrências:\n\n";
+            foreach ($frequent as $themeKey => $c) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $out .= "- {$label} ({$c}x) — Permitido SOMENTE se abordagem totalmente diferente\n";
+            }
+            $out .= "\n";
+        }
+
+        // Temas já usados (1) - apenas listar, não bloquear
+        if (! empty($used)) {
+            $out .= "### ⚪ JÁ USADO (pode usar com cautela) - 1 ocorrência:\n\n";
+            $usedList = [];
+            foreach ($used as $themeKey => $c) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $usedList[] = $label;
+            }
+            $out .= implode(', ', $usedList)."\n\n";
+        }
+
+        // Temas nunca usados (0) - PREFERIR
+        if (! empty($unused)) {
+            $out .= "### ✅ TEMAS NUNCA USADOS (PREFERIR):\n\n";
+            $unusedList = [];
+            foreach ($unused as $themeKey => $kws) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $unusedList[] = $label;
+            }
+            $out .= implode(', ', $unusedList)."\n\n";
+            $out .= "**INSTRUÇÃO:** Priorize temas desta lista para maximizar diversidade.\n";
+        }
+
+        return $out ?: 'Nenhum tema saturado identificado.';
     }
 
     /**
@@ -666,7 +734,44 @@ PROMPT;
         $anomalies = $context['anomalies'] ?? [];
         $ticketMedio = $context['ticket_medio'] ?? 0;
 
+        // ProfileSynthesizer store profile
+        $perfilLojaSection = '';
+        if (! empty($context['store_profile'])) {
+            $profileJson = json_encode($context['store_profile'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $perfilLojaSection = "<perfil_loja>\n{$profileJson}\n</perfil_loja>\n\n";
+        }
+
+        // V6: Module config para análises especializadas
+        $moduleConfig = $context['module_config'] ?? null;
+        $focoModulo = '';
+        $keywordsModulo = '';
+        $exemplosModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $foco = $moduleConfig->strategistConfig['foco'] ?? '';
+            $exemploBom = $moduleConfig->strategistConfig['exemplo_bom'] ?? '';
+            $exemploRuim = $moduleConfig->strategistConfig['exemplo_ruim'] ?? '';
+
+            $focoModulo = "\n<foco_modulo>\nEsta é uma análise especializada. Foco: {$foco}\nDirecione TODAS as sugestões para este foco específico.\n</foco_modulo>";
+
+            $keywords = $moduleConfig->analystKeywords['keywords'] ?? '';
+            if ($keywords) {
+                $keywordsModulo = "\n\nKeywords adicionais para análise {$tipo}:\n{$keywords}";
+            }
+
+            if ($exemploBom || $exemploRuim) {
+                $exemplosModulo = "\n\nExemplos específicos para análise {$tipo}:";
+                if ($exemploBom) {
+                    $exemplosModulo .= "\n\n<exemplo_sugestao_boa_modulo>\n{$exemploBom}\n</exemplo_sugestao_boa_modulo>";
+                }
+                if ($exemploRuim) {
+                    $exemplosModulo .= "\n\n<exemplo_sugestao_ruim_modulo>\n{$exemploRuim}\n</exemplo_sugestao_ruim_modulo>";
+                }
+            }
+        }
+
         $replacements = [
+            '{{perfil_loja}}' => $perfilLojaSection,
             '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($allSuggestions),
             '{{saturated_themes}}' => self::identifySaturatedThemes($allSuggestions),
             '{{accepted_rejected}}' => self::formatAcceptedAndRejected($acceptedTitles, $rejectedTitles),
@@ -685,6 +790,10 @@ PROMPT;
             '{{market_data}}' => is_array($marketData) ? json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $marketData,
             '{{rag_strategies}}' => self::formatRagStrategies($ragStrategies),
             '{{rag_benchmarks}}' => self::formatRagBenchmarks($ragBenchmarks),
+            // V6: Module-specific replacements
+            '{{foco_modulo}}' => $focoModulo,
+            '{{keywords_modulo}}' => $keywordsModulo,
+            '{{exemplos_modulo}}' => $exemplosModulo,
         ];
 
         foreach ($replacements as $k => $v) {
@@ -744,7 +853,7 @@ PROMPT;
                 $gapPct = round(($gap / (float) $goals['monthly_revenue']) * 100);
                 $formattedGap = 'R$ '.number_format($gap, 2, ',', '.');
                 $output .= "\n**GAP PARA META:** {$formattedGap} ({$gapPct}% de aumento necessário)\n";
-                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 9 sugestões deve cobrir pelo menos 50% deste gap.\n";
+                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 12 sugestões deve cobrir pelo menos 50% deste gap.\n";
             }
         }
 
@@ -754,7 +863,7 @@ PROMPT;
     }
 
     /**
-     * Formata o briefing do Analyst para vincular as 3 HIGH aos 3 problemas prioritarios.
+     * Formata o briefing do Analyst para vincular as 3 HIGH aos 5 problemas prioritarios.
      */
     private static function formatAnalystBriefing(array|string $analystAnalysis): string
     {
@@ -771,7 +880,7 @@ PROMPT;
             return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
         }
 
-        // Extrair problemas: formato do Analyst usa problema_1, problema_2, problema_3
+        // Extrair problemas: formato do Analyst usa problema_1 até problema_5
         $problems = [];
         if (! empty($briefing['problema_1'])) {
             $problems[] = $briefing['problema_1'];
@@ -781,6 +890,12 @@ PROMPT;
         }
         if (! empty($briefing['problema_3'])) {
             $problems[] = $briefing['problema_3'];
+        }
+        if (! empty($briefing['problema_4'])) {
+            $problems[] = $briefing['problema_4'];
+        }
+        if (! empty($briefing['problema_5'])) {
+            $problems[] = $briefing['problema_5'];
         }
 
         // Fallback: tentar formato de array
@@ -792,10 +907,10 @@ PROMPT;
             return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
         }
 
-        $output = "### TOP 3 PROBLEMAS PRIORITÁRIOS (cada HIGH deve resolver um destes):\n\n";
+        $output = "### TOP 5 PROBLEMAS PRIORITÁRIOS:\n\n**Escolha 4 dos 5 problemas abaixo para as sugestões HIGH. Priorize os 4 mais críticos e que NUNCA foram abordados em análises anteriores.**\n\n";
         foreach ($problems as $i => $problem) {
             $n = $i + 1;
-            $output .= "**HIGH #{$n} deve resolver:** {$problem}\n";
+            $output .= "**Problema #{$n}:** {$problem}\n";
         }
 
         // Dados-chave do briefing

@@ -13,6 +13,34 @@ class LiteStrategistAgentPrompt
         $analysis = json_encode($context['analysis'] ?? [], JSON_UNESCAPED_UNICODE);
         $niche = $context['niche'] ?? 'geral';
 
+        // V6: Module config para análises especializadas
+        $moduleConfig = $context['module_config'] ?? null;
+        $focoModulo = '';
+        $exemplosModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $foco = $moduleConfig->strategistConfig['foco'] ?? '';
+            $exemploBom = $moduleConfig->strategistConfig['exemplo_bom'] ?? '';
+            $exemploRuim = $moduleConfig->strategistConfig['exemplo_ruim'] ?? '';
+
+            $focoModulo = <<<FOCO
+
+## FOCO ESPECIALIZADO: {$tipo}
+Esta é uma análise especializada. Direcione TODAS as 6 sugestões para: {$foco}
+Não gere sugestões genéricas — todas devem estar alinhadas com o foco acima.
+FOCO;
+
+            if ($exemploBom || $exemploRuim) {
+                $exemplosModulo = "\n\n## EXEMPLOS ESPECÍFICOS PARA {$tipo}";
+                if ($exemploBom) {
+                    $exemplosModulo .= "\n**BOM:** {$exemploBom}";
+                }
+                if ($exemploRuim) {
+                    $exemplosModulo .= "\n**RUIM (evitar):** {$exemploRuim}";
+                }
+            }
+        }
+
         return <<<PROMPT
 # LITE STRATEGIST — SUGESTÕES RÁPIDAS
 
@@ -21,6 +49,7 @@ Você é um consultor sênior de e-commerce brasileiro com 10+ anos de experiên
 
 ## TAREFA
 Gerar EXATAMENTE 6 sugestões acionáveis para aumentar vendas: 2 HIGH, 2 MEDIUM, 2 LOW.
+{$focoModulo}
 
 ## CRITÉRIOS DE IMPACTO
 - HIGH: Potencial > R$ 5.000/mês OU melhoria de conversão > 20%
@@ -41,6 +70,7 @@ Gerar EXATAMENTE 6 sugestões acionáveis para aumentar vendas: 2 HIGH, 2 MEDIUM
 ```
 
 ## Nicho: {$niche}
+{$exemplosModulo}
 
 ---
 

@@ -75,7 +75,7 @@ class CriticAgentService
         $prompt = CriticAgentPrompt::get($data);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 'from_settings',
+            'temperature' => 0.1,
             'prompt_chars' => strlen($prompt),
         ]);
 
@@ -83,6 +83,7 @@ class CriticAgentService
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
+            'temperature' => 0.1,
             'max_tokens' => 32768, // Increased to prevent JSON truncation
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
@@ -181,10 +182,13 @@ class CriticAgentService
                 if (! empty($finalVersion)) {
                     $approvedSuggestions[] = [
                         'final_version' => $this->normalizeFinalVersion($finalVersion),
-                        'quality_score' => 7.0, // V5 doesn't have quality_score, use default
+                        'quality_score' => floatval($item['score_qualidade'] ?? 7.0),
                         'final_priority' => intval($finalVersion['priority'] ?? ($index + 1)),
                         'status' => $status,
                         'changes_made' => $item['changes_made'] ?? null,
+                        'dados_verificados' => $item['dados_verificados'] ?? null,
+                        'numeros_corretos' => $item['numeros_corretos'] ?? null,
+                        'verificacao_status' => $item['verificacao_status'] ?? null,
                     ];
                 }
             } else {
@@ -278,6 +282,9 @@ class CriticAgentService
             // V5 additional fields
             'implementation' => $implementation,
             'competitor_reference' => $suggestion['competitor_reference'] ?? null,
+            // Phase 5: Traceability fields
+            'insight_origem' => $suggestion['insight_origem'] ?? 'best_practice',
+            'nivel_confianca' => $suggestion['nivel_confianca'] ?? 'medio',
         ];
     }
 
@@ -313,7 +320,7 @@ class CriticAgentService
     }
 
     /**
-     * Enforce flexible distribution of suggestions (max 3 per category, total 5-9).
+     * Enforce flexible distribution of suggestions (max 4 per category, total 10-15).
      */
     private function enforceDistribution(array $suggestions): array
     {
@@ -343,10 +350,10 @@ class CriticAgentService
             'low' => count($low),
         ]);
 
-        // Cap each category at max 3
-        $high = array_slice($high, 0, 3);
+        // Cap each category at max 4
+        $high = array_slice($high, 0, 4);
         $medium = array_slice($medium, 0, 4);
-        $low = array_slice($low, 0, 3);
+        $low = array_slice($low, 0, 4);
 
         // Ensure at least 1 HIGH and 1 LOW if we have enough suggestions
         $total = count($high) + count($medium) + count($low);

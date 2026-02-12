@@ -12,6 +12,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const error = ref(null);
     const nextAvailableAt = ref(null);
     const pollingInterval = ref(null);
+    const analysisTypes = ref([]);
 
     // Persistent suggestions state
     const persistentSuggestions = ref([]);
@@ -169,12 +170,23 @@ export const useAnalysisStore = defineStore('analysis', () => {
         }
     }
     
-    async function requestNewAnalysis() {
+    async function fetchAnalysisTypes() {
+        try {
+            const response = await api.get('/analysis/types');
+            analysisTypes.value = response.data.types.filter(t => t.available);
+        } catch {
+            analysisTypes.value = [];
+        }
+    }
+
+    async function requestNewAnalysis(analysisType = 'general') {
         isRequesting.value = true;
         error.value = null;
 
         try {
-            const response = await api.post('/analysis/request');
+            const response = await api.post('/analysis/request', {
+                analysis_type: analysisType,
+            });
             pendingAnalysis.value = response.data.pending_analysis;
 
             // Start polling to check when analysis completes
@@ -633,6 +645,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
         completedSuggestions,
         ignoredSuggestions,
         highImpactSuggestions,
+
+        // Analysis types
+        analysisTypes,
+        fetchAnalysisTypes,
 
         // Analysis actions
         fetchCurrentAnalysis,
