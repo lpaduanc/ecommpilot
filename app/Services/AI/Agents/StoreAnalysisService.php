@@ -842,7 +842,6 @@ class StoreAnalysisService
                 'ticket_medio' => $ticketMedio,
                 'pedidos_mes' => $ordersTotal,
             ],
-            $previousSuggestions['all'] ?? [],
             $previousSuggestions['rejected_titles'] ?? []
         );
 
@@ -1583,38 +1582,6 @@ class StoreAnalysisService
     }
 
     /**
-     * Normalize a title for comparison.
-     * Removes common words, normalizes whitespace, and extracts key concepts.
-     */
-    private function normalizeTitle(string $title): string
-    {
-        $title = mb_strtolower(trim($title));
-
-        // Remove common stopwords and filler words
-        $stopwords = [
-            'de', 'da', 'do', 'das', 'dos', 'para', 'com', 'em', 'a', 'o', 'as', 'os',
-            'e', 'ou', 'um', 'uma', 'uns', 'umas', 'no', 'na', 'nos', 'nas',
-            'pelo', 'pela', 'pelos', 'pelas', 'ao', 'aos', 'à', 'às',
-            'implementar', 'otimizar', 'criar', 'desenvolver', 'lançar', 'ativar',
-            'configurar', 'melhorar', 'aprimorar', 'revisar', 'analisar', 'oferecer',
-            'estratégia', 'estratégico', 'estratégica', 'estratégicos', 'estratégicas',
-            'gestão', 'gerenciamento', 'sistema', 'programa', 'plano',
-            'produtos', 'produto', 'clientes', 'cliente', 'loja', 'lojas',
-            'haircare', 'beleza', 'cosmético', 'cosméticos', 'capilar', 'cabelo', 'cabelos',
-            'nuvemshop', 'ecommerce', 'e-commerce',
-            'priorizar', 'proativo', 'proativa', 'funcionalidade',
-        ];
-
-        $words = preg_split('/\s+/', $title);
-        $filteredWords = array_filter($words, fn ($w) => ! in_array($w, $stopwords) && strlen($w) > 2);
-
-        // Sort to make comparison order-independent
-        sort($filteredWords);
-
-        return implode(' ', $filteredWords);
-    }
-
-    /**
      * Calculate similarity between two normalized titles using Jaccard similarity.
      */
     private function calculateTitleSimilarity(string $title1, string $title2): float
@@ -2021,43 +1988,79 @@ class StoreAnalysisService
             return $strategistSuggestions;
         }
 
-        // Build list of historical titles (normalized)
-        $historicalTitles = [];
+        // Build list of historical titles ONLY from accepted/completed suggestions
+        // Rejected suggestions should NOT block new ideas on the same topic
+        $acceptedTitles = [];
+        $rejectedTitles = [];
         foreach ($previousSuggestions as $prev) {
             $title = $prev['title'] ?? '';
-            if (! empty($title)) {
-                $historicalTitles[] = $this->normalizeTitle($title);
+            if (empty($title)) {
+                continue;
+            }
+            $status = $prev['status'] ?? 'pending';
+            $normalized = $this->normalizeTitle($title);
+
+            if (in_array($status, ['rejected', 'ignored'])) {
+                $rejectedTitles[] = $normalized;
+            } else {
+                $acceptedTitles[] = $normalized;
             }
         }
 
         $validated = [];
+        $filteredByAccepted = 0;
+        $filteredByRejected = 0;
         foreach ($strategistSuggestions as $suggestion) {
             $title = $suggestion['title'] ?? '';
             $normalizedTitle = $this->normalizeTitle($title);
 
-            // Check similarity against historical suggestions
-            $isSimilarToHistory = false;
-            foreach ($historicalTitles as $histTitle) {
-                $similarity = $this->calculateTitleSimilarity($normalizedTitle, $histTitle);
-                if ($similarity >= 0.85) {
-                    Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered (similar to history)', [
-                        'title' => $title,
-                        'similarity' => round($similarity * 100, 1).'%',
-                    ]);
-                    $isSimilarToHistory = true;
+            // Filter against accepted/completed (don't re-suggest what client already has)
+            $isSimilarToAccepted = false;
+            foreach ($acceptedTitles as $accTitle) {
+                if ($this->calculateTitleSimilarity($normalizedTitle, $accTitle) >= 0.85) {
+                    $isSimilarToAccepted = true;
                     break;
                 }
             }
 
-            if (! $isSimilarToHistory) {
-                $validated[] = $suggestion;
+            if ($isSimilarToAccepted) {
+                $filteredByAccepted++;
+                Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered (similar to accepted)', [
+                    'title' => $title,
+                ]);
+
+                continue;
             }
+
+            // Filter against rejected (don't re-suggest what client explicitly rejected)
+            // Use lower threshold (0.75) - only block very similar, allow refined versions
+            $isSimilarToRejected = false;
+            foreach ($rejectedTitles as $rejTitle) {
+                if ($this->calculateTitleSimilarity($normalizedTitle, $rejTitle) >= 0.75) {
+                    $isSimilarToRejected = true;
+                    break;
+                }
+            }
+
+            if ($isSimilarToRejected) {
+                $filteredByRejected++;
+                Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered (similar to rejected)', [
+                    'title' => $title,
+                ]);
+
+                continue;
+            }
+
+            $validated[] = $suggestion;
         }
 
         Log::channel($this->logChannel)->info('Pre-validation of Strategist suggestions', [
             'input' => count($strategistSuggestions),
             'output' => count($validated),
-            'filtered_by_history' => count($strategistSuggestions) - count($validated),
+            'filtered_by_accepted' => $filteredByAccepted,
+            'filtered_by_rejected' => $filteredByRejected,
+            'accepted_history_count' => count($acceptedTitles),
+            'rejected_history_count' => count($rejectedTitles),
         ]);
 
         return $validated;
@@ -2208,7 +2211,7 @@ class StoreAnalysisService
      *
      * V5: Now also validates against historical suggestions to prevent duplicates.
      */
-    private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context, array $previousSuggestions = [], array $rejectedTitles = []): array
+    private function ensureMinimumSuggestions(array $approved, array $allGenerated, array $context, array $rejectedTitles = []): array
     {
         // REGRA DE NEGÓCIO CRÍTICA: SEMPRE 9 sugestões com distribuição 3-3-3
         $required = 9;

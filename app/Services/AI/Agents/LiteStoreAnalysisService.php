@@ -9,6 +9,7 @@ use App\Services\AI\AIManager;
 use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\LiteAnalystAgentPrompt;
 use App\Services\AI\Prompts\LiteStrategistAgentPrompt;
+use App\Services\Analysis\SuggestionDeduplicationTrait;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\Log;
  */
 class LiteStoreAnalysisService
 {
+    use SuggestionDeduplicationTrait;
+
     private const ANALYSIS_PERIOD_DAYS = 7; // Reduced from 15
 
     public function __construct(
@@ -57,6 +60,17 @@ class LiteStoreAnalysisService
         $validatedSuggestions = $this->validateSuggestions($suggestions);
 
         Log::info('Lite Pipeline: After validation: '.count($validatedSuggestions).' suggestions');
+
+        // 5b. Deduplicate against historical suggestions
+        $previousSuggestions = $this->getPreviousSuggestionsDetailed($store->id, 50);
+        if (! empty($previousSuggestions['all'])) {
+            $validatedSuggestions = $this->validateSuggestionUniqueness(
+                $validatedSuggestions,
+                $previousSuggestions['all']
+            );
+
+            Log::info('Lite Pipeline: After historical dedup: '.count($validatedSuggestions).' suggestions');
+        }
 
         // 6. Save analysis and suggestions
         Log::info('Lite Pipeline: Saving analysis and suggestions');

@@ -199,16 +199,36 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
-     * Normaliza título para comparação
+     * Normaliza título para comparação.
+     * Remove stopwords e palavras de ação para extrair conceitos-chave.
+     * Ordena palavras para comparação independente de ordem.
      */
     protected function normalizeTitle(string $title): string
     {
-        $title = mb_strtolower($title);
-        $title = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title) ?: $title;
-        $title = preg_replace('/[^a-z0-9\s]/', '', $title);
-        $title = preg_replace('/\s+/', ' ', $title);
+        $title = mb_strtolower(trim($title));
 
-        return trim($title);
+        // Remove common stopwords and filler words
+        $stopwords = [
+            'de', 'da', 'do', 'das', 'dos', 'para', 'com', 'em', 'a', 'o', 'as', 'os',
+            'e', 'ou', 'um', 'uma', 'uns', 'umas', 'no', 'na', 'nos', 'nas',
+            'pelo', 'pela', 'pelos', 'pelas', 'ao', 'aos', 'à', 'às',
+            'implementar', 'otimizar', 'criar', 'desenvolver', 'lançar', 'ativar',
+            'configurar', 'melhorar', 'aprimorar', 'revisar', 'analisar', 'oferecer',
+            'estratégia', 'estratégico', 'estratégica', 'estratégicos', 'estratégicas',
+            'gestão', 'gerenciamento', 'sistema', 'programa', 'plano',
+            'produtos', 'produto', 'clientes', 'cliente', 'loja', 'lojas',
+            'haircare', 'beleza', 'cosmético', 'cosméticos', 'capilar', 'cabelo', 'cabelos',
+            'nuvemshop', 'ecommerce', 'e-commerce',
+            'priorizar', 'proativo', 'proativa', 'funcionalidade',
+        ];
+
+        $words = preg_split('/\s+/', $title);
+        $filteredWords = array_filter($words, fn ($w) => ! in_array($w, $stopwords) && strlen($w) > 2);
+
+        // Sort to make comparison order-independent
+        sort($filteredWords);
+
+        return implode(' ', $filteredWords);
     }
 
     /**
