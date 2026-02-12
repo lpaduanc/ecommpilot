@@ -41,15 +41,15 @@ class SettingsService
     {
         $settings = $this->getAISettings();
 
-        // Mask API keys
+        // Check configured status before masking (uses decrypted values)
+        $settings['openai']['is_configured'] = ! empty($settings['openai']['api_key']);
+        $settings['gemini']['is_configured'] = ! empty($settings['gemini']['api_key']);
+        $settings['anthropic']['is_configured'] = ! empty($settings['anthropic']['api_key']);
+
+        // Mask API keys for display
         $settings['openai']['api_key'] = $this->maskApiKey($settings['openai']['api_key']);
         $settings['gemini']['api_key'] = $this->maskApiKey($settings['gemini']['api_key']);
         $settings['anthropic']['api_key'] = $this->maskApiKey($settings['anthropic']['api_key']);
-
-        // Add configured status (database only)
-        $settings['openai']['is_configured'] = ! empty(SystemSetting::get('ai.openai.api_key'));
-        $settings['gemini']['is_configured'] = ! empty(SystemSetting::get('ai.gemini.api_key'));
-        $settings['anthropic']['is_configured'] = ! empty(SystemSetting::get('ai.anthropic.api_key'));
 
         return $settings;
     }

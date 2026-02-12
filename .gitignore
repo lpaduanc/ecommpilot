@@ -22,6 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+nul
 
 # Docker environment files with secrets
 .env.docker

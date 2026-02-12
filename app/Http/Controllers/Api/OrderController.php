@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\SyncedOrder;
@@ -134,15 +136,26 @@ class OrderController extends Controller
                 'coupons' => [],
                 'countries' => [],
                 'states' => [],
-                'cities' => [],
             ]);
         }
+
+        // Retornar todos os status possíveis dos enums com labels
+        $statuses = collect(OrderStatus::cases())->map(fn ($status) => [
+            'value' => $status->value,
+            'label' => $status->label(),
+        ])->values()->toArray();
+
+        $paymentStatuses = collect(PaymentStatus::cases())->map(fn ($status) => [
+            'value' => $status->value,
+            'label' => $status->label(),
+        ])->values()->toArray();
 
         // Obter limite de pedidos do plano
         $plan = $user->currentPlan();
         $ordersLimit = $plan?->orders_limit ?? 0;
         $isUnlimited = $plan?->isUnlimited('orders_limit') ?? false;
 
+        // Query base para coupons e countries (respeitando limite do plano)
         $query = SyncedOrder::where('store_id', $store->id);
 
         // Aplicar limite do plano (apenas pedidos do mês dentro do limite)
@@ -157,39 +170,49 @@ class OrderController extends Controller
             $query->whereIn('id', $allowedOrderIds);
         }
 
-        $orders = $query->get();
+        // Extrair cupons únicos usando query DISTINCT, excluindo códigos auto-gerados
+        $coupons = (clone $query)
+            ->whereNotNull('coupon')
+            ->selectRaw("DISTINCT coupon->>'code' as coupon_code")
+            ->pluck('coupon_code')
+            ->filter(function ($code) {
+                if (! $code || strlen($code) < 2) {
+                    return false;
+                }
 
-        $statuses = $orders
-            ->pluck('status')
-            ->filter()
-            ->map(fn ($status) => $status->value)
-            ->unique()
+                // Excluir hashes puros (hex strings com 20+ caracteres)
+                if (preg_match('/^[0-9A-F]{20,}$/', $code)) {
+                    return false;
+                }
+
+                // Excluir cupons ISZICASH auto-gerados (cashback)
+                if (preg_match('/^ISZICASH[0-9A-F]{20,}$/', $code)) {
+                    return false;
+                }
+
+                // Excluir cupons BQ auto-gerados
+                if (preg_match('/^BQ\d{6}[0-9A-F]+$/', $code)) {
+                    return false;
+                }
+
+                // Excluir rascunhos de pedido
+                if (str_starts_with($code, 'DRAFT-ORDER-')) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->sort()
             ->values()
             ->toArray();
 
-        $paymentStatuses = $orders
-            ->pluck('payment_status')
+        // Extrair países únicos usando query DISTINCT
+        $countries = (clone $query)
+            ->whereNotNull('shipping_address')
+            ->selectRaw("DISTINCT shipping_address->>'country' as country")
+            ->pluck('country')
             ->filter()
-            ->map(fn ($status) => $status->value)
-            ->unique()
-            ->values()
-            ->toArray();
-
-        $coupons = $orders
-            ->pluck('coupon')
-            ->filter()
-            ->map(fn ($coupon) => $coupon['code'] ?? null)
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
-
-        $countries = $orders
-            ->pluck('shipping_address')
-            ->filter()
-            ->map(fn ($address) => $address['country'] ?? null)
-            ->filter()
-            ->unique()
+            ->sort()
             ->values()
             ->toArray();
 
@@ -203,23 +226,12 @@ class OrderController extends Controller
             ];
         }, $states);
 
-        $cities = $orders
-            ->pluck('shipping_address')
-            ->filter()
-            ->map(fn ($address) => $address['city'] ?? null)
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values()
-            ->toArray();
-
         return response()->json([
             'statuses' => $statuses,
             'payment_statuses' => $paymentStatuses,
             'coupons' => $coupons,
             'countries' => $countries,
             'states' => $statesList,
-            'cities' => $cities,
         ]);
     }
 
