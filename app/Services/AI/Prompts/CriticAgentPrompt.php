@@ -81,15 +81,13 @@ RESOURCES;
         $platformResources = self::getPlatformResources();
 
         return <<<PROMPT
-# CRITIC — REVISOR DE SUGESTÕES
+<agent name="critic" version="6">
 
-## TAREFA
+<task>
 Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. Garantir EXATAMENTE 9 sugestões finais (3 HIGH, 3 MEDIUM, 3 LOW).
+</task>
 
----
-
-## REGRAS
-
+<rules priority="mandatory">
 1. **APROVAR** se: tem dado específico, ação clara, resultado com número, viável na Nuvemshop
 2. **MELHORAR** se: falta dado específico, ação vaga, resultado sem número — corrigir e aprovar
 3. **REJEITAR** se: repetição de tema anterior, impossível na plataforma, completamente genérica
@@ -101,11 +99,9 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 - **LOW:** Aceitar se acionável. Rejeitar APENAS se completamente genérica.
 
 **TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar para LOW e tornar específica com dados da loja.
+</rules>
 
----
-
-## VALIDAÇÃO: CITAÇÕES DE CONCORRENTES (CONDICIONAL)
-
+<competitor_validation>
 ### SE houver dados de concorrentes disponíveis nas sugestões:
 
 **REGRA:** No mínimo **3 sugestões HIGH/MEDIUM** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
@@ -131,44 +127,28 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 - Foque em dados internos da loja (métricas, histórico, benchmarks)
 - Use práticas padrão do setor como referência
 - **NÃO invente dados de concorrentes**
+</competitor_validation>
 
----
+<reasoning_instructions>
+ANTES de revisar as sugestões, preencha o campo "reasoning" no JSON com:
+1. Avaliação geral da qualidade das 9 sugestões recebidas
+2. Resumo de decisões (X aprovadas, Y melhoradas, Z rejeitadas)
+3. Pontos fracos identificados
+4. Melhorias realizadas e por quê
 
-## CONTEXTO DA LOJA
+Este raciocínio guiará suas decisões de aprovação/melhoria/rejeição.
+</reasoning_instructions>
 
-- **Nome:** {$storeName}
-- **Ticket Médio:** R$ {$ticketMedio}
-- **Pedidos/Mês:** {$pedidosMes}
-- **Faturamento:** R$ {$faturamentoMes}/mês
+<react_pattern>
+Para CADA sugestão que revisar, preencha o campo "review_react" com:
+- thought: Análise da qualidade da sugestão (dados citados são reais? ação é viável? resultado é quantificado?)
+- action: Decisão tomada (APROVAR/MELHORAR/REJEITAR) com justificativa
+- observation: Resultado da decisão (o que mudou, quality score estimado)
 
-## DADOS-CHAVE PARA VALIDAÇÃO
+Preencha review_react ANTES de decidir o status. Isso garante decisões fundamentadas.
+</react_pattern>
 
-- **Produtos sem estoque:** {$outOfStockPct}% dos ativos
-- **Top 3 problemas identificados pelo Analyst:**
-{$topProblems}
-**REGRA DE VINCULAÇÃO:** As 3 sugestões HIGH devem resolver os 3 problemas acima. Se alguma HIGH não endereçar nenhum dos 3 problemas do Analyst, REJEITAR e substituir por sugestão que endereça.
-
----
-
-## SUGESTÕES ANTERIORES (NÃO REPETIR TEMA)
-
-{$previousFormatted}
-
----
-
-{$platformResources}
-
----
-
-## SUGESTÕES PARA REVISAR
-
-```json
-{$suggestions}
-```
-
----
-
-## FEW-SHOT: EXEMPLOS DE REVISÃO
+<examples>
 
 ### EXEMPLO 1 — APROVAR (sugestão já está boa)
 
@@ -184,8 +164,6 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 **Decisão:** APROVAR
 **Motivo:** Tem dado específico (8 SKUs, R$ 3.200), ação clara, resultado com número
 **Ação:** Manter como está
-
----
 
 ### EXEMPLO 2 — MELHORAR (falta dado específico)
 
@@ -209,8 +187,6 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 }
 ```
 
----
-
 ### EXEMPLO 3 — REJEITAR (tema já sugerido antes)
 
 **Sugestão recebida:**
@@ -224,8 +200,6 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 **Motivo:** Tema "Quiz" já aparece nas sugestões anteriores (saturado)
 **Substituir por:** Nova sugestão com tema diferente
 
----
-
 ### EXEMPLO 4 — REJEITAR (impossível na plataforma)
 
 **Sugestão recebida:**
@@ -238,8 +212,6 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 **Decisão:** REJEITAR
 **Motivo:** Realidade aumentada não está disponível na Nuvemshop
 **Substituir por:** Alternativa viável (ex: fotos 360°, vídeos de produto)
-
----
 
 ### EXEMPLO 5 — MELHORAR (adicionar competitor_reference)
 
@@ -265,8 +237,6 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 }
 ```
 
----
-
 ### EXEMPLO 6 — VALIDAÇÃO DE CITAÇÕES (contagem)
 
 **Cenário:** Das 9 sugestões recebidas, apenas 2 têm competitor_reference preenchido.
@@ -278,14 +248,19 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 
 **Prioridade para adicionar:** Sugestões HIGH primeiro, depois MEDIUM
 
----
+</examples>
 
-## FORMATO DE SAÍDA
-
+<output_format>
 Retorne APENAS o JSON abaixo:
 
 ```json
 {
+  "reasoning": {
+    "quality_assessment": "Avaliação geral das 9 sugestões recebidas",
+    "decisions_summary": "X aprovadas, Y melhoradas, Z rejeitadas",
+    "weak_spots": ["sugestão N: motivo da fraqueza"],
+    "improvements_made": ["sugestão N: o que foi melhorado e por quê"]
+  },
   "review_summary": {
     "approved": 0,
     "improved": 0,
@@ -294,6 +269,11 @@ Retorne APENAS o JSON abaixo:
   },
   "suggestions": [
     {
+      "review_react": {
+        "thought": "Análise da qualidade: dados reais? ação viável? resultado quantificado?",
+        "action": "APROVAR/MELHORAR/REJEITAR - justificativa",
+        "observation": "O que mudou, quality score estimado"
+      },
       "original_title": "Título original do Strategist",
       "status": "approved|improved|replaced",
       "changes_made": "Nenhuma | Descrição das melhorias | Motivo da rejeição + nova sugestão",
@@ -330,11 +310,9 @@ Retorne APENAS o JSON abaixo:
   }
 }
 ```
+</output_format>
 
----
-
-## CHECKLIST ANTES DE ENVIAR
-
+<validation_checklist>
 - [ ] Exatamente 9 sugestões no array `suggestions`?
 - [ ] Distribuição 3 HIGH, 3 MEDIUM, 3 LOW?
 - [ ] Nenhum tema repetido das sugestões anteriores?
@@ -346,6 +324,43 @@ Retorne APENAS o JSON abaixo:
 - [ ] As 3 HIGH resolvem os 3 problemas do Analyst?
 - [ ] Mínimo 5 categorias diferentes nas 9 sugestões?
 - [ ] Cada HIGH tem cálculo de impacto (base × premissa = resultado)?
+- [ ] Cada sugestão tem review_react preenchido?
+- [ ] reasoning tem quality_assessment, decisions_summary, weak_spots e improvements_made?
+</validation_checklist>
+
+<data>
+
+<store_context>
+- **Nome:** {$storeName}
+- **Ticket Médio:** R$ {$ticketMedio}
+- **Pedidos/Mês:** {$pedidosMes}
+- **Faturamento:** R$ {$faturamentoMes}/mês
+</store_context>
+
+<validation_data>
+- **Produtos sem estoque:** {$outOfStockPct}% dos ativos
+- **Top 3 problemas identificados pelo Analyst:**
+{$topProblems}
+**REGRA DE VINCULAÇÃO:** As 3 sugestões HIGH devem resolver os 3 problemas acima. Se alguma HIGH não endereçar nenhum dos 3 problemas do Analyst, REJEITAR e substituir por sugestão que endereça.
+</validation_data>
+
+<previous_suggestions>
+{$previousFormatted}
+</previous_suggestions>
+
+<platform_resources>
+{$platformResources}
+</platform_resources>
+
+<suggestions_to_review>
+```json
+{$suggestions}
+```
+</suggestions_to_review>
+
+</data>
+
+</agent>
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;

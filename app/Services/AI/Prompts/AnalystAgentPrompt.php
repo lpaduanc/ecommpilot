@@ -57,109 +57,26 @@ class AnalystAgentPrompt
         $benchmarkSummary = self::summarizeBenchmarks($structuredBenchmarks, $benchmarks, $ticketMedio);
 
         return <<<PROMPT
-# ANALYST — DIAGNÓSTICO DA LOJA
+<agent name="analyst" version="6">
 
-## TAREFA
+<task>
 Analisar os dados da loja e produzir um diagnóstico estruturado com:
 1. Health Score (0-100)
 2. Alertas priorizados
 3. 5 oportunidades com potencial de receita
 4. Briefing para o Strategist
+</task>
 
----
-
-## REGRAS
-
+<rules priority="mandatory">
 1. **Health Score:** Calcular baseado nos 5 componentes. Aplicar OVERRIDE se situação crítica.
 2. **Alertas:** Apenas problemas reais com dados que comprovem. Não inventar alertas. Máximo 5 alertas, priorizados por severidade.
 3. **Oportunidades:** Gerar exatamente 5 oportunidades, cada uma com potencial específico em R$.
 4. **Comparação tripla:** Sempre comparar ticket da loja vs benchmark vs concorrentes.
 5. **Sazonalidade:** Considerar antes de classificar algo como anomalia.
 6. **Classificação Health Score:** critico (0-25), atencao (26-50), saudavel (51-75), excelente (76-100).
+</rules>
 
----
-
-## CONTEXTO DA LOJA
-
-- **Nome:** {$storeName}
-- **Nicho:** {$niche} / {$subcategory}
-- **Ticket Médio:** R$ {$ticketMedio}
-- **Pedidos/Mês:** {$pedidosMes}
-- **Faturamento:** R$ {$faturamentoMes}/mês
-- **Período:** {$periodDays} dias
-
----
-
-## CONTEXTO SAZONAL
-
-{$sazonalidade}
-
----
-
-## DADOS OPERACIONAIS
-
-### Pedidos
-```json
-{$orders}
-```
-
-### Produtos
-```json
-{$products}
-```
-
-### Estoque
-```json
-{$inventory}
-```
-
-**IMPORTANTE:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis (identificados por termos como "brinde", "grátis", "amostra", "gift", etc.). Esses produtos não devem ser considerados em alertas de estoque baixo ou zerado.
-
-### Cupons
-```json
-{$coupons}
-```
-
----
-
-## HISTÓRICO DA LOJA (para detectar anomalias)
-
-```json
-{$historicalData}
-```
-
-**Regra:** Variação > 20% vs média histórica = ANOMALIA
-
----
-
-## DADOS DE MERCADO
-
-{$marketSummary}
-
----
-
-## DADOS DE CONCORRENTES
-
-{$competitorSummary}
-
----
-
-## COMPARATIVO LOJA vs CONCORRENTES
-
-{$comparativoLojaConcorrentes}
-
-**IMPORTANTE:** Use estes dados para preencher a seção `comparativo_concorrentes` no JSON de saída.
-
----
-
-## BENCHMARKS DO SETOR (Base de Conhecimento)
-
-{$benchmarkSummary}
-
----
-
-## CÁLCULO DO HEALTH SCORE
-
+<health_score_calculation>
 | Componente | Peso | Como calcular |
 |------------|------|---------------|
 | Ticket vs Benchmark | 25 pts | ≥100% = 25, 80-99% = 20, 60-79% = 15, <60% = 10 |
@@ -195,10 +112,19 @@ Dependência de cupons:
 
 **IMPORTANTE:** Aplique TODAS as penalizações acumuladas, mas nunca abaixo do mínimo mais restritivo.
 **Exemplo:** Score calculado = 65, estoque zerado 35% (-20), cancelamento 11% (-10) → 65 - 20 - 10 = 35, classificação: atenção.
+</health_score_calculation>
 
----
+<reasoning_instructions>
+ANTES de gerar o diagnóstico, preencha o campo "reasoning" no JSON com:
+1. Avaliação da qualidade e completude dos dados recebidos
+2. Métricas-chave identificadas com classificação (bom/ruim/neutro)
+3. Anomalias detectadas com thresholds usados
+4. Detalhamento do cálculo do Health Score (componente por componente + overrides)
 
-## FEW-SHOT: EXEMPLOS DE DIAGNÓSTICO
+Este raciocínio guiará a geração do diagnóstico completo.
+</reasoning_instructions>
+
+<examples>
 
 ### EXEMPLO 1 — Alerta crítico bem escrito
 
@@ -237,14 +163,20 @@ Dependência de cupons:
 }
 ```
 
----
+</examples>
 
-## FORMATO DE SAÍDA
-
+<output_format>
 Retorne APENAS o JSON abaixo:
 
 ```json
 {
+  "reasoning": {
+    "data_quality": "Avaliação da qualidade e completude dos dados recebidos",
+    "key_metrics": ["métrica 1: valor (bom/ruim/neutro)", "métrica 2: valor"],
+    "anomalies_detected": ["anomalia 1 com threshold", "anomalia 2"],
+    "score_calculation": "Componente1: X pts + Componente2: Y pts + ... = Total. Override: -Z pts. Final: W"
+  },
+
   "resumo_executivo": "2-3 frases: saúde geral, problema principal, oportunidade principal",
 
   "health_score": {
@@ -263,7 +195,6 @@ Retorne APENAS o JSON abaixo:
   },
 
   "alertas": [
-    // MÁXIMO 5 ALERTAS, ordenados por severidade (critico primeiro)
     {
       "severidade": "critico|atencao|monitorar",
       "tipo": "estoque|cancelamento|pricing|cupons|vendas",
@@ -275,7 +206,6 @@ Retorne APENAS o JSON abaixo:
   ],
 
   "oportunidades": [
-    // EXATAMENTE 5 OPORTUNIDADES, ordenadas por potencial (maior primeiro)
     {
       "tipo": "reativacao|upsell|estoque|pricing|conversao",
       "titulo": "Descrição da oportunidade",
@@ -342,11 +272,9 @@ Retorne APENAS o JSON abaixo:
   }
 }
 ```
+</output_format>
 
----
-
-## CHECKLIST ANTES DE ENVIAR
-
+<validation_checklist>
 - [ ] Health Score calculado com os 5 componentes e classificação correta (critico 0-25, atencao 26-50, saudavel 51-75, excelente 76-100)?
 - [ ] Penalizações graduais aplicadas conforme OVERRIDE (estoque, cancelamento, queda de vendas, dependência de cupons)?
 - [ ] Máximo 5 alertas, cada um com dados específicos (números)?
@@ -354,6 +282,81 @@ Retorne APENAS o JSON abaixo:
 - [ ] Posicionamento com comparação tripla (benchmark, mercado, concorrentes)?
 - [ ] Comparativo de concorrentes preenchido (ticket, categorias, promoções, avaliações)?
 - [ ] Briefing para Strategist com 3 problemas e restrições?
+- [ ] reasoning preenchido com data_quality, key_metrics, anomalies_detected e score_calculation?
+</validation_checklist>
+
+<data>
+
+<store_context>
+- **Nome:** {$storeName}
+- **Nicho:** {$niche} / {$subcategory}
+- **Ticket Médio:** R$ {$ticketMedio}
+- **Pedidos/Mês:** {$pedidosMes}
+- **Faturamento:** R$ {$faturamentoMes}/mês
+- **Período:** {$periodDays} dias
+</store_context>
+
+<seasonality>
+{$sazonalidade}
+</seasonality>
+
+<operational_data>
+<orders>
+```json
+{$orders}
+```
+</orders>
+
+<products>
+```json
+{$products}
+```
+</products>
+
+<inventory>
+```json
+{$inventory}
+```
+
+**IMPORTANTE:** Os dados de estoque EXCLUEM produtos que são brindes/amostras grátis (identificados por termos como "brinde", "grátis", "amostra", "gift", etc.). Esses produtos não devem ser considerados em alertas de estoque baixo ou zerado.
+</inventory>
+
+<coupons>
+```json
+{$coupons}
+```
+</coupons>
+</operational_data>
+
+<historical>
+```json
+{$historicalData}
+```
+
+**Regra:** Variação > 20% vs média histórica = ANOMALIA
+</historical>
+
+<market_data>
+{$marketSummary}
+</market_data>
+
+<competitors>
+{$competitorSummary}
+</competitors>
+
+<competitor_comparison>
+{$comparativoLojaConcorrentes}
+
+**IMPORTANTE:** Use estes dados para preencher a seção `comparativo_concorrentes` no JSON de saída.
+</competitor_comparison>
+
+<benchmarks>
+{$benchmarkSummary}
+</benchmarks>
+
+</data>
+
+</agent>
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;

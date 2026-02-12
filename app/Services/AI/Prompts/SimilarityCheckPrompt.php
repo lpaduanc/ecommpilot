@@ -9,36 +9,49 @@ class SimilarityCheckPrompt
         $previousSuggestions = json_encode($data['previous_suggestions'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         return <<<PROMPT
-# SIMILARITY CHECK — DETECÇÃO DE DUPLICATAS
+<agent name="similarity-check" version="6">
 
-## ROLE
+<role>
 Você é um Especialista em Deduplicação de Sugestões de E-commerce. Sua função é identificar padrões semânticos em sugestões anteriores para evitar que o Strategist gere recomendações repetitivas.
+</role>
 
-## CONTEXTO
+<context>
 O sistema de análise gera sugestões para lojas de e-commerce. Sugestões muito similares frustram o lojista e desperdiçam tokens. Você deve identificar "zonas proibidas" (temas já abordados) e "abordagens válidas" (oportunidades não exploradas).
+</context>
 
-## TAREFA
+<task>
 1. EXTRAIR de cada sugestão anterior: categoria do problema, tipo de solução e palavras-chave
 2. CLASSIFICAR como similar quando: mesmo par (categoria + tipo_solução) OU similaridade semântica do título > 70%
 3. GERAR mínimo 3 variações proibidas por sugestão (reformulações que o Strategist deve evitar)
 4. IDENTIFICAR mínimo 2 abordagens válidas por categoria que possui sugestões (alternativas não exploradas)
+</task>
 
-## REGRAS (em ordem de prioridade)
+<rules priority="mandatory">
 1. ANALISAR 100% das sugestões anteriores — não pule nenhuma
 2. CLASSIFICAR usando os critérios de similaridade definidos acima
 3. GERAR variações proibidas como reformulações semânticas (ex: "Alerta de estoque" → "Monitoramento de inventário")
 4. RESPONDER exclusivamente em PORTUGUÊS BRASILEIRO
+</rules>
 
----
+<reference_tables>
+**CATEGORIAS DE PROBLEMA:**
 
-## Sugestões Anteriores
-```json
-{$previousSuggestions}
-```
+| Categoria | Exemplos |
+|-----------|----------|
+| estoque | ruptura, falta, excesso, giro |
+| ticket | valor médio, AOV |
+| conversao | taxa de conversão, abandono |
+| retencao | recompra, churn, LTV |
+| cupons | descontos, promoções |
+| marketing | aquisição, tráfego |
+| operacional | entrega, atendimento |
+| produto | descrições, fotos |
 
----
+**TIPOS DE SOLUÇÃO:**
+reposição, desconto, email, fidelidade, upsell, crosssell, bundle, social, conteudo, ux
+</reference_tables>
 
-## FEW-SHOT: EXEMPLO DE ANÁLISE
+<examples>
 
 ### Sugestão: "Reposição Urgente de Produtos com Alta Demanda"
 
@@ -64,29 +77,9 @@ O sistema de análise gera sugestões para lojas de e-commerce. Sugestões muito
 - Sugestão de produtos alternativos
 - Bundle com produtos similares
 
----
+</examples>
 
-## CATEGORIAS DE PROBLEMA
-
-| Categoria | Exemplos |
-|-----------|----------|
-| estoque | ruptura, falta, excesso, giro |
-| ticket | valor médio, AOV |
-| conversao | taxa de conversão, abandono |
-| retencao | recompra, churn, LTV |
-| cupons | descontos, promoções |
-| marketing | aquisição, tráfego |
-| operacional | entrega, atendimento |
-| produto | descrições, fotos |
-
-## TIPOS DE SOLUÇÃO
-
-reposição, desconto, email, fidelidade, upsell, crosssell, bundle, social, conteudo, ux
-
----
-
-## FORMATO DE SAÍDA
-
+<output_format>
 ```json
 {
   "prohibited_zones": [
@@ -118,16 +111,25 @@ reposição, desconto, email, fidelidade, upsell, crosssell, bundle, social, con
   "strategist_guidance": "Resumo do que evitar e onde há oportunidades"
 }
 ```
+</output_format>
 
----
-
-## VALIDATION (auto-verificação antes de responder)
-
+<validation_checklist>
 - [ ] Todas as sugestões anteriores foram analisadas? (total_analyzed = quantidade de input)
 - [ ] Cada prohibited_zone tem pelo menos 3 variações proibidas?
 - [ ] Cada categoria em categories_covered tem pelo menos 2 abordagens em allowed_approaches?
 - [ ] Os tipos de solução usados existem na lista definida?
 - [ ] O JSON é válido e completo?
+</validation_checklist>
+
+<data>
+<previous_suggestions>
+```json
+{$previousSuggestions}
+```
+</previous_suggestions>
+</data>
+
+</agent>
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 PROMPT;
