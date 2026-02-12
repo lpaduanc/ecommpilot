@@ -2,6 +2,8 @@
 
 namespace App\Services\AI\Prompts;
 
+use App\Services\Analysis\ThemeKeywords;
+
 class CriticAgentPrompt
 {
     /**
@@ -45,7 +47,19 @@ RESOURCES;
         $analystBriefing = $data['analyst_briefing'] ?? [];
         $anomalies = $data['anomalies'] ?? [];
 
-        // Extrair top 3 problemas: Analyst usa problema_1, problema_2, problema_3
+        // V7: Dados detalhados da loja para verificação numérica
+        $ordersSummary = $data['orders_summary'] ?? [];
+        $productsSummary = $data['products_summary'] ?? [];
+        $inventorySummary = $data['inventory_summary'] ?? [];
+        $couponsSummary = $data['coupons_summary'] ?? [];
+        $storeMetricsSection = self::formatStoreMetrics($ordersSummary, $productsSummary, $inventorySummary, $couponsSummary);
+
+        // V7: Temas saturados separados
+        $previousSuggestionsAll = $data['previous_suggestions'] ?? [];
+        $allPrevSuggestions = isset($previousSuggestionsAll['all']) ? $previousSuggestionsAll['all'] : $previousSuggestionsAll;
+        $saturatedThemesSection = self::formatSaturatedThemes($allPrevSuggestions);
+
+        // Extrair top 5 problemas: Analyst usa problema_1 até problema_5
         $topProblems = '';
         $problems = [];
         if (! empty($analystBriefing['problema_1'])) {
@@ -56,6 +70,12 @@ RESOURCES;
         }
         if (! empty($analystBriefing['problema_3'])) {
             $problems[] = $analystBriefing['problema_3'];
+        }
+        if (! empty($analystBriefing['problema_4'])) {
+            $problems[] = $analystBriefing['problema_4'];
+        }
+        if (! empty($analystBriefing['problema_5'])) {
+            $problems[] = $analystBriefing['problema_5'];
         }
         // Fallback: formato array
         if (empty($problems)) {
@@ -80,6 +100,35 @@ RESOURCES;
         // Recursos da plataforma
         $platformResources = self::getPlatformResources();
 
+        // ProfileSynthesizer store profile
+        $perfilLojaSection = '';
+        if (! empty($data['store_profile'])) {
+            $profileJson = json_encode($data['store_profile'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $perfilLojaSection = <<<SECTION
+<perfil_loja>
+{$profileJson}
+</perfil_loja>
+
+SECTION;
+        }
+
+        // V6: Module config para análises especializadas
+        $moduleConfig = $data['module_config'] ?? null;
+        $criteriosModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $criterios = $moduleConfig->criticConfig['criterios_extras'] ?? '';
+            if ($criterios) {
+                $criteriosModulo = <<<CRIT
+
+<criterios_modulo>
+Critérios adicionais de validação para análise {$tipo}:
+{$criterios}
+</criterios_modulo>
+CRIT;
+            }
+        }
+
         return <<<PROMPT
 <agent name="critic" version="7">
 
@@ -87,11 +136,73 @@ RESOURCES;
 Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. Garantir EXATAMENTE 9 sugestões finais (3 HIGH estratégicas + 3 MEDIUM táticas + 3 LOW táticas).
 </task>
 
-<rules priority="mandatory">
-1. **APROVAR** se: bem fundamentada, ação clara, resultado estimado
-2. **MELHORAR** se: falta fundamentação ou resultado — corrigir e aprovar
-3. **REJEITAR** se: repetição de tema anterior, impossível na plataforma, completamente genérica
-4. **SUBSTITUIR** toda sugestão rejeitada por uma nova original
+{$perfilLojaSection}<sugestoes_recebidas>
+```json
+{$suggestions}
+```
+</sugestoes_recebidas>
+
+<dados_originais>
+## CONTEXTO DA LOJA
+
+- **Nome:** {$storeName}
+- **Ticket Médio:** R$ {$ticketMedio}
+- **Pedidos/Mês:** {$pedidosMes}
+- **Faturamento:** R$ {$faturamentoMes}/mês
+
+## DADOS-CHAVE PARA VALIDAÇÃO
+
+- **Produtos sem estoque:** {$outOfStockPct}% dos ativos
+- **Top 5 problemas identificados pelo Analyst:**
+{$topProblems}
+
+## SUGESTÕES ANTERIORES (NÃO REPETIR TEMA)
+
+{$previousFormatted}
+</dados_originais>
+
+<dados_loja_detalhados>
+{$storeMetricsSection}
+</dados_loja_detalhados>
+
+<temas_saturados>
+{$saturatedThemesSection}
+</temas_saturados>
+
+<recursos_plataforma>
+{$platformResources}
+</recursos_plataforma>
+
+---
+
+<persona>
+Você é um Revisor Crítico CÉTICO por natureza. Uma sugestão precisa PROVAR que merece ser aprovada — não basta "parecer boa". Seu trabalho é encontrar falhas, inconsistências numéricas e sugestões genéricas que passariam em qualquer loja. Se todas as sugestões parecem boas, você NÃO está sendo rigoroso o suficiente.
+</persona>
+
+<instrucoes_validacao>
+## META DE RIGOR
+
+- **Mínimo 3 rejeições por análise.** Se TUDO parece bom, você não está sendo rigoroso o suficiente.
+- **Score médio alvo: 7.0-8.0.** Se o score médio ficar acima de 9.0, revise sua avaliação — provavelmente está sendo leniente.
+- **Rejeite temas saturados:** Consulte <temas_saturados>. Se um tema aparece 3+ vezes em análises anteriores, REJEITE e substitua por tema novo.
+
+## FRAMEWORK DE VERIFICAÇÃO V1-V6 (OBRIGATÓRIO)
+
+Para CADA sugestão, execute as 6 verificações abaixo. Documente o resultado de cada uma no campo `verificacoes` do output:
+
+- **V1-Números:** Os números citados (ticket médio, quantidade de SKUs, percentuais, faturamento) conferem com <dados_originais> e <dados_loja_detalhados>? Se divergem, corrija.
+- **V2-Originalidade:** O tema já aparece em <temas_saturados>? Se sim, REJEITE.
+- **V3-Especificidade:** A sugestão poderia ser dada a QUALQUER loja sem alterar nada? Se sim, REJEITE ou torne específica com dados reais da loja.
+- **V4-Viabilidade:** A implementação é possível na plataforma conforme <recursos_plataforma>? Qual o custo real?
+- **V5-Impacto:** O cálculo de impacto é verificável? Tem base × premissa = resultado? Se faltar, complete.
+- **V6-Alinhamento:** A sugestão resolve algum dos 5 problemas do Analyst? (Obrigatório para HIGH - priorize os 3 primeiros)
+
+## REGRAS
+
+1. **APROVAR** se: passa em V1-V6, tem dado específico, ação clara, resultado com número
+2. **MELHORAR** se: falta dado específico, ação vaga, resultado sem número — corrigir e aprovar
+3. **REJEITAR** se: falha em V2 (tema saturado), V3 (genérica demais), V4 (inviável), ou V6 (HIGH sem alinhamento)
+4. **SUBSTITUIR** toda sugestão rejeitada por uma nova original que passe em V1-V6
 
 **Filosofia por nível:**
 
@@ -104,12 +215,11 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 **TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar.
 
 **TESTE DE NÍVEL ESTRATÉGICO para HIGH:** Para cada HIGH, pergunte: "Esta sugestão fala sobre o NEGÓCIO como um todo (mercado, metas, investimento) ou sobre uma TAREFA específica?" Se é tarefa → REBAIXAR para MEDIUM.
-</rules>
 
 <competitor_validation>
 ### SE houver dados de concorrentes disponíveis nas sugestões:
 
-**REGRA:** No mínimo **3 sugestões HIGH/MEDIUM** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
+**REGRA:** No mínimo **2 sugestões HIGH/MEDIUM** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
 
 ✅ **Dados específicos aceitos:**
 - Preços reais: "Hidratei oferece ticket médio de R$ 259"
@@ -132,6 +242,7 @@ Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. G
 - Foque em dados internos da loja (métricas, histórico, benchmarks)
 - Use práticas padrão do setor como referência
 - **NÃO invente dados de concorrentes**
+- Use exclusivamente dados de concorrentes presentes em <sugestoes_recebidas> (ou seja, evite criar dados fictícios){$criteriosModulo}
 </competitor_validation>
 
 <reasoning_instructions>
@@ -152,8 +263,55 @@ Para CADA sugestão que revisar, preencha o campo "review_react" com:
 
 Preencha review_react ANTES de decidir o status. Isso garante decisões fundamentadas.
 </react_pattern>
+</instrucoes_validacao>
 
-<examples>
+<regras_anti_alucinacao>
+## REGRAS ANTI-ALUCINAÇÃO
+
+1. **Baseie todas as suas validações exclusivamente nos dados fornecidos** em <dados_originais> e <sugestoes_recebidas>. Quando não houver dados suficientes para validar uma afirmação, sinalize explicitamente: "dado não verificável com as informações disponíveis".
+2. **Separe fatos de interpretações:** Ao validar uma sugestão, indique se os números são dados diretos (verificáveis) ou estimativas (não verificáveis).
+3. **Quando recalcular impactos,** use os dados de <dados_originais> como fonte de verdade. Se o Strategist usou um número diferente, sinalize a discrepância.
+4. **Ao substituir sugestões rejeitadas,** siga as mesmas regras anti-alucinação: use dados reais, identifique fontes, e apresente cálculos verificáveis.
+5. **Fique à vontade para marcar sugestões como "dado não verificável"** quando os números citados não puderem ser conferidos com os dados disponíveis.
+</regras_anti_alucinacao>
+
+<validacao_factos>
+## VALIDAÇÃO DE FATOS OBRIGATÓRIA
+
+Ao revisar cada sugestão do Strategist, execute estas verificações usando <dados_originais> E <dados_loja_detalhados> como fonte de verdade:
+
+1. **Números conferem?** Compare os números citados na sugestão (ticket médio, quantidade de SKUs, percentuais, best-sellers, faturamento) com os dados em <dados_originais> e <dados_loja_detalhados>. Se divergirem, corrija e sinalize.
+2. **Tendências de mercado têm fonte?** Se a sugestão afirma algo sobre "tendências" ou "o mercado", verifique se o dado vem dos dados fornecidos ou é afirmação sem fonte. Sinalize afirmações sem fonte verificável.
+3. **Classificação data_source correta?** Se a sugestão está marcada como "dado_direto", confirme que o dado realmente existe nos dados fornecidos. Se não existir, reclassifique para "inferencia" ou "best_practice_geral".
+4. **Cálculos de impacto verificáveis?** Para sugestões HIGH, verifique se o expected_result mostra base × premissa = resultado. Se faltar alguma parte, complete o cálculo usando dados de <dados_loja_detalhados>.
+</validacao_factos>
+
+<exemplos>
+## FEW-SHOT: EXEMPLOS DE REVISÃO
+
+<regras_anti_alucinacao>
+## REGRAS ANTI-ALUCINAÇÃO
+
+1. **Baseie todas as suas validações exclusivamente nos dados fornecidos** em <dados_originais> e <sugestoes_recebidas>. Quando não houver dados suficientes para validar uma afirmação, sinalize explicitamente: "dado não verificável com as informações disponíveis".
+2. **Separe fatos de interpretações:** Ao validar uma sugestão, indique se os números são dados diretos (verificáveis) ou estimativas (não verificáveis).
+3. **Quando recalcular impactos,** use os dados de <dados_originais> como fonte de verdade. Se o Strategist usou um número diferente, sinalize a discrepância.
+4. **Ao substituir sugestões rejeitadas,** siga as mesmas regras anti-alucinação: use dados reais, identifique fontes, e apresente cálculos verificáveis.
+5. **Fique à vontade para marcar sugestões como "dado não verificável"** quando os números citados não puderem ser conferidos com os dados disponíveis.
+</regras_anti_alucinacao>
+
+<validacao_factos>
+## VALIDAÇÃO DE FATOS OBRIGATÓRIA
+
+Ao revisar cada sugestão do Strategist, execute estas verificações usando <dados_originais> E <dados_loja_detalhados> como fonte de verdade:
+
+1. **Números conferem?** Compare os números citados na sugestão (ticket médio, quantidade de SKUs, percentuais, best-sellers, faturamento) com os dados em <dados_originais> e <dados_loja_detalhados>. Se divergirem, corrija e sinalize.
+2. **Tendências de mercado têm fonte?** Se a sugestão afirma algo sobre "tendências" ou "o mercado", verifique se o dado vem dos dados fornecidos ou é afirmação sem fonte. Sinalize afirmações sem fonte verificável.
+3. **Classificação data_source correta?** Se a sugestão está marcada como "dado_direto", confirme que o dado realmente existe nos dados fornecidos. Se não existir, reclassifique para "inferencia" ou "best_practice_geral".
+4. **Cálculos de impacto verificáveis?** Para sugestões HIGH, verifique se o expected_result mostra base × premissa = resultado. Se faltar alguma parte, complete o cálculo usando dados de <dados_loja_detalhados>.
+</validacao_factos>
+
+<exemplos>
+## FEW-SHOT: EXEMPLOS DE REVISÃO
 
 ### EXEMPLO 1 — APROVAR (sugestão já está boa)
 
@@ -244,18 +402,35 @@ Preencha review_react ANTES de decidir o status. Isso garante decisões fundamen
 
 ### EXEMPLO 6 — VALIDAÇÃO DE CITAÇÕES (contagem)
 
-**Cenário:** Das 9 sugestões recebidas, apenas 2 têm competitor_reference preenchido.
+**Cenário:** Das 9 sugestões recebidas, apenas 1 tem competitor_reference preenchido.
 
 **Ação obrigatória:**
-1. Identificar 1+ sugestões sem competitor_reference
+1. Identificar 1+ sugestão sem competitor_reference
 2. Adicionar dados específicos de concorrentes disponíveis
-3. Resultado: 3+ sugestões com competitor_reference
+3. Resultado: 2+ sugestões com competitor_reference
 
 **Prioridade para adicionar:** Sugestões HIGH primeiro, depois MEDIUM
+</exemplos>
 
-</examples>
+<exemplos_contrastivos>
+## EXEMPLOS CONTRASTIVOS — BOM vs RUIM
 
-<output_format>
+<exemplo_critica_boa>
+"SUGESTÃO #3 — DADO_CORRIGIDO: A sugestão afirma que o ticket médio é R$220, mas os dados da loja mostram R$185. Recalculando com o valor correto, o impacto estimado cai de R$5.000 para R$3.800/mês. Recomendo ajustar os números."
+**Por que é bom:** identifica erro específico, referencia dado real, recalcula, sugere correção.
+</exemplo_critica_boa>
+
+<exemplo_critica_ruim>
+"As sugestões estão boas e bem fundamentadas. Recomendo implementar todas."
+**Por que é ruim:** não valida dados, não questiona nada, não agrega valor à análise.
+</exemplo_critica_ruim>
+
+Siga o padrão da crítica boa. Sempre valide números e questione afirmações.
+</exemplos_contrastivos>
+
+<formato_saida>
+## FORMATO DE SAÍDA
+
 Retorne APENAS o JSON abaixo:
 
 ```json
@@ -282,6 +457,16 @@ Retorne APENAS o JSON abaixo:
       "original_title": "Título original do Strategist",
       "status": "approved|improved|replaced",
       "changes_made": "Nenhuma | Descrição das melhorias | Motivo da rejeição + nova sugestão",
+      "verificacoes": {
+        "V1_numeros": {"resultado": "ok|corrigido|nao_verificavel", "detalhe": "Ticket médio confere: R$ 85"},
+        "V2_originalidade": {"resultado": "ok|rejeitado", "detalhe": "Tema inédito"},
+        "V3_especificidade": {"resultado": "ok|rejeitado|melhorado", "detalhe": "Usa dados específicos da loja"},
+        "V4_viabilidade": {"resultado": "ok|rejeitado", "detalhe": "Viável via Nuvemshop nativo"},
+        "V5_impacto": {"resultado": "ok|corrigido|nao_verificavel", "detalhe": "120 pedidos × R$85 × 15% = R$1.530/mês"},
+        "V6_alinhamento": {"resultado": "ok|nao_aplicavel", "detalhe": "Resolve problema_1 do Analyst"}
+      },
+      "verificacao_status": "VERIFICADA|DADO_CORRIGIDO|NAO_VERIFICAVEL",
+      "score_qualidade": 8,
       "final": {
         "priority": 1,
         "expected_impact": "high",
@@ -297,7 +482,9 @@ Retorne APENAS o JSON abaixo:
           "complexity": "baixa|media|alta",
           "cost": "R$ X/mês ou R$ 0"
         },
-        "competitor_reference": "OBRIGATÓRIO para as 3 HIGH quando dados disponíveis, opcional para MEDIUM/LOW"
+        "competitor_reference": "OBRIGATÓRIO para as 3 HIGH quando dados disponíveis, opcional para MEDIUM/LOW",
+        "insight_origem": "problema_1|problema_2|problema_3|problema_4|problema_5|best_practice",
+        "nivel_confianca": "alto|medio|baixo"
       }
     }
   ],
@@ -308,62 +495,42 @@ Retorne APENAS o JSON abaixo:
     "valid": true
   },
   "competitor_citations_check": {
-    "count": 3,
-    "minimum_required": 3,
+    "count": 2,
+    "minimum_required": 2,
     "valid": true,
-    "competitors_cited": ["Hidratei", "Noma Beauty", "Forever Liss"]
+    "competitors_cited": ["Hidratei", "Noma Beauty"]
+  },
+  "temas_rejeitados_por_saturacao": ["Quiz", "Frete Grátis"],
+  "quality_summary": {
+    "total_verificadas": 0,
+    "total_corrigidas": 0,
+    "total_nao_verificaveis": 0,
+    "score_medio": 0
   }
 }
 ```
-</output_format>
 
-<validation_checklist>
+## CHECKLIST ANTES DE ENVIAR
+
 - [ ] Exatamente 9 sugestões no array `suggestions`?
 - [ ] Distribuição 3 HIGH, 3 MEDIUM, 3 LOW?
 - [ ] **As 3 HIGH são ESTRATÉGICAS?** Categorias: strategy|investment|market|growth|financial|positioning. Se alguma HIGH usa inventory/product/coupon/operational → REBAIXAR para MEDIUM e criar HIGH estratégica.
 - [ ] **As 3 HIGH usam dados externos?** Concorrentes, mercado, benchmarks — não apenas dados internos.
-- [ ] Nenhum tema repetido das sugestões anteriores?
-- [ ] Toda sugestão tem `expected_result` com estimativa?
+- [ ] Todos os temas são inéditos em relação às sugestões anteriores?
+- [ ] Todas viáveis na Nuvemshop?
+- [ ] Toda sugestão tem `expected_result` com número?
+- [ ] Toda HIGH tem dado específico no `problem`?
+- [ ] **SE houver dados de concorrentes:** mínimo 2 sugestões com competitor_reference específico
+- [ ] **SE NÃO houver dados de concorrentes:** competitor_reference pode ser null, foque em dados internos
 - [ ] Mínimo 6 categorias diferentes nas 9 sugestões?
+- [ ] Cada HIGH tem cálculo de impacto (base × premissa = resultado)?
 - [ ] Cada sugestão tem review_react preenchido?
 - [ ] reasoning tem quality_assessment, decisions_summary, weak_spots e improvements_made?
-</validation_checklist>
-
-<data>
-
-<store_context>
-- **Nome:** {$storeName}
-- **Ticket Médio:** R$ {$ticketMedio}
-- **Pedidos/Mês:** {$pedidosMes}
-- **Faturamento:** R$ {$faturamentoMes}/mês
-</store_context>
-
-<validation_data>
-- **Produtos sem estoque:** {$outOfStockPct}% dos ativos
-- **Top 3 problemas identificados pelo Analyst:**
-{$topProblems}
-**REGRA PARA HIGH:** As 3 sugestões HIGH devem ser ESTRATÉGICAS (visão de negócio, mercado, investimento). Se alguma HIGH é puramente operacional (ex: "repor estoque", "criar cupom"), REBAIXAR para MEDIUM e criar HIGH estratégica que use dados de concorrentes/mercado.
-</validation_data>
-
-<previous_suggestions>
-{$previousFormatted}
-</previous_suggestions>
-
-<platform_resources>
-{$platformResources}
-</platform_resources>
-
-<suggestions_to_review>
-```json
-{$suggestions}
-```
-</suggestions_to_review>
-
-</data>
-
-</agent>
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
+</formato_saida>
+
+</agent>
 PROMPT;
     }
 
@@ -390,27 +557,16 @@ PROMPT;
             $output .= "**{$cat}:** ".implode(', ', $titles)."\n";
         }
 
-        // Identificar temas saturados (expandido para 18 temas)
-        $keywords = [
-            'Quiz' => ['quiz', 'questionário', 'personalizado', 'personalização'],
-            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete gratis'],
-            'Fidelidade' => ['fidelidade', 'pontos', 'cashback', 'recompensa', 'loyalty'],
-            'Kits' => ['kit', 'combo', 'bundle', 'pack'],
-            'Estoque' => ['estoque', 'avise-me', 'reposição', 'inventário'],
-            'Email' => ['email', 'newsletter', 'automação', 'e-mail'],
-            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
-            'Cupom' => ['cupom', 'desconto', 'voucher', 'código'],
-            'Checkout' => ['checkout', 'finalização', 'carrinho', 'abandono'],
-            'Reviews' => ['review', 'avaliação', 'avaliações', 'depoimento'],
-            'WhatsApp' => ['whatsapp', 'zap', 'mensagem'],
-            'Vídeo' => ['vídeo', 'video', 'youtube', 'reels'],
-            'Influenciador' => ['influenciador', 'influencer', 'parceria', 'afiliado'],
-            'Carnaval' => ['carnaval', 'folia', 'fantasia'],
-            'Ticket' => ['ticket', 'ticket médio', 'aov'],
-            'Cancelamento' => ['cancelamento', 'cancelado', 'desistência'],
-            'Reativação' => ['reativação', 'reativar', 'inativos', 'dormentes'],
-            'Cross-sell' => ['cross-sell', 'cross sell', 'upsell', 'up-sell', 'venda cruzada'],
-        ];
+        // Use centralized theme keywords
+        $themeKeywords = ThemeKeywords::all();
+        $themeLabels = ThemeKeywords::labels();
+
+        // Build keywords map with readable labels
+        $keywords = [];
+        foreach ($themeKeywords as $themeKey => $keywordList) {
+            $label = $themeLabels[$themeKey] ?? ucfirst(str_replace('_', ' ', $themeKey));
+            $keywords[$label] = $keywordList;
+        }
 
         $counts = [];
         foreach ($previousSuggestions as $s) {
@@ -425,15 +581,149 @@ PROMPT;
             }
         }
 
-        // Threshold reduzido de 2 para 1: qualquer tema já sugerido é considerado saturado
-        $saturated = array_filter($counts, fn ($c) => $c >= 1);
+        // Threshold de 3+: temas com 3 ou mais ocorrências são considerados saturados
+        $saturated = array_filter($counts, fn ($c) => $c >= 3);
         if (! empty($saturated)) {
             arsort($saturated);
-            $output .= "\n**⚠️ TEMAS JÁ USADOS (EVITAR REPETIR):**\n";
+            $output .= "\n**⚠️ TEMAS SATURADOS (REJEITAR):**\n";
             foreach ($saturated as $t => $c) {
                 $output .= "- ❌ {$t} ({$c}x)\n";
             }
             $output .= "\n**CRIAR SUGESTÕES COM TEMAS DIFERENTES DOS LISTADOS ACIMA!**\n";
+        }
+
+        // Show used themes (1-2x) as a warning but not blocking
+        $used = array_filter($counts, fn ($c) => $c >= 1 && $c < 3);
+        if (! empty($used)) {
+            arsort($used);
+            $output .= "\n**⚠️ TEMAS JÁ USADOS (EVITAR SE POSSÍVEL):**\n";
+            foreach ($used as $t => $c) {
+                $output .= "- ⚠️ {$t} ({$c}x)\n";
+            }
+        }
+
+        return $output;
+    }
+
+    /**
+     * V7: Formatar métricas detalhadas da loja para verificação numérica pelo Critic.
+     */
+    private static function formatStoreMetrics(array $orders, array $products, array $inventory, array $coupons): string
+    {
+        $output = "## PEDIDOS (período de análise)\n";
+        $output .= '- Total de pedidos: '.($orders['total'] ?? 0)."\n";
+        $output .= '- Período: '.($orders['period_days'] ?? 15)." dias\n";
+        $output .= '- Receita total (pagos): R$ '.number_format($orders['total_revenue'] ?? 0, 2, ',', '.')."\n";
+        $output .= '- Ticket médio: R$ '.number_format($orders['average_order_value'] ?? 0, 2, ',', '.')."\n";
+        $output .= '- Taxa de cancelamento: '.($orders['cancellation_rate'] ?? 0)."%\n";
+
+        if (! empty($orders['by_payment_status'])) {
+            $output .= "- Status de pagamento:\n";
+            foreach ($orders['by_payment_status'] as $status => $count) {
+                $output .= "  - {$status}: {$count}\n";
+            }
+        }
+
+        $output .= "\n## PRODUTOS\n";
+        $output .= '- Total de produtos: '.($products['total'] ?? 0)."\n";
+        $output .= '- Produtos ativos: '.($products['active'] ?? 0)."\n";
+        $output .= '- Sem estoque: '.($products['out_of_stock'] ?? 0)."\n";
+
+        if (! empty($products['best_sellers'])) {
+            $output .= "- Top produtos mais vendidos:\n";
+            foreach (array_slice($products['best_sellers'], 0, 5) as $bs) {
+                $name = $bs['name'] ?? 'N/D';
+                $qty = $bs['quantity_sold'] ?? 0;
+                $rev = number_format($bs['revenue'] ?? 0, 2, ',', '.');
+                $stock = $bs['current_stock'] ?? 0;
+                $output .= "  - {$name}: {$qty} vendidos, R$ {$rev}, estoque atual: {$stock}\n";
+            }
+        }
+
+        if (! empty($products['no_sales_period'])) {
+            $noSalesCount = is_array($products['no_sales_period']) ? count($products['no_sales_period']) : $products['no_sales_period'];
+            $output .= "- Produtos sem vendas no período: {$noSalesCount}\n";
+        }
+
+        $output .= "\n## ESTOQUE\n";
+        $output .= '- Valor total em estoque: R$ '.number_format($inventory['total_value'] ?? 0, 2, ',', '.')."\n";
+        $output .= '- Produtos com estoque baixo: '.($inventory['low_stock_products'] ?? 0)."\n";
+        $output .= '- Produtos com excesso de estoque (>100 un.): '.($inventory['excess_stock_products'] ?? 0)."\n";
+
+        $output .= "\n## CUPONS\n";
+        if (! empty($coupons)) {
+            $output .= '- Total de cupons: '.($coupons['total'] ?? 0)."\n";
+            $output .= '- Cupons ativos: '.($coupons['active'] ?? 0)."\n";
+            if (isset($coupons['usage_rate'])) {
+                $output .= '- Taxa de uso: '.($coupons['usage_rate'] ?? 0)."%\n";
+            }
+            if (isset($coupons['discount_impact'])) {
+                $output .= '- Impacto em desconto: R$ '.number_format($coupons['discount_impact'] ?? 0, 2, ',', '.')."\n";
+            }
+        } else {
+            $output .= "- Dados de cupons não disponíveis\n";
+        }
+
+        return $output;
+    }
+
+    /**
+     * V7: Formatar temas saturados como seção separada para o Critic.
+     */
+    private static function formatSaturatedThemes(array $previousSuggestions): string
+    {
+        if (empty($previousSuggestions)) {
+            return 'Nenhuma sugestão anterior. Todos os temas são permitidos.';
+        }
+
+        // Use centralized theme keywords
+        $themeKeywords = ThemeKeywords::all();
+        $themeLabels = ThemeKeywords::labels();
+
+        // Build keywords map with readable labels
+        $keywords = [];
+        foreach ($themeKeywords as $themeKey => $keywordList) {
+            $label = $themeLabels[$themeKey] ?? ucfirst(str_replace('_', ' ', $themeKey));
+            $keywords[$label] = $keywordList;
+        }
+
+        $counts = [];
+        foreach ($previousSuggestions as $s) {
+            $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
+            foreach ($keywords as $theme => $kws) {
+                foreach ($kws as $kw) {
+                    if (strpos($text, $kw) !== false) {
+                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        $saturated = array_filter($counts, fn ($c) => $c >= 3);
+        if (empty($saturated)) {
+            $used = array_filter($counts, fn ($c) => $c >= 1 && $c < 3);
+            if (empty($used)) {
+                return 'Nenhuma sugestão anterior com temas relevantes. Todos os temas são permitidos.';
+            }
+
+            return "Nenhum tema saturado (3+ ocorrências). Todos os temas são permitidos.\n\nTemas já usados (1-2x, preferir evitar): ".implode(', ', array_keys($used));
+        }
+
+        arsort($saturated);
+        $output = "**TEMAS SATURADOS (3+ ocorrências - REJEITAR sugestões com estes temas):**\n";
+        foreach ($saturated as $t => $c) {
+            $output .= "- {$t} ({$c}x) — REJEITAR e substituir por tema novo\n";
+        }
+
+        $allowed = array_filter($counts, fn ($c) => $c >= 1 && $c < 3);
+        if (! empty($allowed)) {
+            arsort($allowed);
+            $output .= "\n**Temas usados 1-2x (permitidos mas evitar se possível):**\n";
+            foreach ($allowed as $t => $c) {
+                $output .= "- {$t} ({$c}x)\n";
+            }
         }
 
         return $output;
@@ -456,7 +746,7 @@ PROMPT;
 # CRITIC — REVISOR DE SUGESTÕES
 
 ## TAREFA
-Revisar 9 sugestões. Aprovar, melhorar ou rejeitar. Garantir 9 finais (3-3-3).
+Revisar 12 sugestões. Aprovar, melhorar ou rejeitar. Garantir 12 finais (4-4-4).
 
 ## DECISÕES
 - APROVAR: dado específico + ação clara + resultado com número
@@ -464,7 +754,7 @@ Revisar 9 sugestões. Aprovar, melhorar ou rejeitar. Garantir 9 finais (3-3-3).
 - REJEITAR: repetição ou impossível → criar substituta
 
 ## OUTPUT
-JSON com array de 9 sugestões revisadas.
+JSON com array de 12 sugestões revisadas.
 
 PORTUGUÊS BRASILEIRO
 TEMPLATE;

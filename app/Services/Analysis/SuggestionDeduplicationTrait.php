@@ -47,44 +47,15 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
-     * Identifica temas saturados (sugeridos 2+ vezes)
+     * Identifica temas saturados (sugeridos 3+ vezes)
      *
-     * V5: Threshold aumentado para 2 - permite re-sugerir tema 1x antes de bloquear.
+     * V6: Threshold aumentado para 3 - permite re-sugerir tema 2x antes de bloquear.
      * Considera também sugestões rejeitadas como fator de saturação.
+     * Usa ThemeKeywords centralizado para consistência entre trait/prompts.
      */
     protected function identifySaturatedThemes(array $suggestions): array
     {
-        // Expandido para 25 categorias de temas monitorados
-        $themeKeywords = [
-            // Temas originais
-            'quiz' => ['quiz', 'questionário', 'personalizado', 'recomendação', 'personalização'],
-            'frete_gratis' => ['frete grátis', 'frete gratuito', 'entrega grátis', 'frete gratis'],
-            'fidelidade' => ['fidelidade', 'pontos', 'cashback', 'loyalty', 'recompensa'],
-            'kits' => ['kit', 'combo', 'bundle', 'cronograma', 'pack'],
-            'estoque' => ['estoque', 'avise-me', 'reposição', 'inventário', 'ruptura'],
-            'email' => ['email', 'e-mail', 'newsletter', 'automação', 'pós-venda'],
-            'video' => ['vídeo', 'video', 'tutorial', 'youtube', 'reels'],
-            'assinatura' => ['assinatura', 'recorrência', 'subscription', 'clube'],
-            'cupom' => ['cupom', 'desconto', 'promoção', 'voucher', 'código'],
-            'checkout' => ['checkout', 'carrinho', 'conversão', 'abandono', 'finalização'],
-            'whatsapp' => ['whatsapp', 'telegram', 'chat', 'mensagem', 'zap'],
-            'reviews' => ['review', 'ugc', 'avaliação', 'depoimento', 'fotos', 'vídeos', 'antes e depois'],
-            'pos_compra' => ['pós-compra', 'pos-compra', 'follow-up', 'acompanhamento'],
-            'influenciadores' => ['influenciador', 'micro-influenciador', 'embaixador', 'embaixadora', 'parceria', 'afiliado'],
-            'gamificacao' => ['gamificação', 'gamificacao', 'desafio', 'milhas', 'níveis'],
-            'conteudo' => ['conteúdo', 'conteudo', 'hub', 'guia', 'educativo'],
-
-            // Novos temas adicionados (sazonais e operacionais)
-            'carnaval' => ['carnaval', 'folia', 'fantasia', 'bloco'],
-            'ticket' => ['ticket médio', 'ticket', 'aov', 'valor médio'],
-            'cancelamento' => ['cancelamento', 'cancelado', 'desistência', 'churn'],
-            'reativacao' => ['reativação', 'reativar', 'inativos', 'dormentes', 'win-back'],
-            'upsell' => ['upsell', 'up-sell', 'upgrade', 'premium'],
-            'cross_sell' => ['cross-sell', 'cross sell', 'venda cruzada', 'produtos relacionados', 'compre junto'],
-            'preco' => ['preço', 'pricing', 'margem', 'precificação'],
-            'seo' => ['seo', 'google', 'busca', 'orgânico', 'ranqueamento'],
-            'remarketing' => ['remarketing', 'retargeting', 'pixel', 'público similar'],
-        ];
+        $themeKeywords = ThemeKeywords::all();
 
         $counts = [];
         $rejectedThemes = [];
@@ -202,32 +173,33 @@ trait SuggestionDeduplicationTrait
 
     /**
      * Normaliza título para comparação.
-     * Remove stopwords e palavras de ação para extrair conceitos-chave.
-     * Ordena palavras para comparação independente de ordem.
+     *
+     * V7: Unificado com StoreAnalysisService::normalizeTitle()
+     * - Remove stopwords comuns em português
+     * - Remove verbos de ação genéricos (implementar, otimizar, etc.)
+     * - Remove palavras de domínio (produto, cliente, loja, etc.)
+     * - Ordena palavras alfabeticamente para comparação order-independent
      */
     protected function normalizeTitle(string $title): string
     {
         $title = mb_strtolower(trim($title));
+        $title = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title) ?: $title;
+        $title = preg_replace('/[^a-z0-9\s]/', '', $title);
 
-        // Remove common stopwords and filler words
         $stopwords = [
             'de', 'da', 'do', 'das', 'dos', 'para', 'com', 'em', 'a', 'o', 'as', 'os',
             'e', 'ou', 'um', 'uma', 'uns', 'umas', 'no', 'na', 'nos', 'nas',
-            'pelo', 'pela', 'pelos', 'pelas', 'ao', 'aos', 'à', 'às',
-            'implementar', 'otimizar', 'criar', 'desenvolver', 'lançar', 'ativar',
+            'pelo', 'pela', 'pelos', 'pelas', 'ao', 'aos',
+            'implementar', 'otimizar', 'criar', 'desenvolver', 'lancar', 'ativar',
             'configurar', 'melhorar', 'aprimorar', 'revisar', 'analisar', 'oferecer',
-            'estratégia', 'estratégico', 'estratégica', 'estratégicos', 'estratégicas',
-            'gestão', 'gerenciamento', 'sistema', 'programa', 'plano',
+            'estrategia', 'estrategico', 'estrategica',
+            'gestao', 'gerenciamento', 'sistema', 'programa', 'plano',
             'produtos', 'produto', 'clientes', 'cliente', 'loja', 'lojas',
-            'haircare', 'beleza', 'cosmético', 'cosméticos', 'capilar', 'cabelo', 'cabelos',
-            'nuvemshop', 'ecommerce', 'e-commerce',
-            'priorizar', 'proativo', 'proativa', 'funcionalidade',
         ];
 
         $words = preg_split('/\s+/', $title);
         $filteredWords = array_filter($words, fn ($w) => ! in_array($w, $stopwords) && strlen($w) > 2);
 
-        // Sort to make comparison order-independent
         sort($filteredWords);
 
         return implode(' ', $filteredWords);

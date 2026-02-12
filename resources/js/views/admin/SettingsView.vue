@@ -179,7 +179,28 @@ async function fetchSettings() {
 async function saveSettings() {
     isSaving.value = true;
     try {
-        await api.put('/admin/settings/ai', settings);
+        // Prepare payload - remove masked API keys to prevent overwriting real values
+        const payload = {
+            provider: settings.provider,
+            openai: { ...settings.openai },
+            gemini: { ...settings.gemini },
+            anthropic: { ...settings.anthropic },
+        };
+
+        // Remove masked API keys (they start with the key prefix and contain ****)
+        const isMasked = (value) => value && (value.includes('****') || value === '********');
+
+        if (isMasked(payload.openai.api_key)) {
+            delete payload.openai.api_key;
+        }
+        if (isMasked(payload.gemini.api_key)) {
+            delete payload.gemini.api_key;
+        }
+        if (isMasked(payload.anthropic.api_key)) {
+            delete payload.anthropic.api_key;
+        }
+
+        await api.put('/admin/settings/ai', payload);
         notificationStore.success('Configurações salvas com sucesso!');
         // Refresh settings to get updated masked values
         await fetchSettings();

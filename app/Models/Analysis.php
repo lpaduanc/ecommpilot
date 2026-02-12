@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AnalysisStatus;
+use App\Enums\AnalysisType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,6 +35,7 @@ class Analysis extends Model
         'user_id',
         'store_id',
         'status',
+        'analysis_type',
         'error_message',
         'summary',
         'suggestions',
@@ -61,6 +63,7 @@ class Analysis extends Model
         return [
             'uuid' => 'string',
             'status' => AnalysisStatus::class,
+            'analysis_type' => AnalysisType::class,
             'summary' => 'array',
             'suggestions' => 'array',
             'alerts' => 'array',
@@ -291,5 +294,34 @@ class Analysis extends Model
     public function scopeLatest($query)
     {
         return $query->orderBy('created_at', 'desc');
+    }
+
+    public function scopeOfType($query, string $type)
+    {
+        return $query->where('analysis_type', $type);
+    }
+
+    /**
+     * Check if this analysis is a specialized (non-general) type.
+     */
+    public function isSpecialized(): bool
+    {
+        return $this->analysis_type !== AnalysisType::General;
+    }
+
+    /**
+     * Get the type configuration (label, description, available).
+     */
+    public function getTypeConfig(): array
+    {
+        $type = $this->analysis_type ?? AnalysisType::General;
+
+        return [
+            'key' => $type->value,
+            'label' => $type->label(),
+            'description' => $type->description(),
+            'available' => $type->available(),
+            'is_default' => $type->isDefault(),
+        ];
     }
 }

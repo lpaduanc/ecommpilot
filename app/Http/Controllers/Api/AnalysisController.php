@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AnalysisStatus;
+use App\Enums\AnalysisType;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AnalysisResource;
 use App\Http\Resources\SuggestionResource;
@@ -163,11 +164,18 @@ class AnalysisController extends Controller
             $this->planLimitService->recordAnalysisUsage($user, $store);
         }
 
+        // Validate analysis type (only allow implemented types)
+        $availableValues = array_map(fn ($type) => $type->value, AnalysisType::availableTypes());
+        $validated = $request->validate([
+            'analysis_type' => ['sometimes', 'string', 'in:'.implode(',', $availableValues)],
+        ]);
+
         // Create analysis
         $analysis = Analysis::create([
             'user_id' => $user->id,
             'store_id' => $store->id,
             'status' => AnalysisStatus::Pending,
+            'analysis_type' => $validated['analysis_type'] ?? 'general',
             'period_start' => now()->subDays(15),
             'period_end' => now(),
         ]);
@@ -191,6 +199,16 @@ class AnalysisController extends Controller
                 'error_message' => $analysis->error_message,
             ],
             'remaining_today' => $this->planLimitService->getRemainingAnalysesToday($user, $store),
+        ]);
+    }
+
+    /**
+     * List available analysis types.
+     */
+    public function types(): JsonResponse
+    {
+        return response()->json([
+            'types' => AnalysisType::toApiArray(),
         ]);
     }
 

@@ -73,15 +73,12 @@ const showDetailModal = ref(false);
 const selectedOrder = ref(null);
 
 const statusLabels = {
-    authorized: 'Autorizado',
     pending: 'Pendente',
     paid: 'Pago',
-    partially_paid: 'Parcialmente Pago',
-    abandoned: 'Abandonado',
     refunded: 'Reembolsado',
-    partially_refunded: 'Parcialmente Reembolsado',
     voided: 'Recusado',
     failed: 'Falhou',
+    cancelled: 'Cancelado',
 };
 
 const perPageOptions = [10, 20, 50, 100];
@@ -233,15 +230,12 @@ function getStatusConfig(status) {
 
 function getPaymentStatusConfig(status) {
     const configs = {
-        authorized: { label: 'Autorizado', color: 'primary' },
         pending: { label: 'Pendente', color: 'warning' },
         paid: { label: 'Pago', color: 'success' },
-        partially_paid: { label: 'Parcialmente Pago', color: 'warning' },
-        abandoned: { label: 'Abandonado', color: 'gray' },
         refunded: { label: 'Reembolsado', color: 'gray' },
-        partially_refunded: { label: 'Parcialmente Reembolsado', color: 'gray' },
         voided: { label: 'Recusado', color: 'danger' },
         failed: { label: 'Falhou', color: 'danger' },
+        cancelled: { label: 'Cancelado', color: 'danger' },
     };
     return configs[status] || { label: status, color: 'gray' };
 }
@@ -631,8 +625,8 @@ onUnmounted(() => {
                                     style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27m6 8 4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-size: 1.5em 1.5em;"
                                 >
                                     <option value="">Todos os Status</option>
-                                    <option v-for="status in filterOptions.payment_statuses" :key="status" :value="status">
-                                        {{ statusLabels[status] || status }}
+                                    <option v-for="status in filterOptions.payment_statuses" :key="status.value" :value="status.value">
+                                        {{ status.label }}
                                     </option>
                                 </select>
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 
 class SystemSetting extends Model
 {
@@ -141,6 +142,19 @@ class SystemSetting extends Model
         try {
             return Crypt::decryptString($value);
         } catch (\Exception) {
+            // If the value looks like an encrypted payload (base64 JSON with iv/value/mac)
+            // but can't be decrypted, the APP_KEY likely changed. Return empty to force
+            // re-configuration instead of returning encrypted gibberish.
+            if (str_starts_with($value, 'eyJ')) {
+                Log::warning('Failed to decrypt sensitive setting - APP_KEY may have changed', [
+                    'key' => $this->key,
+                ]);
+
+                return '';
+            }
+
+            // If it doesn't look encrypted, it might be a plain text value
+            // from before encryption was enabled - return as-is
             return $value;
         }
     }

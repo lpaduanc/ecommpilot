@@ -30,6 +30,8 @@ class AdminAnalysisDetailResource extends JsonResource
             ],
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
+            'analysis_type' => $this->analysis_type?->value ?? 'general',
+            'analysis_type_label' => $this->analysis_type?->label() ?? 'Análise Geral',
             'summary' => $this->summary,
             'alerts' => $this->alerts,
             'opportunities' => $this->opportunities,

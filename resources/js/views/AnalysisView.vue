@@ -18,6 +18,7 @@ import SuggestionChatPanel from '../components/analysis/SuggestionChatPanel.vue'
 import HealthScore from '../components/analysis/HealthScore.vue';
 import AnalysisAlerts from '../components/analysis/AnalysisAlerts.vue';
 import OpportunitiesPanel from '../components/analysis/OpportunitiesPanel.vue';
+import AnalysisTypeSelector from '../components/analysis/AnalysisTypeSelector.vue';
 import ChatContainer from '../components/chat/ChatContainer.vue';
 import {
     SparklesIcon,
@@ -55,6 +56,10 @@ const showContent = computed(() => canAccessAnalysis.value || isInPreviewMode.va
 
 // Usa dados mockados quando em preview mode E não tem acesso
 const shouldUseMocks = computed(() => isInPreviewMode.value && !canAccessAnalysis.value);
+
+// Feature flag para módulos de análise
+const featureModulesEnabled = import.meta.env.VITE_FEATURE_ANALYSIS_MODULES === 'true';
+const selectedAnalysisType = ref('general');
 
 const showRateLimitWarning = ref(false);
 const selectedSuggestion = ref(null);
@@ -136,7 +141,8 @@ async function handleRequestAnalysis() {
         return;
     }
 
-    const result = await analysisStore.requestNewAnalysis();
+    const analysisType = featureModulesEnabled ? selectedAnalysisType.value : 'general';
+    const result = await analysisStore.requestNewAnalysis(analysisType);
 
     if (result.success) {
         notificationStore.success('Análise iniciada! Você será notificado quando ela for concluída.');
@@ -608,6 +614,12 @@ onUnmounted(() => {
                 </button>
             </div>
         </div>
+
+        <!-- Analysis Type Selector (feature flag) -->
+        <AnalysisTypeSelector
+            v-if="featureModulesEnabled && authStore.hasPermission('analysis.request')"
+            v-model="selectedAnalysisType"
+        />
 
         <!-- Análises Section -->
         <div v-if="currentAnalysis || recentAnalyses.length > 0" class="relative">

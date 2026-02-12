@@ -144,6 +144,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('analysis')->group(function () {
         // Visualização de análises - requer permissão
         Route::middleware('can:analysis.view')->group(function () {
+            Route::get('types', [AnalysisController::class, 'types']);
             Route::get('current', [AnalysisController::class, 'current']);
             Route::get('history', [AnalysisController::class, 'history']);
             Route::get('{analysis}', [AnalysisController::class, 'show']);

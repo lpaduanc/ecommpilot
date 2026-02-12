@@ -6,6 +6,7 @@ use App\Models\Analysis;
 use App\Models\Store;
 use App\Models\Suggestion;
 use App\Services\AI\AIManager;
+use App\Services\AI\AnalysisRouter;
 use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\LiteAnalystAgentPrompt;
 use App\Services\AI\Prompts\LiteStrategistAgentPrompt;
@@ -29,7 +30,8 @@ class LiteStoreAnalysisService
     private const ANALYSIS_PERIOD_DAYS = 7; // Reduced from 15
 
     public function __construct(
-        private AIManager $aiManager
+        private AIManager $aiManager,
+        private AnalysisRouter $analysisRouter,
     ) {}
 
     /**
@@ -37,7 +39,16 @@ class LiteStoreAnalysisService
      */
     public function execute(Store $store, Analysis $analysis): array
     {
-        Log::info("Starting LITE store analysis pipeline for store {$store->id}");
+        // V6: Resolver configuração do módulo de análise
+        $moduleConfig = $this->analysisRouter->resolve(
+            $analysis->analysis_type?->value ?? 'general'
+        );
+
+        Log::info("Starting LITE store analysis pipeline for store {$store->id}", [
+            'analysis_type' => $analysis->analysis_type?->value ?? 'general',
+            'module_specialized' => $moduleConfig->isSpecialized,
+            'module_type' => $moduleConfig->analysisType,
+        ]);
 
         // 1. Identify store niche
         $niche = $this->identifyNiche($store);
@@ -48,11 +59,11 @@ class LiteStoreAnalysisService
 
         // 3. Execute Lite Analyst
         Log::info('Lite Pipeline: Executing Analyst');
-        $analysisResult = $this->executeAnalyst($storeData);
+        $analysisResult = $this->executeAnalyst($storeData, $moduleConfig);
 
         // 4. Execute Lite Strategist
         Log::info('Lite Pipeline: Executing Strategist');
-        $suggestions = $this->executeStrategist($analysisResult, $niche);
+        $suggestions = $this->executeStrategist($analysisResult, $niche, $moduleConfig);
 
         Log::info('Lite Pipeline: Strategist generated '.count($suggestions).' suggestions');
 
@@ -150,9 +161,12 @@ class LiteStoreAnalysisService
     /**
      * Execute the lite analyst agent.
      */
-    private function executeAnalyst(array $storeData): array
+    private function executeAnalyst(array $storeData, \App\DTOs\AnalysisModuleConfig $moduleConfig): array
     {
-        $prompt = LiteAnalystAgentPrompt::get(['store_data' => $storeData]);
+        $prompt = LiteAnalystAgentPrompt::get([
+            'store_data' => $storeData,
+            'module_config' => $moduleConfig,
+        ]);
 
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
@@ -179,11 +193,12 @@ class LiteStoreAnalysisService
     /**
      * Execute the lite strategist agent.
      */
-    private function executeStrategist(array $analysisResult, string $niche): array
+    private function executeStrategist(array $analysisResult, string $niche, \App\DTOs\AnalysisModuleConfig $moduleConfig): array
     {
         $prompt = LiteStrategistAgentPrompt::get([
             'analysis' => $analysisResult,
             'niche' => $niche,
+            'module_config' => $moduleConfig,
         ]);
 
         $response = $this->aiManager->chat([

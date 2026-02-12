@@ -5,14 +5,17 @@ namespace App\Services\AI\Prompts;
 class StrategistAgentPrompt
 {
     /**
-     * STRATEGIST AGENT V5 - REFATORADO
+     * STRATEGIST AGENT V7 - STRATEGIC REWRITE
      *
-     * Mudanças:
-     * - Removida persona fictícia
-     * - Adicionados few-shot examples concretos
-     * - Prompt reduzido (~50%)
-     * - Formato de saída simplificado
-     * - Constraints específicos e mensuráveis
+     * Mudanças principais vs V6:
+     * - 9 sugestões (3 HIGH estratégicas + 3 MEDIUM táticas + 3 LOW táticas)
+     * - Reasoning section com diagnóstico estratégico e self-consistency
+     * - React pattern (thought → action → observation) para cada sugestão
+     * - HIGH obrigatoriamente estratégicas (categorias: strategy, investment, market, growth, financial, positioning)
+     * - MEDIUM/LOW são táticas operacionais (categorias: inventory, pricing, product, customer, conversion, marketing, coupon, operational)
+     * - HIGH devem usar dados externos (competitor_data, market_data, store_goals, rag_benchmarks)
+     * - Sistema graduado de temas saturados (3+ bloqueado, 2 frequente, 1 já usado)
+     * - Min 6 categorias diferentes nas 9 sugestões
      */
     public static function getSeasonalityContext(): array
     {
@@ -291,6 +294,7 @@ Isso garante que cada sugestão é fundamentada em dados → ação → resultad
   }
 }
 ```
+</exemplos>
 
 </examples>
 
@@ -351,7 +355,9 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
         "complexity": "baixa|media|alta",
         "cost": "R$ X/mês ou R$ 0"
       },
-      "competitor_reference": "Se HIGH: qual dado de concorrente ou mercado embasa isso. Se não há: null"
+      "competitor_reference": "Se HIGH: qual dado de concorrente ou mercado embasa isso. Se não há: null",
+      "insight_origem": "problema_1|problema_2|problema_3|problema_4|problema_5|best_practice (qual problema do Analyst esta sugestão resolve)",
+      "nivel_confianca": "alto|medio|baixo"
     }
   ]
 }
@@ -453,9 +459,9 @@ Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrij
 
 </data>
 
-</agent>
-
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
+
+</agent>
 PROMPT;
     }
 
@@ -491,23 +497,9 @@ PROMPT;
      */
     private static function extractProhibitedKeywords(array $suggestions): array
     {
-        $patterns = [
-            'kits' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
-            'cupom' => ['cupom', 'desconto', 'voucher', 'código', 'coupon'],
-            'frete' => ['frete', 'entrega', 'shipping', 'envio'],
-            'fidelidade' => ['fidelidade', 'pontos', 'recompensa', 'loyalty', 'cashback'],
-            'cancelamento' => ['cancelamento', 'abandono', 'desistência', 'carrinho abandonado'],
-            'checkout' => ['checkout', 'finalização', 'carrinho', 'conversão'],
-            'estoque' => ['estoque', 'reposição', 'inventário', 'avise-me'],
-            'email' => ['email', 'newsletter', 'automação', 'e-mail'],
-            'quiz' => ['quiz', 'questionário', 'personalização', 'teste'],
-            'ticket' => ['ticket médio', 'ticket', 'aov', 'valor médio'],
-            'upsell' => ['upsell', 'cross-sell', 'venda cruzada', 'produtos relacionados'],
-            'reativacao' => ['reativação', 'reativar', 'clientes inativos', 'win-back'],
-            'reviews' => ['review', 'avaliação', 'depoimento', 'prova social'],
-            'conteudo' => ['conteúdo', 'blog', 'seo', 'redes sociais'],
-            'assinatura' => ['assinatura', 'recorrência', 'subscription'],
-        ];
+        // V6: Use ThemeKeywords centralizado
+        $patterns = \App\Services\Analysis\ThemeKeywords::all();
+        $labels = \App\Services\Analysis\ThemeKeywords::labels();
 
         $foundKeywords = [];
         foreach ($suggestions as $s) {
@@ -518,72 +510,95 @@ PROMPT;
             foreach ($patterns as $theme => $words) {
                 foreach ($words as $word) {
                     if (mb_strpos($text, $word) !== false) {
-                        $foundKeywords[$theme] = true;
+                        $foundKeywords[$theme] = $labels[$theme] ?? $theme;
                         break;
                     }
                 }
             }
         }
 
-        return array_keys($foundKeywords);
+        return array_values($foundKeywords);
     }
 
     public static function identifySaturatedThemes(array $previousSuggestions): string
     {
         if (empty($previousSuggestions)) {
-            return 'Nenhum.';
+            return 'Nenhum tema foi usado anteriormente. Todos os temas estão disponíveis.';
         }
 
-        // V5: Keywords expandidas para capturar mais variações
-        $keywords = [
-            'Quiz/Personalização' => ['quiz', 'questionário', 'personalizado', 'teste de'],
-            'Frete Grátis' => ['frete grátis', 'frete gratuito', 'frete condicional'],
-            'Fidelidade/Pontos' => ['fidelidade', 'pontos', 'cashback', 'recompensa', 'loyalty'],
-            'Kits/Combos' => ['kit', 'combo', 'bundle', 'pack', 'cronograma'],
-            'Estoque/Reposição' => ['estoque', 'avise-me', 'reposição', 'inventário'],
-            'Email Marketing' => ['email', 'newsletter', 'automação', 'e-mail marketing'],
-            'Assinatura' => ['assinatura', 'recorrência', 'subscription'],
-            'Cupom/Desconto' => ['cupom', 'desconto', 'voucher', 'código promocional'],
-            'Checkout/Conversão' => ['checkout', 'carrinho', 'abandono', 'conversão'],
-            'Cancelamento' => ['cancelamento', 'taxa de cancelamento', 'desistência'],
-            'Ticket Médio' => ['ticket médio', 'aov', 'valor médio', 'ticket'],
-            'Upsell/Cross-sell' => ['upsell', 'cross-sell', 'venda cruzada', 'produtos relacionados'],
-            'Reativação' => ['reativação', 'clientes inativos', 'win-back', 'reativar'],
-            'Reviews/Avaliações' => ['review', 'avaliação', 'depoimento', 'prova social'],
-            'SEO/Conteúdo' => ['seo', 'conteúdo', 'blog', 'descrição de produto'],
-            'Redes Sociais' => ['instagram', 'facebook', 'redes sociais', 'social'],
-            'WhatsApp' => ['whatsapp', 'zap', 'atendimento'],
-            'Pós-Venda' => ['pós-venda', 'pós compra', 'acompanhamento', 'feedback'],
-        ];
+        // V6: Use ThemeKeywords centralizado
+        $keywords = \App\Services\Analysis\ThemeKeywords::all();
+        $labels = \App\Services\Analysis\ThemeKeywords::labels();
 
         $counts = [];
         foreach ($previousSuggestions as $s) {
             $text = mb_strtolower(($s['title'] ?? '').' '.($s['description'] ?? ''));
-            foreach ($keywords as $theme => $kws) {
+            foreach ($keywords as $themeKey => $kws) {
                 foreach ($kws as $kw) {
                     if (mb_strpos($text, $kw) !== false) {
-                        $counts[$theme] = ($counts[$theme] ?? 0) + 1;
+                        $counts[$themeKey] = ($counts[$themeKey] ?? 0) + 1;
                         break;
                     }
                 }
             }
         }
 
-        // V5: Threshold baixado de 2 para 1 - qualquer tema já usado é considerado saturado
-        $saturated = array_filter($counts, fn ($c) => $c >= 1);
-        arsort($saturated);
+        // V6: Sistema graduado de saturação
+        $blocked = array_filter($counts, fn ($c) => $c >= 3);      // 3+ = BLOQUEADO
+        $frequent = array_filter($counts, fn ($c) => $c === 2);    // 2 = FREQUENTE
+        $used = array_filter($counts, fn ($c) => $c === 1);        // 1 = JÁ USADO
+        $unused = array_diff_key($keywords, $counts);               // 0 = NUNCA USADO
 
-        if (empty($saturated)) {
-            return 'Nenhum.';
-        }
+        arsort($blocked);
+        arsort($frequent);
+        arsort($used);
 
         $out = '';
-        foreach ($saturated as $t => $c) {
-            $label = $c >= 2 ? 'MUITO USADO' : 'JÁ USADO';
-            $out .= "- {$t} ({$c}x) — {$label}, EVITAR\n";
+
+        // Temas bloqueados (3+)
+        if (! empty($blocked)) {
+            $out .= "### 🔴 BLOQUEADO (PROIBIDO) - 3+ ocorrências:\n\n";
+            foreach ($blocked as $themeKey => $c) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $out .= "- {$label} ({$c}x) — NÃO SUGERIR\n";
+            }
+            $out .= "\n";
         }
 
-        return $out;
+        // Temas frequentes (2)
+        if (! empty($frequent)) {
+            $out .= "### 🟡 FREQUENTE (usar apenas com ângulo completamente novo) - 2 ocorrências:\n\n";
+            foreach ($frequent as $themeKey => $c) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $out .= "- {$label} ({$c}x) — Permitido SOMENTE se abordagem totalmente diferente\n";
+            }
+            $out .= "\n";
+        }
+
+        // Temas já usados (1) - apenas listar, não bloquear
+        if (! empty($used)) {
+            $out .= "### ⚪ JÁ USADO (pode usar com cautela) - 1 ocorrência:\n\n";
+            $usedList = [];
+            foreach ($used as $themeKey => $c) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $usedList[] = $label;
+            }
+            $out .= implode(', ', $usedList)."\n\n";
+        }
+
+        // Temas nunca usados (0) - PREFERIR
+        if (! empty($unused)) {
+            $out .= "### ✅ TEMAS NUNCA USADOS (PREFERIR):\n\n";
+            $unusedList = [];
+            foreach ($unused as $themeKey => $kws) {
+                $label = $labels[$themeKey] ?? $themeKey;
+                $unusedList[] = $label;
+            }
+            $out .= implode(', ', $unusedList)."\n\n";
+            $out .= "**INSTRUÇÃO:** Priorize temas desta lista para maximizar diversidade.\n";
+        }
+
+        return $out ?: 'Nenhum tema saturado identificado.';
     }
 
     /**
@@ -783,7 +798,44 @@ PROMPT;
         $anomalies = $context['anomalies'] ?? [];
         $ticketMedio = $context['ticket_medio'] ?? 0;
 
+        // ProfileSynthesizer store profile
+        $perfilLojaSection = '';
+        if (! empty($context['store_profile'])) {
+            $profileJson = json_encode($context['store_profile'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $perfilLojaSection = "<perfil_loja>\n{$profileJson}\n</perfil_loja>\n\n";
+        }
+
+        // V6: Module config para análises especializadas
+        $moduleConfig = $context['module_config'] ?? null;
+        $focoModulo = '';
+        $keywordsModulo = '';
+        $exemplosModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $foco = $moduleConfig->strategistConfig['foco'] ?? '';
+            $exemploBom = $moduleConfig->strategistConfig['exemplo_bom'] ?? '';
+            $exemploRuim = $moduleConfig->strategistConfig['exemplo_ruim'] ?? '';
+
+            $focoModulo = "\n<foco_modulo>\nEsta é uma análise especializada. Foco: {$foco}\nDirecione TODAS as sugestões para este foco específico.\n</foco_modulo>";
+
+            $keywords = $moduleConfig->analystKeywords['keywords'] ?? '';
+            if ($keywords) {
+                $keywordsModulo = "\n\nKeywords adicionais para análise {$tipo}:\n{$keywords}";
+            }
+
+            if ($exemploBom || $exemploRuim) {
+                $exemplosModulo = "\n\nExemplos específicos para análise {$tipo}:";
+                if ($exemploBom) {
+                    $exemplosModulo .= "\n\n<exemplo_sugestao_boa_modulo>\n{$exemploBom}\n</exemplo_sugestao_boa_modulo>";
+                }
+                if ($exemploRuim) {
+                    $exemplosModulo .= "\n\n<exemplo_sugestao_ruim_modulo>\n{$exemploRuim}\n</exemplo_sugestao_ruim_modulo>";
+                }
+            }
+        }
+
         $replacements = [
+            '{{perfil_loja}}' => $perfilLojaSection,
             '{{prohibited_suggestions}}' => self::formatProhibitedSuggestions($allSuggestions),
             '{{saturated_themes}}' => self::identifySaturatedThemes($allSuggestions),
             '{{accepted_rejected}}' => self::formatAcceptedAndRejected($acceptedTitles, $rejectedTitles),
@@ -802,6 +854,10 @@ PROMPT;
             '{{market_data}}' => is_array($marketData) ? json_encode($marketData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : $marketData,
             '{{rag_strategies}}' => self::formatRagStrategies($ragStrategies),
             '{{rag_benchmarks}}' => self::formatRagBenchmarks($ragBenchmarks),
+            // V6: Module-specific replacements
+            '{{foco_modulo}}' => $focoModulo,
+            '{{keywords_modulo}}' => $keywordsModulo,
+            '{{exemplos_modulo}}' => $exemplosModulo,
         ];
 
         foreach ($replacements as $k => $v) {
@@ -861,7 +917,7 @@ PROMPT;
                 $gapPct = round(($gap / (float) $goals['monthly_revenue']) * 100);
                 $formattedGap = 'R$ '.number_format($gap, 2, ',', '.');
                 $output .= "\n**GAP PARA META:** {$formattedGap} ({$gapPct}% de aumento necessário)\n";
-                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 9 sugestões deve cobrir pelo menos 50% deste gap.\n";
+                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 12 sugestões deve cobrir pelo menos 50% deste gap.\n";
             }
         }
 
@@ -871,7 +927,7 @@ PROMPT;
     }
 
     /**
-     * Formata o briefing do Analyst para vincular as 3 HIGH aos 3 problemas prioritarios.
+     * Formata o briefing do Analyst para vincular as 3 HIGH aos 5 problemas prioritarios.
      */
     private static function formatAnalystBriefing(array|string $analystAnalysis): string
     {
@@ -888,7 +944,7 @@ PROMPT;
             return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
         }
 
-        // Extrair problemas: formato do Analyst usa problema_1, problema_2, problema_3
+        // Extrair problemas: formato do Analyst usa problema_1 até problema_5
         $problems = [];
         if (! empty($briefing['problema_1'])) {
             $problems[] = $briefing['problema_1'];
@@ -898,6 +954,12 @@ PROMPT;
         }
         if (! empty($briefing['problema_3'])) {
             $problems[] = $briefing['problema_3'];
+        }
+        if (! empty($briefing['problema_4'])) {
+            $problems[] = $briefing['problema_4'];
+        }
+        if (! empty($briefing['problema_5'])) {
+            $problems[] = $briefing['problema_5'];
         }
 
         // Fallback: tentar formato de array
@@ -909,10 +971,10 @@ PROMPT;
             return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
         }
 
-        $output = "### TOP 3 PROBLEMAS PRIORITÁRIOS (cada HIGH deve resolver um destes):\n\n";
+        $output = "### TOP 5 PROBLEMAS PRIORITÁRIOS:\n\n**Escolha 4 dos 5 problemas abaixo para as sugestões HIGH. Priorize os 4 mais críticos e que NUNCA foram abordados em análises anteriores.**\n\n";
         foreach ($problems as $i => $problem) {
             $n = $i + 1;
-            $output .= "**HIGH #{$n} deve resolver:** {$problem}\n";
+            $output .= "**Problema #{$n}:** {$problem}\n";
         }
 
         // Dados-chave do briefing

@@ -79,7 +79,7 @@ class AnalystAgentService
         $prompt = AnalystAgentPrompt::get($data);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 0.3,
+            'temperature' => 0.2,
             'prompt_chars' => strlen($prompt),
         ]);
 
@@ -87,7 +87,7 @@ class AnalystAgentService
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
         ], [
-            'temperature' => 0.3, // Baixa: análise de métricas precisa de precisão
+            'temperature' => 0.2,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
@@ -194,6 +194,7 @@ class AnalystAgentService
             'resumo_executivo' => $analysis['resumo_executivo'] ?? null,
             'health_score' => $healthScore,
             'overall_health' => $overallHealth,
+            'dados_insuficientes' => $analysis['dados_insuficientes'] ?? [],
         ];
     }
 
@@ -233,6 +234,8 @@ class AnalystAgentService
                 'descricao' => $alerta['dados'] ?? $alerta['descricao'] ?? '',
                 'impacto_estimado' => $alerta['impacto'] ?? '',
                 'acao' => $alerta['acao'] ?? '',
+                'fonte' => $alerta['fonte'] ?? 'inferencia',
+                'confianca' => $alerta['confianca'] ?? 'media',
             ];
         }
 

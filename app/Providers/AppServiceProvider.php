@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Mail\Transport\MailjetTransport;
 use App\Notifications\Channels\DatabaseEmailChannel;
 use App\Services\AI\AIManager;
+use App\Services\AI\AnalysisRouter;
 use App\Services\ExternalData\CompetitorAnalysisService;
 use App\Services\ExternalData\DecodoProxyService;
 use App\Services\ExternalData\ExternalDataAggregator;
@@ -60,6 +61,9 @@ class AppServiceProvider extends ServiceProvider
             return new CompetitorAnalysisService($app->make(DecodoProxyService::class));
         });
         $this->app->singleton(ExternalDataAggregator::class);
+
+        // Register Analysis Router for module-based analysis
+        $this->app->singleton(AnalysisRouter::class);
     }
 
     /**

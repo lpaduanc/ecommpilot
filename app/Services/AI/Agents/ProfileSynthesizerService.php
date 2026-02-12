@@ -4,10 +4,10 @@ namespace App\Services\AI\Agents;
 
 use App\Services\AI\AIManager;
 use App\Services\AI\JsonExtractor;
-use App\Services\AI\Prompts\CollectorAgentPrompt;
+use App\Services\AI\Prompts\ProfileSynthesizerPrompt;
 use Illuminate\Support\Facades\Log;
 
-class CollectorAgentService
+class ProfileSynthesizerService
 {
     private string $logChannel = 'analysis';
 
@@ -40,41 +40,37 @@ class CollectorAgentService
     }
 
     /**
-     * Execute the collector agent.
+     * Execute the profile synthesizer agent.
      */
     public function execute(array $context): array
     {
         $startTime = microtime(true);
 
-        Log::channel($this->logChannel)->info('    ┌─── COLLECTOR AGENT ───────────────────────────────────────┐');
-        Log::channel($this->logChannel)->info('    │ Gerando contexto historico e benchmarks                   │');
-        Log::channel($this->logChannel)->info('    └────────────────────────────────────────────────────────────┘');
+        Log::channel($this->logChannel)->info('    ┌─── PROFILE SYNTHESIZER AGENT ───────────────────────────┐');
+        Log::channel($this->logChannel)->info('    │ Gerando perfil sintetizado da loja                      │');
+        Log::channel($this->logChannel)->info('    └──────────────────────────────────────────────────────────┘');
 
         // Log das variáveis usadas (resumo)
-        Log::channel($this->logChannel)->info('    [COLLECTOR] Variaveis do contexto:', [
+        Log::channel($this->logChannel)->info('    [PROFILE_SYNTHESIZER] Variaveis do contexto:', [
+            'store_name' => $context['store_name'] ?? 'desconhecida',
             'platform' => $context['platform'] ?? 'desconhecida',
             'niche' => $context['niche'] ?? 'geral',
+            'subcategory' => $context['subcategory'] ?? 'geral',
             'store_stats_keys' => array_keys($context['store_stats'] ?? []),
-            'previous_analyses_count' => count($context['previous_analyses'] ?? []),
-            'previous_suggestions_count' => count($context['previous_suggestions'] ?? []),
             'benchmarks_count' => count($context['benchmarks'] ?? []),
-            'has_external_data' => ! empty($context['external_data']),
         ]);
 
         // ═══════════════════════════════════════════════════════════════════
-        // LOG COMPLETO: Contexto recebido pelo Collector
+        // LOG COMPLETO: Contexto recebido pelo ProfileSynthesizer
         // ═══════════════════════════════════════════════════════════════════
-        $this->logFullData('COLLECTOR INPUT - Store Stats', $context['store_stats'] ?? []);
-        $this->logFullData('COLLECTOR INPUT - External Data (Concorrentes)', $context['external_data'] ?? []);
-        $this->logFullData('COLLECTOR INPUT - Benchmarks', $context['benchmarks'] ?? []);
-        $this->logFullData('COLLECTOR INPUT - Previous Analyses', $context['previous_analyses'] ?? []);
-        $this->logFullData('COLLECTOR INPUT - Store Goals', $context['store_goals'] ?? []);
+        $this->logFullData('PROFILE_SYNTHESIZER INPUT - Store Stats', $context['store_stats'] ?? []);
+        $this->logFullData('PROFILE_SYNTHESIZER INPUT - Benchmarks', $context['benchmarks'] ?? []);
 
         // Log do template do prompt
-        Log::channel($this->logChannel)->info('    [COLLECTOR] PROMPT TEMPLATE:');
-        Log::channel($this->logChannel)->info(CollectorAgentPrompt::getTemplate());
+        Log::channel($this->logChannel)->info('    [PROFILE_SYNTHESIZER] PROMPT TEMPLATE:');
+        Log::channel($this->logChannel)->info(ProfileSynthesizerPrompt::getTemplate());
 
-        $prompt = CollectorAgentPrompt::get($context);
+        $prompt = ProfileSynthesizerPrompt::get($context);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
             'temperature' => 0.1,
@@ -95,14 +91,14 @@ class CollectorAgentService
         ]);
 
         // Log da resposta completa da AI
-        Log::channel($this->logChannel)->info('    [COLLECTOR] RESPOSTA AI:');
+        Log::channel($this->logChannel)->info('    [PROFILE_SYNTHESIZER] RESPOSTA AI:');
         Log::channel($this->logChannel)->info($response);
 
-        $result = $this->parseResponse($response);
+        $result = $this->parseResponse($response, $context);
 
         $totalTime = round((microtime(true) - $startTime) * 1000, 2);
 
-        Log::channel($this->logChannel)->info('    [COLLECTOR] Concluido', [
+        Log::channel($this->logChannel)->info('    [PROFILE_SYNTHESIZER] Concluido', [
             'keys_returned' => array_keys($result),
             'total_time_ms' => $totalTime,
         ]);
@@ -116,24 +112,35 @@ class CollectorAgentService
     /**
      * Parse the AI response into structured data.
      */
-    private function parseResponse(string $response): array
+    private function parseResponse(string $response, array $context): array
     {
         $json = $this->extractJson($response);
 
         if ($json === null) {
-            Log::channel($this->logChannel)->warning('    [COLLECTOR] ERRO: Nao foi possivel extrair JSON da resposta');
+            Log::channel($this->logChannel)->warning('    [PROFILE_SYNTHESIZER] ERRO: Nao foi possivel extrair JSON da resposta. Usando perfil padrao.');
 
             return [
-                'historical_summary' => [],
-                'success_patterns' => [],
-                'suggestions_to_avoid' => [],
-                'relevant_benchmarks' => [],
-                'identified_gaps' => [],
-                'special_context' => 'Could not parse collector response',
+                'store_profile' => [
+                    'nome' => $context['store_name'] ?? 'Loja',
+                    'url' => $context['store_url'] ?? 'N/D',
+                    'plataforma' => $context['platform'] ?? 'nuvemshop',
+                    'nicho' => $context['niche'] ?? 'geral',
+                    'nicho_detalhado' => $context['subcategory'] ?? 'geral',
+                    'porte_estimado' => 'nao_determinado',
+                    'maturidade_digital' => 'nao_determinado',
+                    'publico_alvo_estimado' => 'nao_determinado',
+                    'diferenciais_visiveis' => [],
+                    'sazonalidade_relevante' => 'nao_determinado',
+                ],
+                'contexto_analise' => [
+                    'data_analise' => now()->toDateString(),
+                    'eventos_sazonais_proximos' => [],
+                    'observacoes_iniciais' => 'Perfil gerado com valores padrão devido a falha na análise.',
+                ],
             ];
         }
 
-        Log::channel($this->logChannel)->info('    [COLLECTOR] JSON extraido com sucesso', [
+        Log::channel($this->logChannel)->info('    [PROFILE_SYNTHESIZER] JSON extraido com sucesso', [
             'keys' => array_keys($json),
         ]);
 
@@ -145,6 +152,6 @@ class CollectorAgentService
      */
     private function extractJson(string $content): ?array
     {
-        return JsonExtractor::extract($content, 'Collector');
+        return JsonExtractor::extract($content, 'ProfileSynthesizer');
     }
 }

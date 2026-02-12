@@ -12,6 +12,23 @@ class LiteAnalystAgentPrompt
     {
         $storeData = json_encode($data['store_data'] ?? [], JSON_UNESCAPED_UNICODE);
 
+        // V6: Module config para análises especializadas
+        $moduleConfig = $data['module_config'] ?? null;
+        $focoModulo = '';
+        if ($moduleConfig && $moduleConfig->isSpecialized) {
+            $tipo = $moduleConfig->analysisType;
+            $keywords = $moduleConfig->analystKeywords['keywords'] ?? '';
+            $foco = $moduleConfig->analystKeywords['foco_analise'] ?? '';
+            $focoModulo = <<<FOCO
+
+## FOCO ESPECIALIZADO: {$tipo}
+Esta é uma análise especializada. Priorize anomalias e métricas relacionadas a:
+{$keywords}
+
+Direcionamento: {$foco}
+FOCO;
+        }
+
         return <<<PROMPT
 <agent name="lite-analyst" version="6">
 
@@ -22,6 +39,7 @@ Você é um analista de e-commerce sênior especializado em diagnósticos rápid
 <task>
 Analisar dados da loja e retornar métricas + anomalias de forma concisa em JSON.
 </task>
+{$focoModulo}
 
 <rules priority="mandatory">
 1. Máximo 3 anomalias, priorizadas por IMPACTO FINANCEIRO (maior perda de receita primeiro)

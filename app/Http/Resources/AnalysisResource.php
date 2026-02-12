@@ -19,6 +19,8 @@ class AnalysisResource extends JsonResource
         return [
             'id' => $this->uuid,
             'status' => $this->status?->value,
+            'analysis_type' => $this->analysis_type?->value ?? 'general',
+            'analysis_type_label' => $this->analysis_type?->label() ?? 'Análise Geral',
             'error_message' => $this->error_message,
             'summary' => $this->summary,
             'suggestions' => $formattedSuggestions,
