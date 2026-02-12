@@ -81,15 +81,16 @@ trait SuggestionDeduplicationTrait
             }
         }
 
-        // V6: Threshold aumentado para 3
-        // OU se foi rejeitado pelo menos 1x (penaliza temas que o cliente não gostou)
+        // V7: Threshold aumentado para 3 — permite evolução de temas
+        // Um tema pode ser re-sugerido com abordagem diferente até 2x antes de bloquear.
+        // Temas rejeitados 2+ vezes são bloqueados (cliente não quer).
         $saturated = array_filter($counts, function ($count) {
             return $count >= 3;
         });
 
-        // Adicionar temas rejeitados mesmo que apareçam só 1x
+        // Adicionar temas rejeitados 2+ vezes (cliente claramente não quer)
         foreach ($rejectedThemes as $theme => $rejectCount) {
-            if (! isset($saturated[$theme]) && $rejectCount >= 1) {
+            if (! isset($saturated[$theme]) && $rejectCount >= 2) {
                 $saturated[$theme] = $counts[$theme] ?? 1;
             }
         }
@@ -145,8 +146,9 @@ trait SuggestionDeduplicationTrait
             }
 
             // Verificar repetição HISTÓRICA
+            // V7: Threshold relaxado de 0.75 para 0.85 — permite evoluções de temas anteriores
             $maxSimilarity = $this->calculateMaxSimilarity($normalizedTitle, $previousTitles);
-            if ($maxSimilarity > 0.75) {
+            if ($maxSimilarity > 0.85) {
                 Log::warning('Sugestão similar a HISTÓRICA detectada', [
                     'title' => $title,
                     'similarity' => round($maxSimilarity * 100, 1).'%',
@@ -170,9 +172,9 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
-     * Normaliza título para comparação
+     * Normaliza título para comparação.
      *
-     * V6: Unificado com StoreAnalysisService::normalizeTitle()
+     * V7: Unificado com StoreAnalysisService::normalizeTitle()
      * - Remove stopwords comuns em português
      * - Remove verbos de ação genéricos (implementar, otimizar, etc.)
      * - Remove palavras de domínio (produto, cliente, loja, etc.)
@@ -204,6 +206,29 @@ trait SuggestionDeduplicationTrait
     }
 
     /**
+     * Calcula similaridade entre dois títulos normalizados usando Jaccard (word-based).
+     * Apropriado para títulos já normalizados com stopwords removidos e palavras ordenadas.
+     */
+    protected function calculateTitleSimilarity(string $title1, string $title2): float
+    {
+        $words1 = array_unique(array_filter(preg_split('/\s+/', $title1)));
+        $words2 = array_unique(array_filter(preg_split('/\s+/', $title2)));
+
+        if (empty($words1) || empty($words2)) {
+            return 0.0;
+        }
+
+        $intersection = count(array_intersect($words1, $words2));
+        $union = count(array_unique(array_merge($words1, $words2)));
+
+        if ($union === 0) {
+            return 0.0;
+        }
+
+        return $intersection / $union;
+    }
+
+    /**
      * Calcula similaridade máxima com lista de títulos
      */
     protected function calculateMaxSimilarity(string $title, array $previousTitles): float
@@ -211,18 +236,7 @@ trait SuggestionDeduplicationTrait
         $maxSimilarity = 0;
 
         foreach ($previousTitles as $prevTitle) {
-            similar_text($title, $prevTitle, $percent);
-            $similarity1 = $percent / 100;
-
-            $maxLen = max(strlen($title), strlen($prevTitle));
-            if ($maxLen > 0) {
-                $levenshtein = levenshtein($title, $prevTitle);
-                $similarity2 = 1 - ($levenshtein / $maxLen);
-            } else {
-                $similarity2 = 0;
-            }
-
-            $similarity = max($similarity1, $similarity2);
+            $similarity = $this->calculateTitleSimilarity($title, $prevTitle);
             $maxSimilarity = max($maxSimilarity, $similarity);
         }
 

@@ -920,8 +920,7 @@ class StoreAnalysisService
             $store->id
         );
 
-        // V5: Não precisa mais validar depois, pois já foi feito antes
-        $beforeValidation = count($finalSuggestions);
+        $afterRecovery = count($finalSuggestions);
 
         // Enforcement programático: max 2 sugestões por categoria
         $finalSuggestions = $this->enforceCategoryDiversification($finalSuggestions, $validatedStrategistSuggestions);
@@ -936,7 +935,9 @@ class StoreAnalysisService
         $this->logDeduplicationStats($analysis->id, [
             'from_strategist' => count($generatedSuggestions['suggestions'] ?? []),
             'from_critic' => count($criticizedSuggestions['approved_suggestions'] ?? []),
-            'after_similarity' => $beforeValidation,
+            'after_similarity_filter' => count($filteredSuggestions),
+            'after_recovery' => $afterRecovery,
+            'after_category_diversification' => count($finalSuggestions),
             'final_count' => count($finalSuggestions),
             'saturated_themes' => $saturatedThemes ?? [],
         ]);
@@ -2402,8 +2403,21 @@ class StoreAnalysisService
             $approved
         );
 
+        // Normalizar títulos rejeitados para filtragem
+        $rejectedNormalized = array_map(
+            fn ($t) => $this->normalizeTitle($t),
+            $rejectedTitles
+        );
+
+        if (count($rejectedTitles) > 0) {
+            Log::channel($this->logChannel)->info('Titulos rejeitados para filtrar no recovery', [
+                'count' => count($rejectedTitles),
+            ]);
+        }
+
         // Agrupar sugestões do Strategist por impact para preencher lacunas
         $strategistByImpact = ['high' => [], 'medium' => [], 'low' => []];
+        $rejectedInRecovery = 0;
         foreach ($allGenerated as $suggestion) {
             $impact = $suggestion['expected_impact'] ?? 'medium';
             if (! isset($strategistByImpact[$impact])) {
@@ -2412,12 +2426,30 @@ class StoreAnalysisService
             $title = strtolower(trim($suggestion['title'] ?? ''));
             $normalizedTitle = $this->normalizeTitle($suggestion['title'] ?? '');
 
-            // Check for exact duplicate
+            // Check for exact duplicate with approved
             if (in_array($title, $approvedTitles)) {
                 continue;
             }
 
-            // Check for semantically similar title
+            // Filter out previously rejected suggestions
+            $isRejected = false;
+            foreach ($rejectedNormalized as $rejNormalized) {
+                if ($this->calculateTitleSimilarity($normalizedTitle, $rejNormalized) >= 0.75) {
+                    $isRejected = true;
+                    break;
+                }
+            }
+
+            if ($isRejected) {
+                $rejectedInRecovery++;
+                Log::channel($this->logChannel)->info('Sugestao filtrada no recovery (similar a rejeitada anteriormente)', [
+                    'title' => $suggestion['title'] ?? 'N/A',
+                ]);
+
+                continue;
+            }
+
+            // Check for semantically similar title with approved
             $isSimilar = false;
             foreach ($approvedNormalizedTitles as $approvedNormalized) {
                 if ($this->calculateTitleSimilarity($normalizedTitle, $approvedNormalized) >= 0.85) {
@@ -2429,6 +2461,12 @@ class StoreAnalysisService
             if (! $isSimilar) {
                 $strategistByImpact[$impact][] = $suggestion;
             }
+        }
+
+        if ($rejectedInRecovery > 0) {
+            Log::channel($this->logChannel)->info('Total de sugestoes filtradas no recovery por serem similares a rejeitadas', [
+                'count' => $rejectedInRecovery,
+            ]);
         }
 
         // Preencher cada categoria para atingir exatamente 3

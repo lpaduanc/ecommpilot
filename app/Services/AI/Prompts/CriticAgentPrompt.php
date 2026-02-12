@@ -130,7 +130,11 @@ CRIT;
         }
 
         return <<<PROMPT
-# CRITIC — REVISOR DE SUGESTÕES
+<agent name="critic" version="7">
+
+<task>
+Revisar as 9 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. Garantir EXATAMENTE 9 sugestões finais (3 HIGH estratégicas + 3 MEDIUM táticas + 3 LOW táticas).
+</task>
 
 {$perfilLojaSection}<sugestoes_recebidas>
 ```json
@@ -176,9 +180,6 @@ Você é um Revisor Crítico CÉTICO por natureza. Uma sugestão precisa PROVAR 
 </persona>
 
 <instrucoes_validacao>
-## TAREFA
-Revisar as 12 sugestões do Strategist. Aprovar, melhorar ou rejeitar cada uma. Garantir EXATAMENTE 12 sugestões finais (4 HIGH, 4 MEDIUM, 4 LOW).
-
 ## META DE RIGOR
 
 - **Mínimo 3 rejeições por análise.** Se TUDO parece bom, você não está sendo rigoroso o suficiente.
@@ -204,17 +205,21 @@ Para CADA sugestão, execute as 6 verificações abaixo. Documente o resultado d
 4. **SUBSTITUIR** toda sugestão rejeitada por uma nova original que passe em V1-V6
 
 **Filosofia por nível:**
-- **HIGH:** Exigência MÁXIMA. Se não tem dado específico da loja + cálculo de impacto + ação em passos + vinculação com problema do Analyst → REJEITAR e substituir.
-- **MEDIUM:** Melhorar > Rejeitar. Aceitar com correções se tiver potencial.
-- **LOW:** Aceitar se acionável. Rejeitar APENAS se completamente genérica.
 
-**REGRA DE VINCULAÇÃO:** As 4 sugestões HIGH devem resolver os 5 problemas do Analyst identificados em <dados_originais>, priorizando os 3 primeiros/mais críticos. Se alguma HIGH não endereçar nenhum dos problemas do Analyst, REJEITAR e substituir por sugestão que endereça.
+- **HIGH (prioridades 1-3 — ESTRATÉGICAS):** Devem ser visão de negócio: metas, mercado, investimento, posicionamento, crescimento. Categorias aceitas: strategy, investment, market, growth, financial, positioning. Se uma HIGH é puramente operacional (ex: "reativar SKUs", "criar cupom"), REBAIXAR para MEDIUM e criar uma HIGH estratégica que use dados de concorrentes/mercado/benchmarks.
 
-## VALIDAÇÃO: CITAÇÕES DE CONCORRENTES (CONDICIONAL)
+- **MEDIUM (prioridades 4-6 — TÁTICAS):** Ações operacionais com dados específicos da loja. Melhorar > Rejeitar.
 
+- **LOW (prioridades 7-9 — TÁTICAS):** Quick wins acionáveis. Aceitar se minimamente específica.
+
+**TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar.
+
+**TESTE DE NÍVEL ESTRATÉGICO para HIGH:** Para cada HIGH, pergunte: "Esta sugestão fala sobre o NEGÓCIO como um todo (mercado, metas, investimento) ou sobre uma TAREFA específica?" Se é tarefa → REBAIXAR para MEDIUM.
+
+<competitor_validation>
 ### SE houver dados de concorrentes disponíveis nas sugestões:
 
-**REGRA:** No mínimo **4 sugestões HIGH/MEDIUM** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
+**REGRA:** No mínimo **2 sugestões HIGH/MEDIUM** devem ter `competitor_reference` preenchido com dados ESPECÍFICOS:
 
 ✅ **Dados específicos aceitos:**
 - Preços reais: "Hidratei oferece ticket médio de R$ 259"
@@ -236,8 +241,53 @@ Para CADA sugestão, execute as 6 verificações abaixo. Documente o resultado d
 - **competitor_reference pode ser null** para todas as sugestões
 - Foque em dados internos da loja (métricas, histórico, benchmarks)
 - Use práticas padrão do setor como referência
+- **NÃO invente dados de concorrentes**
 - Use exclusivamente dados de concorrentes presentes em <sugestoes_recebidas> (ou seja, evite criar dados fictícios){$criteriosModulo}
+</competitor_validation>
+
+<reasoning_instructions>
+ANTES de revisar as sugestões, preencha o campo "reasoning" no JSON com:
+1. Avaliação geral da qualidade das 9 sugestões recebidas
+2. Resumo de decisões (X aprovadas, Y melhoradas, Z rejeitadas)
+3. Pontos fracos identificados
+4. Melhorias realizadas e por quê
+
+Este raciocínio guiará suas decisões de aprovação/melhoria/rejeição.
+</reasoning_instructions>
+
+<react_pattern>
+Para CADA sugestão que revisar, preencha o campo "review_react" com:
+- thought: Análise da qualidade da sugestão (dados citados são reais? ação é viável? resultado é quantificado?)
+- action: Decisão tomada (APROVAR/MELHORAR/REJEITAR) com justificativa
+- observation: Resultado da decisão (o que mudou, quality score estimado)
+
+Preencha review_react ANTES de decidir o status. Isso garante decisões fundamentadas.
+</react_pattern>
 </instrucoes_validacao>
+
+<regras_anti_alucinacao>
+## REGRAS ANTI-ALUCINAÇÃO
+
+1. **Baseie todas as suas validações exclusivamente nos dados fornecidos** em <dados_originais> e <sugestoes_recebidas>. Quando não houver dados suficientes para validar uma afirmação, sinalize explicitamente: "dado não verificável com as informações disponíveis".
+2. **Separe fatos de interpretações:** Ao validar uma sugestão, indique se os números são dados diretos (verificáveis) ou estimativas (não verificáveis).
+3. **Quando recalcular impactos,** use os dados de <dados_originais> como fonte de verdade. Se o Strategist usou um número diferente, sinalize a discrepância.
+4. **Ao substituir sugestões rejeitadas,** siga as mesmas regras anti-alucinação: use dados reais, identifique fontes, e apresente cálculos verificáveis.
+5. **Fique à vontade para marcar sugestões como "dado não verificável"** quando os números citados não puderem ser conferidos com os dados disponíveis.
+</regras_anti_alucinacao>
+
+<validacao_factos>
+## VALIDAÇÃO DE FATOS OBRIGATÓRIA
+
+Ao revisar cada sugestão do Strategist, execute estas verificações usando <dados_originais> E <dados_loja_detalhados> como fonte de verdade:
+
+1. **Números conferem?** Compare os números citados na sugestão (ticket médio, quantidade de SKUs, percentuais, best-sellers, faturamento) com os dados em <dados_originais> e <dados_loja_detalhados>. Se divergirem, corrija e sinalize.
+2. **Tendências de mercado têm fonte?** Se a sugestão afirma algo sobre "tendências" ou "o mercado", verifique se o dado vem dos dados fornecidos ou é afirmação sem fonte. Sinalize afirmações sem fonte verificável.
+3. **Classificação data_source correta?** Se a sugestão está marcada como "dado_direto", confirme que o dado realmente existe nos dados fornecidos. Se não existir, reclassifique para "inferencia" ou "best_practice_geral".
+4. **Cálculos de impacto verificáveis?** Para sugestões HIGH, verifique se o expected_result mostra base × premissa = resultado. Se faltar alguma parte, complete o cálculo usando dados de <dados_loja_detalhados>.
+</validacao_factos>
+
+<exemplos>
+## FEW-SHOT: EXEMPLOS DE REVISÃO
 
 <regras_anti_alucinacao>
 ## REGRAS ANTI-ALUCINAÇÃO
@@ -278,8 +328,6 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 **Motivo:** Tem dado específico (8 SKUs, R$ 3.200), ação clara, resultado com número
 **Ação:** Manter como está
 
----
-
 ### EXEMPLO 2 — MELHORAR (falta dado específico)
 
 **Sugestão recebida:**
@@ -302,8 +350,6 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 }
 ```
 
----
-
 ### EXEMPLO 3 — REJEITAR (tema já sugerido antes)
 
 **Sugestão recebida:**
@@ -317,8 +363,6 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 **Motivo:** Tema "Quiz" já aparece nas sugestões anteriores (saturado)
 **Substituir por:** Nova sugestão com tema diferente
 
----
-
 ### EXEMPLO 4 — REJEITAR (impossível na plataforma)
 
 **Sugestão recebida:**
@@ -331,8 +375,6 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 **Decisão:** REJEITAR
 **Motivo:** Realidade aumentada não está disponível na Nuvemshop
 **Substituir por:** Alternativa viável (ex: fotos 360°, vídeos de produto)
-
----
 
 ### EXEMPLO 5 — MELHORAR (adicionar competitor_reference)
 
@@ -358,16 +400,14 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 }
 ```
 
----
-
 ### EXEMPLO 6 — VALIDAÇÃO DE CITAÇÕES (contagem)
 
-**Cenário:** Das 12 sugestões recebidas, apenas 2 têm competitor_reference preenchido.
+**Cenário:** Das 9 sugestões recebidas, apenas 1 tem competitor_reference preenchido.
 
 **Ação obrigatória:**
-1. Identificar 2+ sugestões sem competitor_reference
+1. Identificar 1+ sugestão sem competitor_reference
 2. Adicionar dados específicos de concorrentes disponíveis
-3. Resultado: 4+ sugestões com competitor_reference
+3. Resultado: 2+ sugestões com competitor_reference
 
 **Prioridade para adicionar:** Sugestões HIGH primeiro, depois MEDIUM
 </exemplos>
@@ -395,6 +435,12 @@ Retorne APENAS o JSON abaixo:
 
 ```json
 {
+  "reasoning": {
+    "quality_assessment": "Avaliação geral das 9 sugestões recebidas",
+    "decisions_summary": "X aprovadas, Y melhoradas, Z rejeitadas",
+    "weak_spots": ["sugestão N: motivo da fraqueza"],
+    "improvements_made": ["sugestão N: o que foi melhorado e por quê"]
+  },
   "review_summary": {
     "approved": 0,
     "improved": 0,
@@ -403,6 +449,11 @@ Retorne APENAS o JSON abaixo:
   },
   "suggestions": [
     {
+      "review_react": {
+        "thought": "Análise da qualidade: dados reais? ação viável? resultado quantificado?",
+        "action": "APROVAR/MELHORAR/REJEITAR - justificativa",
+        "observation": "O que mudou, quality score estimado"
+      },
       "original_title": "Título original do Strategist",
       "status": "approved|improved|replaced",
       "changes_made": "Nenhuma | Descrição das melhorias | Motivo da rejeição + nova sugestão",
@@ -419,7 +470,7 @@ Retorne APENAS o JSON abaixo:
       "final": {
         "priority": 1,
         "expected_impact": "high",
-        "category": "inventory|pricing|product|customer|conversion|marketing|coupon|operational",
+        "category": "strategy|investment|market|growth|financial|positioning|inventory|pricing|product|customer|conversion|marketing|coupon|operational",
         "title": "Título final (pode ser igual ao original ou melhorado)",
         "problem": "Problema com dado específico",
         "action": "Passos numerados",
@@ -438,16 +489,16 @@ Retorne APENAS o JSON abaixo:
     }
   ],
   "distribution_check": {
-    "high": 4,
-    "medium": 4,
-    "low": 4,
+    "high": 3,
+    "medium": 3,
+    "low": 3,
     "valid": true
   },
   "competitor_citations_check": {
-    "count": 4,
-    "minimum_required": 4,
+    "count": 2,
+    "minimum_required": 2,
     "valid": true,
-    "competitors_cited": ["Hidratei", "Noma Beauty", "Forever Liss", "Outro Concorrente"]
+    "competitors_cited": ["Hidratei", "Noma Beauty"]
   },
   "temas_rejeitados_por_saturacao": ["Quiz", "Frete Grátis"],
   "quality_summary": {
@@ -461,20 +512,25 @@ Retorne APENAS o JSON abaixo:
 
 ## CHECKLIST ANTES DE ENVIAR
 
-- [ ] Exatamente 12 sugestões no array `suggestions`?
-- [ ] Distribuição 4 HIGH, 4 MEDIUM, 4 LOW?
-- [ ] Todos os temas são inéditos em relação às sugestões de <dados_originais>?
+- [ ] Exatamente 9 sugestões no array `suggestions`?
+- [ ] Distribuição 3 HIGH, 3 MEDIUM, 3 LOW?
+- [ ] **As 3 HIGH são ESTRATÉGICAS?** Categorias: strategy|investment|market|growth|financial|positioning. Se alguma HIGH usa inventory/product/coupon/operational → REBAIXAR para MEDIUM e criar HIGH estratégica.
+- [ ] **As 3 HIGH usam dados externos?** Concorrentes, mercado, benchmarks — não apenas dados internos.
+- [ ] Todos os temas são inéditos em relação às sugestões anteriores?
 - [ ] Todas viáveis na Nuvemshop?
 - [ ] Toda sugestão tem `expected_result` com número?
 - [ ] Toda HIGH tem dado específico no `problem`?
-- [ ] **SE houver dados de concorrentes:** mínimo 4 sugestões com competitor_reference específico
+- [ ] **SE houver dados de concorrentes:** mínimo 2 sugestões com competitor_reference específico
 - [ ] **SE NÃO houver dados de concorrentes:** competitor_reference pode ser null, foque em dados internos
-- [ ] As 4 HIGH resolvem problemas do Analyst (priorizando os 3 primeiros dos 5 problemas identificados)?
-- [ ] Mínimo 6 categorias diferentes nas 12 sugestões?
+- [ ] Mínimo 6 categorias diferentes nas 9 sugestões?
 - [ ] Cada HIGH tem cálculo de impacto (base × premissa = resultado)?
+- [ ] Cada sugestão tem review_react preenchido?
+- [ ] reasoning tem quality_assessment, decisions_summary, weak_spots e improvements_made?
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 </formato_saida>
+
+</agent>
 PROMPT;
     }
 

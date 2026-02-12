@@ -49,12 +49,18 @@ onUnmounted(() => {
 });
 
 const categoryConfig = {
+    strategy: { icon: '🎯', label: 'Estratégia', color: 'from-rose-500 to-red-500', bg: 'bg-rose-100' },
+    investment: { icon: '💎', label: 'Investimento', color: 'from-cyan-500 to-blue-500', bg: 'bg-cyan-100' },
+    market: { icon: '🌍', label: 'Mercado', color: 'from-teal-500 to-emerald-500', bg: 'bg-teal-100' },
+    growth: { icon: '📈', label: 'Crescimento', color: 'from-lime-500 to-green-500', bg: 'bg-lime-100' },
+    financial: { icon: '💵', label: 'Financeiro', color: 'from-yellow-500 to-amber-500', bg: 'bg-yellow-100' },
+    positioning: { icon: '🏆', label: 'Posicionamento', color: 'from-fuchsia-500 to-purple-500', bg: 'bg-fuchsia-100' },
     marketing: { icon: '📣', label: 'Marketing', color: 'from-pink-500 to-rose-500', bg: 'bg-pink-100' },
     pricing: { icon: '💰', label: 'Precificação', color: 'from-amber-500 to-yellow-500', bg: 'bg-amber-100' },
     inventory: { icon: '📦', label: 'Estoque', color: 'from-sky-500 to-cyan-500', bg: 'bg-sky-100' },
     product: { icon: '🛍️', label: 'Produtos', color: 'from-violet-500 to-purple-500', bg: 'bg-violet-100' },
     customer: { icon: '👥', label: 'Clientes', color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-100' },
-    conversion: { icon: '🎯', label: 'Conversão', color: 'from-orange-500 to-red-500', bg: 'bg-orange-100' },
+    conversion: { icon: '🔄', label: 'Conversão', color: 'from-orange-500 to-red-500', bg: 'bg-orange-100' },
     coupon: { icon: '🏷️', label: 'Cupons', color: 'from-indigo-500 to-blue-500', bg: 'bg-indigo-100' },
     operational: { icon: '⚙️', label: 'Operacional', color: 'from-slate-500 to-gray-500', bg: 'bg-slate-100' },
 };

@@ -17,25 +17,25 @@ if ($settings->isEmpty()) {
 } else {
     foreach ($settings as $s) {
         echo "KEY: {$s->key}\n";
-        echo "  is_sensitive: " . ($s->is_sensitive ? 'true' : 'false') . "\n";
+        echo '  is_sensitive: '.($s->is_sensitive ? 'true' : 'false')."\n";
         echo "  type: {$s->type}\n";
-        echo "  raw_value_length: " . strlen($s->value ?? '') . "\n";
-        echo "  raw_value_prefix: " . substr($s->value ?? '(null)', 0, 40) . "\n";
+        echo '  raw_value_length: '.strlen($s->value ?? '')."\n";
+        echo '  raw_value_prefix: '.substr($s->value ?? '(null)', 0, 40)."\n";
 
         if ($s->is_sensitive && $s->value) {
             try {
                 $decrypted = Crypt::decryptString($s->value);
-                echo "  DECRYPT: OK (length=" . strlen($decrypted) . ", prefix=" . substr($decrypted, 0, 8) . "...)\n";
+                echo '  DECRYPT: OK (length='.strlen($decrypted).', prefix='.substr($decrypted, 0, 8)."...)\n";
             } catch (Exception $e) {
-                echo "  DECRYPT: FAILED - " . $e->getMessage() . "\n";
+                echo '  DECRYPT: FAILED - '.$e->getMessage()."\n";
             }
         }
 
         try {
             $casted = $s->getCastedValue();
-            echo "  getCastedValue: " . substr((string)$casted, 0, 20) . "\n";
+            echo '  getCastedValue: '.substr((string) $casted, 0, 20)."\n";
         } catch (Exception $e) {
-            echo "  getCastedValue: ERROR - " . $e->getMessage() . "\n";
+            echo '  getCastedValue: ERROR - '.$e->getMessage()."\n";
         }
 
         echo "\n";
@@ -43,13 +43,13 @@ if ($settings->isEmpty()) {
 }
 
 echo "\n=== Testing SettingsService::getAISettings() ===\n\n";
-$service = new App\Services\SettingsService();
+$service = new App\Services\SettingsService;
 $aiSettings = $service->getAISettings();
-echo "provider: " . $aiSettings['provider'] . "\n";
+echo 'provider: '.$aiSettings['provider']."\n";
 foreach (['openai', 'gemini', 'anthropic'] as $p) {
     $key = $aiSettings[$p]['api_key'] ?? '';
-    echo "{$p}.api_key: " . (empty($key) ? '(EMPTY)' : 'len=' . strlen($key) . ', prefix=' . substr($key, 0, 8)) . "\n";
-    echo "{$p}.model: " . ($aiSettings[$p]['model'] ?? '(not set)') . "\n";
+    echo "{$p}.api_key: ".(empty($key) ? '(EMPTY)' : 'len='.strlen($key).', prefix='.substr($key, 0, 8))."\n";
+    echo "{$p}.model: ".($aiSettings[$p]['model'] ?? '(not set)')."\n";
 }
 
 echo "\n=== Testing SettingsService::getAISettingsForDisplay() ===\n\n";
@@ -57,6 +57,6 @@ $displaySettings = $service->getAISettingsForDisplay();
 foreach (['openai', 'gemini', 'anthropic'] as $p) {
     $key = $displaySettings[$p]['api_key'] ?? '';
     $configured = $displaySettings[$p]['is_configured'] ?? false;
-    echo "{$p}.api_key (display): " . (empty($key) ? '(EMPTY)' : $key) . "\n";
-    echo "{$p}.is_configured: " . ($configured ? 'true' : 'false') . "\n";
+    echo "{$p}.api_key (display): ".(empty($key) ? '(EMPTY)' : $key)."\n";
+    echo "{$p}.is_configured: ".($configured ? 'true' : 'false')."\n";
 }

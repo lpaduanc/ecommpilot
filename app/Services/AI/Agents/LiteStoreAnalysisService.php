@@ -10,6 +10,7 @@ use App\Services\AI\AnalysisRouter;
 use App\Services\AI\JsonExtractor;
 use App\Services\AI\Prompts\LiteAnalystAgentPrompt;
 use App\Services\AI\Prompts\LiteStrategistAgentPrompt;
+use App\Services\Analysis\SuggestionDeduplicationTrait;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\Log;
  */
 class LiteStoreAnalysisService
 {
+    use SuggestionDeduplicationTrait;
+
     private const ANALYSIS_PERIOD_DAYS = 7; // Reduced from 15
 
     public function __construct(
@@ -68,6 +71,17 @@ class LiteStoreAnalysisService
         $validatedSuggestions = $this->validateSuggestions($suggestions);
 
         Log::info('Lite Pipeline: After validation: '.count($validatedSuggestions).' suggestions');
+
+        // 5b. Deduplicate against historical suggestions
+        $previousSuggestions = $this->getPreviousSuggestionsDetailed($store->id, 50);
+        if (! empty($previousSuggestions['all'])) {
+            $validatedSuggestions = $this->validateSuggestionUniqueness(
+                $validatedSuggestions,
+                $previousSuggestions['all']
+            );
+
+            Log::info('Lite Pipeline: After historical dedup: '.count($validatedSuggestions).' suggestions');
+        }
 
         // 6. Save analysis and suggestions
         Log::info('Lite Pipeline: Saving analysis and suggestions');
@@ -158,6 +172,7 @@ class LiteStoreAnalysisService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'max_tokens' => 4096, // Reduced from 8192
+            'temperature' => 0.3, // Baixa: análise de métricas precisa de precisão
         ]);
 
         Log::debug('Lite Analyst raw response (first 1000 chars): '.substr($response, 0, 1000));
@@ -190,6 +205,7 @@ class LiteStoreAnalysisService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'max_tokens' => 6144, // Reduced from 8192
+            'temperature' => 0.7, // Alta: geração de ideias estratégicas requer criatividade
         ]);
 
         Log::debug('Lite Strategist raw response (first 1000 chars): '.substr($response, 0, 1000));
