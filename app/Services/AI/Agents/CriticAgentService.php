@@ -75,7 +75,7 @@ class CriticAgentService
         $prompt = CriticAgentPrompt::get($data);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 'from_settings',
+            'temperature' => 0.2,
             'prompt_chars' => strlen($prompt),
         ]);
 
@@ -84,6 +84,7 @@ class CriticAgentService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'max_tokens' => 32768, // Increased to prevent JSON truncation
+            'temperature' => 0.2, // Baixa: avaliação crítica precisa de rigor e consistência
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 

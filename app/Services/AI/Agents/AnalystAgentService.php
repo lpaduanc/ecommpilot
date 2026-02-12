@@ -79,13 +79,15 @@ class AnalystAgentService
         $prompt = AnalystAgentPrompt::get($data);
 
         Log::channel($this->logChannel)->info('    >>> Chamando AI Provider', [
-            'temperature' => 'from_settings',
+            'temperature' => 0.3,
             'prompt_chars' => strlen($prompt),
         ]);
 
         $apiStart = microtime(true);
         $response = $this->aiManager->chat([
             ['role' => 'user', 'content' => $prompt],
+        ], [
+            'temperature' => 0.3, // Baixa: análise de métricas precisa de precisão
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 

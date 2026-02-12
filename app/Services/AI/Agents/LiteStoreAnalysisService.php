@@ -144,6 +144,7 @@ class LiteStoreAnalysisService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'max_tokens' => 4096, // Reduced from 8192
+            'temperature' => 0.3, // Baixa: análise de métricas precisa de precisão
         ]);
 
         Log::debug('Lite Analyst raw response (first 1000 chars): '.substr($response, 0, 1000));
@@ -175,6 +176,7 @@ class LiteStoreAnalysisService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'max_tokens' => 6144, // Reduced from 8192
+            'temperature' => 0.7, // Alta: geração de ideias estratégicas requer criatividade
         ]);
 
         Log::debug('Lite Strategist raw response (first 1000 chars): '.substr($response, 0, 1000));
