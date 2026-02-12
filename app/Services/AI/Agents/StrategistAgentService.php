@@ -145,22 +145,22 @@ class StrategistAgentService
         $suggestions = $json['suggestions'] ?? [];
         $validatedSuggestions = [];
 
-        // V6: Accept 10-15 suggestions, minimum 10
+        // V7: Accept 15-20 suggestions (target 18: 6 HIGH + 6 MEDIUM + 6 LOW)
         $totalFound = count($suggestions);
         Log::channel($this->logChannel)->info('    [STRATEGIST] Validando sugestoes', [
             'total_encontradas' => $totalFound,
-            'expected_range' => '10-15',
+            'expected_range' => '15-20',
         ]);
 
-        if ($totalFound < 10) {
-            Log::channel($this->logChannel)->warning('    [STRATEGIST] AVISO: Menos de 10 sugestoes recebidas', [
+        if ($totalFound < 15) {
+            Log::channel($this->logChannel)->warning('    [STRATEGIST] AVISO: Menos de 15 sugestoes recebidas', [
                 'total' => $totalFound,
-                'expected_min' => 10,
+                'expected_min' => 15,
             ]);
-        } elseif ($totalFound > 15) {
-            Log::channel($this->logChannel)->warning('    [STRATEGIST] AVISO: Mais de 15 sugestoes recebidas', [
+        } elseif ($totalFound > 20) {
+            Log::channel($this->logChannel)->warning('    [STRATEGIST] AVISO: Mais de 20 sugestoes recebidas', [
                 'total' => $totalFound,
-                'expected_max' => 15,
+                'expected_max' => 20,
             ]);
         }
 

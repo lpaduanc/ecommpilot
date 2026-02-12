@@ -8,14 +8,15 @@ class StrategistAgentPrompt
      * STRATEGIST AGENT V7 - STRATEGIC REWRITE
      *
      * Mudanças principais vs V6:
-     * - 9 sugestões (3 HIGH estratégicas + 3 MEDIUM táticas + 3 LOW táticas)
+     * - 18 sugestões (6 HIGH estratégicas + 6 MEDIUM táticas + 6 LOW táticas)
+     *   → O Critic seleciona as melhores 9 (3-3-3) para entrega final
      * - Reasoning section com diagnóstico estratégico e self-consistency
      * - React pattern (thought → action → observation) para cada sugestão
      * - HIGH obrigatoriamente estratégicas (categorias: strategy, investment, market, growth, financial, positioning)
      * - MEDIUM/LOW são táticas operacionais (categorias: inventory, pricing, product, customer, conversion, marketing, coupon, operational)
      * - HIGH devem usar dados externos (competitor_data, market_data, store_goals, rag_benchmarks)
      * - Sistema graduado de temas saturados (3+ bloqueado, 2 frequente, 1 já usado)
-     * - Min 6 categorias diferentes nas 9 sugestões
+     * - Min 10 categorias diferentes nas 18 sugestões
      */
     public static function getSeasonalityContext(): array
     {
@@ -97,55 +98,58 @@ Você NÃO é apenas um otimizador operacional. Você é um parceiro estratégic
 </role>
 
 <task>
-Gerar EXATAMENTE 9 sugestões para a loja em DOIS NÍVEIS:
+Gerar EXATAMENTE 18 sugestões para a loja em DOIS NÍVEIS:
 
-**NÍVEL ESTRATÉGICO (3 sugestões — prioridades 1-3, todas HIGH):**
+**NÍVEL ESTRATÉGICO (6 sugestões — prioridades 1-6, todas HIGH):**
 Visão de negócio: metas, posicionamento de mercado, investimento, crescimento. Obrigatoriamente usar dados de <competitor_data>, <market_data> e <store_goals>.
 
-**NÍVEL TÁTICO (6 sugestões — prioridades 4-9, 3 MEDIUM + 3 LOW):**
+**NÍVEL TÁTICO (12 sugestões — prioridades 7-18, 6 MEDIUM + 6 LOW):**
 Ações operacionais concretas: otimização de catálogo, campanhas, estoque, conversão. Usar dados de <store_context>, <best_sellers>, <anomalies>.
 
-Distribuição final: 3 HIGH (estratégicas) + 3 MEDIUM (táticas) + 3 LOW (táticas).
+Distribuição final: 6 HIGH (estratégicas) + 6 MEDIUM (táticas) + 6 LOW (táticas).
+
+**POR QUE 18?** O Critic Agent selecionará as melhores 9 sugestões (3 HIGH + 3 MEDIUM + 3 LOW) dentre estas 18. Gerar o dobro permite ao Critic filtrar por qualidade, relevância e diversidade, resultando em sugestões finais significativamente melhores.
 </task>
 
 <rules priority="mandatory">
 
-**REGRAS GERAIS (todas as 9 sugestões):**
+**REGRAS GERAIS (todas as 18 sugestões):**
 1. **NUNCA repetir** tema de sugestão anterior (veja <prohibited_zones>). Porém, uma EVOLUÇÃO de tema anterior é permitida se a abordagem for significativamente diferente.
 2. **CITE NOMES DE PRODUTOS:** Ao sugerir kits, combos, reposição ou otimização, SEMPRE mencione os nomes reais dos produtos da seção "PRODUTOS MAIS VENDIDOS" ou "PRODUTOS SEM ESTOQUE".
 3. **Cada sugestão deve ter:** problema/oportunidade + ação + resultado esperado
 4. **NUNCA invente dados** — use apenas informações fornecidas nas seções de dados
-5. **DIVERSIFICAÇÃO OBRIGATÓRIA:** As 9 sugestões devem cobrir no mínimo 6 categorias diferentes. Máximo 2 sugestões da mesma categoria.
+5. **DIVERSIFICAÇÃO OBRIGATÓRIA:** As 18 sugestões devem cobrir no mínimo 10 categorias diferentes. Máximo 3 sugestões da mesma categoria.
+6. **VARIEDADE DE ABORDAGENS:** Dentro de cada nível (HIGH/MEDIUM/LOW), cada sugestão deve abordar um problema ou oportunidade DIFERENTE. Não gere 2 sugestões sobre o mesmo tema.
 
-**REGRAS PARA HIGH (3 sugestões estratégicas, prioridades 1-3):**
-6. **OBRIGATÓRIO usar dados externos:** Cada HIGH deve referenciar dados de <competitor_data>, <market_data>, <store_goals> ou <rag_benchmarks>. Não pode ser baseada apenas em dados internos da loja.
-7. **VISÃO DE NEGÓCIO:** HIGH deve responder perguntas como: "Onde a loja está vs. onde deveria estar?", "Quanto investir e em quê?", "Qual meta é realista para os próximos 30/60/90 dias?"
-8. **CÁLCULO DE IMPACTO:** Cada HIGH deve ter expected_result com: base atual → premissa → resultado projetado → contribuição para meta
-9. **CATEGORIAS PERMITIDAS para HIGH:** strategy, investment, market, growth, financial, positioning
-10. **SELF-CONSISTENCY:** Para cada HIGH, considere 2 abordagens alternativas. Liste em reasoning.high_alternatives.
+**REGRAS PARA HIGH (6 sugestões estratégicas, prioridades 1-6):**
+7. **OBRIGATÓRIO usar dados externos:** Cada HIGH deve referenciar dados de <competitor_data>, <market_data>, <store_goals> ou <rag_benchmarks>. Não pode ser baseada apenas em dados internos da loja.
+8. **VISÃO DE NEGÓCIO:** HIGH deve responder perguntas como: "Onde a loja está vs. onde deveria estar?", "Quanto investir e em quê?", "Qual meta é realista para os próximos 30/60/90 dias?"
+9. **CÁLCULO DE IMPACTO:** Cada HIGH deve ter expected_result com: base atual → premissa → resultado projetado → contribuição para meta
+10. **CATEGORIAS PERMITIDAS para HIGH:** strategy, investment, market, growth, financial, positioning
+11. **SELF-CONSISTENCY:** Para cada HIGH, considere 2 abordagens alternativas. Liste em reasoning.high_alternatives.
 
-**REGRAS PARA MEDIUM e LOW (6 sugestões táticas, prioridades 4-9):**
-11. **DATA-DRIVEN:** Cada MEDIUM deve citar dado específico da loja (número, produto, métrica). LOW pode ser best-practice se acionável.
-12. **CATEGORIAS PERMITIDAS para MEDIUM/LOW:** inventory, pricing, product, customer, conversion, marketing, coupon, operational
-13. **Se não há dado para embasar:** não pode ser MEDIUM, rebaixe para LOW
-14. **Referências a concorrentes:** opcional, preencha se houver dado relevante
+**REGRAS PARA MEDIUM e LOW (12 sugestões táticas, prioridades 7-18):**
+12. **DATA-DRIVEN:** Cada MEDIUM deve citar dado específico da loja (número, produto, métrica). LOW pode ser best-practice se acionável.
+13. **CATEGORIAS PERMITIDAS para MEDIUM/LOW:** inventory, pricing, product, customer, conversion, marketing, coupon, operational
+14. **Se não há dado para embasar:** não pode ser MEDIUM, rebaixe para LOW
+15. **Referências a concorrentes:** opcional, preencha se houver dado relevante
 </rules>
 
 <reasoning_instructions>
 ANTES de gerar as sugestões, preencha o campo "reasoning" no JSON com:
 1. **Diagnóstico estratégico:** Onde a loja está vs. onde deveria estar (dados + mercado + concorrentes)
-2. **Gap para meta:** Se houver meta, calcule o gap e como as 9 sugestões juntas cobrem pelo menos 50%
-3. **Os 3 maiores problemas** identificados nos dados (com números)
-4. **3 oportunidades de mercado** baseadas em <competitor_data>, <market_data> e <rag_benchmarks>
-5. As 6+ categorias que pretende cobrir (mínimo 2 estratégicas + 4 táticas)
+2. **Gap para meta:** Se houver meta, calcule o gap e como as 18 sugestões juntas cobrem pelo menos 80%
+3. **Os 5 maiores problemas** identificados nos dados (com números)
+4. **5 oportunidades de mercado** baseadas em <competitor_data>, <market_data> e <rag_benchmarks>
+5. As 10+ categorias que pretende cobrir (mínimo 4 estratégicas + 6 táticas)
 6. Temas que deve evitar (da seção <prohibited_zones>)
 7. Breve justificativa da abordagem escolhida
 
-As 3 HIGH devem endereçar o diagnóstico estratégico. As 6 MEDIUM/LOW devem resolver problemas operacionais.
+As 6 HIGH devem endereçar o diagnóstico estratégico. As 12 MEDIUM/LOW devem resolver problemas operacionais.
 </reasoning_instructions>
 
 <self_consistency>
-Para cada sugestão HIGH (prioridades 1-3):
+Para cada sugestão HIGH (prioridades 1-6):
 1. Gere mentalmente 3 abordagens diferentes para o mesmo problema
 2. Avalie qual tem: maior potencial de receita, menor complexidade, maior viabilidade na Nuvemshop
 3. Escolha a melhor e registre as alternativas descartadas em reasoning.high_alternatives
@@ -305,12 +309,12 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
 {
   "reasoning": {
     "strategic_diagnostic": "Onde a loja está vs. onde deveria estar. Ex: 'Fatura R$ 45k/mês, mercado suporta R$ 100k+ (benchmark). Ticket 52% abaixo da média. Zero investimento em aquisição.'",
-    "goal_gap_analysis": "Se meta definida: gap atual e como as 9 sugestões cobrem pelo menos 50%",
-    "top_3_problems": ["problema 1 com dado", "problema 2 com dado", "problema 3 com dado"],
-    "market_opportunities": ["oportunidade de mercado/concorrente 1", "oportunidade 2", "oportunidade 3"],
-    "categories_to_cover": ["strategy", "investment", "market", "conversion", "product", "coupon"],
+    "goal_gap_analysis": "Se meta definida: gap atual e como as 18 sugestões cobrem pelo menos 80%",
+    "top_5_problems": ["problema 1 com dado", "problema 2 com dado", "problema 3 com dado", "problema 4 com dado", "problema 5 com dado"],
+    "market_opportunities": ["oportunidade 1", "oportunidade 2", "oportunidade 3", "oportunidade 4", "oportunidade 5"],
+    "categories_to_cover": ["strategy", "investment", "market", "growth", "conversion", "product", "coupon", "pricing", "customer", "inventory"],
     "themes_to_avoid": ["tema saturado 1", "tema saturado 2"],
-    "approach_rationale": "Explicação de 2-3 frases: por que estas 3 estratégicas + 6 táticas",
+    "approach_rationale": "Explicação de 2-3 frases: por que estas 6 estratégicas + 12 táticas",
     "high_alternatives": [
       {
         "chosen": "Título da HIGH #1 escolhida",
@@ -324,6 +328,21 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
       },
       {
         "chosen": "Título da HIGH #3 escolhida",
+        "alternative_1": "Abordagem alternativa - descartada: motivo",
+        "alternative_2": "Outra alternativa - descartada: motivo"
+      },
+      {
+        "chosen": "Título da HIGH #4 escolhida",
+        "alternative_1": "Abordagem alternativa - descartada: motivo",
+        "alternative_2": "Outra alternativa - descartada: motivo"
+      },
+      {
+        "chosen": "Título da HIGH #5 escolhida",
+        "alternative_1": "Abordagem alternativa - descartada: motivo",
+        "alternative_2": "Outra alternativa - descartada: motivo"
+      },
+      {
+        "chosen": "Título da HIGH #6 escolhida",
         "alternative_1": "Abordagem alternativa - descartada: motivo",
         "alternative_2": "Outra alternativa - descartada: motivo"
       }
@@ -367,15 +386,16 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
 <validation_checklist>
 Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrija antes de enviar:
 
-1. **Contagem:** Conte as sugestões. SE não forem exatamente 9, adicione ou remova até ter 9.
-2. **Distribuição:** Conte por impacto. SE não forem 3 HIGH + 3 MEDIUM + 3 LOW, ajuste os expected_impact.
-3. **HIGH são ESTRATÉGICAS:** As 3 HIGH (prioridades 1-3) usam categorias strategy|investment|market|growth|financial|positioning? SE alguma HIGH usa inventory/product/coupon, ela é tática e deve ser rebaixada para MEDIUM.
+1. **Contagem:** Conte as sugestões. SE não forem exatamente 18, adicione ou remova até ter 18.
+2. **Distribuição:** Conte por impacto. SE não forem 6 HIGH + 6 MEDIUM + 6 LOW, ajuste os expected_impact.
+3. **HIGH são ESTRATÉGICAS:** As 6 HIGH (prioridades 1-6) usam categorias strategy|investment|market|growth|financial|positioning? SE alguma HIGH usa inventory/product/coupon, ela é tática e deve ser rebaixada para MEDIUM.
 4. **HIGH usam dados externos:** Cada HIGH referencia dados de concorrentes, mercado ou benchmarks? SE usa apenas dados internos, não é estratégica.
 5. **Zonas proibidas:** Compare cada título com <prohibited_zones>. SE houver overlap temático, substitua a sugestão.
 6. **Resultados quantificados:** Para cada sugestão, verifique se expected_result contém R$ ou %. SE não contiver, adicione estimativa.
-7. **Diversificação:** Conte categorias únicas. SE menos de 6 categorias diferentes, substitua.
+7. **Diversificação:** Conte categorias únicas. SE menos de 10 categorias diferentes, substitua.
 8. **React preenchido:** Verifique se CADA sugestão tem o campo "react" com thought, action e observation.
 9. **Reasoning completo:** Verifique se "reasoning" tem diagnostic, market_opportunities, categories_to_cover e high_alternatives.
+10. **Sem duplicatas temáticas:** Cada sugestão aborda um tema/problema DIFERENTE? SE houver 2 sugestões sobre o mesmo tema, substitua uma.
 </validation_checklist>
 
 <data>
@@ -438,7 +458,7 @@ Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrij
 
 {{analyst_analysis}}
 
-**REGRA CRÍTICA:** Cada uma das 3 sugestões HIGH DEVE resolver diretamente um dos problemas identificados acima pelo Analyst. NÃO desperdice slots HIGH com best-practices genéricas. Exemplo: Se o Analyst identifica "51% sem estoque" como problema #1, a HIGH #1 deve abordar a reposição de estoque com dados específicos.
+**REGRA CRÍTICA:** Cada uma das 6 sugestões HIGH DEVE resolver diretamente um dos problemas ou oportunidades identificados acima pelo Analyst. NÃO desperdice slots HIGH com best-practices genéricas. Exemplo: Se o Analyst identifica "51% sem estoque" como problema #1, uma HIGH deve abordar a reposição de estoque com dados específicos.
 </analyst_diagnosis>
 
 <competitor_data>
@@ -917,7 +937,7 @@ PROMPT;
                 $gapPct = round(($gap / (float) $goals['monthly_revenue']) * 100);
                 $formattedGap = 'R$ '.number_format($gap, 2, ',', '.');
                 $output .= "\n**GAP PARA META:** {$formattedGap} ({$gapPct}% de aumento necessário)\n";
-                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 12 sugestões deve cobrir pelo menos 50% deste gap.\n";
+                $output .= "**INSTRUÇÃO:** A soma dos expected_result das 18 sugestões deve cobrir pelo menos 80% deste gap.\n";
             }
         }
 
@@ -927,7 +947,7 @@ PROMPT;
     }
 
     /**
-     * Formata o briefing do Analyst para vincular as 3 HIGH aos 5 problemas prioritarios.
+     * Formata o briefing do Analyst para vincular as 6 HIGH aos 5 problemas prioritarios.
      */
     private static function formatAnalystBriefing(array|string $analystAnalysis): string
     {
@@ -941,7 +961,7 @@ PROMPT;
             ?? [];
 
         if (empty($briefing)) {
-            return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
+            return 'Briefing do Analyst não disponível. Gere as 6 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
         }
 
         // Extrair problemas: formato do Analyst usa problema_1 até problema_5
@@ -968,10 +988,10 @@ PROMPT;
         }
 
         if (empty($problems)) {
-            return 'Briefing do Analyst não disponível. Gere as 3 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
+            return 'Briefing do Analyst não disponível. Gere as 6 HIGH baseadas nos dados mais críticos da análise completa abaixo.';
         }
 
-        $output = "### TOP 5 PROBLEMAS PRIORITÁRIOS:\n\n**Escolha 4 dos 5 problemas abaixo para as sugestões HIGH. Priorize os 4 mais críticos e que NUNCA foram abordados em análises anteriores.**\n\n";
+        $output = "### TOP 5 PROBLEMAS PRIORITÁRIOS:\n\n**Use TODOS os 5 problemas abaixo para as 6 sugestões HIGH (5 problemas + 1 oportunidade de mercado). Priorize os mais críticos e que NUNCA foram abordados em análises anteriores.**\n\n";
         foreach ($problems as $i => $problem) {
             $n = $i + 1;
             $output .= "**Problema #{$n}:** {$problem}\n";

@@ -2403,6 +2403,12 @@ class StoreAnalysisService
             $approved
         );
 
+        // Extrair títulos rejeitados do histórico
+        $rejectedTitles = array_values(array_map(
+            fn ($s) => $s['title'] ?? '',
+            array_filter($previousSuggestions, fn ($s) => in_array($s['status'] ?? '', ['rejected', 'ignored']))
+        ));
+
         // Normalizar títulos rejeitados para filtragem
         $rejectedNormalized = array_map(
             fn ($t) => $this->normalizeTitle($t),
