@@ -287,7 +287,7 @@ onMounted(() => {
                 </div>
 
                 <!-- Title -->
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-4">
                     Dashboard de Impacto nas Vendas
                 </h1>
 
@@ -391,26 +391,26 @@ onMounted(() => {
                 </div>
 
                 <div class="relative z-10 max-w-7xl mx-auto">
-                    <div class="flex items-center gap-4 mb-4">
-                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                            <ChartBarIcon class="w-7 h-7 text-white" />
+                    <div class="flex items-center gap-2 sm:gap-4 mb-4">
+                        <div class="w-10 sm:w-12 lg:w-14 h-10 sm:h-12 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 flex-shrink-0">
+                            <ChartBarIcon class="w-5 sm:w-6 lg:w-7 h-5 sm:h-6 lg:h-7 text-white" />
                         </div>
-                        <div>
-                            <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
+                        <div class="min-w-0">
+                            <h1 class="text-xl sm:text-2xl lg:text-4xl font-display font-bold text-white">
                                 Impacto das Suas Sugestões
                             </h1>
-                            <p v-if="summary?.period" class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base mt-1">
+                            <p v-if="summary?.period" class="text-primary-200/80 dark:text-gray-400 text-xs sm:text-sm lg:text-base mt-1">
                                 Analisando {{ summary.period.before.start }} a {{ summary.period.after.end }}
                             </p>
                         </div>
                     </div>
 
                     <!-- Badges -->
-                    <div v-if="summary?.has_data" class="flex items-center gap-3 mt-4">
-                        <div class="px-4 py-2 bg-primary-500/20 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                    <div v-if="summary?.has_data" class="flex flex-wrap items-center gap-2 sm:gap-3 mt-4">
+                        <div class="px-3 sm:px-4 py-1.5 sm:py-2 bg-primary-500/20 backdrop-blur-sm rounded-full text-white text-xs sm:text-sm font-medium">
                             {{ summary.suggestions_in_progress }} sugestões em andamento
                         </div>
-                        <div class="px-4 py-2 bg-success-500/20 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                        <div class="px-3 sm:px-4 py-1.5 sm:py-2 bg-success-500/20 backdrop-blur-sm rounded-full text-white text-xs sm:text-sm font-medium">
                             {{ summary.suggestions_completed }} concluídas
                         </div>
                     </div>
@@ -459,7 +459,7 @@ onMounted(() => {
                                         </div>
                                     </div>
                                     <div class="mb-2">
-                                        <div class="text-3xl font-bold text-gray-900 dark:text-white">
+                                        <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
                                             {{ formatCurrency(summary.after?.daily_revenue || 0) }}
                                         </div>
                                         <div v-if="revenueVariation !== null" class="flex items-center gap-2 mt-2">
@@ -494,7 +494,7 @@ onMounted(() => {
                                         </div>
                                     </div>
                                     <div class="mb-2">
-                                        <div class="text-3xl font-bold text-gray-900 dark:text-white">
+                                        <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
                                             {{ formatNumber(summary.after?.daily_orders || 0, 1) }}
                                         </div>
                                         <div v-if="ordersVariation !== null" class="flex items-center gap-2 mt-2">
@@ -529,7 +529,7 @@ onMounted(() => {
                                         </div>
                                     </div>
                                     <div class="mb-2">
-                                        <div class="text-3xl font-bold text-gray-900 dark:text-white">
+                                        <div class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
                                             {{ formatCurrency(summary.after?.avg_ticket || 0) }}
                                         </div>
                                         <div v-if="ticketVariation !== null" class="flex items-center gap-2 mt-2">

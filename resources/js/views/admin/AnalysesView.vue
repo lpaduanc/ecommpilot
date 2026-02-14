@@ -136,18 +136,18 @@ watch([searchInput, selectedStatus, dateFrom, dateTo], () => {
         <!-- Header -->
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                    <DocumentChartBarIcon class="w-8 h-8 text-primary-500" />
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                    <DocumentChartBarIcon class="w-8 sm:w-10 lg:w-12 h-8 sm:h-10 lg:h-12 text-primary-500" />
                     Análises Geradas
                 </h1>
-                <p class="text-gray-500 dark:text-gray-400 mt-1">
+                <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">
                     Visualize e monitore todas as análises de IA do sistema
                 </p>
             </div>
         </div>
 
         <!-- Stats Cards -->
-        <div v-if="adminAnalysesStore.stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div v-if="adminAnalysesStore.stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <BaseCard padding="normal">
                 <div class="flex items-center justify-between">
                     <div>
@@ -208,7 +208,7 @@ watch([searchInput, selectedStatus, dateFrom, dateTo], () => {
         <!-- Filters -->
         <BaseCard padding="normal">
             <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <!-- Search -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -267,12 +267,12 @@ watch([searchInput, selectedStatus, dateFrom, dateTo], () => {
                 </div>
 
                 <!-- Filter Actions -->
-                <div class="flex items-center gap-3">
-                    <BaseButton @click="applyFilters" size="sm">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <BaseButton @click="applyFilters" size="sm" class="w-full sm:w-auto">
                         <MagnifyingGlassIcon class="w-4 h-4" />
                         Aplicar Filtros
                     </BaseButton>
-                    <BaseButton v-if="hasActiveFilters" @click="clearFilters" variant="secondary" size="sm">
+                    <BaseButton v-if="hasActiveFilters" @click="clearFilters" variant="secondary" size="sm" class="w-full sm:w-auto">
                         <XMarkIcon class="w-4 h-4" />
                         Limpar Filtros
                     </BaseButton>

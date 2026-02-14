@@ -59,7 +59,7 @@ function removeNotification(id) {
 
 <template>
     <div
-        class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3"
+        class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 left-4 sm:left-auto z-[9999] flex flex-col gap-3"
         aria-live="polite"
         aria-atomic="true"
     >
@@ -77,7 +77,7 @@ function removeNotification(id) {
                 role="alert"
                 :aria-label="`${notification.type}: ${notification.message}`"
                 :class="[
-                    'flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm',
+                    'flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg w-full sm:max-w-sm',
                     'transform transition-transform hover:scale-105',
                     getColors(notification.type).bg,
                     getColors(notification.type).border

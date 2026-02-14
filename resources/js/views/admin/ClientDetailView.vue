@@ -171,13 +171,13 @@ onMounted(() => {
         <template v-else-if="client">
             <!-- Client Header -->
             <BaseCard padding="lg">
-                <div class="flex items-start gap-6">
-                    <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-2xl font-bold">
+                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+                    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xl sm:text-2xl font-bold flex-shrink-0">
                         {{ client.name.charAt(0).toUpperCase() }}
                     </div>
-                    <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-2">
-                            <h1 class="text-2xl font-display font-bold text-gray-900 dark:text-gray-100">{{ client.name }}</h1>
+                    <div class="flex-1 min-w-0 text-center sm:text-left">
+                        <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 mb-2">
+                            <h1 class="text-xl sm:text-2xl font-display font-bold text-gray-900 dark:text-gray-100 truncate">{{ client.name }}</h1>
                             <span :class="[
                                 'badge',
                                 client.is_active ? 'badge-success' : 'badge-danger'
@@ -185,7 +185,7 @@ onMounted(() => {
                                 {{ client.is_active ? 'Ativo' : 'Inativo' }}
                             </span>
                         </div>
-                        <div class="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-sm text-gray-500 dark:text-gray-400">
                             <span class="flex items-center gap-2">
                                 <EnvelopeIcon class="w-4 h-4" />
                                 {{ client.email }}
@@ -335,7 +335,7 @@ onMounted(() => {
             <!-- Actions -->
             <BaseCard padding="normal">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Ações</h3>
-                <div class="flex items-center gap-4">
+                <div class="flex flex-wrap items-center gap-3 sm:gap-4">
                     <BaseButton variant="secondary">
                         Adicionar Créditos
                     </BaseButton>

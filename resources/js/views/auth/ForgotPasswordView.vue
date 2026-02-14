@@ -75,10 +75,10 @@ function resetForm() {
 </script>
 
 <template>
-    <div class="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 to-gray-100">
+    <div class="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
         <div class="w-full max-w-md">
             <!-- Card -->
-            <div class="bg-white rounded-2xl shadow-xl p-8">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-5 sm:p-8">
                 <!-- Logo -->
                 <div class="flex items-center justify-center gap-3 mb-8">
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center">

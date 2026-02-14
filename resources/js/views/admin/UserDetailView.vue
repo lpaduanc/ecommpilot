@@ -35,13 +35,13 @@ onMounted(() => {
         </BaseButton>
 
         <BaseCard v-if="user" padding="lg">
-            <div class="flex items-center gap-6">
-                <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
-                    <UserCircleIcon class="w-10 h-10 text-white" />
+            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center flex-shrink-0">
+                    <UserCircleIcon class="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                 </div>
-                <div>
-                    <h1 class="text-2xl font-display font-bold text-gray-900">{{ user.name }}</h1>
-                    <p class="text-gray-500">{{ user.email }}</p>
+                <div class="text-center sm:text-left min-w-0">
+                    <h1 class="text-xl sm:text-2xl font-display font-bold text-gray-900 dark:text-gray-100">{{ user.name }}</h1>
+                    <p class="text-gray-500 dark:text-gray-400">{{ user.email }}</p>
                 </div>
             </div>
         </BaseCard>

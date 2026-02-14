@@ -446,15 +446,15 @@ onUnmounted(() => {
             <div class="relative z-10 max-w-7xl mx-auto">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                     <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                                <CurrencyDollarIcon class="w-7 h-7 text-white" />
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <div class="w-10 sm:w-12 lg:w-14 h-10 sm:h-12 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 flex-shrink-0">
+                                <CurrencyDollarIcon class="w-5 sm:w-6 lg:w-7 h-5 sm:h-6 lg:h-7 text-white" />
                             </div>
-                            <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
+                            <div class="min-w-0">
+                                <h1 class="text-xl sm:text-2xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
                                     Pedidos
                                 </h1>
-                                <p class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base">
+                                <p class="text-primary-200/80 dark:text-gray-400 text-xs sm:text-sm lg:text-base">
                                     {{ totalItems }} pedidos sincronizados
                                 </p>
                             </div>
@@ -503,8 +503,7 @@ onUnmounted(() => {
                                 >
                                     <div
                                         v-if="showPeriodDropdown"
-                                        class="fixed w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4"
-                                        style="top: 120px; right: 200px;"
+                                        class="fixed left-4 right-4 sm:left-auto sm:right-8 sm:w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4 top-20"
                                     >
                                         <div class="flex items-center justify-between mb-4">
                                             <h3 class="font-semibold text-gray-900 dark:text-gray-100">Período</h3>
@@ -594,15 +593,15 @@ onUnmounted(() => {
             <div class="w-full">
                 <!-- Filters Section -->
                 <BaseCard v-if="!isLoading" class="mb-6">
-                    <div class="flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
-                            <FunnelIcon class="w-6 h-6 text-primary-600" />
+                    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
+                            <FunnelIcon class="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
                         </div>
-                        <div class="flex-1">
-                            <div class="flex items-center justify-between mb-4">
+                        <div class="flex-1 w-full min-w-0">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Filtros</h3>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">Filtre os pedidos por status, localização ou cupom</p>
+                                    <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-0.5 sm:mb-1">Filtros</h3>
+                                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Filtre os pedidos por status, localização ou cupom</p>
                                 </div>
                                 <BaseButton
                                     v-if="hasActiveFilters"
@@ -689,7 +688,7 @@ onUnmounted(() => {
                                 </select>
 
                                 <!-- Per Page Selector -->
-                                <div class="flex items-center gap-2 ml-auto">
+                                <div class="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
                                     <span class="text-sm text-gray-500 dark:text-gray-400">Exibir:</span>
                                     <select
                                         :value="perPage"
@@ -982,7 +981,7 @@ onUnmounted(() => {
                     <!-- Modal -->
                     <div class="relative w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl shadow-2xl mx-2 sm:mx-4">
                         <!-- Header with Gradient -->
-                        <div class="relative px-8 py-6 bg-gradient-to-r from-primary-500 to-secondary-500 overflow-hidden">
+                        <div class="relative px-4 sm:px-8 py-4 sm:py-6 bg-gradient-to-r from-primary-500 to-secondary-500 overflow-hidden">
                             <!-- Background Pattern -->
                             <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px); background-size: 20px 20px;"></div>
 
@@ -997,7 +996,7 @@ onUnmounted(() => {
                             <div class="relative flex items-center justify-between">
                                 <div>
                                     <p class="text-white/80 text-sm mb-1">Pedido</p>
-                                    <p class="text-2xl font-display font-bold text-white">{{ selectedOrder.order_number }}</p>
+                                    <p class="text-lg sm:text-2xl font-display font-bold text-white">{{ selectedOrder.order_number }}</p>
                                 </div>
                                 <span :class="['badge bg-white dark:bg-gray-800/20 text-white border-white/30', `badge-${getPaymentStatusConfig(selectedOrder.payment_status).color}`]">
                                     {{ getPaymentStatusConfig(selectedOrder.payment_status).label }}
@@ -1006,7 +1005,7 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Content -->
-                        <div class="px-8 py-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-6">
+                        <div class="px-4 sm:px-8 py-4 sm:py-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-4 sm:space-y-6">
                             <!-- Customer Info -->
                             <div class="space-y-3">
                                 <h4 class="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -1015,17 +1014,17 @@ onUnmounted(() => {
                                     </div>
                                     Informações do Cliente
                                 </h4>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-xl">
-                                        <div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                    <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-700/30 rounded-xl">
+                                        <div class="min-w-0">
                                             <p class="text-xs text-gray-500 dark:text-gray-400">Nome</p>
-                                            <p class="font-medium text-gray-900 dark:text-gray-100">{{ selectedOrder.customer_name }}</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100 truncate">{{ selectedOrder.customer_name }}</p>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-xl">
-                                        <div>
+                                    <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-700/30 rounded-xl">
+                                        <div class="min-w-0">
                                             <p class="text-xs text-gray-500 dark:text-gray-400">E-mail</p>
-                                            <p class="font-medium text-gray-900 dark:text-gray-100">{{ selectedOrder.customer_email }}</p>
+                                            <p class="font-medium text-gray-900 dark:text-gray-100 truncate">{{ selectedOrder.customer_email }}</p>
                                         </div>
                                     </div>
                                     <div v-if="selectedOrder.customer_phone" class="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-transparent rounded-xl">
@@ -1134,7 +1133,7 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Footer -->
-                        <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
+                        <div class="px-4 sm:px-8 py-4 sm:py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                             <div class="flex justify-end">
                                 <BaseButton variant="secondary" @click="showDetailModal = false">
                                     Fechar

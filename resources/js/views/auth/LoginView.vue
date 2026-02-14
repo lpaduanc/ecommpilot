@@ -88,7 +88,7 @@ function clearErrors() {
 <template>
     <div class="min-h-screen flex">
         <!-- Left Side - Form -->
-        <div class="flex-1 flex items-center justify-center p-8">
+        <div class="flex-1 flex items-center justify-center p-4 sm:p-8">
             <div class="w-full max-w-md">
                 <!-- Logo -->
                 <div class="flex items-center gap-3 mb-8">
@@ -100,7 +100,7 @@ function clearErrors() {
 
                 <!-- Header -->
                 <div class="mb-8">
-                    <h1 class="text-3xl font-display font-bold text-gray-900 mb-2">
+                    <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 mb-2">
                         Acesso à Plataforma
                     </h1>
                     <p class="text-gray-500">
@@ -183,7 +183,7 @@ function clearErrors() {
                 <div class="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-8">
                     <SparklesIcon class="w-10 h-10" />
                 </div>
-                <h2 class="text-3xl font-display font-bold mb-4">
+                <h2 class="text-2xl lg:text-3xl font-display font-bold mb-4">
                     Inteligência Artificial para seu E-commerce
                 </h2>
                 <p class="text-white/80 text-lg">

@@ -652,7 +652,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Analyses List -->
-            <div v-if="recentAnalyses.length > 0" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div v-if="recentAnalyses.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <button
                     v-for="(analysis, index) in recentAnalyses"
                     :key="analysis.id"

@@ -289,15 +289,15 @@ onMounted(() => {
             <div class="relative z-10 max-w-7xl mx-auto">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                     <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-                                <TagIcon class="w-7 h-7 text-white" />
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <div class="w-10 sm:w-12 lg:w-14 h-10 sm:h-12 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 flex-shrink-0">
+                                <TagIcon class="w-5 sm:w-6 lg:w-7 h-5 sm:h-6 lg:h-7 text-white" />
                             </div>
-                            <div>
-                                <h1 class="text-3xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
+                            <div class="min-w-0">
+                                <h1 class="text-xl sm:text-2xl lg:text-4xl font-display font-bold text-white dark:text-gray-100">
                                     Cupons de Descontos
                                 </h1>
-                                <p class="text-primary-200/80 dark:text-gray-400 text-sm lg:text-base">
+                                <p class="text-primary-200/80 dark:text-gray-400 text-xs sm:text-sm lg:text-base">
                                     {{ discountStore.totalItems }} cupons sincronizados
                                 </p>
                             </div>
@@ -332,8 +332,7 @@ onMounted(() => {
                                     <div
                                         v-if="showPeriodDropdown"
                                         id="period-dropdown"
-                                        class="fixed w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4"
-                                        style="top: 120px; right: 40px;"
+                                        class="fixed left-4 right-4 sm:left-auto sm:right-10 sm:w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4 top-20"
                                     >
                                         <div class="flex items-center justify-between mb-4">
                                             <h3 class="font-semibold text-gray-900 dark:text-gray-100">Período</h3>
@@ -426,9 +425,9 @@ onMounted(() => {
                         class="relative overflow-hidden rounded-2xl shadow-lg"
                     >
                         <div :class="['absolute inset-0 bg-gradient-to-br', stat.color]"></div>
-                        <div class="relative p-6 text-white">
-                            <p class="text-white/80 text-sm font-medium mb-2">{{ stat.label }}</p>
-                            <p class="text-2xl lg:text-3xl font-display font-bold">{{ stat.value }}</p>
+                        <div class="relative p-3 sm:p-4 lg:p-6 text-white">
+                            <p class="text-white/80 text-xs sm:text-sm font-medium mb-1 sm:mb-2">{{ stat.label }}</p>
+                            <p class="text-lg sm:text-2xl lg:text-3xl font-display font-bold truncate">{{ stat.value }}</p>
                         </div>
                     </div>
                 </div>
@@ -444,15 +443,15 @@ onMounted(() => {
 
                 <!-- Filters Section -->
                 <BaseCard class="mb-6">
-                    <div class="flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/50 dark:to-primary-800/50 flex items-center justify-center flex-shrink-0">
-                            <FunnelIcon class="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/50 dark:to-primary-800/50 flex items-center justify-center flex-shrink-0">
+                            <FunnelIcon class="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 dark:text-primary-400" />
                         </div>
-                        <div class="flex-1">
-                            <div class="flex items-center justify-between mb-4">
+                        <div class="flex-1 w-full min-w-0">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Filtros</h3>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">Filtre os cupons por status ou tipo</p>
+                                    <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-0.5 sm:mb-1">Filtros</h3>
+                                    <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Filtre os cupons por status ou tipo</p>
                                 </div>
                                 <BaseButton
                                     v-if="hasActiveFilters"
@@ -566,7 +565,7 @@ onMounted(() => {
                 </div>
 
                 <!-- Coupons Table -->
-                <BaseCard padding="none" class="overflow-hidden">
+                <BaseCard padding="none" style="overflow: visible;">
                     <!-- Loading -->
                     <div v-if="isLoading" class="flex items-center justify-center py-20">
                         <div class="relative">
@@ -576,7 +575,7 @@ onMounted(() => {
                     </div>
 
                     <!-- Mobile/Tablet Cards -->
-                    <div v-else-if="coupons.length > 0" class="xl:hidden">
+                    <div v-else-if="coupons.length > 0" class="xl:hidden overflow-hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
                             <div
                                 v-for="coupon in coupons"
@@ -644,7 +643,7 @@ onMounted(() => {
 
                     <!-- Desktop Table -->
                     <div v-if="coupons.length > 0" class="hidden xl:block overflow-x-auto">
-                        <table class="w-full table-fixed">
+                        <table class="w-full" style="min-width: 1420px;">
                             <colgroup>
                                 <col style="width: 50px"><!-- Checkbox -->
                                 <col style="width: 180px"><!-- Cupom -->

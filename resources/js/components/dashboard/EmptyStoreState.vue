@@ -33,7 +33,7 @@ function goToIntegrations() {
         </BaseButton>
 
         <!-- Features -->
-        <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="mt-8 sm:mt-12 md:mt-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
             <div class="text-center">
                 <div class="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-4">
                     <ChartBarIcon class="w-7 h-7 text-primary-600" />

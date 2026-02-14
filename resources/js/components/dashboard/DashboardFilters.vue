@@ -154,7 +154,7 @@ function toggleFilters() {
                 <div
                     v-if="showFilters"
                     id="dashboard-filters-dropdown"
-                    class="fixed w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4"
+                    class="fixed left-4 right-4 sm:left-auto sm:w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4"
                     :style="{ top: dropdownPosition.top + 'px', right: dropdownPosition.right + 'px' }"
                 >
                 <div class="flex items-center justify-between mb-4">

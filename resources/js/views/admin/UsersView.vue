@@ -64,23 +64,23 @@ onMounted(() => {
 <template>
     <div class="space-y-6">
         <!-- Page Header -->
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-display font-bold text-gray-900 flex items-center gap-3">
-                    <UsersIcon class="w-8 h-8 text-primary-500" />
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                    <UsersIcon class="w-8 sm:w-10 lg:w-12 h-8 sm:h-10 lg:h-12 text-primary-500" />
                     Usuários
                 </h1>
-                <p class="text-gray-500 mt-1">Gerenciamento de usuários do sistema</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">Gerenciamento de usuários do sistema</p>
             </div>
-            <BaseButton>
+            <BaseButton class="w-full sm:w-auto">
                 <PlusIcon class="w-4 h-4" />
                 Novo Usuário
             </BaseButton>
         </div>
 
         <!-- Search -->
-        <div class="flex items-center gap-4">
-            <div class="flex-1 max-w-md">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div class="flex-1 sm:max-w-md">
                 <div class="relative">
                     <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input

@@ -224,17 +224,17 @@ function goBack() {
                         <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px); background-size: 20px 20px;"></div>
 
                         <div class="relative flex items-start justify-between gap-4">
-                            <div class="flex items-start gap-4 flex-1">
-                                <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-3xl">
+                            <div class="flex items-start gap-2 sm:gap-3 lg:gap-4 flex-1">
+                                <div class="w-10 sm:w-12 lg:w-14 h-10 sm:h-12 lg:h-14 rounded-xl sm:rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-xl sm:text-2xl lg:text-3xl flex-shrink-0">
                                     {{ category.icon }}
                                 </div>
-                                <div class="flex-1">
+                                <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 mb-2">
-                                        <span class="text-white/80 text-sm font-medium uppercase tracking-wider">
+                                        <span class="text-white/80 text-xs sm:text-sm font-medium uppercase tracking-wider">
                                             {{ category.label }}
                                         </span>
                                     </div>
-                                    <h1 class="text-2xl lg:text-3xl font-display font-bold text-white">
+                                    <h1 class="text-lg sm:text-xl lg:text-3xl font-display font-bold text-white">
                                         {{ suggestion.title }}
                                     </h1>
                                 </div>

@@ -24,7 +24,7 @@ function goHome() {
                 </div>
             </div>
             
-            <h1 class="text-3xl font-display font-bold text-gray-900 mb-4">
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 mb-4">
                 Página não encontrada
             </h1>
             <p class="text-gray-500 mb-8 max-w-md mx-auto">

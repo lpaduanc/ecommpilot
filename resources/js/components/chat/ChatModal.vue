@@ -39,9 +39,9 @@ onUnmounted(() => {
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-4xl max-h-[80vh] bg-white dark:bg-gray-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+                <div class="relative w-full max-w-4xl max-h-[80vh] bg-white dark:bg-gray-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden m-2 sm:m-4">
                     <!-- Header -->
-                    <div class="px-6 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-between">
+                    <div class="px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
                                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,8 +49,8 @@ onUnmounted(() => {
                                 </svg>
                             </div>
                             <div>
-                                <h2 class="text-lg font-semibold text-white">Chat com IA</h2>
-                                <p v-if="initialContext?.suggestion" class="text-white/80 text-sm">
+                                <h2 class="text-base sm:text-lg font-semibold text-white">Chat com IA</h2>
+                                <p v-if="initialContext?.suggestion" class="text-white/80 text-xs sm:text-sm truncate max-w-[200px] sm:max-w-none">
                                     Discutindo: {{ initialContext.suggestion.title }}
                                 </p>
                             </div>

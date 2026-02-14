@@ -337,8 +337,8 @@ onMounted(() => {
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-xl sm:text-2xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                    <UsersIcon class="w-6 sm:w-8 h-6 sm:h-8 text-primary-500" />
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                    <UsersIcon class="w-8 sm:w-10 lg:w-12 h-8 sm:h-10 lg:h-12 text-primary-500" />
                     Gerenciar Clientes
                 </h1>
                 <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">{{ totalItems }} clientes cadastrados</p>

@@ -207,9 +207,9 @@ function handleManageWorkflow() {
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl z-10">
+                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl z-10 m-2 sm:m-4">
                     <!-- Header with Gradient based on Priority -->
-                    <div class="relative px-8 py-6 bg-gradient-to-r overflow-hidden" :class="priority.color">
+                    <div class="relative px-4 sm:px-6 lg:px-8 py-4 sm:py-6 bg-gradient-to-r overflow-hidden" :class="priority.color">
                         <!-- Background Pattern -->
                         <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px); background-size: 20px 20px;"></div>
                         
@@ -234,7 +234,7 @@ function handleManageWorkflow() {
                                         {{ priority.label }}
                                     </span>
                                 </div>
-                                <h2 class="text-xl lg:text-2xl font-display font-bold text-white pr-8">
+                                <h2 class="text-lg sm:text-xl lg:text-2xl font-display font-bold text-white pr-8">
                                     {{ suggestion.title }}
                                 </h2>
                             </div>
@@ -242,7 +242,7 @@ function handleManageWorkflow() {
                     </div>
 
                     <!-- Content -->
-                    <div class="px-8 py-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-6">
+                    <div class="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-6">
                         <!-- Description -->
                         <div>
                             <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-3">
@@ -306,7 +306,7 @@ function handleManageWorkflow() {
                     </div>
 
                     <!-- Footer -->
-                    <div class="px-8 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
+                    <div class="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                             <!-- Analysis Page: Accept/Reject buttons -->
                             <template v-if="isOnAnalysisPage">

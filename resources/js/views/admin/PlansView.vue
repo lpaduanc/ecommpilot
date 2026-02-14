@@ -179,17 +179,17 @@ onMounted(fetchPlans);
 <template>
     <div class="space-y-6">
         <!-- Header -->
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
-                    <SparklesIcon class="w-8 h-8 text-primary-500" />
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                    <SparklesIcon class="w-8 sm:w-10 lg:w-12 h-8 sm:h-10 lg:h-12 text-primary-500" />
                     Gerenciamento de Planos
                 </h1>
-                <p class="text-gray-500 dark:text-gray-400 mt-1">
+                <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">
                     Configure os planos e limites do sistema
                 </p>
             </div>
-            <BaseButton @click="openModal()">
+            <BaseButton @click="openModal()" class="w-full sm:w-auto">
                 <PlusIcon class="w-4 h-4" />
                 Novo Plano
             </BaseButton>
@@ -216,7 +216,7 @@ onMounted(fetchPlans);
         </BaseCard>
 
         <!-- Plans Grid -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <BaseCard
                 v-for="plan in plans"
                 :key="plan.id"
@@ -395,7 +395,7 @@ onMounted(fetchPlans);
         >
             <form @submit.prevent="savePlan" class="space-y-6">
                 <!-- Informações Básicas -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Nome do Plano *
@@ -445,7 +445,7 @@ onMounted(fetchPlans);
                             class="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
                         />
                     </div>
-                    <div class="md:col-span-2">
+                    <div class="sm:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Descrição
                         </label>
@@ -465,7 +465,7 @@ onMounted(fetchPlans);
                         <span class="text-xs text-gray-500 ml-2">(-1 = ilimitado)</span>
                     </h3>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">
                                 Pedidos/mês

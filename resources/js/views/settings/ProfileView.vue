@@ -171,15 +171,15 @@ onMounted(() => {
             </div>
 
             <div class="relative z-10 max-w-7xl mx-auto">
-                <div class="flex items-center gap-3">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <UserCircleIcon class="w-7 h-7 text-white" />
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="w-10 sm:w-12 lg:w-14 h-10 sm:h-12 lg:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+                        <UserCircleIcon class="w-5 sm:w-6 lg:w-7 h-5 sm:h-6 lg:h-7 text-white" />
                     </div>
-                    <div>
-                        <h1 class="text-3xl lg:text-4xl font-display font-bold text-white">
+                    <div class="min-w-0">
+                        <h1 class="text-xl sm:text-2xl lg:text-4xl font-display font-bold text-white">
                             Meu Perfil
                         </h1>
-                        <p class="text-primary-200/80 text-sm lg:text-base">
+                        <p class="text-primary-200/80 text-xs sm:text-sm lg:text-base">
                             Gerencie suas informações pessoais e segurança
                         </p>
                     </div>

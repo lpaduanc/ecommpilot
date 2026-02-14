@@ -71,7 +71,7 @@ onMounted(() => {
         </div>
 
         <!-- Stats Grid -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <BaseCard
                 v-for="card in statCards"
                 :key="card.key"
@@ -81,7 +81,7 @@ onMounted(() => {
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-500 mb-1">{{ card.label }}</p>
-                        <p class="text-2xl font-display font-bold text-gray-900">
+                        <p class="text-xl sm:text-2xl font-display font-bold text-gray-900">
                             {{ formatValue(stats?.[card.key], card.isCurrency) }}
                         </p>
                     </div>
