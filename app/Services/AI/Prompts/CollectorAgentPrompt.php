@@ -372,7 +372,7 @@ PROMPT;
 
         $output = '';
         foreach ($saturated as $theme => $count) {
-            $output .= "🔴 **{$theme}**: {$count}x — EVITAR\n";
+            $output .= "🔴 **{$theme}**: {$count}x — PROIBIDO (resultará em REJEIÇÃO pelo Critic)\n";
         }
 
         return $output;

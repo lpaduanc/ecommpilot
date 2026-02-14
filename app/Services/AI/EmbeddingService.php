@@ -370,6 +370,64 @@ class EmbeddingService
     }
 
     /**
+     * Check if a suggestion is too similar to existing ones with additional filters.
+     * Returns true if similarity is above threshold.
+     *
+     * @param  array  $embedding  The embedding vector to compare
+     * @param  int  $storeId  The store ID
+     * @param  float  $threshold  Similarity threshold (default 0.85)
+     * @param  array  $excludeStatuses  Statuses to exclude from comparison (e.g., ['rejected', 'ignored'])
+     * @param  int|null  $maxAgeDays  Only compare with suggestions created within this many days (null = no limit)
+     */
+    public function isTooSimilarFiltered(
+        array $embedding,
+        int $storeId,
+        float $threshold = 0.85,
+        array $excludeStatuses = [],
+        ?int $maxAgeDays = null
+    ): bool {
+        $embeddingStr = '['.implode(',', $embedding).']';
+
+        $sql = "
+            SELECT
+                id, title, status,
+                embedding <=> '{$embeddingStr}'::vector as distance
+            FROM suggestions
+            WHERE store_id = ?
+              AND embedding IS NOT NULL
+        ";
+
+        $params = [$storeId];
+
+        // Exclude certain statuses
+        if (! empty($excludeStatuses)) {
+            $placeholders = implode(',', array_fill(0, count($excludeStatuses), '?'));
+            $sql .= " AND status NOT IN ({$placeholders})";
+            $params = array_merge($params, $excludeStatuses);
+        }
+
+        // Filter by age
+        if ($maxAgeDays !== null) {
+            $sql .= " AND created_at >= NOW() - INTERVAL '{$maxAgeDays} days'";
+        }
+
+        $sql .= ' ORDER BY distance LIMIT 1';
+
+        $results = DB::select($sql, $params);
+
+        if (empty($results)) {
+            return false;
+        }
+
+        // pgvector returns distance (1 - similarity for cosine)
+        // So lower distance = higher similarity
+        $distance = $results[0]->distance;
+        $similarity = 1 - $distance;
+
+        return $similarity > $threshold;
+    }
+
+    /**
      * Format embedding array for pgvector storage.
      */
     public function formatForStorage(array $embedding): string

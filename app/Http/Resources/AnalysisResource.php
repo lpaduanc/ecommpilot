@@ -26,6 +26,7 @@ class AnalysisResource extends JsonResource
             'suggestions' => $formattedSuggestions,
             'alerts' => $this->alerts ?? [],
             'opportunities' => $this->opportunities ?? [],
+            'premium_summary' => $this->summary['premium_summary'] ?? null,
             'period_start' => $this->period_start?->format('Y-m-d'),
             'period_end' => $this->period_end?->format('Y-m-d'),
             'completed_at' => $this->completed_at?->toISOString(),

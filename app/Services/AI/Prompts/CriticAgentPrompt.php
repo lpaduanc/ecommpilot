@@ -717,9 +717,10 @@ PROMPT;
         }
 
         arsort($saturated);
-        $output = "**TEMAS SATURADOS (3+ ocorrências - REJEITAR sugestões com estes temas):**\n";
+        $output = "**TEMAS SATURADOS (3+ ocorrências - SCORE AUTOMÁTICO 0, NÃO PASSAM V2-Originalidade):**\n";
+        $output .= "Qualquer sugestão que aborde estes temas DEVE receber score_qualidade = 0 e ser DESCARTADA.\n\n";
         foreach ($saturated as $t => $c) {
-            $output .= "- {$t} ({$c}x) — REJEITAR e substituir por tema novo\n";
+            $output .= "- {$t} ({$c}x) — REJEITAR AUTOMATICAMENTE e substituir por tema novo\n";
         }
 
         $allowed = array_filter($counts, fn ($c) => $c >= 1 && $c < 3);

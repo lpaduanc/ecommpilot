@@ -178,6 +178,82 @@ export interface AnalysisSummary {
 }
 
 /**
+ * Premium Summary Types (Growth Intelligence Framework)
+ */
+
+export interface GrowthScenario {
+  crescimento_percentual: number;
+  receita_mensal_projetada: number;
+  receita_anual_projetada: number;
+  o_que_precisa_melhorar: string;
+}
+
+export interface FinancialOpportunity {
+  action: string;
+  impact_type: 'ticket' | 'retention' | 'conversion' | 'margin';
+  estimated_monthly_impact: number;
+  estimated_annual_impact: number;
+}
+
+export interface PremiumSummary {
+  executive_summary: {
+    resumo_direto?: {
+      nao_precisa: string;
+      precisa: string[];
+      potencial_real: string[];
+    };
+    diagnostico_principal: string;
+    maior_gargalo: string;
+    maior_oportunidade: string;
+    risco_mais_relevante: string;
+    potencial_crescimento_estimado_percentual: number;
+  };
+  growth_score: {
+    overall_score: number;
+    efficiency_score: number;
+    margin_health: number;
+    retention_score: number;
+    scale_readiness: string;
+  };
+  diagnostico_quantitativo: {
+    ticket_medio_vs_benchmark: string;
+    dependencia_desconto: string;
+    risco_margem: string;
+    estrutura_catalogo: string;
+    potencial_retencao: string;
+  };
+  gaps_estrategicos: {
+    dados_ausentes: string[];
+    estruturais: string[];
+    operacionais: string[];
+    estrategicos: string[];
+  };
+  financial_opportunities: FinancialOpportunity[];
+  prioritized_roadmap: {
+    '30_dias': string[];
+    '60_dias': string[];
+    '90_dias': string[];
+  };
+  impact_effort_matrix: {
+    quick_wins: string[];
+    high_impact: string[];
+    fill_ins: string[];
+    avoid: string[];
+  };
+  growth_scenarios: {
+    conservador: GrowthScenario;
+    base: GrowthScenario;
+    agressivo: GrowthScenario;
+  };
+  strategic_risks: string[];
+  final_verdict: {
+    conclusao_estrategica: string;
+    current_stage: string;
+    next_stage_requirement: string;
+  };
+}
+
+/**
  * Impact Dashboard Types
  */
 

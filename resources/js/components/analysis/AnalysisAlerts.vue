@@ -136,17 +136,6 @@ function isVisible(index) {
                     </p>
                 </div>
 
-                <!-- Dismiss Button -->
-                <button
-                    @click.stop="dismissAlert(index)"
-                    :class="[
-                        'flex-shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white/50 dark:hover:bg-gray-700/50',
-                        getConfig(alert.type).subtext
-                    ]"
-                >
-                    <XMarkIcon class="w-4 h-4" />
-                </button>
-
                 <!-- Accent Line -->
                 <div 
                     :class="[

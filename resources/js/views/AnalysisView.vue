@@ -18,6 +18,7 @@ import SuggestionChatPanel from '../components/analysis/SuggestionChatPanel.vue'
 import HealthScore from '../components/analysis/HealthScore.vue';
 import AnalysisAlerts from '../components/analysis/AnalysisAlerts.vue';
 import OpportunitiesPanel from '../components/analysis/OpportunitiesPanel.vue';
+import StrategicSummaryPanel from '../components/analysis/StrategicSummaryPanel.vue';
 import AnalysisTypeSelector from '../components/analysis/AnalysisTypeSelector.vue';
 import ChatContainer from '../components/chat/ChatContainer.vue';
 import {
@@ -30,6 +31,7 @@ import {
     CalendarIcon,
     ArrowLeftIcon,
     EnvelopeIcon,
+    LightBulbIcon,
 } from '@heroicons/vue/24/outline';
 import {
     mockCurrentAnalysis,
@@ -37,6 +39,7 @@ import {
     mockSuggestions,
     mockAnalysisAlerts,
     mockOpportunities,
+    mockPremiumSummary,
 } from '../mocks/previewMocks';
 
 const router = useRouter();
@@ -69,6 +72,7 @@ const showOpportunityDetail = ref(false);
 const countdownInterval = ref(null);
 const showChat = ref(false);
 const isResendingEmail = ref(false);
+const emailAlertDismissed = ref(false);
 const showChatPanel = ref(false);
 const chatPanelContext = ref(null);
 
@@ -90,6 +94,7 @@ const suggestions = computed(() => shouldUseMocks.value ? mockSuggestions : anal
 const summary = computed(() => shouldUseMocks.value ? mockAnalysisSummary : analysisStore.summary);
 const alerts = computed(() => shouldUseMocks.value ? mockAnalysisAlerts : analysisStore.alerts);
 const opportunities = computed(() => shouldUseMocks.value ? mockOpportunities : analysisStore.opportunities);
+const premiumSummary = computed(() => shouldUseMocks.value ? mockPremiumSummary : analysisStore.premiumSummary);
 const canRequestAnalysis = computed(() => shouldUseMocks.value ? true : analysisStore.canRequestAnalysis);
 const timeUntilNext = computed(() => shouldUseMocks.value ? '00:00' : analysisStore.timeUntilNextAnalysis);
 
@@ -267,7 +272,7 @@ async function handleResendEmail() {
 function formatAnalysisDate(dateString) {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
+    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function getScoreColorClasses(score) {
@@ -519,7 +524,7 @@ onUnmounted(() => {
 
         <!-- Alerta de E-mail não enviado - TOPO DA PÁGINA -->
         <div
-            v-if="currentAnalysis?.status === 'completed' && currentAnalysis?.email_error && !currentAnalysis?.email_sent_at"
+            v-if="currentAnalysis?.status === 'completed' && currentAnalysis?.email_error && !currentAnalysis?.email_sent_at && !emailAlertDismissed"
             class="bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-300 dark:border-rose-700 rounded-xl p-5"
         >
             <div class="flex items-start gap-4">
@@ -537,35 +542,36 @@ onUnmounted(() => {
                     <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
                         Erro: {{ currentAnalysis.email_error }}
                     </p>
-                    <BaseButton
-                        variant="danger"
-                        size="md"
-                        @click="handleResendEmail"
-                        :loading="isResendingEmail"
-                        class="mt-4"
-                    >
-                        <EnvelopeIcon class="w-5 h-5" />
-                        Reenviar E-mail da Análise
-                    </BaseButton>
+                    <div class="flex items-center gap-3 mt-4">
+                        <BaseButton
+                            variant="danger"
+                            size="md"
+                            @click="handleResendEmail"
+                            :loading="isResendingEmail"
+                        >
+                            <EnvelopeIcon class="w-5 h-5" />
+                            Reenviar E-mail da Análise
+                        </BaseButton>
+                        <button
+                            @click="emailAlertDismissed = true"
+                            class="px-4 py-2 text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-lg transition-colors"
+                        >
+                            Lembrar mais tarde
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Compact Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/20">
                     <SparklesIcon class="w-5 h-5 text-white" />
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Análises IA</h1>
-                        <span
-                            v-if="currentAnalysis?.id"
-                            class="text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
-                        >
-                            #{{ currentAnalysis.id }}
-                        </span>
+                        <h1 class="text-2xl font-extrabold text-gray-900 dark:text-white">Análise IA</h1>
                         <span
                             v-if="isViewingHistorical"
                             class="px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 rounded border border-amber-300 dark:border-amber-700"
@@ -573,34 +579,12 @@ onUnmounted(() => {
                             Visualizando Histórico
                         </span>
                     </div>
-                    <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                        <span class="flex items-center gap-1">
-                            <BoltIcon class="w-3.5 h-3.5" />
-                            {{ totalSuggestions }} sugestões
-                        </span>
-                        <span class="flex items-center gap-1">
-                            <ChartBarIcon class="w-3.5 h-3.5" />
-                            {{ completedSuggestions }} implementadas
-                        </span>
-                        <span v-if="currentAnalysis?.created_at" class="flex items-center gap-1">
-                            <CalendarIcon class="w-3.5 h-3.5" />
-                            {{ formatAnalysisDate(currentAnalysis.created_at) }}
-                        </span>
-                    </div>
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <!-- Nova Análise button (when modules disabled) -->
                 <button
-                    @click="showChat = !showChat"
-                    class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                    :class="showChat
-                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'"
-                >
-                    {{ showChat ? 'Ocultar Chat' : 'Chat IA' }}
-                </button>
-                <button
-                    v-if="authStore.hasPermission('analysis.request')"
+                    v-if="!featureModulesEnabled && authStore.hasPermission('analysis.request')"
                     @click="handleRequestAnalysis"
                     :disabled="isRequesting || isStoreSyncing || hasAnalysisInProgress || (isInPreviewMode && !canAccessAnalysis)"
                     :class="[
@@ -612,14 +596,40 @@ onUnmounted(() => {
                     <LoadingSpinner v-else size="sm" class="text-white" />
                     Nova Análise
                 </button>
+                <button
+                    @click="showChat = !showChat"
+                    class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                    :class="showChat
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'"
+                >
+                    {{ showChat ? 'Ocultar Chat' : 'Chat IA' }}
+                </button>
             </div>
         </div>
 
-        <!-- Analysis Type Selector (feature flag) -->
-        <AnalysisTypeSelector
-            v-if="featureModulesEnabled && authStore.hasPermission('analysis.request')"
-            v-model="selectedAnalysisType"
-        />
+        <!-- Analysis Type Selector + Nova Análise Button -->
+        <div v-if="featureModulesEnabled && authStore.hasPermission('analysis.request')" class="mb-8">
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+                <AnalysisTypeSelector
+                    v-model="selectedAnalysisType"
+                />
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                        @click="handleRequestAnalysis"
+                        :disabled="isRequesting || isStoreSyncing || hasAnalysisInProgress || (isInPreviewMode && !canAccessAnalysis)"
+                        :class="[
+                            'flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-primary-500 to-secondary-500 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed',
+                            isInPreviewMode && !canAccessAnalysis ? 'pointer-events-none opacity-60' : ''
+                        ]"
+                    >
+                        <SparklesIcon v-if="!isRequesting" class="w-4 h-4" />
+                        <LoadingSpinner v-else size="sm" class="text-white" />
+                        Nova Análise
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Análises Section -->
         <div v-if="currentAnalysis || recentAnalyses.length > 0" class="relative">
@@ -627,7 +637,7 @@ onUnmounted(() => {
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-2">
                     <ClockIcon class="w-5 h-5 text-gray-400" />
-                    <h2 class="text-base font-semibold text-gray-700 dark:text-gray-300">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">
                         Histórico de Análises
                     </h2>
                 </div>
@@ -642,58 +652,28 @@ onUnmounted(() => {
             </div>
 
             <!-- Analyses List -->
-            <div v-if="recentAnalyses.length > 0" class="space-y-3">
+            <div v-if="recentAnalyses.length > 0" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <button
                     v-for="(analysis, index) in recentAnalyses"
                     :key="analysis.id"
                     @click="selectAnalysis(analysis.id, index)"
                     :class="[
-                        'relative w-full text-left p-4 rounded-xl border',
+                        'relative text-left p-4 rounded-xl border transition-colors',
                         ((!isViewingHistorical && index === 0) || selectedHistoricalId === analysis.id)
                             ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-400 dark:border-primary-600'
-                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     ]"
                 >
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                            <CalendarIcon class="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                            <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {{ formatAnalysisDate(analysis.created_at) }}
-                            </span>
-                            <span v-if="index === 0" class="px-2 py-0.5 text-xs font-semibold text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/50 rounded-full border border-primary-300 dark:border-primary-700">
-                                Atual
-                            </span>
+                    <div class="mb-3">
+                        <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold', getScoreColorClasses(analysis.summary?.health_score)]">
+                            {{ analysis.summary?.health_score || '-' }}
                         </div>
-                        <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
-                            #{{ analysis.id }}
-                        </span>
                     </div>
-
-                    <div class="grid grid-cols-3 gap-3">
-                        <div class="flex items-center gap-2">
-                            <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold', getScoreColorClasses(analysis.summary?.health_score)]">
-                                {{ analysis.summary?.health_score || '-' }}
-                            </div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {{ getScoreLabel(analysis.summary?.health_score) }}
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <BoltIcon class="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ analysis.suggestions?.length || 0 }}
-                                <span class="text-xs text-gray-500 dark:text-gray-400 ml-0.5">sugestões</span>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0" />
-                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ analysis.alerts?.length || 0 }}
-                                <span class="text-xs text-gray-500 dark:text-gray-400 ml-0.5">alertas</span>
-                            </div>
-                        </div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                        {{ formatAnalysisDate(analysis.created_at) }}
+                    </div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">
+                        {{ analysis.id }}
                     </div>
                 </button>
             </div>
@@ -719,81 +699,101 @@ onUnmounted(() => {
                         <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" />
                     </div>
 
-                    <!-- Opportunities Row -->
-                    <OpportunitiesPanel
-                        v-if="opportunities.length > 0 && !showChat"
-                        :opportunities="opportunities"
-                        @view-detail="viewOpportunityDetail"
+                    <!-- Resumo Estratégico -->
+                    <StrategicSummaryPanel
+                        v-if="premiumSummary"
+                        :premium-summary="premiumSummary"
                     />
 
                     <!-- Suggestions -->
-                    <div v-if="suggestions.length > 0" class="space-y-6">
-                        <!-- High Priority -->
-                        <div v-if="groupedSuggestions.high.length > 0">
-                            <div class="flex items-center gap-2 mb-4">
-                                <div class="w-8 h-8 rounded-lg bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center">
-                                    <BoltIcon class="w-4 h-4 text-danger-600 dark:text-danger-400" />
+                    <div v-if="suggestions.length > 0" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <!-- Header -->
+                        <div class="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <LightBulbIcon class="w-6 h-6 text-white" />
                                 </div>
                                 <div>
-                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
+                                    <h2 class="text-lg font-bold text-white">Sugestões Estratégicas</h2>
+                                    <p class="text-blue-100 text-sm">Ações recomendadas pela IA para impulsionar seus resultados</p>
                                 </div>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                <SuggestionCard
-                                    v-for="suggestion in groupedSuggestions.high"
-                                    :key="suggestion.id"
-                                    :suggestion="suggestion"
-                                    @view-detail="viewSuggestionDetail"
-                                    @accept="handleAcceptSuggestion"
-                                    @reject="handleRejectSuggestion"
-                                />
+                                <div class="ml-auto">
+                                    <span class="bg-white/20 text-white text-sm font-semibold px-3 py-1 rounded-full">
+                                        {{ suggestions.length }} sugestões
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Medium Priority -->
-                        <div v-if="groupedSuggestions.medium.length > 0">
-                            <div class="flex items-center gap-2 mb-4">
-                                <div class="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-                                    <ChartBarIcon class="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                        <!-- Content -->
+                        <div class="p-6 space-y-6">
+                            <!-- High Priority -->
+                            <div v-if="groupedSuggestions.high.length > 0">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <div class="w-8 h-8 rounded-lg bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center">
+                                        <BoltIcon class="w-4 h-4 text-danger-600 dark:text-danger-400" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    <SuggestionCard
+                                        v-for="suggestion in groupedSuggestions.high"
+                                        :key="suggestion.id"
+                                        :suggestion="suggestion"
+                                        @view-detail="viewSuggestionDetail"
+                                        @accept="handleAcceptSuggestion"
+                                        @reject="handleRejectSuggestion"
+                                    />
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                <SuggestionCard
-                                    v-for="suggestion in groupedSuggestions.medium"
-                                    :key="suggestion.id"
-                                    :suggestion="suggestion"
-                                    @view-detail="viewSuggestionDetail"
-                                    @accept="handleAcceptSuggestion"
-                                    @reject="handleRejectSuggestion"
-                                />
-                            </div>
-                        </div>
 
-                        <!-- Low Priority -->
-                        <div v-if="groupedSuggestions.low.length > 0">
-                            <div class="flex items-center gap-2 mb-4">
-                                <div class="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
-                                    <RocketLaunchIcon class="w-4 h-4 text-success-600 dark:text-success-400" />
+                            <!-- Medium Priority -->
+                            <div v-if="groupedSuggestions.medium.length > 0">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <div class="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+                                        <ChartBarIcon class="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">Otimizações complementares</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    <SuggestionCard
+                                        v-for="suggestion in groupedSuggestions.medium"
+                                        :key="suggestion.id"
+                                        :suggestion="suggestion"
+                                        @view-detail="viewSuggestionDetail"
+                                        @accept="handleAcceptSuggestion"
+                                        @reject="handleRejectSuggestion"
+                                    />
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                <SuggestionCard
-                                    v-for="suggestion in groupedSuggestions.low"
-                                    :key="suggestion.id"
-                                    :suggestion="suggestion"
-                                    @view-detail="viewSuggestionDetail"
-                                    @accept="handleAcceptSuggestion"
-                                    @reject="handleRejectSuggestion"
-                                />
+
+                            <!-- Low Priority -->
+                            <div v-if="groupedSuggestions.low.length > 0">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <div class="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
+                                        <RocketLaunchIcon class="w-4 h-4 text-success-600 dark:text-success-400" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Otimizações complementares</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    <SuggestionCard
+                                        v-for="suggestion in groupedSuggestions.low"
+                                        :key="suggestion.id"
+                                        :suggestion="suggestion"
+                                        @view-detail="viewSuggestionDetail"
+                                        @accept="handleAcceptSuggestion"
+                                        @reject="handleRejectSuggestion"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -63,7 +63,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const alerts = computed(() => currentAnalysis.value?.alerts || []);
     const opportunities = computed(() => currentAnalysis.value?.opportunities || []);
     const summary = computed(() => currentAnalysis.value?.summary || null);
-    
+    const premiumSummary = computed(() => currentAnalysis.value?.premium_summary || null);
+
     const highPrioritySuggestions = computed(() =>
         suggestions.value.filter(s => s.priority === 'high')
     );
@@ -630,6 +631,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
         alerts,
         opportunities,
         summary,
+        premiumSummary,
         highPrioritySuggestions,
         mediumPrioritySuggestions,
         lowPrioritySuggestions,

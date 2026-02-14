@@ -139,6 +139,7 @@ class StrategistAgentService
         Log::channel($this->logChannel)->info('    [STRATEGIST] JSON extraido com sucesso', [
             'keys' => array_keys($json),
             'has_suggestions' => isset($json['suggestions']),
+            'has_premium_summary' => isset($json['premium_summary']),
         ]);
 
         // Validate suggestions structure
@@ -186,9 +187,21 @@ class StrategistAgentService
         // Validar qualidade das sugestões HIGH (rebaixar se não tiverem dados específicos)
         $finalSuggestions = $this->validateHighPrioritySuggestions($validatedSuggestions);
 
+        // Extract premium_summary (Growth Intelligence Framework™)
+        $premiumSummary = $json['premium_summary'] ?? null;
+        if ($premiumSummary) {
+            Log::channel($this->logChannel)->info('    [STRATEGIST] Premium summary extraido', [
+                'sections' => array_keys($premiumSummary),
+                'has_executive_summary' => isset($premiumSummary['executive_summary']),
+                'has_growth_scenarios' => isset($premiumSummary['growth_scenarios']),
+                'has_growth_score' => isset($premiumSummary['growth_score']),
+            ]);
+        }
+
         return [
             'suggestions' => $finalSuggestions,
             'general_observations' => $json['general_observations'] ?? '',
+            'premium_summary' => $premiumSummary,
         ];
     }
 

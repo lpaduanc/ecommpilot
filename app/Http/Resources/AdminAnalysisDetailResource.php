@@ -61,6 +61,8 @@ class AdminAnalysisDetailResource extends JsonResource
             'total_stages' => $this->total_stages ?? 9,
             'progress_percentage' => $this->getProgressPercentage(),
             'current_stage_name' => $this->getCurrentStageName(),
+            // Raw agent outputs for debugging
+            'raw_agent_outputs' => $this->raw_agent_outputs,
         ];
     }
 }

@@ -6,7 +6,7 @@
  */
 
 import type { DashboardStats, RevenueChartData, OrdersStatusData, TopProduct } from '@/types/dashboard'
-import type { Analysis, Suggestion } from '@/types/analysis'
+import type { Analysis, Suggestion, PremiumSummary } from '@/types/analysis'
 import type { ChatMessage } from '@/types/chat'
 
 // ============================================
@@ -250,6 +250,149 @@ export const mockCurrentAnalysis: Analysis = {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     completed_at: new Date().toISOString(),
+}
+
+export const mockPremiumSummary: PremiumSummary = {
+    executive_summary: {
+        resumo_direto: {
+            nao_precisa: 'vender mais barato',
+            precisa: [
+                'Vender com mais inteligencia',
+                'Monetizar base existente',
+                'Reduzir dependencia de cupom',
+                'Trabalhar recorrencia',
+                'Melhorar percepcao de valor',
+            ],
+            potencial_real: [
+                'Assinatura',
+                'Pos-compra',
+                'Social Selling',
+                'Personalizacao',
+            ],
+        },
+        diagnostico_principal: 'Sua loja tem boa tracao com 234 pedidos/mes e ticket medio de R$ 196, mas opera com margem pressionada por dependencia de cupons (38% dos pedidos). O catalogo e concentrado nos 5 produtos top que representam 78% da receita.',
+        maior_gargalo: 'Dependencia de cupons corroendo margem em 8-12% por pedido',
+        maior_oportunidade: 'Cross-sell nos 87 compradores de Camiseta Premium Cotton pode gerar R$ 4.350/mes adicional',
+        risco_mais_relevante: 'Ruptura de estoque nos 3 produtos mais vendidos pode causar perda de R$ 12.400/mes',
+        potencial_crescimento_estimado_percentual: 25,
+    },
+    growth_score: {
+        overall_score: 72,
+        efficiency_score: 65,
+        margin_health: 58,
+        retention_score: 45,
+        scale_readiness: 'Estruturada',
+    },
+    diagnostico_quantitativo: {
+        ticket_medio_vs_benchmark: 'R$ 196 vs benchmark R$ 245 (-20%). Abaixo da media do segmento.',
+        dependencia_desconto: '38% dos pedidos usam cupom. Media saudavel: <20%.',
+        risco_margem: 'Desconto medio de 12% por pedido. Margem estimada comprimida em 8-12pp.',
+        estrutura_catalogo: '156 produtos, mas top 5 = 78% da receita. Alta concentracao de risco.',
+        potencial_retencao: 'Apenas 18% de recompra. Benchmark segmento: 30-35%.',
+    },
+    gaps_estrategicos: {
+        dados_ausentes: ['Margem de lucro por produto', 'Custo de aquisicao (CAC)', 'Dados de trafego'],
+        estruturais: ['Sem programa de fidelidade', 'Sem automacao de pos-venda'],
+        operacionais: ['Estoque critico em 3 SKUs principais', 'Sem cross-sell configurado'],
+        estrategicos: ['Dependencia de cupons para conversao', 'Ausencia de recorrencia'],
+    },
+    financial_opportunities: [
+        {
+            action: 'Aumentar ticket medio em R$ 30 via cross-sell/upsell',
+            impact_type: 'ticket',
+            estimated_monthly_impact: 7020,
+            estimated_annual_impact: 84240,
+        },
+        {
+            action: 'Reduzir uso de cupom de 38% para 20% dos pedidos',
+            impact_type: 'margin',
+            estimated_monthly_impact: 3600,
+            estimated_annual_impact: 43200,
+        },
+        {
+            action: 'Aumentar taxa de recompra de 18% para 28%',
+            impact_type: 'retention',
+            estimated_monthly_impact: 4590,
+            estimated_annual_impact: 55080,
+        },
+        {
+            action: 'Recuperar 15% dos carrinhos abandonados',
+            impact_type: 'conversion',
+            estimated_monthly_impact: 2470,
+            estimated_annual_impact: 29640,
+        },
+    ],
+    prioritized_roadmap: {
+        '30_dias': [
+            'Configurar automacao de carrinho abandonado (3 emails)',
+            'Repor estoque dos 3 SKUs criticos',
+            'Criar bundle com Camiseta Premium + acessorio',
+            'Reduzir cupom BEMVINDO10 de 10% para 7%',
+        ],
+        '60_dias': [
+            'Implementar programa de pontos basico',
+            'Configurar cross-sell automatico no checkout',
+            'Criar segmentacao de clientes VIP (3+ compras)',
+            'Lancar campanha de reativacao para inativos 60d+',
+        ],
+        '90_dias': [
+            'Lancar modelo de assinatura para produtos recorrentes',
+            'Implementar precificacao dinamica baseada em demanda',
+            'Criar fluxo de pos-compra com conteudo educativo',
+            'Diversificar catalogo para reduzir concentracao nos top 5',
+        ],
+    },
+    impact_effort_matrix: {
+        quick_wins: [
+            'Automacao de carrinho abandonado',
+            'Reposicao de estoque critico',
+            'Reducao do cupom de boas-vindas',
+        ],
+        high_impact: [
+            'Programa de fidelidade/pontos',
+            'Cross-sell automatico no checkout',
+            'Modelo de assinatura',
+        ],
+        fill_ins: [
+            'Melhorar descricoes de produtos',
+            'Adicionar avaliacoes de clientes',
+            'Conteudo para redes sociais',
+        ],
+        avoid: [
+            'Aumentar catalogo sem demanda validada',
+            'Criar mais cupons de desconto',
+        ],
+    },
+    growth_scenarios: {
+        conservador: {
+            crescimento_percentual: 10,
+            receita_mensal_projetada: 50479,
+            receita_anual_projetada: 605753,
+            o_que_precisa_melhorar: 'Corrigir estoque critico e implementar automacao basica de carrinho abandonado.',
+        },
+        base: {
+            crescimento_percentual: 25,
+            receita_mensal_projetada: 57363,
+            receita_anual_projetada: 688356,
+            o_que_precisa_melhorar: 'Implementar cross-sell, reduzir dependencia de cupom e aumentar recompra para 25%.',
+        },
+        agressivo: {
+            crescimento_percentual: 50,
+            receita_mensal_projetada: 68835,
+            receita_anual_projetada: 826027,
+            o_que_precisa_melhorar: 'Tudo acima + assinatura, precificacao dinamica e diversificacao de catalogo.',
+        },
+    },
+    strategic_risks: [
+        'Ruptura de estoque nos 3 principais SKUs pode causar queda de 25% na receita',
+        'Dependencia excessiva de cupons esta criando cultura de desconto nos clientes',
+        'Concentracao em 5 produtos (78% receita) cria vulnerabilidade a mudancas de demanda',
+    ],
+    final_verdict: {
+        conclusao_estrategica: 'A loja tem boa tracao e base de clientes, mas opera abaixo do potencial por falta de automacao, excesso de cupons e ausencia de estrategia de retencao. O foco deve ser monetizar a base existente antes de buscar novos clientes.',
+        current_stage: 'Estruturada',
+        next_stage_requirement: 'Implementar automacoes de marketing (carrinho abandonado, pos-venda, segmentacao) e programa de fidelidade para atingir estagio Escalavel.',
+    },
 }
 
 export const mockAnalysisAlerts = [

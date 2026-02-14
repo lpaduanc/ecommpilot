@@ -320,7 +320,7 @@ class CriticAgentService
     }
 
     /**
-     * Enforce flexible distribution of suggestions (max 4 per category, total 10-15).
+     * Enforce strict 3-3-3 distribution of suggestions (exactly 3 per impact level, 9 total).
      */
     private function enforceDistribution(array $suggestions): array
     {
@@ -350,10 +350,10 @@ class CriticAgentService
             'low' => count($low),
         ]);
 
-        // Cap each category at max 4
-        $high = array_slice($high, 0, 4);
-        $medium = array_slice($medium, 0, 4);
-        $low = array_slice($low, 0, 4);
+        // Cap each category at max 3 (strict 3-3-3 = 9 total)
+        $high = array_slice($high, 0, 3);
+        $medium = array_slice($medium, 0, 3);
+        $low = array_slice($low, 0, 3);
 
         // Ensure at least 1 HIGH and 1 LOW if we have enough suggestions
         $total = count($high) + count($medium) + count($low);

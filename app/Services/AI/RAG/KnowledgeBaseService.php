@@ -85,7 +85,7 @@ class KnowledgeBaseService
 
         $results = $this->embeddingService->searchKnowledge($embedding, $category, $niche, $subcategory, $limit);
 
-        return array_map(function ($item) {
+        $mapped = array_map(function ($item) {
             return [
                 'title' => $item->title,
                 'content' => $item->content,
@@ -96,6 +96,9 @@ class KnowledgeBaseService
                 'metadata' => json_decode($item->metadata ?? '{}', true),
             ];
         }, $results);
+
+        // Filter out irrelevant results (negative or very low relevance scores)
+        return array_values(array_filter($mapped, fn ($item) => $item['relevance'] > 0.05));
     }
 
     /**

@@ -33,6 +33,10 @@ class StoreAnalysisService
 
     private array $collectedEmbeddings = [];
 
+    private ?array $premiumSummary = null;
+
+    private array $rawAgentOutputs = [];
+
     /**
      * Maximum retries per stage before failing permanently.
      */
@@ -552,6 +556,21 @@ class StoreAnalysisService
             $this->collectedPrompts['collector'] = $collectorContext['_prompt_used'] ?? null;
             unset($collectorContext['_prompt_used']);
 
+            // Salvar output bruto para debug
+            $this->rawAgentOutputs['collector'] = $collectorContext;
+
+            // Truncar data_not_available para reduzir noise nos agentes downstream
+            if (isset($collectorContext['data_not_available']) && count($collectorContext['data_not_available']) > 10) {
+                $totalUnavailable = count($collectorContext['data_not_available']);
+                $collectorContext['data_not_available'] = array_slice($collectorContext['data_not_available'], 0, 10);
+                $collectorContext['data_not_available'][] = '... e mais '.($totalUnavailable - 10).' itens indisponíveis';
+            }
+            if (isset($collectorContext['data_quality']['missing_data']) && is_array($collectorContext['data_quality']['missing_data']) && count($collectorContext['data_quality']['missing_data']) > 10) {
+                $totalMissing = count($collectorContext['data_quality']['missing_data']);
+                $collectorContext['data_quality']['missing_data'] = array_slice($collectorContext['data_quality']['missing_data'], 0, 10);
+                $collectorContext['data_quality']['missing_data'][] = '... e mais '.($totalMissing - 10).' itens';
+            }
+
             Log::channel($this->logChannel)->info('<<< Collector Agent concluido', [
                 'keys_returned' => array_keys($collectorContext),
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
@@ -643,6 +662,9 @@ class StoreAnalysisService
             // Coletar prompt para logging no final
             $this->collectedPrompts['analyst'] = $analysisResult['_prompt_used'] ?? null;
             unset($analysisResult['_prompt_used']);
+
+            // Salvar output bruto para debug
+            $this->rawAgentOutputs['analyst'] = $analysisResult;
 
             Log::channel($this->logChannel)->info('<<< Analyst Agent concluido', [
                 'health_score' => $analysisResult['overall_health']['score'] ?? 'N/A',
@@ -747,8 +769,16 @@ class StoreAnalysisService
             $this->collectedPrompts['strategist'] = $generatedSuggestions['_prompt_used'] ?? null;
             unset($generatedSuggestions['_prompt_used']);
 
+            // Salvar output bruto para debug
+            $this->rawAgentOutputs['strategist'] = $generatedSuggestions;
+
+            // Extrair premium_summary (Growth Intelligence Framework™)
+            $this->premiumSummary = $generatedSuggestions['premium_summary'] ?? null;
+
             Log::channel($this->logChannel)->info('<<< Strategist Agent concluido', [
                 'suggestions_generated' => count($generatedSuggestions['suggestions'] ?? []),
+                'has_premium_summary' => $this->premiumSummary !== null,
+                'premium_sections' => $this->premiumSummary ? array_keys($this->premiumSummary) : [],
                 'time_ms' => round((microtime(true) - $stepStart) * 1000, 2),
             ]);
 
@@ -812,6 +842,9 @@ class StoreAnalysisService
             // Coletar prompt para logging no final
             $this->collectedPrompts['critic'] = $criticizedSuggestions['_prompt_used'] ?? null;
             unset($criticizedSuggestions['_prompt_used']);
+
+            // Salvar output bruto para debug
+            $this->rawAgentOutputs['critic'] = $criticizedSuggestions;
 
             Log::channel($this->logChannel)->info('<<< Critic Agent concluido', [
                 'suggestions_approved' => count($criticizedSuggestions['approved_suggestions'] ?? []),
@@ -1398,7 +1431,8 @@ class StoreAnalysisService
             $items = is_array($order->items) ? $order->items : [];
             foreach ($items as $item) {
                 $productId = $item['product_id'] ?? null;
-                if ($productId) {
+                $itemPrice = $item['price'] ?? 0;
+                if ($productId && $itemPrice > 0) {
                     if (! isset($productStats[$productId])) {
                         $productStats[$productId] = [
                             'quantity' => 0,
@@ -1406,7 +1440,7 @@ class StoreAnalysisService
                         ];
                     }
                     $productStats[$productId]['quantity'] += ($item['quantity'] ?? 1);
-                    $productStats[$productId]['revenue'] += ($item['price'] ?? 0) * ($item['quantity'] ?? 1);
+                    $productStats[$productId]['revenue'] += $itemPrice * ($item['quantity'] ?? 1);
                 }
             }
         }
@@ -1415,8 +1449,9 @@ class StoreAnalysisService
         uasort($productStats, fn ($a, $b) => $b['quantity'] <=> $a['quantity']);
         $topProductIds = array_slice(array_keys($productStats), 0, $limit);
 
-        // Get product details
+        // Get product details (excluding gifts/brindes)
         $products = $store->products()
+            ->excludeGifts()
             ->whereIn('external_id', $topProductIds)
             ->get()
             ->keyBy('external_id');
@@ -1582,9 +1617,10 @@ class StoreAnalysisService
                 ];
 
                 // Check similarity with existing suggestions in DB
-                // Threshold de 0.78 = sugestões com 78%+ de similaridade são filtradas
-                // Isso evita sugestões muito parecidas entre análises consecutivas
-                if (! $this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                // Threshold de 0.85 = sugestões com 85%+ de similaridade são filtradas
+                // Exclui rejected/ignored/completed e considera apenas últimos 90 dias
+                // Isso evita sugestões muito parecidas mas não filtra todo o histórico
+                if (! $this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
                     $suggestion['embedding'] = $embedding;
                     $filteredSuggestions[] = $suggestion;
                 } else {
@@ -1766,11 +1802,17 @@ class StoreAnalysisService
                 'health_score' => $score,
                 'health_status' => $status,
                 'main_insight' => $insight,
+                'premium_summary' => $this->premiumSummary,
             ],
             'suggestions' => [], // Legacy field - suggestions are now in separate table
             'alerts' => $this->extractAlerts($analysisResult),
             'opportunities' => $this->extractOpportunities($analysisResult),
         ]);
+
+        // Salvar outputs brutos dos agentes para debug (admin only)
+        if (! empty($this->rawAgentOutputs)) {
+            $analysis->update(['raw_agent_outputs' => $this->rawAgentOutputs]);
+        }
     }
 
     /**
@@ -2200,7 +2242,7 @@ class StoreAnalysisService
                 try {
                     $textToEmbed = $title.' '.($suggestion['description'] ?? '');
                     $embedding = $this->embedding->generate($textToEmbed);
-                    if ($this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                    if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
                         $isSimilarToHistory = true;
                         Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered by EMBEDDING (passed Jaccard)', [
                             'title' => $title,
@@ -2510,7 +2552,7 @@ class StoreAnalysisService
                     $textToEmbed = ($suggestion['title'] ?? '').' '.($suggestion['description'] ?? '');
                     try {
                         $embedding = $this->embedding->generate($textToEmbed);
-                        if ($this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                        if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
                             Log::channel($this->logChannel)->info('Recovery candidate rejected by embedding check', [
                                 'title' => $suggestion['title'] ?? 'N/A',
                             ]);
@@ -2572,7 +2614,7 @@ class StoreAnalysisService
                             $textToEmbed = ($suggestion['title'] ?? '').' '.($suggestion['description'] ?? '');
                             try {
                                 $embedding = $this->embedding->generate($textToEmbed);
-                                if ($this->embedding->isTooSimilar($embedding, $storeId, 0.78)) {
+                                if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
                                     Log::channel($this->logChannel)->info('Recovery candidate (promoted) rejected by embedding check', [
                                         'title' => $suggestion['title'] ?? 'N/A',
                                     ]);

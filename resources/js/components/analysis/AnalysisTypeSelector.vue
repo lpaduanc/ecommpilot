@@ -34,7 +34,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="mb-4">
+    <div>
         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Tipo de Análise
         </label>
