@@ -138,11 +138,11 @@ watch(() => analysisStore.pendingAnalysis, (newVal, oldVal) => {
                 <div class="h-full bg-white animate-progress"></div>
             </div>
 
-            <div class="relative flex items-center justify-center gap-4 px-6 py-4">
+            <div class="relative flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4">
                 <!-- Icon with animation -->
                 <div
                     :class="[
-                        'flex items-center justify-center w-12 h-12 rounded-full',
+                        'flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0',
                         bannerVariant === 'danger'
                             ? 'bg-red-700/50'
                             : bannerVariant === 'success'
@@ -153,15 +153,15 @@ watch(() => analysisStore.pendingAnalysis, (newVal, oldVal) => {
                     <component
                         :is="bannerIcon"
                         :class="[
-                            'w-7 h-7 text-white',
+                            'w-5 h-5 sm:w-7 sm:h-7 text-white',
                             analysisStore.hasAnalysisInProgress && !hasError ? 'animate-pulse' : ''
                         ]"
                     />
                 </div>
 
                 <!-- Message -->
-                <div class="flex-1 text-center lg:text-left">
-                    <p class="text-lg font-bold text-white">
+                <div class="flex-1 text-center sm:text-left min-w-0">
+                    <p class="text-base sm:text-lg font-bold text-white">
                         <span v-if="hasError">
                             Falha na Análise
                         </span>
@@ -181,7 +181,7 @@ watch(() => analysisStore.pendingAnalysis, (newVal, oldVal) => {
                 <button
                     @click="handleAction"
                     :class="[
-                        'px-6 py-3 rounded-xl text-base font-bold shadow-lg transition-all hover:scale-105 active:scale-95',
+                        'px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-bold shadow-lg transition-all hover:scale-105 active:scale-95 flex-shrink-0',
                         bannerVariant === 'danger'
                             ? 'bg-white text-red-600 hover:bg-red-50'
                             : bannerVariant === 'success'

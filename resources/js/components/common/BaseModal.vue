@@ -127,7 +127,7 @@ onUnmounted(() => {
                         :class="['w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden', sizeClasses[size]]"
                     >
                         <!-- Header -->
-                        <div v-if="title || closable" class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                        <div v-if="title || closable" class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-700">
                             <h3 v-if="title" :id="titleId" class="text-lg font-semibold text-gray-900 dark:text-gray-100 dark:text-white">{{ title }}</h3>
                             <button
                                 v-if="closable"
@@ -142,12 +142,12 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Content -->
-                        <div :id="descriptionId" class="px-6 py-4 max-h-[80vh] overflow-y-auto">
+                        <div :id="descriptionId" class="px-4 sm:px-6 py-4 max-h-[70vh] sm:max-h-[80vh] overflow-y-auto">
                             <slot />
                         </div>
 
                         <!-- Footer -->
-                        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
+                        <div v-if="$slots.footer" class="px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700">
                             <slot name="footer" />
                         </div>
                     </div>

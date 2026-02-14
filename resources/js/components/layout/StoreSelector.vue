@@ -159,7 +159,7 @@ onMounted(() => {
         <!-- Dropdown -->
         <div
             v-if="isOpen"
-            class="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden"
+            class="absolute top-full right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden"
         >
             <div class="p-2 border-b border-gray-100">
                 <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
