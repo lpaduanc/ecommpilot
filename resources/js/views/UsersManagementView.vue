@@ -258,7 +258,7 @@ onMounted(() => {
 
                     <!-- Desktop Table -->
                     <div v-if="hasUsers" class="hidden xl:block overflow-x-auto">
-                        <table class="w-full">
+                        <table class="w-full min-w-[750px]">
                             <thead class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">

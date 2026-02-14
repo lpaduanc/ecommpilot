@@ -437,7 +437,7 @@ onMounted(() => {
 
             <!-- Desktop Table -->
             <div v-if="clients.length > 0" class="hidden xl:block overflow-x-auto">
-                <table class="w-full">
+                <table class="w-full min-w-[800px]">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>
                             <th class="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">

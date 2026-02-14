@@ -420,7 +420,7 @@ onMounted(() => {
 
             <!-- Financial Opportunities Table -->
             <div v-if="financialOpportunities.length" class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full min-w-[600px] text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-900/50">
                         <tr class="border-b border-gray-200 dark:border-gray-700">
                             <th class="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Ação</th>

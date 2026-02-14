@@ -309,7 +309,7 @@ watch([searchInput, selectedStatus, dateFrom, dateTo], () => {
         <!-- Table -->
         <BaseCard v-else padding="none">
             <div class="overflow-x-auto">
-                <table class="w-full">
+                <table class="w-full min-w-[900px]">
                     <thead class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
