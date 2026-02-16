@@ -42,7 +42,7 @@ class AdminSettingsController extends Controller
             'gemini.api_key' => ['sometimes', 'nullable', 'string'],
             'gemini.model' => ['sometimes', 'string'],
             'gemini.temperature' => ['sometimes', 'numeric', 'min:0', 'max:2'],
-            'gemini.max_tokens' => ['sometimes', 'integer', 'min:100', 'max:32000'],
+            'gemini.max_tokens' => ['sometimes', 'integer', 'min:100', 'max:65536'],
             'anthropic.api_key' => ['sometimes', 'nullable', 'string'],
             'anthropic.model' => ['sometimes', 'string'],
             'anthropic.temperature' => ['sometimes', 'numeric', 'min:0', 'max:2'],

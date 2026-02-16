@@ -165,6 +165,12 @@ const menuItems = computed(() => [
                 permission: 'settings.view',
             },
             {
+                name: 'Config. Análise',
+                label: 'Config. Análise',
+                route: 'settings-analysis-config',
+                permission: 'settings.view',
+            },
+            {
                 name: 'Informações da Loja',
                 label: 'Informações da Loja',
                 route: 'settings-store-info',

@@ -411,8 +411,7 @@ class StoreAnalysisService
 
         try {
             // Obter top produtos para usar nas buscas de mercado
-            $topProductNames = $store->products()
-                ->excludeGifts()
+            $topProductNames = $store->analysisProducts()
                 ->where('is_active', true)
                 ->orderByDesc('external_updated_at')
                 ->limit(5)
@@ -1111,8 +1110,7 @@ class StoreAnalysisService
     private function identifyNiche(Store $store): string
     {
         // Get product categories
-        $categories = $store->products()
-            ->excludeGifts()
+        $categories = $store->analysisProducts()
             ->whereNotNull('categories')
             ->pluck('categories')
             ->flatten()
@@ -1123,8 +1121,7 @@ class StoreAnalysisService
             ->toArray();
 
         // Get top product titles (active products, most recent)
-        $productTitles = $store->products()
-            ->excludeGifts()
+        $productTitles = $store->analysisProducts()
             ->where('is_active', true)
             ->orderByDesc('external_updated_at')
             ->limit(10)
@@ -1255,8 +1252,7 @@ class StoreAnalysisService
     private function detectNicheAndSubcategory(Store $store): array
     {
         // Get product categories
-        $categories = $store->products()
-            ->excludeGifts()
+        $categories = $store->analysisProducts()
             ->whereNotNull('categories')
             ->pluck('categories')
             ->flatten()
@@ -1267,8 +1263,7 @@ class StoreAnalysisService
             ->toArray();
 
         // Get top product titles (active products, most recent)
-        $productTitles = $store->products()
-            ->excludeGifts()
+        $productTitles = $store->analysisProducts()
             ->where('is_active', true)
             ->orderByDesc('external_updated_at')
             ->limit(10)
@@ -1313,8 +1308,7 @@ class StoreAnalysisService
     private function detectSubcategoryForNiche(Store $store, string $niche): string
     {
         // Get product categories
-        $categories = $store->products()
-            ->excludeGifts()
+        $categories = $store->analysisProducts()
             ->whereNotNull('categories')
             ->pluck('categories')
             ->flatten()
@@ -1325,8 +1319,7 @@ class StoreAnalysisService
             ->toArray();
 
         // Get top product titles
-        $productTitles = $store->products()
-            ->excludeGifts()
+        $productTitles = $store->analysisProducts()
             ->where('is_active', true)
             ->orderByDesc('external_updated_at')
             ->limit(10)
@@ -1380,14 +1373,14 @@ class StoreAnalysisService
 
         $paidOrders = $orders->filter(fn ($o) => $o->isPaid());
 
-        // Products (excluding gifts/brindes)
+        // Products (applying analysis config exclusions)
         $allProductsCount = $store->products()->count();
-        $products = $store->products()->excludeGifts()->get();
-        $giftsFiltered = $allProductsCount - $products->count();
-        $activeProducts = $products->filter(fn ($p) => $p->is_active && ! $p->isGift());
+        $products = $store->analysisProducts()->get();
+        $excludedCount = $allProductsCount - $products->count();
+        $activeProducts = $products->filter(fn ($p) => $p->is_active);
 
-        if ($giftsFiltered > 0) {
-            Log::channel($this->logChannel)->info(">>> {$giftsFiltered} produto(s) brinde foram excluídos da análise");
+        if ($excludedCount > 0) {
+            Log::channel($this->logChannel)->info(">>> {$excludedCount} produto(s) excluído(s) da análise via config");
         }
 
         return [
@@ -1409,7 +1402,7 @@ class StoreAnalysisService
                 'out_of_stock_list' => $this->getOutOfStockProducts($products),
                 'best_sellers' => $this->getBestSellers($store, $paidOrders),
                 'no_sales_period' => $this->getNoSalesProducts($store, $periodDays),
-                'gifts_filtered' => $giftsFiltered,
+                'excluded_count' => $excludedCount,
             ],
             'inventory' => [
                 'total_value' => $products->sum(fn ($p) => ($p->stock_quantity ?? 0) * ($p->cost ?? 0)),
@@ -1450,8 +1443,7 @@ class StoreAnalysisService
         $topProductIds = array_slice(array_keys($productStats), 0, $limit);
 
         // Get product details (excluding gifts/brindes)
-        $products = $store->products()
-            ->excludeGifts()
+        $products = $store->analysisProducts()
             ->whereIn('external_id', $topProductIds)
             ->get()
             ->keyBy('external_id');
@@ -1491,8 +1483,7 @@ class StoreAnalysisService
             ->unique()
             ->toArray();
 
-        return $store->products()
-            ->excludeGifts()
+        return $store->analysisProducts()
             ->where('is_active', true)
             ->where('stock_quantity', '>', 0)
             ->whereNotIn('external_id', $soldProductIds)

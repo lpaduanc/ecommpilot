@@ -159,7 +159,7 @@ const availableFormats = ref([]);
 const isSavingFormat = ref(false);
 
 const selectedProviderConfig = computed(() => {
-    return settings.provider === 'openai' ? settings.openai : settings.gemini;
+    return settings[settings.provider] || settings.openai;
 });
 
 async function fetchSettings() {
@@ -179,7 +179,6 @@ async function fetchSettings() {
 async function saveSettings() {
     isSaving.value = true;
     try {
-        // Prepare payload - remove masked API keys to prevent overwriting real values
         const payload = {
             provider: settings.provider,
             openai: { ...settings.openai },
@@ -187,22 +186,24 @@ async function saveSettings() {
             anthropic: { ...settings.anthropic },
         };
 
-        // Remove masked API keys (they start with the key prefix and contain ****)
-        const isMasked = (value) => value && (value.includes('****') || value === '********');
+        // Remove is_configured (campo somente de leitura)
+        delete payload.openai.is_configured;
+        delete payload.gemini.is_configured;
+        delete payload.anthropic.is_configured;
 
-        if (isMasked(payload.openai.api_key)) {
+        // Se API key está vazia, não enviar (preserva valor existente no backend)
+        if (!payload.openai.api_key) {
             delete payload.openai.api_key;
         }
-        if (isMasked(payload.gemini.api_key)) {
+        if (!payload.gemini.api_key) {
             delete payload.gemini.api_key;
         }
-        if (isMasked(payload.anthropic.api_key)) {
+        if (!payload.anthropic.api_key) {
             delete payload.anthropic.api_key;
         }
 
         await api.put('/admin/settings/ai', payload);
         notificationStore.success('Configurações salvas com sucesso!');
-        // Refresh settings to get updated masked values
         await fetchSettings();
     } catch (error) {
         notificationStore.error('Erro ao salvar configurações');
@@ -362,20 +363,76 @@ function closeEmailModal() {
 async function saveEmailConfig() {
     isSavingEmail.value = true;
     try {
+        // Construir settings apenas com campos do provedor selecionado
+        const providerSettings = {
+            from_address: emailForm.config.from_address,
+            from_name: emailForm.config.from_name,
+        };
+
+        // Adicionar campos específicos do provedor
+        switch (emailForm.provider) {
+            case 'smtp':
+                Object.assign(providerSettings, {
+                    host: emailForm.config.host,
+                    port: emailForm.config.port,
+                    username: emailForm.config.username,
+                    password: emailForm.config.password,
+                    encryption: emailForm.config.encryption,
+                });
+                break;
+            case 'mailgun':
+                Object.assign(providerSettings, {
+                    api_key: emailForm.config.api_key,
+                    domain: emailForm.config.domain,
+                });
+                break;
+            case 'ses':
+                Object.assign(providerSettings, {
+                    key: emailForm.config.key,
+                    secret: emailForm.config.secret,
+                    region: emailForm.config.region,
+                });
+                break;
+            case 'postmark':
+                Object.assign(providerSettings, {
+                    token: emailForm.config.token,
+                });
+                break;
+            case 'resend':
+                Object.assign(providerSettings, {
+                    api_key: emailForm.config.api_key,
+                });
+                break;
+            case 'mailjet':
+                Object.assign(providerSettings, {
+                    api_key: emailForm.config.api_key,
+                    secret_key: emailForm.config.secret_key,
+                });
+                break;
+        }
+
+        // Se editando, remover campos sensíveis vazios para preservar valores existentes
+        if (emailForm.id) {
+            const sensitiveFields = ['password', 'api_key', 'secret', 'token', 'key', 'secret_key'];
+            sensitiveFields.forEach(field => {
+                if (providerSettings[field] === '' || providerSettings[field] === undefined) {
+                    delete providerSettings[field];
+                }
+            });
+        }
+
         const payload = {
             name: emailForm.name,
             identifier: emailForm.identifier,
             provider: emailForm.provider,
             is_active: emailForm.is_active,
-            settings: emailForm.config,
+            settings: providerSettings,
         };
 
         if (emailForm.id) {
-            // Atualizar
             await api.put(`/admin/settings/email/${emailForm.id}`, payload);
             notificationStore.success('Configuração atualizada com sucesso!');
         } else {
-            // Criar
             await api.post('/admin/settings/email', payload);
             notificationStore.success('Configuração criada com sucesso!');
         }
@@ -642,7 +699,7 @@ onMounted(() => {
                 <BaseCard>
                     <div class="flex items-center gap-3 mb-6">
                         <SparklesIcon class="w-6 h-6 text-primary-500" />
-                        <h2 class="text-lg font-semibold text-gray-900">Provedor de IA</h2>
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Provedor de IA</h2>
                     </div>
 
                     <div class="space-y-3">
@@ -652,8 +709,8 @@ onMounted(() => {
                             :class="[
                                 'flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all',
                                 settings.provider === provider.id
-                                    ? 'border-primary-500 bg-primary-50'
-                                    : 'border-gray-200 hover:border-gray-300'
+                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                             ]"
                         >
                             <input
@@ -665,24 +722,24 @@ onMounted(() => {
                             <div class="text-2xl">{{ getProviderIcon(provider.id) }}</div>
                             <div class="flex-1">
                                 <div class="flex items-center gap-2">
-                                    <span class="font-semibold text-gray-900">{{ provider.name }}</span>
+                                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ provider.name }}</span>
                                     <CheckCircleIcon
                                         v-if="settings[provider.id].is_configured"
                                         class="w-5 h-5 text-success-500"
                                     />
                                     <XCircleIcon
                                         v-else
-                                        class="w-5 h-5 text-gray-300"
+                                        class="w-5 h-5 text-gray-300 dark:border-gray-600"
                                     />
                                 </div>
-                                <p class="text-sm text-gray-500">{{ provider.description }}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ provider.description }}</p>
                             </div>
                             <div
                                 :class="[
                                     'w-4 h-4 rounded-full border-2',
                                     settings.provider === provider.id
                                         ? 'border-primary-500 bg-primary-500'
-                                        : 'border-gray-300'
+                                        : 'border-gray-300 dark:border-gray-600'
                                 ]"
                             >
                                 <div
@@ -712,20 +769,20 @@ onMounted(() => {
                         <div class="flex items-center gap-3">
                             <div class="text-2xl">🤖</div>
                             <div>
-                                <h2 class="text-lg font-semibold text-gray-900">OpenAI</h2>
-                                <p class="text-sm text-gray-500">Configurações do GPT-4 e outros modelos</p>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">OpenAI</h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Configurações do GPT-4 e outros modelos</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
                             <span
                                 v-if="settings.openai.is_configured"
-                                class="px-3 py-1 text-xs font-medium rounded-full bg-success-100 text-success-700"
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400"
                             >
                                 Configurado
                             </span>
                             <span
                                 v-else
-                                class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                             >
                                 Não configurado
                             </span>
@@ -734,7 +791,7 @@ onMounted(() => {
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
                             <div class="relative">
                                 <input
                                     :type="showOpenAIKey ? 'text' : 'password'"
@@ -745,7 +802,7 @@ onMounted(() => {
                                 <button
                                     type="button"
                                     @click="showOpenAIKey = !showOpenAIKey"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                 >
                                     <EyeIcon v-if="!showOpenAIKey" class="w-5 h-5" />
                                     <EyeSlashIcon v-else class="w-5 h-5" />
@@ -754,7 +811,7 @@ onMounted(() => {
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Modelo</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Modelo</label>
                             <select v-model="settings.openai.model" class="input">
                                 <option
                                     v-for="model in availableModels.openai"
@@ -767,7 +824,7 @@ onMounted(() => {
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Temperatura ({{ settings.openai.temperature }})
                             </label>
                             <input
@@ -778,14 +835,14 @@ onMounted(() => {
                                 step="0.1"
                                 class="w-full"
                             />
-                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                            <div class="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
                                 <span>Preciso</span>
                                 <span>Criativo</span>
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
                             <input
                                 type="number"
                                 v-model.number="settings.openai.max_tokens"
@@ -813,7 +870,7 @@ onMounted(() => {
                         v-if="testResults.openai"
                         :class="[
                             'mt-4 p-4 rounded-xl',
-                            testResults.openai.success ? 'bg-success-50' : 'bg-danger-50'
+                            testResults.openai.success ? 'bg-success-50 dark:bg-success-900/20' : 'bg-danger-50 dark:bg-danger-900/20'
                         ]"
                     >
                         <div class="flex items-start gap-3">
@@ -826,12 +883,12 @@ onMounted(() => {
                                 class="w-5 h-5 text-danger-500 mt-0.5"
                             />
                             <div>
-                                <p :class="testResults.openai.success ? 'text-success-700' : 'text-danger-700'">
+                                <p :class="testResults.openai.success ? 'text-success-700 dark:text-success-400' : 'text-danger-700 dark:text-danger-400'">
                                     {{ testResults.openai.message }}
                                 </p>
                                 <p
                                     v-if="testResults.openai.response"
-                                    class="text-sm text-gray-600 mt-1"
+                                    class="text-sm text-gray-600 dark:text-gray-400 mt-1"
                                 >
                                     Resposta: "{{ testResults.openai.response }}"
                                 </p>

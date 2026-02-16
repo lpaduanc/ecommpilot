@@ -187,6 +187,15 @@ const routes = [
         meta: { requiresAuth: true, permission: 'settings.view' },
     },
     {
+        path: '/settings/analysis-config',
+        name: 'settings-analysis-config',
+        component: () => import(
+            /* webpackChunkName: "settings" */
+            '../views/settings/AnalysisConfigView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'settings.view' },
+    },
+    {
         path: '/settings/users',
         name: 'users-management',
         component: () => import(

@@ -69,37 +69,4 @@ class UpdateEmailConfigurationRequest extends FormRequest
             'settings.from_name.required' => 'O nome do remetente é obrigatório.',
         ];
     }
-
-    /**
-     * Prepare the data for validation.
-     */
-    protected function prepareForValidation(): void
-    {
-        // Don't mask values check - if value looks masked, don't update it
-        if ($this->has('settings')) {
-            $settings = $this->settings;
-
-            // Remove masked values from settings
-            $sensitiveFields = ['password', 'api_key', 'secret', 'token', 'key', 'secret_key'];
-            foreach ($sensitiveFields as $field) {
-                if (isset($settings[$field]) && $this->isMaskedValue($settings[$field])) {
-                    unset($settings[$field]);
-                }
-            }
-
-            $this->merge(['settings' => $settings]);
-        }
-    }
-
-    /**
-     * Check if value is masked.
-     */
-    private function isMaskedValue(?string $value): bool
-    {
-        if (empty($value)) {
-            return false;
-        }
-
-        return str_contains($value, '****') || $value === '********';
-    }
 }

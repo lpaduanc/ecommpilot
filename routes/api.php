@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AdminEmailConfigurationController;
 use App\Http\Controllers\Api\AdminIntegrationsController;
 use App\Http\Controllers\Api\AdminPlanController;
 use App\Http\Controllers\Api\AdminSettingsController;
+use App\Http\Controllers\Api\AnalysisConfigController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
@@ -329,6 +330,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('stores/{store}')->group(function () {
         Route::get('config', [StoreConfigController::class, 'show']);
         Route::put('config', [StoreConfigController::class, 'update'])->middleware('can:integrations.manage');
+
+        // Analysis Configuration
+        Route::get('analysis-config', [AnalysisConfigController::class, 'show']);
+        Route::put('analysis-config', [AnalysisConfigController::class, 'update'])->middleware('can:integrations.manage');
+        Route::get('analysis-config/products/search', [AnalysisConfigController::class, 'searchProducts']);
     });
 
     /*

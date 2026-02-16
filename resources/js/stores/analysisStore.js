@@ -137,6 +137,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
                     // Analysis completed! Fetch full analysis data with suggestions
                     stopPolling();
                     await fetchCurrentAnalysis();
+                    await fetchAnalysisHistory();
                 } else {
                     // Still processing, update pending analysis progress
                     pendingAnalysis.value = response.data.pending_analysis;

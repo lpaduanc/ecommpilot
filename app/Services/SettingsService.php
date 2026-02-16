@@ -35,21 +35,19 @@ class SettingsService
     }
 
     /**
-     * Get AI settings for display (with masked sensitive values).
+     * Get AI settings for display (with real decrypted values).
      */
     public function getAISettingsForDisplay(): array
     {
         $settings = $this->getAISettings();
 
-        // Check configured status before masking (uses decrypted values)
+        // Add configured status
         $settings['openai']['is_configured'] = ! empty($settings['openai']['api_key']);
         $settings['gemini']['is_configured'] = ! empty($settings['gemini']['api_key']);
         $settings['anthropic']['is_configured'] = ! empty($settings['anthropic']['api_key']);
 
-        // Mask API keys for display
-        $settings['openai']['api_key'] = $this->maskApiKey($settings['openai']['api_key']);
-        $settings['gemini']['api_key'] = $this->maskApiKey($settings['gemini']['api_key']);
-        $settings['anthropic']['api_key'] = $this->maskApiKey($settings['anthropic']['api_key']);
+        // API keys são enviados como estão (descriptografados)
+        // Frontend usa type="password" com toggle de visibilidade
 
         return $settings;
     }
@@ -93,7 +91,7 @@ class SettingsService
      */
     private function updateOpenAISettings(array $data): void
     {
-        if (isset($data['api_key']) && ! $this->isMaskedValue($data['api_key'])) {
+        if (isset($data['api_key']) && $data['api_key'] !== '') {
             SystemSetting::set('ai.openai.api_key', $data['api_key'], [
                 'type' => 'string',
                 'group' => 'ai',
@@ -132,7 +130,7 @@ class SettingsService
      */
     private function updateGeminiSettings(array $data): void
     {
-        if (isset($data['api_key']) && ! $this->isMaskedValue($data['api_key'])) {
+        if (isset($data['api_key']) && $data['api_key'] !== '') {
             SystemSetting::set('ai.gemini.api_key', $data['api_key'], [
                 'type' => 'string',
                 'group' => 'ai',
@@ -171,7 +169,7 @@ class SettingsService
      */
     private function updateAnthropicSettings(array $data): void
     {
-        if (isset($data['api_key']) && ! $this->isMaskedValue($data['api_key'])) {
+        if (isset($data['api_key']) && $data['api_key'] !== '') {
             SystemSetting::set('ai.anthropic.api_key', $data['api_key'], [
                 'type' => 'string',
                 'group' => 'ai',
@@ -232,34 +230,6 @@ class SettingsService
                 'message' => 'Erro ao conectar: '.$e->getMessage(),
             ];
         }
-    }
-
-    /**
-     * Mask an API key for display.
-     */
-    private function maskApiKey(?string $key): string
-    {
-        if (empty($key)) {
-            return '';
-        }
-
-        if (strlen($key) <= 8) {
-            return '********';
-        }
-
-        return substr($key, 0, 4).str_repeat('*', strlen($key) - 8).substr($key, -4);
-    }
-
-    /**
-     * Check if value is a masked placeholder.
-     */
-    private function isMaskedValue(?string $value): bool
-    {
-        if (empty($value)) {
-            return false;
-        }
-
-        return str_contains($value, '****') || $value === '********';
     }
 
     /**

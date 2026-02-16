@@ -428,20 +428,11 @@ class EmailConfigurationService
     }
 
     /**
-     * Get settings for display (mask sensitive data).
+     * Get settings for display (with real values).
      */
     public function getForDisplay(int $id): array
     {
         $configuration = EmailConfiguration::findOrFail($id);
-        $settings = $configuration->settings;
-
-        // Mask sensitive fields
-        $sensitiveFields = ['password', 'api_key', 'secret', 'token', 'key', 'secret_key'];
-        foreach ($sensitiveFields as $field) {
-            if (isset($settings[$field]) && ! empty($settings[$field])) {
-                $settings[$field] = $this->maskValue($settings[$field]);
-            }
-        }
 
         return [
             'id' => $configuration->id,
@@ -449,26 +440,10 @@ class EmailConfigurationService
             'identifier' => $configuration->identifier,
             'provider' => $configuration->provider,
             'is_active' => $configuration->is_active,
-            'settings' => $settings,
+            'settings' => $configuration->settings,
             'created_at' => $configuration->created_at,
             'updated_at' => $configuration->updated_at,
         ];
-    }
-
-    /**
-     * Mask sensitive values for display.
-     */
-    private function maskValue(?string $value): string
-    {
-        if (empty($value)) {
-            return '';
-        }
-
-        if (strlen($value) <= 8) {
-            return '********';
-        }
-
-        return substr($value, 0, 4).str_repeat('*', strlen($value) - 8).substr($value, -4);
     }
 
     /**

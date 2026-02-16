@@ -56,6 +56,7 @@ class Store extends Model
         'monthly_visits',
         'competitors',
         'tracking_settings',
+        'analysis_config',
     ];
 
     protected $hidden = [
@@ -83,6 +84,7 @@ class Store extends Model
             'monthly_visits' => 'integer',
             'competitors' => 'array',
             'tracking_settings' => 'array',
+            'analysis_config' => 'array',
         ];
     }
 
@@ -329,5 +331,85 @@ class Store extends Model
             || ($settings['meta_pixel']['enabled'] ?? false)
             || ($settings['clarity']['enabled'] ?? false)
             || ($settings['hotjar']['enabled'] ?? false);
+    }
+
+    /**
+     * Retorna a estrutura padrão de configuração de análise
+     */
+    public static function getDefaultAnalysisConfig(): array
+    {
+        return [
+            'products' => [
+                'excluded_product_ids' => [],
+                'exclude_zero_stock' => false,
+                'exclude_gift_products' => true,
+                'exclude_inactive_products' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Retorna as configurações de análise da loja com defaults
+     */
+    public function getAnalysisConfig(): array
+    {
+        $defaults = self::getDefaultAnalysisConfig();
+        $config = $this->analysis_config ?? [];
+
+        return array_replace_recursive($defaults, $config);
+    }
+
+    /**
+     * Retorna apenas as configurações de produtos para análise
+     */
+    public function getAnalysisProductConfig(): array
+    {
+        $config = $this->getAnalysisConfig();
+
+        return $config['products'] ?? self::getDefaultAnalysisConfig()['products'];
+    }
+
+    /**
+     * Retorna query de produtos filtrada conforme analysis_config.
+     * Substitui chamadas diretas a $store->products()->excludeGifts().
+     */
+    public function analysisProducts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        $query = $this->products();
+        $config = $this->getAnalysisProductConfig();
+
+        // Excluir produtos por ID
+        $excludedIds = $config['excluded_product_ids'] ?? [];
+        if (! empty($excludedIds)) {
+            $query->whereNotIn('id', $excludedIds);
+        }
+
+        // Excluir produtos sem estoque
+        if (! empty($config['exclude_zero_stock'])) {
+            $query->where('stock_quantity', '>', 0);
+        }
+
+        // Excluir brindes/presentes
+        if (! empty($config['exclude_gift_products'])) {
+            $query->excludeGifts();
+        }
+
+        // Excluir produtos inativos
+        if (! empty($config['exclude_inactive_products'])) {
+            $query->where('is_active', true);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Atualiza as configurações de análise
+     */
+    public function updateAnalysisConfig(array $config): void
+    {
+        $currentConfig = $this->getAnalysisConfig();
+        $mergedConfig = array_replace_recursive($currentConfig, $config);
+
+        $this->update(['analysis_config' => $mergedConfig]);
     }
 }

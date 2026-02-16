@@ -1,0 +1,2788 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Documentação do Pipeline de Análise (IA) — EcommPilot</title>
+    <style>
+      :root {
+        --text: #111827;
+        --muted: #374151;
+        --border: #e5e7eb;
+        --bg-soft: #f8fafc;
+        --bg-thead: #f3f4f6;
+        --blue: #2563eb;
+        --amber: #b45309;
+        --red: #b91c1c;
+      }
+
+      @page {
+        size: A4;
+        margin: 18mm 16mm;
+      }
+
+      html {
+        font-size: 12pt;
+      }
+
+      body {
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          Arial,
+          "Noto Sans",
+          "Liberation Sans",
+          sans-serif;
+        color: var(--text);
+        line-height: 1.35;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        page-break-after: avoid;
+        break-after: avoid-page;
+      }
+
+      h1 {
+        font-size: 24pt;
+        margin: 0 0 6mm;
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        font-size: 16pt;
+        margin: 10mm 0 4mm;
+        letter-spacing: -0.01em;
+      }
+
+      h3 {
+        font-size: 13pt;
+        margin: 6mm 0 3mm;
+      }
+
+      h4 {
+        font-size: 11.5pt;
+        margin: 5mm 0 2mm;
+      }
+
+      p,
+      li {
+        margin: 0 0 4mm;
+      }
+
+      ul,
+      ol {
+        margin: 0 0 4mm;
+      }
+
+      pre {
+        margin: 0 0 5mm;
+        padding: 9pt 10pt;
+        border: 1px solid var(--border);
+        border-radius: 8pt;
+        background: var(--bg-soft);
+        font-size: 9.5pt;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      code {
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          "Liberation Mono",
+          "Courier New",
+          monospace;
+        font-size: 0.95em;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10.5pt;
+        margin: 0 0 6mm;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 6pt 7pt;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--bg-thead);
+        text-align: left;
+      }
+
+      hr {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 8mm 0;
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration: none;
+      }
+
+      .small {
+        font-size: 10pt;
+        color: var(--muted);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .page-break {
+        break-before: page;
+        page-break-before: always;
+      }
+
+      .callout {
+        margin: 6mm 0;
+        padding: 8pt 10pt;
+        border: 1px solid var(--border);
+        border-left: 4pt solid var(--blue);
+        border-radius: 8pt;
+        background: #eff6ff;
+      }
+
+      .callout.warn {
+        border-left-color: var(--amber);
+        background: #fffbeb;
+      }
+
+      .callout.danger {
+        border-left-color: var(--red);
+        background: #fef2f2;
+      }
+
+      .toc ol {
+        padding-left: 18pt;
+      }
+
+      .toc li {
+        margin: 2mm 0;
+      }
+
+      @media print {
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Documentação Técnica do Pipeline de Análise (IA) — EcommPilot</h1>
+      <p class="small">
+        Versão do código (git): <code>e8c46644ccb05ce5b0ef6f3bba3ae5ca10e383a3</code> • Data do documento:
+        <time datetime="2026-02-14">14/02/2026</time>
+      </p>
+      <p class="small">
+        Este documento descreve, passo a passo e em detalhes, como o EcommPilot executa a análise FULL (9 etapas) e
+        LITE (2 etapas), quais dados entram e saem de cada agente, quais cálculos são determinísticos no backend e como
+        as recomendações são geradas, criticadas e filtradas até o resultado final exposto para a API/UI.
+      </p>
+      <div class="callout warn">
+        <strong>Nota importante sobre “cálculos”:</strong> parte do pipeline é determinística (código) e parte é
+        inferencial (modelo de IA seguindo regras do prompt). Quando um valor depende de interpretação da IA, este
+        documento explica a regra e como ela deve ser aplicada, mas deixa claro que a decisão final é do agente.
+      </div>
+    </header>
+
+    <section class="toc page-break" id="sumario">
+      <h2>Sumário</h2>
+      <ol>
+        <li><a href="#objetivo-escopo">Objetivo e escopo</a></li>
+        <li><a href="#visao-geral">Visão geral do pipeline</a></li>
+        <li><a href="#fontes-dados">Fontes de dados e estruturas de entrada</a></li>
+        <li><a href="#pipeline-full">Pipeline FULL (9 etapas)</a></li>
+        <li><a href="#pipeline-lite">Pipeline LITE (diferenças)</a></li>
+        <li><a href="#calculos-backend">Cálculos determinísticos do backend</a></li>
+        <li><a href="#dedup-similarity">Deduplicação, saturação e similaridade</a></li>
+        <li><a href="#schemas">Contratos de saída (JSON) por agente</a></li>
+        <li><a href="#api-ui">Persistência, API e UI (como os dados aparecem)</a></li>
+        <li><a href="#exemplos-fim-a-fim">Exemplos fim-a-fim (concretos)</a></li>
+        <li><a href="#apendice">Apêndice (glossário, listas e referências)</a></li>
+      </ol>
+    </section>
+
+    <!-- CONTENT START -->
+    <section class="page-break" id="objetivo-escopo">
+      <h2>1) Objetivo e escopo</h2>
+      <p>
+        O objetivo desta documentação é permitir que qualquer pessoa (produto, engenharia, suporte ou operação) entenda,
+        com precisão, como o EcommPilot:
+      </p>
+      <ul>
+        <li>prepara dados internos (pedidos, produtos, estoque, cupons) para análise;</li>
+        <li>coleta dados externos (Trends, preços de mercado e concorrentes), quando habilitado;</li>
+        <li>busca benchmarks e estratégias via RAG (base de conhecimento/embeddings);</li>
+        <li>orquestra agentes de IA (ProfileSynthesizer → Collector → Analyst → Strategist → Critic);</li>
+        <li>executa filtros de qualidade (dedup, saturação de temas, similaridade por embeddings, diversificação);</li>
+        <li>persiste resultados e os expõe em API/Frontend.</li>
+      </ul>
+      <p>
+        O pipeline existe em duas variações:
+      </p>
+      <ul>
+        <li><strong>FULL:</strong> 9 etapas com 4 agentes principais + ProfileSynthesizer + pós-processamento.</li>
+        <li><strong>LITE:</strong> 2 etapas (Analyst + Strategist) com dados compactos e menos sugestões.</li>
+      </ul>
+      <div class="callout">
+        <strong>Escopo do documento:</strong> descreve comportamento conforme o código no commit indicado na capa. Se
+        houver alterações futuras em prompts, thresholds ou campos, esta documentação deve ser atualizada.
+      </div>
+    </section>
+
+    <section class="page-break" id="visao-geral">
+      <h2>2) Visão geral do pipeline</h2>
+      <h3>2.1) Componentes principais</h3>
+      <ul>
+        <li><strong>Orquestração FULL:</strong> <code>app/Services/AI/Agents/StoreAnalysisService.php</code></li>
+        <li><strong>Orquestração LITE:</strong> <code>app/Services/AI/Agents/LiteStoreAnalysisService.php</code></li>
+        <li><strong>Agentes (serviços):</strong> ProfileSynthesizer, Collector, Analyst, Strategist, Critic</li>
+        <li><strong>Prompts:</strong> <code>app/Services/AI/Prompts/*.php</code></li>
+        <li><strong>RAG:</strong> <code>app/Services/AI/RAG/KnowledgeBaseService.php</code></li>
+        <li><strong>Dados externos:</strong> <code>app/Services/ExternalData/*</code></li>
+        <li><strong>Dedup/similaridade:</strong> <code>app/Services/Analysis/*</code> e <code>app/Services/AI/EmbeddingService.php</code></li>
+        <li><strong>Persistência/API:</strong> <code>app/Http/Resources/AnalysisResource.php</code>, <code>SuggestionResource.php</code></li>
+      </ul>
+
+      <h3>2.2) Etapas FULL (progress tracking)</h3>
+      <p>O progresso da análise FULL é exposto como 9 etapas (0–9), com nomes legíveis para UI:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Etapa</th>
+            <th>Nome (UI)</th>
+            <th>O que acontece</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Identificando nicho</td>
+            <td>Define nicho/subcategoria (configurado ou detectado) + carrega benchmarks estruturados.</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Carregando histórico</td>
+            <td>Carrega análises e sugestões anteriores, identifica temas saturados e categorias bloqueadas.</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Buscando benchmarks</td>
+            <td>Busca benchmarks e estratégias via RAG (embeddings ou fallback textual).</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Coletando dados externos</td>
+            <td>Google Trends, preços (Google Shopping) e scraping de concorrentes (opcional).</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Executando Collector</td>
+            <td>Organiza contexto completo (histórico + benchmarks + mercado + concorrentes) para o Analyst.</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>Executando Analyst</td>
+            <td>Diagnóstico, alertas, oportunidades, posicionamento e Health Score (com regras explícitas).</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>Executando Strategist</td>
+            <td>Gera 18 sugestões (6/6/6) + premium_summary (Growth Intelligence Framework™).</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>Executando Critic</td>
+            <td>Valida fatos, corrige números, rejeita/recria e seleciona as melhores sugestões finais.</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>Filtrando sugestões</td>
+            <td>Dedup intra-batch, similaridade por embeddings, saturação de temas, diversificação e recovery.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Etapa 4.5 (sem número no progresso):</strong> o ProfileSynthesizer roda entre as etapas 4 e 5 como uma
+        etapa intermediária (“4.5”) e não altera o contador de progresso 1–9.
+      </div>
+    </section>
+
+    <section class="page-break" id="fontes-dados">
+      <h2>3) Fontes de dados e estruturas de entrada</h2>
+
+      <h3>3.1) Dados internos da loja (backend)</h3>
+      <p>
+        O pipeline FULL prepara um pacote de dados internos com foco em operação e performance recente. Em geral, a
+        análise trabalha com um período de <strong>15 dias</strong> (FULL) ou <strong>7 dias</strong> (LITE), incluindo o
+        dia atual, com corte em <code>startOfDay()</code>.
+      </p>
+
+      <h4>3.1.1) Estatísticas globais (store_stats)</h4>
+      <p>
+        Antes de chamar agentes, o sistema calcula estatísticas globais da loja (independentes do período de 15/7 dias),
+        usadas como “contexto de operação”:
+      </p>
+      <ul>
+        <li><code>operation_time</code>: tempo desde o primeiro pedido (ou desde criação da loja se sem pedidos);</li>
+        <li><code>total_orders</code>, <code>total_customers</code>, <code>total_products</code>;</li>
+        <li><code>active_products</code>: produtos com <code>is_active = true</code>;</li>
+        <li><code>recent_orders_15d</code>: quantidade de pedidos recentes em 15 dias;</li>
+        <li><code>total_revenue</code>: soma de <code>total</code> apenas de pedidos pagos (pagamento confirmado);</li>
+        <li><code>connected_at</code>: data (YYYY-MM-DD) de conexão/criação.</li>
+      </ul>
+
+      <h4>3.1.2) Resumo operacional do período (store_data FULL)</h4>
+      <p>
+        Para o FULL, o método de preparação de dados retorna um JSON com quatro blocos: <code>orders</code>,
+        <code>products</code>, <code>inventory</code> e <code>coupons</code>. Estes blocos são passados ao Analyst (e parte
+        deles aparece indiretamente em Collector/Strategist via contexto).
+      </p>
+
+      <div class="callout">
+        <strong>Regra crítica (brindes/amostras):</strong> produtos identificados como brinde/amostra são excluídos dos
+        cálculos de estoque e de listas operacionais. Isso evita que “SKUs gratuitos” distorçam alertas de ruptura e
+        sugestões de reposição.
+      </div>
+
+      <h4>3.1.3) Detecção e exclusão de brindes (excludeGifts / isGift)</h4>
+      <p>
+        A exclusão de brindes ocorre via escopo <code>excludeGifts()</code> aplicado nas consultas de produtos. A detecção
+        é baseada em termos no nome do produto (ex.: <em>brinde</em>, <em>amostra</em>, <em>gratis</em>, <em>gift</em>,
+        <em>travel size</em>, etc.). Se o nome contiver qualquer termo da lista, o produto é considerado brinde.
+      </p>
+
+      <h3>3.2) Dados externos de mercado (opcional)</h3>
+      <p>
+        A coleta externa é opcional e controlada por configurações (SystemSettings). Quando habilitada, o pipeline
+        agrega:
+      </p>
+      <ul>
+        <li><strong>Google Trends (SerpAPI):</strong> interesse de busca (0–100), tendência (alta/estável/queda), sazonalidade;</li>
+        <li><strong>Google Shopping (SerpAPI):</strong> faixa de preços (min/max/média/mediana) e produtos referência;</li>
+        <li><strong>Concorrentes (scraping):</strong> faixa de preços, categorias foco, promoções, avaliações e diferenciais.</li>
+      </ul>
+
+      <p>
+        Mesmo quando ocorre erro em algum serviço externo, o pipeline FULL <strong>não falha</strong> por esse motivo: ele
+        registra o erro e continua com <code>external_data</code> vazio ou parcial.
+      </p>
+
+      <h3>3.3) RAG / Base de conhecimento (benchmarks e estratégias)</h3>
+      <p>
+        Benchmarks e estratégias são buscados em uma base interna (<code>knowledge_embeddings</code>). Quando embeddings
+        estão configurados, a busca é semântica; caso contrário, há fallback para busca textual e/ou defaults.
+      </p>
+
+      <div class="callout warn">
+        <strong>Dependência técnica:</strong> busca semântica com embeddings exige que o banco seja PostgreSQL e que exista
+        armazenamento em <em>pgvector</em>. Caso contrário, o serviço cai para busca textual/fallback.
+      </div>
+
+      <h3>3.4) Histórico, feedback e aprendizado</h3>
+      <p>
+        O pipeline carrega até 5 análises anteriores concluídas e até 50 sugestões anteriores. A partir disso, ele
+        constrói um <code>learning_context</code> com:
+      </p>
+      <ul>
+        <li>casos de sucesso semelhantes (mesmo nicho/subcategoria);</li>
+        <li>casos de falha/ignorado da própria loja;</li>
+        <li>taxa de sucesso por categoria (global, agregada em tabela de stats);</li>
+        <li>sugestões agrupadas por status (pendente, em progresso, concluída, rejeitada, ignorada);</li>
+        <li>categorias bloqueadas (3+ rejeições) e temas saturados (3+ ocorrências; ou 2+ rejeições).</li>
+      </ul>
+
+      <p>
+        Em formato <code>analysis.format_version = v2</code>, existe um modo adicional de resumo de histórico
+        (<code>history_summary</code>) para reduzir tokens, consolidando as últimas 100 sugestões em um resumo estruturado.
+      </p>
+
+      <h3>3.5) Configurações e feature flags relevantes</h3>
+      <p>As principais chaves de configuração (SystemSettings) envolvidas neste pipeline incluem:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Grupo</th>
+            <th>Chaves</th>
+            <th>Efeito prático</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Análise</td>
+            <td><code>analysis.format_version</code>, <code>analysis.v2.use_history_summary</code></td>
+            <td>Controla formato/normalização e uso de resumo do histórico para economizar tokens.</td>
+          </tr>
+          <tr>
+            <td>IA (chat)</td>
+            <td><code>ai.provider</code> (+ chaves de API/model/temperature/max_tokens por provedor)</td>
+            <td>Define provedor primário (Gemini/OpenAI/Anthropic) e parâmetros padrão.</td>
+          </tr>
+          <tr>
+            <td>Embeddings</td>
+            <td><code>ai.embeddings.provider</code> (+ chaves por provedor)</td>
+            <td>Habilita embeddings para RAG e filtro de similaridade por vetores.</td>
+          </tr>
+          <tr>
+            <td>Dados externos</td>
+            <td>
+              <code>external_data.enabled</code>, <code>external_data.trends.enabled</code>, <code>external_data.market.enabled</code>,
+              <code>external_data.competitors.enabled</code>, <code>external_data.serpapi_key</code>
+            </td>
+            <td>Ativa/parametriza coleta externa de Trends/Shopping/Concorrentes.</td>
+          </tr>
+          <tr>
+            <td>Concorrentes (scraping)</td>
+            <td>
+              <code>external_data.competitors.max_per_store</code>, <code>external_data.competitors.scrape_timeout</code>,
+              <code>external_data.competitors.request_delay</code>
+            </td>
+            <td>Limita quantidade, timeout e atraso entre scraping de concorrentes.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="page-break" id="pipeline-full">
+      <h2>4) Pipeline FULL (9 etapas)</h2>
+
+      <h3>4.1) Ponto de entrada, logs e progresso</h3>
+      <p>
+        A execução FULL é orquestrada por <code>StoreAnalysisService</code>. A cada etapa, o serviço registra logs e
+        atualiza o progresso da análise (campos <code>current_stage</code>, <code>total_stages</code> e dados auxiliares).
+      </p>
+      <ul>
+        <li>
+          <strong>Tracking de etapa (admin/debug):</strong> criação/atualização de <code>AnalysisExecutionLog</code> com
+          status <code>running</code> → <code>completed</code> ou <code>failed</code>.
+        </li>
+        <li>
+          <strong>Tracking para UI:</strong> a API retorna <code>progress_percentage</code> e <code>current_stage_name</code>
+          (ex.: “Executando Analyst”) para exibição no frontend.
+        </li>
+        <li>
+          <strong>Resiliência:</strong> falhas em dados externos (etapa 4) e ProfileSynthesizer (etapa 4.5) não derrubam a
+          análise; falhas nas etapas principais (Collector/Analyst/Strategist/Critic) interrompem o pipeline.
+        </li>
+      </ul>
+
+      <h3>4.2) Etapa 1 — Identificação de nicho e subcategoria</h3>
+      <p>
+        Esta etapa define <code>niche</code> e <code>subcategory</code>, carrega metas configuradas da loja e busca
+        benchmarks estruturados do nicho/subcategoria.
+      </p>
+
+      <h4>4.2.1) Caminhos possíveis</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Condição</th>
+            <th>Resultado</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Loja tem <code>niche</code> e <code>niche_subcategory</code> configurados</td>
+            <td>Usa os valores configurados (não tenta detectar)</td>
+            <td>Prioriza configuração explícita do cliente</td>
+          </tr>
+          <tr>
+            <td>Loja tem apenas <code>niche</code> configurado</td>
+            <td>Detecta somente a subcategoria dentro do nicho</td>
+            <td>Preserva nicho configurado, detalha subcategoria</td>
+          </tr>
+          <tr>
+            <td>Loja não tem nicho configurado</td>
+            <td>Detecta nicho e subcategoria</td>
+            <td>Automação para lojas sem setup</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>4.2.2) Auto-detecção (RAG + fallback)</h4>
+      <p>
+        A detecção preferencial é via RAG (embeddings) usando categorias mais frequentes e títulos de produtos ativos. Se
+        o RAG retornar <code>general</code> para nicho, existe fallback por keywords (nome da loja e categorias).
+      </p>
+      <div class="callout warn">
+        <strong>Importante:</strong> a auto-detecção depende da qualidade dos dados de catálogo (categorias e títulos).
+        Lojas com categorias genéricas (“Produtos”, “Novidades”) tendem a cair em fallback/geral.
+      </div>
+
+      <h4>4.2.3) Benchmarks estruturados</h4>
+      <p>
+        Além dos textos de benchmarks (RAG), o pipeline carrega <strong>benchmarks estruturados</strong> (ex. ticket médio,
+        conversão, abandono). Eles são usados para:
+      </p>
+      <ul>
+        <li>comparações quantitativas (ex.: ticket da loja vs benchmark);</li>
+        <li>cálculo guiado do Health Score no Analyst;</li>
+        <li>ancoragem de decisões no Strategist (premium_summary e sugestões HIGH estratégicas).</li>
+      </ul>
+
+      <h3>4.3) Etapa 2 — Contexto histórico e aprendizado</h3>
+      <p>
+        Nesta etapa, o sistema carrega o histórico e constrói um contexto de aprendizado para reduzir repetição e aumentar
+        eficácia. Os principais produtos desta etapa são:
+      </p>
+      <ul>
+        <li><code>previous_analyses</code>: últimas análises concluídas (score/status/insight);</li>
+        <li><code>previous_suggestions</code>: últimas sugestões, com status e metadados;</li>
+        <li><code>saturated_themes</code>: temas sugeridos 3+ vezes (ou rejeitados 2+);</li>
+        <li><code>blocked_categories</code>: categorias com 3+ rejeições (sinal de “cliente não quer”);</li>
+        <li><code>learning_context</code>: casos de sucesso/falha + taxas de sucesso por categoria.</li>
+      </ul>
+
+      <p>
+        Exemplo simplificado do <code>learning_context</code> (formato ilustrativo):
+      </p>
+      <pre><code>{
+  "success_cases": [
+    {"category": "conversion", "title": "Reduzir abandono...", "metrics_impact": {"revenue": 12.5}}
+  ],
+  "failure_cases": [
+    {"category": "coupon", "title": "Cupom X", "failure_reason": "Margem caiu"}
+  ],
+  "category_success_rates": {
+    "conversion": {"total_implemented": 8, "total_successful": 5, "success_rate": 62.5}
+  },
+  "suggestions_by_status": {
+    "accepted_successful": [],
+    "accepted_failed": [],
+    "rejected": [],
+    "in_progress": [],
+    "pending": []
+  },
+  "blocked_categories": {"pricing": 3}
+}</code></pre>
+
+      <div class="callout">
+        <strong>Como isso afeta recomendações:</strong> temas saturados e categorias bloqueadas alimentam “zonas proibidas”
+        nos prompts (Strategist/Critic) e também são reforçados por filtros programáticos na etapa 9.
+      </div>
+
+      <h3>4.4) Etapa 3 — RAG: benchmarks e estratégias</h3>
+      <p>
+        Com nicho e subcategoria definidos, o sistema busca:
+      </p>
+      <ul>
+        <li><code>benchmarks</code>: textos de benchmarks do nicho/subcategoria;</li>
+        <li><code>rag_strategies</code>: estratégias e “melhores práticas” contextualizadas para o nicho.</li>
+      </ul>
+      <p>
+        Os resultados são passados para Collector, Analyst e Strategist. Caso não haja embeddings configurados, o serviço
+        cai para fallback textual e/ou valores padrão (quando aplicável).
+      </p>
+
+      <h3>4.5) Etapa 4 — Coleta de dados externos (Trends, preços e concorrentes)</h3>
+      <p>
+        A coleta externa roda como “Etapa 4/9” no tracking, mas internamente é descrita no código como “Etapa 3.1”.
+        Nesta etapa, o sistema:
+      </p>
+      <ul>
+        <li>seleciona até 5 nomes de produtos ativos (não brindes) mais recentemente atualizados;</li>
+        <li>monta palavras-chave (nicho, subcategoria, top produtos) para Trends;</li>
+        <li>consulta Trends e Shopping via SerpAPI;</li>
+        <li>faz scraping de concorrentes informados na loja (se existir lista de concorrentes).</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Comportamento em falha:</strong> se um serviço externo falhar (timeout, HTTP inválido, sem chave de API),
+        a etapa é marcada como falha no log, mas o pipeline continua com dados externos vazios/parciais.
+      </div>
+
+      <h3>4.6) Etapa 4.5 — ProfileSynthesizer (perfil sintetizado)</h3>
+      <p>
+        O ProfileSynthesizer gera um <code>store_profile</code> e um <code>contexto_analise</code> concisos, que servem
+        como “perfil compartilhado” para os agentes seguintes. Ele roda com baixa temperatura (0.1) e regras estritas
+        anti-alucinação (usar <code>nao_determinado</code> quando não houver dado).
+      </p>
+      <ul>
+        <li><strong>Inputs principais:</strong> nome, plataforma, nicho/subcategoria, URL, <code>store_stats</code> e benchmarks.</li>
+        <li><strong>Outputs principais:</strong> porte estimado, maturidade digital, público-alvo estimado, diferenciais mensuráveis e sazonalidade.</li>
+        <li><strong>Falha:</strong> se não extrair JSON, retorna perfil padrão (porte/maturidade “nao_determinado”).</li>
+      </ul>
+
+      <h3>4.7) Etapa 5 — Collector Agent (organização do contexto)</h3>
+      <p>
+        O Collector é responsável por <strong>organizar</strong> (não “diagnosticar”) todo o contexto necessário para o
+        Analyst: histórico, benchmarks, dados externos e “zonas proibidas” (temas saturados/categorias bloqueadas).
+      </p>
+      <ul>
+        <li><strong>Temperatura:</strong> 0.1 (prioriza consistência e estrutura).</li>
+        <li><strong>Saída:</strong> JSON com identificação da loja, resumo histórico (5–7 fatos com números),
+          posicionamento de mercado (comparação tripla) e análise competitiva (quando disponível).</li>
+        <li><strong>Alertas para o Analyst:</strong> o Collector já antecipa sinais (critical/warnings/info), mas não substitui o diagnóstico.</li>
+        <li><strong>Data quality:</strong> registra dados ausentes e nível de completude para orientar confiança dos agentes seguintes.</li>
+      </ul>
+      <div class="callout">
+        <strong>Por que existe o Collector:</strong> ele reduz carga cognitiva/tokens do Analyst ao entregar uma visão
+        organizada e rastreável do contexto (incluindo o que não deve ser repetido).
+      </div>
+
+      <h3>4.8) Etapa 6 — Analyst Agent (diagnóstico + Health Score + briefing)</h3>
+      <p>
+        O Analyst produz o diagnóstico estruturado. Ele recebe dados operacionais do período, histórico da loja, dados
+        externos e benchmarks. O output do Analyst alimenta diretamente:
+      </p>
+      <ul>
+        <li>o resumo exibido no frontend (<code>health_score</code>, <code>health_status</code>, <code>main_insight</code>);</li>
+        <li>os alertas (<code>alerts</code>) e oportunidades (<code>opportunities</code>);</li>
+        <li>o briefing para o Strategist (5 causas raiz) e o comparativo competitivo.</li>
+      </ul>
+      <p>
+        Regras centrais (impostas no prompt do Analyst):
+      </p>
+      <ul>
+        <li><strong>Health Score (0–100):</strong> calculado por 5 componentes com pesos e regras de override graduais;</li>
+        <li><strong>Alertas:</strong> máximo 5, sempre com evidência numérica; confiança baixa → severidade “monitorar”;</li>
+        <li><strong>Oportunidades:</strong> exatamente 5, cada uma com potencial específico em R$ (ou faixa se baixa confiança);</li>
+        <li><strong>Posicionamento:</strong> comparação tripla (benchmark vs mercado vs concorrentes);</li>
+        <li><strong>Briefing strategist:</strong> 5 problemas como <em>causas raiz</em> (não sintomas), diferentes entre si.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Normalização do output:</strong> o backend suporta formatos legados e converte alertas para um formato
+        compatível com a UI. Se o JSON vier inválido, o Analyst retorna uma estrutura padrão para evitar quebra do
+        pipeline.
+      </div>
+
+      <h3>4.9) Etapa 7 — Strategist Agent (18 sugestões + premium_summary)</h3>
+      <p>
+        O Strategist transforma o diagnóstico em um plano de ação: ele gera <strong>18 sugestões</strong> (6 HIGH + 6
+        MEDIUM + 6 LOW) e também um <code>premium_summary</code> completo seguindo o Growth Intelligence Framework™.
+      </p>
+      <ul>
+        <li><strong>Temperatura:</strong> rotativa por contagem de análises (0.5 → 0.7) para balancear criatividade sem perder aderência.</li>
+        <li><strong>HIGH estratégicas:</strong> devem usar categorias estratégicas (strategy/investment/market/growth/financial/positioning) e referenciar dados externos/benchmarks quando disponíveis.</li>
+        <li><strong>MEDIUM/LOW táticas:</strong> ações operacionais, viáveis e específicas (estoque, pricing, produto, conversão, marketing, cupom, operacional).</li>
+        <li><strong>Validação programática:</strong> sugestões HIGH sem dados específicos (R$, %, contagens) podem ser rebaixadas para MEDIUM.</li>
+      </ul>
+
+      <h3>4.10) Etapa 8 — Critic Agent (verificação, correção e seleção final)</h3>
+      <p>
+        O Critic revisa a saída do Strategist com foco em qualidade e veracidade: valida números, originalidade, viabilidade
+        e alinhamento ao diagnóstico. O Critic executa 6 verificações (V1–V6) por sugestão e documenta o resultado.
+      </p>
+      <ul>
+        <li><strong>Entrada:</strong> sugestões do Strategist + dados originais + dados detalhados de loja (para validar cálculos).</li>
+        <li><strong>Saída:</strong> 9 sugestões selecionadas (3 HIGH, 3 MEDIUM, 3 LOW), com versão final e score de qualidade.</li>
+        <li><strong>Substituição:</strong> sugestões rejeitadas devem ser substituídas por alternativas novas e verificáveis.</li>
+      </ul>
+
+      <h3>4.11) Etapa 9 — Filtros finais (similaridade, saturação, recovery e diversificação)</h3>
+      <p>
+        Após o Critic, o backend aplica filtros determinísticos para garantir:
+      </p>
+      <ul>
+        <li>mínimo de repetição (intra-batch e histórica);</li>
+        <li>bloqueio de temas saturados (3+ ocorrências ou rejeição recorrente);</li>
+        <li>controle de similaridade por embeddings (quando configurado);</li>
+        <li>distribuição final 3-3-3 e diversidade por categoria (máximo 2 por categoria).</li>
+      </ul>
+
+      <div class="callout danger">
+        <strong>Regra de negócio:</strong> o objetivo do pipeline FULL é entregar <strong>exatamente 9 sugestões</strong>
+        finais, na distribuição <strong>3 HIGH / 3 MEDIUM / 3 LOW</strong>. Quando filtros removem sugestões, o sistema
+        tenta recuperar do pool do Strategist (já pré-validado contra histórico) e, se necessário, promove níveis adjacentes.
+      </div>
+
+      <p>
+        A etapa 9 é detalhada em profundidade na seção <a href="#dedup-similarity">7) Deduplicação, saturação e similaridade</a>,
+        incluindo thresholds e exemplos de como uma sugestão é descartada/recuperada.
+      </p>
+    </section>
+
+    <section class="page-break" id="pipeline-lite">
+      <h2>5) Pipeline LITE (diferenças)</h2>
+      <p>
+        O pipeline LITE existe para cenários em que há necessidade de reduzir custo/tokens e acelerar execução. Ele troca
+        profundidade por velocidade e reduz o número de sugestões finais.
+      </p>
+
+      <h3>5.1) Principais diferenças vs FULL</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Dimensão</th>
+            <th>FULL</th>
+            <th>LITE</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Etapas</td>
+            <td>9 etapas (com dados externos, Collector, Analyst, Strategist, Critic e filtros finais)</td>
+            <td>2 etapas (Lite Analyst + Lite Strategist) + validação básica + dedup histórico</td>
+          </tr>
+          <tr>
+            <td>Período de dados operacionais</td>
+            <td>15 dias</td>
+            <td>7 dias</td>
+          </tr>
+          <tr>
+            <td>Quantidade de sugestões</td>
+            <td>9 finais (3 HIGH, 3 MEDIUM, 3 LOW), derivadas de pool maior (18 do Strategist)</td>
+            <td>6 finais (2 HIGH, 2 MEDIUM, 2 LOW)</td>
+          </tr>
+          <tr>
+            <td>Critic</td>
+            <td>Sim (validação factual e seleção final)</td>
+            <td>Não (validação básica inline no código)</td>
+          </tr>
+          <tr>
+            <td>Dados externos e RAG</td>
+            <td>Usados (quando habilitados) e influenciam HIGH/premium_summary</td>
+            <td>Em geral, não há coleta externa no fluxo LITE padrão (foco em dados compactos)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>5.2) Fluxo LITE passo a passo</h3>
+      <ol>
+        <li><strong>Resolver módulo especializado:</strong> usa <code>AnalysisRouter</code> para obter foco extra (se aplicável).</li>
+        <li><strong>Identificar nicho:</strong> executa detecção (mais simples) para contextualizar prompts.</li>
+        <li><strong>Preparar dados compactos:</strong> período de 7 dias, top 20 best sellers, resumo de cupons (sem lista detalhada).</li>
+        <li><strong>Lite Analyst:</strong> retorna <code>metrics</code>, até 3 <code>anomalies</code> e <code>overall_health</code>.</li>
+        <li><strong>Lite Strategist:</strong> retorna 6 sugestões com distribuição 2-2-2, ações implementáveis em até 1 semana.</li>
+        <li><strong>Validação básica:</strong> exige campos mínimos e normaliza <code>expected_impact</code> para high/medium/low.</li>
+        <li><strong>Dedup histórico:</strong> aplica <code>validateSuggestionUniqueness</code> contra sugestões anteriores.</li>
+        <li><strong>Persistência:</strong> salva análise e sugestões (sem Critic).</li>
+      </ol>
+
+      <div class="callout warn">
+        <strong>Trade-off:</strong> sem Critic, o LITE tem menor “garantia de qualidade” em verificação numérica e
+        originalidade. Em compensação, ele executa mais rápido e consome menos tokens.
+      </div>
+    </section>
+
+    <section class="page-break" id="calculos-backend">
+      <h2>6) Cálculos determinísticos do backend</h2>
+      <p>
+        Esta seção descreve <strong>apenas</strong> os cálculos feitos pelo código (determinísticos). Ela é essencial
+        porque vários agentes (principalmente Analyst/Critic) dependem desses números como “fonte de verdade” para evitar
+        alucinação, recalcular impactos e validar consistência.
+      </p>
+
+      <h3>6.1) Janela temporal e definições</h3>
+      <ul>
+        <li><strong>FULL:</strong> período operacional = 15 dias (<code>ANALYSIS_PERIOD_DAYS = 15</code>), incluindo o dia atual.</li>
+        <li><strong>LITE:</strong> período operacional = 7 dias (<code>ANALYSIS_PERIOD_DAYS = 7</code> no serviço LITE).</li>
+        <li><strong>Pedidos pagos:</strong> várias métricas de receita/ticket usam <em>apenas pedidos pagos</em>.</li>
+        <li><strong>Brindes:</strong> produtos brinde são excluídos de consultas e métricas de estoque.</li>
+      </ul>
+
+      <h3>6.2) Pedidos (orders)</h3>
+      <p>Resumo calculado para o período do pipeline:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Como é calculado</th>
+            <th>Observações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>total</code></td>
+            <td>Contagem de pedidos no período</td>
+            <td>Inclui todos os status; receita é calculada separadamente com pagos</td>
+          </tr>
+          <tr>
+            <td><code>by_payment_status</code></td>
+            <td>Agrupamento por status de pagamento → contagem</td>
+            <td>Chave = valor do enum (ou <code>unknown</code>)</td>
+          </tr>
+          <tr>
+            <td><code>total_revenue</code></td>
+            <td>Soma de <code>total</code> apenas dos pedidos pagos</td>
+            <td>Não inclui pedidos pendentes/cancelados</td>
+          </tr>
+          <tr>
+            <td><code>average_order_value</code></td>
+            <td>Média de <code>total</code> dos pedidos pagos</td>
+            <td>Se não houver pagos, fica 0</td>
+          </tr>
+          <tr>
+            <td><code>by_day</code></td>
+            <td>Agrupamento por data (<code>Y-m-d</code>) → contagem</td>
+            <td>Útil para detectar sazonalidade/volatilidade</td>
+          </tr>
+          <tr>
+            <td><code>cancellation_rate</code></td>
+            <td>(Pedidos cancelados ÷ total do período) × 100</td>
+            <td>Se total = 0, fica 0</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.3) Produtos (products)</h3>
+      <p>Resumo do catálogo (excluindo brindes) + derivações importantes:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Como é calculado</th>
+            <th>Observações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>total</code></td>
+            <td>Contagem de produtos após <code>excludeGifts()</code></td>
+            <td>O total bruto é usado para calcular <code>gifts_filtered</code></td>
+          </tr>
+          <tr>
+            <td><code>active</code></td>
+            <td>Produtos com <code>is_active = true</code> e não brinde</td>
+            <td>Filtro duplo: status ativo + checagem <code>!isGift()</code></td>
+          </tr>
+          <tr>
+            <td><code>out_of_stock</code></td>
+            <td>Contagem de produtos com <code>stock_quantity &lt;= 0</code></td>
+            <td>Base para alertas de ruptura e override do Health Score</td>
+          </tr>
+          <tr>
+            <td><code>out_of_stock_list</code></td>
+            <td>Lista (limitada) com detalhes dos esgotados</td>
+            <td>Inclui <code>id</code>, <code>name</code>, <code>price</code>, <code>sku</code>, <code>last_updated</code></td>
+          </tr>
+          <tr>
+            <td><code>best_sellers</code></td>
+            <td>Top 10 por quantidade vendida em pedidos pagos (agregado por <code>product_id</code> dos itens)</td>
+            <td>Inclui quantidade, receita, preço e estoque atual</td>
+          </tr>
+          <tr>
+            <td><code>no_sales_period</code></td>
+            <td>Contagem de produtos ativos com estoque &gt; 0 e sem vendas no período</td>
+            <td>Útil para “estoque parado” e ações de giro</td>
+          </tr>
+          <tr>
+            <td><code>gifts_filtered</code></td>
+            <td>Total bruto − total após <code>excludeGifts()</code></td>
+            <td>Indica quantos itens foram removidos por serem brindes</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.4) Estoque (inventory)</h3>
+      <p>Resumo de inventário (produtos excluindo brindes):</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Como é calculado</th>
+            <th>Observações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>total_value</code></td>
+            <td>Σ(<code>stock_quantity × cost</code>)</td>
+            <td>Depende de custo preenchido; custo ausente reduz a precisão</td>
+          </tr>
+          <tr>
+            <td><code>low_stock_products</code></td>
+            <td>Contagem de produtos com <code>stock_quantity &lt; 10</code></td>
+            <td>O threshold padrão do modelo é 10</td>
+          </tr>
+          <tr>
+            <td><code>excess_stock_products</code></td>
+            <td>Contagem de produtos com <code>stock_quantity &gt; 100</code></td>
+            <td>Heurística simples para “estoque alto/excesso”</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.5) Cupons (coupons)</h3>
+      <p>
+        O pipeline calcula tanto a situação de cadastro (quantos cupons existem/ativos) quanto o uso real em pedidos
+        pagos no período.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Como é calculado</th>
+            <th>Interpretação</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>usage_rate_percent</code></td>
+            <td>(Pedidos pagos com cupom ÷ total de pedidos pagos) × 100</td>
+            <td>Alta dependência sugere risco de margem e preço âncora “desconto”</td>
+          </tr>
+          <tr>
+            <td><code>ticket_impact_percent</code></td>
+            <td>((Ticket médio com cupom − ticket médio sem cupom) ÷ ticket médio sem cupom) × 100</td>
+            <td>Negativo = cupom reduz ticket; positivo = cupom aumenta ticket (ex.: cupom condicionado)</td>
+          </tr>
+          <tr>
+            <td><code>total_discount_given</code></td>
+            <td>Soma de <code>discount</code> dos pedidos pagos com cupom</td>
+            <td>Estimativa de “custo do desconto” no período</td>
+          </tr>
+          <tr>
+            <td><code>most_used_coupons</code></td>
+            <td>Top 5 por <code>times_used</code> (agregado por código)</td>
+            <td>Ajuda a identificar cupons “viciantes” e oportunidades de reestruturação</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.6) Cálculos de dados externos</h3>
+
+      <h4>6.6.1) Google Trends (SerpAPI)</h4>
+      <ul>
+        <li><code>interesse_busca</code>: média dos pontos (arredondada) do interesse no tempo (0–100).</li>
+        <li>
+          <code>tendencia</code>:
+          compara a média dos <strong>4 primeiros</strong> pontos com a média dos <strong>4 últimos</strong>:
+          variação &gt; +15% → <code>alta</code>; variação &lt; −15% → <code>queda</code>; caso contrário → <code>estavel</code>.
+        </li>
+        <li><code>sazonalidade</code>: meses cujo interesse médio fica &gt; 20% acima da média geral.</li>
+        <li><code>termos_relacionados</code>: até 5 queries “rising”.</li>
+      </ul>
+
+      <h4>6.6.2) Preços de mercado (Google Shopping via SerpAPI)</h4>
+      <ul>
+        <li><strong>Query:</strong> se houver top produtos, usa até 3 nomes; caso contrário, usa rótulos de nicho + subcategoria.</li>
+        <li><strong>Extração de preço:</strong> prioriza <code>extracted_price</code>; fallback para parse de string <code>price</code>.</li>
+        <li><strong>Outliers:</strong> remove preços fora de 1.5×IQR (método do intervalo interquartil).</li>
+        <li><strong>Estatísticas:</strong> calcula min, max, média e mediana; mantém até 10 produtos referência.</li>
+      </ul>
+
+      <h4>6.6.3) Concorrentes (scraping + parsing)</h4>
+      <p>
+        A análise de concorrentes depende de uma lista de concorrentes informada no cadastro da loja. Para cada URL,
+        o sistema tenta coletar conteúdo (via proxy ou request direto) e extrai sinais estruturados:
+      </p>
+      <ul>
+        <li>preços (regex e padrões comuns, em HTML/Markdown/JSON embutido);</li>
+        <li>produtos (nome + preço, limitado a 50);</li>
+        <li>avaliações (nota média, quantidade quando possível);</li>
+        <li>categorias e promoções; diferenciais (frete grátis, cashback, parcelamento, etc.).</li>
+      </ul>
+
+      <h3>6.7) Benchmarks estruturados e RAG (detecção e busca)</h3>
+      <p>
+        O serviço de base de conhecimento faz três tarefas distintas:
+      </p>
+      <ul>
+        <li><strong>Buscar benchmarks/estratégias (texto):</strong> para inclusão em prompts;</li>
+        <li><strong>Fornecer benchmarks estruturados:</strong> números (ticket médio, conversão, abandono, etc.) com fallback;</li>
+        <li><strong>Identificar nicho/subcategoria:</strong> via embeddings + config/keywords como reforço.</li>
+      </ul>
+
+      <div class="callout">
+        <strong>Onde a IA usa esses números:</strong> o Analyst usa benchmarks estruturados para pontuar componentes do
+        Health Score e justificar gaps; o Strategist usa para “ancorar” expected_result e projeções do premium_summary.
+      </div>
+    </section>
+
+    <section class="page-break" id="dedup-similarity">
+      <h2>7) Deduplicação, saturação e similaridade</h2>
+      <p>
+        Esta seção explica, detalhadamente, as camadas de proteção contra repetição e baixa qualidade. Elas existem porque
+        um agente pode gerar ideias boas porém repetidas (por linguagem diferente) e porque cada loja acumula histórico.
+      </p>
+
+      <h3>7.1) Conceitos</h3>
+      <ul>
+        <li><strong>Duplicata interna (intra-batch):</strong> duas sugestões muito similares dentro da mesma execução.</li>
+        <li><strong>Duplicata histórica:</strong> sugestão muito similar a uma sugestão já entregue para a mesma loja.</li>
+        <li><strong>Tema saturado:</strong> um tema apareceu 3+ vezes (ou foi rejeitado repetidamente), devendo ser evitado.</li>
+        <li><strong>Similaridade por embeddings:</strong> comparação semântica via vetores (cosine) no banco (pgvector).</li>
+      </ul>
+
+      <h3>7.2) Normalização de títulos (para comparação semântica)</h3>
+      <p>
+        Antes de calcular similaridade, os títulos são normalizados para reduzir ruído linguístico:
+      </p>
+      <ul>
+        <li>converte para minúsculo;</li>
+        <li>remove acentos (quando possível) e caracteres não alfanuméricos;</li>
+        <li>remove stopwords (de/da/do/para/com/…);</li>
+        <li>remove verbos genéricos (implementar, otimizar, criar, ativar, melhorar, etc.);</li>
+        <li>remove palavras genéricas de domínio (produto, cliente, loja, etc.);</li>
+        <li>remove palavras muito curtas (≤2);</li>
+        <li>ordena alfabeticamente as palavras restantes (comparação independe da ordem).</li>
+      </ul>
+
+      <p>Exemplo (ilustrativo):</p>
+      <pre><code>Título original:
+  "Implementar cupom de primeira compra 10% para captar e-mails"
+
+Após normalização (exemplo):
+  "capta emails primeira compra 10"</code></pre>
+
+      <h3>7.3) Similaridade Jaccard (word-based)</h3>
+      <p>
+        A similaridade entre dois títulos normalizados é calculada por Jaccard:
+      </p>
+      <pre><code>similaridade = |interseção(palavras)| ÷ |união(palavras)|</code></pre>
+      <p>
+        Onde “palavras” são os tokens únicos do título normalizado.
+      </p>
+
+      <h3>7.4) Deduplicação intra-batch (mesma execução)</h3>
+      <p>
+        Antes de comparar com histórico, o pipeline remove duplicatas dentro do próprio lote:
+      </p>
+      <ul>
+        <li><strong>Duplicata exata:</strong> título igual (case-insensitive, trim) → descartada.</li>
+        <li><strong>Duplicata semântica:</strong> Jaccard ≥ <strong>0.85</strong> entre títulos normalizados → descartada.</li>
+      </ul>
+
+      <h3>7.5) Temas saturados (ThemeKeywords)</h3>
+      <p>
+        O sistema identifica temas saturados varrendo título + descrição de sugestões anteriores em busca de palavras-chave
+        canônicas por tema (ex.: <em>quiz</em>, <em>frete grátis</em>, <em>fidelidade</em>, <em>kits</em>, <em>reviews</em>, etc.).
+      </p>
+      <ul>
+        <li><strong>Saturação por repetição:</strong> tema com 3+ ocorrências → considerado saturado.</li>
+        <li><strong>Saturação por rejeição:</strong> tema rejeitado/ignorado 2+ vezes também é marcado como saturado para o prompt.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Importante (enforcement programático):</strong> o filtro programático de “tema saturado” bloqueia temas com
+        contagem ≥ 3. Temas “saturados por rejeição” (2+ rejeições) são sinalizados no contexto/prompt e devem ser evitados
+        pelos agentes, mas podem não ser bloqueados programaticamente se a contagem total ainda for &lt; 3.
+      </div>
+
+      <h3>7.6) Categorias bloqueadas por rejeição</h3>
+      <p>
+        Se uma categoria tiver 3+ sugestões com status <code>rejected</code> ou <code>ignored</code>, ela é considerada
+        “bloqueada” para reduzir atrito com o lojista. Esse dado entra no <code>learning_context</code> e influencia prompts
+        (principalmente Critic/Strategist).
+      </p>
+
+      <h3>7.7) Similaridade por embeddings (pgvector)</h3>
+      <p>
+        Quando embeddings estão configurados, o pipeline gera um vetor para o texto (título + descrição) e consulta o banco
+        para encontrar sugestões similares da mesma loja.
+      </p>
+      <ul>
+        <li><strong>Métrica:</strong> cosine distance via operador <code>&lt;=&gt;</code> (pgvector).</li>
+        <li><strong>Conversão:</strong> similaridade = <code>1 − distance</code>.</li>
+        <li><strong>Threshold:</strong> similaridade &gt; <strong>0.85</strong> → “muito similar” (filtra).</li>
+        <li><strong>Janela:</strong> considera apenas sugestões dos últimos <strong>90 dias</strong> (quando filtrado).</li>
+        <li><strong>Status excluídos:</strong> normalmente exclui <code>rejected</code>, <code>ignored</code> e <code>completed</code> (não compara com esses).</li>
+      </ul>
+
+      <div class="callout">
+        <strong>Por que embeddings:</strong> Jaccard captura similaridade de palavras; embeddings capturam similaridade de
+        significado mesmo quando o texto muda (paráfrase).
+      </div>
+
+      <h3>7.8) Pré-validação do pool do Strategist (para recovery)</h3>
+      <p>
+        Após o Strategist gerar 15–20 sugestões (alvo 18), o pipeline pré-valida esse pool contra histórico:
+      </p>
+      <ul>
+        <li>se Jaccard ≥ 0.85 vs histórico → remove do pool de recovery;</li>
+        <li>se passar Jaccard, pode haver checagem por embedding (threshold 0.85) para remover duplicatas semânticas.</li>
+      </ul>
+      <p>
+        Isso garante que, se o Critic/embeddings removerem sugestões, o recovery não reintroduz “mais do mesmo”.
+      </p>
+
+      <h3>7.9) Recovery para garantir 9 sugestões (3-3-3)</h3>
+      <p>
+        Se, após Critic e filtros, o conjunto final ficar abaixo de 9, o pipeline tenta preencher lacunas seguindo ordem:
+      </p>
+      <ol>
+        <li>recuperar sugestões do Strategist no mesmo nível de impacto (high/medium/low);</li>
+        <li>se faltar, promover sugestões de níveis adjacentes (ex.: medium → high) mantendo diversidade;</li>
+        <li>executar checagem de embedding antes de aceitar candidatos recuperados/promovidos.</li>
+      </ol>
+      <p>
+        Além disso, o recovery filtra sugestões similares a títulos previamente rejeitados usando um threshold mais baixo
+        (Jaccard ≥ <strong>0.75</strong>), assumindo que “se parece com rejeitada” tende a gerar frustração.
+      </p>
+
+      <h3>7.10) Diversificação por categoria (máximo 2 por categoria)</h3>
+      <p>
+        Para evitar que o resultado final traga, por exemplo, “6 sugestões de cupom”, o pipeline aplica um limite de
+        <strong>2 sugestões por categoria</strong>. Se alguma categoria exceder o limite:
+      </p>
+      <ul>
+        <li>mantém as 2 primeiras e remove excedentes;</li>
+        <li>tenta substituir usando o pool do Strategist com categorias diferentes;</li>
+        <li>descarta candidatos cujo título for muito similar aos já usados (heurística <code>similar_text</code> ≥ 75%).</li>
+      </ul>
+
+      <h3>7.11) Guardas finais ao salvar</h3>
+      <p>
+        Antes de persistir, o pipeline aplica uma última proteção contra duplicatas na mesma análise:
+      </p>
+      <ul>
+        <li>bloqueia títulos duplicados (case-insensitive) dentro da análise;</li>
+        <li>renumera prioridades após qualquer remoção;</li>
+        <li>anexa metadados do Critic/Strategist em <code>specific_data</code> (rastreabilidade).</li>
+      </ul>
+    </section>
+
+    <section class="page-break" id="schemas">
+      <h2>8) Contratos de saída (JSON) por agente</h2>
+      <p>
+        Nesta seção, cada agente tem seu contrato de saída documentado com:
+      </p>
+      <ul>
+        <li><strong>Objetivo:</strong> o que o agente deve produzir.</li>
+        <li><strong>Formato (schema):</strong> o JSON esperado (conforme prompt).</li>
+        <li><strong>Significado dos campos:</strong> o que cada campo representa e como é usado.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Chave interna “_prompt_used”:</strong> os serviços dos agentes adicionam <code>_prompt_used</code> ao
+        resultado para auditoria/logs. Essa chave é removida antes de alimentar etapas seguintes e não deve ser tratada
+        como parte do contrato público.
+      </div>
+
+      <h3>8.1) ProfileSynthesizer (perfil compartilhado)</h3>
+      <p>
+        Gera um perfil sintetizado e factual da loja. É usado para aumentar coerência entre agentes e reduzir “chute”.
+        Campos sem evidência devem ser preenchidos com <code>nao_determinado</code>.
+      </p>
+
+      <h4>8.1.1) Schema (JSON)</h4>
+      <pre><code>{
+  "store_profile": {
+    "nome": "nome da loja",
+    "url": "url da loja",
+    "plataforma": "nuvemshop|shopify|vtex|tray|outro",
+    "nicho": "nicho identificado",
+    "nicho_detalhado": "sub-nicho se identificável",
+    "porte_estimado": "micro|pequeno|medio|grande",
+    "maturidade_digital": "iniciante|intermediario|avancado",
+    "publico_alvo_estimado": "descrição do público",
+    "diferenciais_visiveis": [
+      "diferencial com dado mensurável (ex: '168 kits no catálogo', 'frete grátis acima de R$99')"
+    ],
+    "sazonalidade_relevante": "descreva eventos sazonais do nicho"
+  },
+  "contexto_analise": {
+    "data_analise": "data atual",
+    "eventos_sazonais_proximos": ["lista de datas comerciais próximas"],
+    "observacoes_iniciais": "primeiras impressões sobre a loja"
+  }
+}</code></pre>
+
+      <h4>8.1.2) Campos e uso</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Descrição</th>
+            <th>Como é usado no pipeline</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>porte_estimado</code></td>
+            <td>Classificação por faturamento mensal (micro/pequeno/médio/grande).</td>
+            <td>Contextualiza recomendações (ex.: soluções de baixo custo para micro).</td>
+          </tr>
+          <tr>
+            <td><code>maturidade_digital</code></td>
+            <td>Estimativa de nível operacional/digital (iniciante/intermediário/avançado).</td>
+            <td>Modula complexidade/ambição das sugestões.</td>
+          </tr>
+          <tr>
+            <td><code>diferenciais_visiveis</code></td>
+            <td>Lista de diferenciais observáveis com números/condições.</td>
+            <td>Evita sugestões redundantes (“ativar frete grátis”) quando já existe.</td>
+          </tr>
+          <tr>
+            <td><code>eventos_sazonais_proximos</code></td>
+            <td>Datas comerciais próximas relevantes ao nicho.</td>
+            <td>Ajuda a ajustar urgência/tempo das sugestões (30/60/90 dias).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>8.2) Collector Agent (contexto organizado para diagnóstico)</h3>
+      <p>
+        Organiza dados e histórico para o Analyst. Seu papel é estruturar contexto e registrar o que está faltando (data
+        quality) e o que deve ser evitado (prohibited suggestions/temas saturados).
+      </p>
+
+      <h4>8.2.1) Schema (JSON)</h4>
+      <pre><code>{
+  "store_identification": {
+    "name": "string",
+    "niche": "string",
+    "subcategory": "string",
+    "platform": "string",
+    "operation_time_months": 0,
+    "total_orders": 0,
+    "total_revenue": 0
+  },
+  "historical_summary": ["fato1 com número", "fato2 com número", "fato3", "fato4", "fato5", "fato6 (opcional)", "fato7 (opcional)"],
+  "success_patterns": [
+    {"title": "título", "category": "categoria", "what_worked": "o que funcionou"}
+  ],
+  "suggestions_to_avoid": [
+    {"title": "título", "category": "categoria", "why_failed": "motivo"}
+  ],
+  "prohibited_suggestions": {
+    "total": 0,
+    "saturated_themes": [],
+    "by_category": {},
+    "all_titles": []
+  },
+  "relevant_benchmarks": {},
+  "market_positioning": {
+    "ticket_loja": 0,
+    "vs_benchmark": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_mercado": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_concorrentes": {"valor": 0, "diferenca": "+X% ou -X%"}
+  },
+  "competitive_analysis": {
+    "total_concorrentes": 0,
+    "por_concorrente": [],
+    "insights": {
+      "categorias_populares": [],
+      "maior_desconto": "X%",
+      "faixa_preco": {"min": 0, "max": 0, "media": 0}
+    },
+    "diferenciais_que_loja_nao_tem": [],
+    "oportunidades": []
+  },
+  "identified_gaps": [],
+  "data_not_available": [],
+  "market_context": {"tendencia": "string", "interesse": 0},
+  "alerts_for_analyst": {
+    "critical": [{"descricao": "string", "dados": "evidência numérica", "recorrente": false, "vezes_reportado": 0}],
+    "warnings": [{"descricao": "string", "dados": "evidência numérica", "recorrente": false, "vezes_reportado": 0}],
+    "info": [{"descricao": "string", "dados": "evidência numérica", "recorrente": false, "vezes_reportado": 0}]
+  },
+  "data_quality": {
+    "completeness": "alta|media|baixa",
+    "missing_data": ["lista de dados que não foram encontrados"],
+    "confidence_notes": "Observações sobre a confiabilidade dos dados"
+  }
+}</code></pre>
+
+      <h4>8.2.2) Campos e uso</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>O que significa</th>
+            <th>Por que é importante</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>historical_summary</code></td>
+            <td>Lista de fatos do histórico com números.</td>
+            <td>Garante que o diagnóstico do Analyst comece de dados verificáveis, não de generalidades.</td>
+          </tr>
+          <tr>
+            <td><code>prohibited_suggestions</code></td>
+            <td>Mapa do que já foi sugerido e o que saturou.</td>
+            <td>Evita repetição e instrui Strategist/Critic sobre “zonas proibidas”.</td>
+          </tr>
+          <tr>
+            <td><code>market_positioning</code></td>
+            <td>Comparação tripla do ticket: benchmark, mercado e concorrentes.</td>
+            <td>Base para decisões de preço, margem e proposta de valor.</td>
+          </tr>
+          <tr>
+            <td><code>alerts_for_analyst</code></td>
+            <td>Sinais antecipados (não é o diagnóstico final).</td>
+            <td>Ajuda o Analyst a priorizar, especialmente em pipelines com pouco tempo.</td>
+          </tr>
+          <tr>
+            <td><code>data_quality</code></td>
+            <td>Qualidade/completude e dados ausentes.</td>
+            <td>Controla confiança e reduz risco de alucinação (“dados insuficientes”).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>8.3) Analyst Agent (diagnóstico, alertas e Health Score)</h3>
+      <p>
+        O Analyst é responsável pelo diagnóstico numérico da loja. Ele produz: um <strong>Health Score (0–100)</strong>,
+        alertas priorizados, 5 oportunidades com potencial estimado em R$ e um briefing para o Strategist contendo 5
+        problemas (causas raiz).
+      </p>
+
+      <div class="callout warn">
+        <strong>Importante sobre “mês”:</strong> na execução FULL, o pipeline usa uma janela operacional fixa de
+        <strong>15 dias</strong>. Mesmo assim, alguns prompts exibem “Pedidos/Mês” e “Faturamento/mês” como proxy dessa
+        janela. Interprete qualquer “/mês” nos resultados considerando a janela do pipeline (FULL=15 dias, LITE=7 dias),
+        a menos que o agente declare explicitamente uma premissa de extrapolação.
+      </div>
+
+      <h4>8.3.1) Schema (JSON — conforme prompt)</h4>
+      <pre><code>{
+  "reasoning": {
+    "data_quality": "Avaliação da qualidade e completude dos dados recebidos",
+    "key_metrics": ["métrica 1: valor (bom/ruim/neutro)", "métrica 2: valor"],
+    "anomalies_detected": ["anomalia 1 com threshold", "anomalia 2"],
+    "score_calculation": "Componente1: X pts + Componente2: Y pts + ... = Total. Override: -Z pts. Final: W"
+  },
+
+  "resumo_executivo": "2-3 frases: saúde geral, problema principal, oportunidade principal",
+
+  "health_score": {
+    "score_calculado": 0,
+    "componentes": {
+      "ticket_vs_benchmark": {"pontos": 0, "detalhe": "X% do benchmark"},
+      "estoque_disponivel": {"pontos": 0, "detalhe": "X% zerado"},
+      "taxa_cancelamento": {"pontos": 0, "detalhe": "X%"},
+      "saude_cupons": {"pontos": 0, "detalhe": "X% uso, Y% impacto"},
+      "tendencia_vendas": {"pontos": 0, "detalhe": "crescendo|estável|queda"}
+    },
+    "override_aplicado": false,
+    "motivo_override": null,
+    "score_final": 0,
+    "classificacao": "critico|atencao|saudavel|excelente"
+  },
+
+  "alertas": [
+    {
+      "severidade": "critico|atencao|monitorar",
+      "tipo": "estoque|cancelamento|pricing|cupons|vendas",
+      "titulo": "Descrição curta do problema",
+      "dados": "Números específicos que comprovam",
+      "impacto": "R$ X/mês ou X% de perda",
+      "causa_raiz": "Análise de POR QUE isso está acontecendo, não apenas O QUE",
+      "acao": "O que fazer",
+      "fonte": "dado_direto|inferencia|benchmark_geral",
+      "confianca": "alta|media|baixa"
+    }
+  ],
+
+  "oportunidades": [
+    {
+      "tipo": "reativacao|upsell|estoque|pricing|conversao",
+      "titulo": "Descrição da oportunidade",
+      "dados": "Números que embasam",
+      "potencial": "R$ X/mês",
+      "acao": "Como capturar",
+      "fonte": "dado_direto|inferencia|benchmark_geral",
+      "confianca": "alta|media|baixa",
+      "ja_sugerido_antes": false
+    }
+  ],
+
+  "posicionamento": {
+    "ticket_loja": 0,
+    "vs_benchmark": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_mercado": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "vs_concorrentes": {"valor": 0, "diferenca": "+X% ou -X%"},
+    "interpretacao": "Loja está acima/abaixo/dentro do mercado porque..."
+  },
+
+  "anomalias": [
+    {
+      "metrica": "nome",
+      "atual": 0,
+      "historico": 0,
+      "variacao": "+X% ou -X%",
+      "tipo": "positiva|negativa",
+      "explicacao_sazonal": "É ou não explicado pela sazonalidade"
+    }
+  ],
+
+  "comparativo_concorrentes": {
+    "ticket_medio": {
+      "loja": 0,
+      "concorrentes_media": 0,
+      "gap": "+X% ou -X%",
+      "insight": "Loja está acima/abaixo porque..."
+    },
+    "categorias": {
+      "loja_foco": ["categoria1", "categoria2"],
+      "concorrentes_foco": ["categoria1", "categoria2"],
+      "oportunidade": "Categoria que concorrentes têm e loja não"
+    },
+    "promocoes": {
+      "loja_tipos": ["tipo1", "tipo2"],
+      "concorrentes_tipos": ["tipo1", "tipo2", "tipo3"],
+      "gap": "Concorrentes usam X tipos de promoção que loja não usa"
+    },
+    "avaliacoes": {
+      "melhor_concorrente": "Nome (nota/5)",
+      "insight": "Se loja deve investir em programa de reviews"
+    }
+  },
+
+  "briefing_strategist": {
+    "problema_1": "Causa raiz #1 — detalhada, com dados, diferente dos problemas anteriores",
+    "problema_2": "Causa raiz #2 — diferente do problema_1",
+    "problema_3": "Causa raiz #3 — diferente dos dois anteriores",
+    "problema_4": "Causa raiz #4 — diferente dos três anteriores",
+    "problema_5": "Causa raiz #5 — diferente dos quatro anteriores",
+    "oportunidade_principal": "Maior oportunidade não explorada",
+    "restricoes": ["O que NÃO fazer ou limitações da loja"],
+    "temas_ja_saturados": ["temas que já foram sugeridos 3+ vezes em análises anteriores"],
+    "dados_chave": {
+      "faturamento_mes": 0,
+      "ticket_medio": 0,
+      "taxa_conversao": 0,
+      "estoque_zerado_percent": 0,
+      "uso_cupons_percent": 0
+    }
+  },
+  "dados_insuficientes": ["áreas onde não há dados suficientes para análise completa"]
+}</code></pre>
+
+      <h4>8.3.2) Campos e uso (visão completa)</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>O que representa</th>
+            <th>O que o sistema faz com isso</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>health_score</code></td>
+            <td>Score detalhado (componentes + override + classificação).</td>
+            <td>O backend deriva um resumo em <code>overall_health</code> e persiste o score/status na <code>summary</code>.</td>
+          </tr>
+          <tr>
+            <td><code>alertas</code></td>
+            <td>Lista de alertas com evidência numérica e causa raiz.</td>
+            <td>Normaliza para estrutura por severidade e persiste no máximo 3 alertas para UI.</td>
+          </tr>
+          <tr>
+            <td><code>oportunidades</code></td>
+            <td>Lista de oportunidades com potencial (R$) e ação.</td>
+            <td>Persistidas como <code>opportunities</code> e usadas para orientar HIGH/MEDIUM do Strategist.</td>
+          </tr>
+          <tr>
+            <td><code>briefing_strategist</code></td>
+            <td>5 problemas (causas raiz) + restrições e dados-chave.</td>
+            <td>Vira <code>alertas_para_strategist</code> normalizado e alimenta a geração de sugestões.</td>
+          </tr>
+          <tr>
+            <td><code>posicionamento</code> / <code>comparativo_concorrentes</code></td>
+            <td>Comparações ticket/mercado/concorrentes e gaps competitivos.</td>
+            <td>Ajuda a justificar pricing/posicionamento e dar base para sugestões estratégicas.</td>
+          </tr>
+          <tr>
+            <td><code>dados_insuficientes</code></td>
+            <td>Lista explícita do que faltou para concluir análise com confiança.</td>
+            <td>Reduz risco de alucinação; pode rebaixar confiança e levar a recomendações “de dados” primeiro.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>8.3.3) Cálculo do Health Score (passo a passo)</h4>
+      <p>
+        O prompt define pesos e faixas de pontuação para 5 componentes. Depois, aplica penalizações graduais (“override”)
+        para cenários críticos (estoque, cancelamento, queda forte, dependência de cupons).
+      </p>
+
+      <h4>8.3.3.1) Componentes (pontos)</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Componente</th>
+            <th>Peso</th>
+            <th>Regra de pontuação (conforme prompt)</th>
+            <th>Dados típicos de entrada</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ticket vs Benchmark</td>
+            <td>25</td>
+            <td>≥100% = 25; 80–99% = 20; 60–79% = 15; &lt;60% = 10</td>
+            <td><code>orders.average_order_value</code> e <code>structured_benchmarks.ticket_medio.media</code></td>
+          </tr>
+          <tr>
+            <td>Estoque disponível</td>
+            <td>25</td>
+            <td>≤10% zerado = 25; 11–20% = 20; 21–35% = 15; &gt;35% = 10</td>
+            <td><code>products.out_of_stock</code> ÷ <code>products.total</code></td>
+          </tr>
+          <tr>
+            <td>Taxa de cancelamento</td>
+            <td>15</td>
+            <td>≤3% = 15; 4–7% = 12; 8–12% = 8; &gt;12% = 4</td>
+            <td><code>orders.cancellation_rate</code> (%)</td>
+          </tr>
+          <tr>
+            <td>Saúde de cupons</td>
+            <td>15</td>
+            <td>Uso &lt;50% e impacto &lt;15% = 15; senão proporcional</td>
+            <td><code>coupons.usage_rate_percent</code> e <code>coupons.ticket_impact_percent</code></td>
+          </tr>
+          <tr>
+            <td>Tendência de vendas</td>
+            <td>20</td>
+            <td>crescendo = 20; estável = 15; queda leve = 10; queda forte = 5</td>
+            <td><code>orders.by_day</code> + <code>historical_metrics</code> (quando disponível)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>8.3.3.2) Overrides (penalizações graduais)</h4>
+      <p>
+        Após calcular o score, o Analyst aplica penalizações acumuladas. A regra é: aplicar todas as penalizações, mas
+        respeitar pisos/máximos quando definidos no prompt.
+      </p>
+      <ul>
+        <li><strong>Estoque zerado:</strong> 20–30% (−10); 30–40% (−20, mínimo 30); 40–50% (−30, mínimo 20); &gt;50% (máximo 15).</li>
+        <li><strong>Cancelamento:</strong> 8–12% (−10); 12–18% (−20, mínimo 25); &gt;18% (máximo 15).</li>
+        <li><strong>Queda de vendas vs histórico:</strong> 20–30% (−5); 30–45% (−15, mínimo 25); &gt;45% (máximo 20).</li>
+        <li><strong>Dependência de cupons:</strong> 60–75% (−5); 75–90% (−15, mínimo 30); &gt;90% (−25, mínimo 20).</li>
+      </ul>
+
+      <h4>8.3.3.3) Exemplo numérico (completo)</h4>
+      <pre><code>Ticket vs benchmark (75%) = 15
+Estoque (35% zerado)      = 15
+Cancelamento (10%)        =  8
+Cupons (uso 72%; -12,5%)  =  8  (exemplo de proporcionalidade coerente)
+Tendência (estável)       = 15
+--------------------------------
+Score calculado           = 61
+
+Overrides:
+Estoque 35%  → -20 (mínimo 30)
+Cancel. 10%  → -10
+Cupons 72%   → -5
+61 - 20 - 10 - 5 = 26 → aplicar mínimo 30 → score_final = 30</code></pre>
+
+      <h4>8.3.4) Normalização no backend (AnalystAgentService)</h4>
+      <p>
+        Para manter compatibilidade com versões anteriores, o backend normaliza campos e formatos. Em especial, ele:
+      </p>
+      <ul>
+        <li>deriva <code>overall_health</code> a partir de <code>health_score.score_final</code> e <code>resumo_executivo</code>;</li>
+        <li>converte <code>alertas</code> “flat” (V5) em estrutura por severidade (V4: <code>criticos</code>, <code>atencao</code>, <code>monitoramento</code>).</li>
+      </ul>
+
+      <h4>8.3.4.1) Estrutura normalizada de alertas (V4)</h4>
+      <pre><code>{
+  "alertas": {
+    "criticos": [{"tipo": "", "titulo": "", "descricao": "", "impacto_estimado": "", "acao": "", "fonte": "", "confianca": ""}],
+    "atencao": [{"tipo": "", "titulo": "", "descricao": "", "impacto_estimado": "", "acao": "", "fonte": "", "confianca": ""}],
+    "monitoramento": [{"tipo": "", "titulo": "", "descricao": "", "impacto_estimado": "", "acao": "", "fonte": "", "confianca": ""}]
+  }
+}</code></pre>
+
+      <hr />
+
+      <h3>8.4) Strategist Agent (18 sugestões + Premium Summary)</h3>
+      <p>
+        O Strategist é o “motor de recomendações”. Ele recebe o diagnóstico do Analyst (incluindo problemas prioritários,
+        alertas e oportunidades), além de contexto de mercado e execução (benchmarks, concorrentes, recursos da plataforma,
+        sazonalidade e histórico). A partir disso, ele deve gerar:
+      </p>
+      <ul>
+        <li><strong>18 sugestões</strong> (alvo): 6 HIGH + 6 MEDIUM + 6 LOW;</li>
+        <li><strong>premium_summary</strong>: análise executiva estruturada no Growth Intelligence Framework™.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Regra crítica do prompt:</strong> HIGH devem ser estratégicas (categorias como
+        <code>strategy</code>/<code>market</code>/<code>growth</code>/<code>financial</code>/<code>positioning</code>) e
+        referenciar dados externos (concorrentes/mercado/benchmarks). Se HIGH for tática e/ou sem evidência, o Critic deve
+        rebaixar/substituir.
+      </div>
+
+      <h4>8.4.1) Schema (JSON — conforme prompt)</h4>
+      <pre><code>{
+  "reasoning": {
+    "strategic_diagnostic": "Onde a loja está vs. onde deveria estar. Ex: 'Fatura R$ 45k/mês, mercado suporta R$ 100k+ (benchmark). Ticket 52% abaixo da média. Zero investimento em aquisição.'",
+    "goal_gap_analysis": "Se meta definida: gap atual e como as 18 sugestões cobrem pelo menos 80%",
+    "top_5_problems": ["problema 1 com dado", "problema 2 com dado", "problema 3 com dado", "problema 4 com dado", "problema 5 com dado"],
+    "market_opportunities": ["oportunidade 1", "oportunidade 2", "oportunidade 3", "oportunidade 4", "oportunidade 5"],
+    "categories_to_cover": ["strategy", "investment", "market", "growth", "conversion", "product", "coupon", "pricing", "customer", "inventory"],
+    "themes_to_avoid": ["tema saturado 1", "tema saturado 2"],
+    "approach_rationale": "Explicação de 2-3 frases: por que estas 6 estratégicas + 12 táticas",
+    "high_alternatives": [
+      {
+        "chosen": "Título da HIGH #1 escolhida",
+        "alternative_1": "Abordagem alternativa - descartada: motivo",
+        "alternative_2": "Outra alternativa - descartada: motivo"
+      }
+    ]
+  },
+  "analysis_context": {
+    "main_problems": ["problema 1", "problema 2", "problema 3"],
+    "main_opportunities": ["oportunidade 1", "oportunidade 2"],
+    "avoided_themes": ["tema já sugerido antes 1", "tema já sugerido antes 2"]
+  },
+  "suggestions": [
+    {
+      "react": {
+        "thought": "Qual dado/problema motivou esta sugestão (com números)",
+        "action": "Qual ação específica resolve isso (passos resumidos)",
+        "observation": "Qual resultado esperar (R$ ou %)"
+      },
+      "priority": 1,
+      "expected_impact": "high",
+      "category": "strategy|investment|market|growth|financial|positioning|inventory|pricing|product|customer|conversion|marketing|coupon|operational",
+      "title": "Título específico com número quando possível",
+      "problem": "Descrição do problema com dados específicos da loja",
+      "action": "Passos numerados e específicos",
+      "expected_result": "Resultado esperado com número (R$ ou %)",
+      "data_source": "De onde veio o dado que embasa esta sugestão",
+      "implementation": {
+        "type": "nativo|app|terceiro",
+        "app_name": "nome se aplicável ou null",
+        "complexity": "baixa|media|alta",
+        "cost": "R$ X/mês ou R$ 0"
+      },
+      "competitor_reference": "Se HIGH: qual dado de concorrente ou mercado embasa isso. Se não há: null",
+      "insight_origem": "problema_1|problema_2|problema_3|problema_4|problema_5|best_practice (qual problema do Analyst esta sugestão resolve)",
+      "nivel_confianca": "alto|medio|baixo"
+    }
+  ],
+  "premium_summary": {
+    "executive_summary": {
+      "resumo_direto": {
+        "nao_precisa": "Frase do que NÃO precisa (ex: 'vender mais barato')",
+        "precisa": ["ação estratégica 1", "ação estratégica 2", "ação estratégica 3"],
+        "potencial_real": ["área de potencial 1", "área de potencial 2", "área de potencial 3"]
+      },
+      "diagnostico_principal": "Diagnóstico central em até 5 linhas",
+      "maior_gargalo": "Principal gargalo estrutural",
+      "maior_oportunidade": "Maior oportunidade financeira escondida",
+      "risco_mais_relevante": "Risco mais relevante",
+      "potencial_crescimento_estimado_percentual": 0
+    },
+    "growth_score": {
+      "overall_score": 0,
+      "efficiency_score": 0,
+      "margin_health": 0,
+      "retention_score": 0,
+      "scale_readiness": "Operacional|Estruturada|Escalável|Otimizada|Dominante"
+    },
+    "diagnostico_quantitativo": {
+      "ticket_medio_vs_benchmark": "Avaliação com números",
+      "dependencia_desconto": "Avaliação com números",
+      "risco_margem": "Avaliação com números",
+      "estrutura_catalogo": "Avaliação com números",
+      "potencial_retencao": "Avaliação com números"
+    },
+    "gaps_estrategicos": {
+      "dados_ausentes": ["gap 1", "gap 2"],
+      "estruturais": ["gap 1", "gap 2"],
+      "operacionais": ["gap 1", "gap 2"],
+      "estrategicos": ["gap 1", "gap 2"]
+    },
+    "financial_opportunities": [
+      {
+        "action": "Descrição da oportunidade",
+        "impact_type": "ticket|retention|conversion|margin",
+        "estimated_monthly_impact": 0,
+        "estimated_annual_impact": 0
+      }
+    ],
+    "prioritized_roadmap": {
+      "30_dias": ["ação quick win 1", "ação quick win 2"],
+      "60_dias": ["ação estruturação 1", "ação estruturação 2"],
+      "90_dias": ["ação escala 1", "ação escala 2"]
+    },
+    "impact_effort_matrix": {
+      "quick_wins": ["alto impacto, baixo esforço"],
+      "high_impact": ["alto impacto, alto esforço"],
+      "fill_ins": ["baixo impacto, baixo esforço"],
+      "avoid": ["baixo impacto, alto esforço"]
+    },
+    "growth_scenarios": {
+      "conservador": {
+        "crescimento_percentual": 10,
+        "receita_mensal_projetada": 0,
+        "receita_anual_projetada": 0,
+        "o_que_precisa_melhorar": ""
+      },
+      "base": {
+        "crescimento_percentual": 25,
+        "receita_mensal_projetada": 0,
+        "receita_anual_projetada": 0,
+        "o_que_precisa_melhorar": ""
+      },
+      "agressivo": {
+        "crescimento_percentual": 50,
+        "receita_mensal_projetada": 0,
+        "receita_anual_projetada": 0,
+        "o_que_precisa_melhorar": ""
+      }
+    },
+    "strategic_risks": ["risco 1", "risco 2", "risco 3"],
+    "final_verdict": {
+      "conclusao_estrategica": "Resumo executivo final em até 5 linhas",
+      "current_stage": "Operacional|Estruturada|Escalável|Otimizada|Dominante",
+      "next_stage_requirement": "O que falta para subir de nível"
+    }
+  }
+}</code></pre>
+
+      <h4>8.4.2) Campos de sugestão (detalhe por detalhe)</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>O que significa</th>
+            <th>O que deve conter (regras do prompt)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>priority</code></td>
+            <td>Ordem de prioridade 1..18.</td>
+            <td>HIGH normalmente ocupam 1–6; MEDIUM 7–12; LOW 13–18 (não é obrigatório, mas é esperado).</td>
+          </tr>
+          <tr>
+            <td><code>expected_impact</code></td>
+            <td>Nível do impacto (high/medium/low).</td>
+            <td>O agente deve garantir 6-6-6; cada item precisa ser coerente com o impacto estimado.</td>
+          </tr>
+          <tr>
+            <td><code>category</code></td>
+            <td>Categoria do tema (estratégico ou tático).</td>
+            <td>HIGH não devem cair em categorias táticas; se cair, deve ser rebaixada para MEDIUM.</td>
+          </tr>
+          <tr>
+            <td><code>title</code></td>
+            <td>Título curto e acionável.</td>
+            <td>Deve conter número (R$ ou %) sempre que possível e ser específico da loja.</td>
+          </tr>
+          <tr>
+            <td><code>problem</code></td>
+            <td>Problema diagnosticado com evidência.</td>
+            <td>Deve citar números reais do input; em HIGH, deve ser inevitavelmente “executivo/estrutural”.</td>
+          </tr>
+          <tr>
+            <td><code>action</code></td>
+            <td>Passos numerados e executáveis.</td>
+            <td>Sem generalidades; deve apontar como fazer e, quando possível, usar recursos da plataforma.</td>
+          </tr>
+          <tr>
+            <td><code>expected_result</code></td>
+            <td>Resultado estimado (R$ ou %).</td>
+            <td>O prompt exige quantificação. Deve explicitar premissas (base × taxa = impacto) quando necessário.</td>
+          </tr>
+          <tr>
+            <td><code>implementation</code></td>
+            <td>Como implementar e custo.</td>
+            <td>Tipo (nativo/app/terceiro), complexidade e custo aproximado.</td>
+          </tr>
+          <tr>
+            <td><code>competitor_reference</code></td>
+            <td>Âncora externa.</td>
+            <td>Para HIGH, deve citar concorrentes/mercado/benchmark quando dados existirem; caso contrário pode ser null.</td>
+          </tr>
+          <tr>
+            <td><code>insight_origem</code></td>
+            <td>Rastreabilidade com o Analyst.</td>
+            <td>Deve apontar qual problema do briefing está sendo resolvido (problema_1..problema_5).</td>
+          </tr>
+          <tr>
+            <td><code>nivel_confianca</code></td>
+            <td>Confiança do Strategist.</td>
+            <td>Deve refletir qualidade do dado (alto/medio/baixo).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>8.4.3) Premium Summary (o “Resumo Estratégico” exibido na UI)</h4>
+      <p>
+        O <code>premium_summary</code> é o artefato “executivo” do pipeline: uma leitura estruturada (de negócio) que
+        transforma diagnóstico + dados + benchmarks em narrativa de crescimento, oportunidades financeiras e plano de ação.
+        Diferente das <em>sugestões</em> (itens acionáveis isolados), o Premium Summary organiza a história do crescimento em
+        seções fixas (Growth Intelligence Framework™) para responder, com clareza: “onde estamos”, “por que” e “o que fazer
+        agora”.
+      </p>
+
+      <h4>8.4.3.1) Onde ele aparece (persistência/API/UI)</h4>
+      <p>
+        No backend FULL, o <code>premium_summary</code> é extraído do JSON do Strategist e salvo dentro de
+        <code>analysis.summary.premium_summary</code>. A API expõe esse objeto em <code>premium_summary</code> (atalho) e
+        também dentro de <code>summary</code>. No Frontend, o componente <code>StrategicSummaryPanel.vue</code> renderiza
+        cada seção do framework.
+      </p>
+      <ul>
+        <li><strong>Estrutura rígida:</strong> a UI não “inventa” campos; se uma seção faltar, o painel perde blocos.</li>
+        <li><strong>Números podem ser estimativas:</strong> mas devem ser coerentes e rastreáveis (base × premissa = impacto).</li>
+        <li><strong>Sem validação forte no código:</strong> o sistema confia no contrato do prompt (qualidade depende do agente).</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Armadilha comum (janela de dados):</strong> apesar de nomes como <code>pedidos_mes</code> e
+        <code>faturamento_mes</code> aparecerem no contexto/prompt, no pipeline FULL esses valores normalmente representam
+        o <strong>período de análise</strong> (ex.: 15 dias; ver <code>orders_summary.period_days</code>).
+        Se o Strategist calcular cenários “mensais” usando um faturamento de 15 dias, a projeção pode ficar inflada ou
+        subestimada. A forma correta é normalizar para 30 dias quando o texto/valor exigir “por mês”.
+      </div>
+
+      <h4>8.4.3.2) Regras do prompt (o que é obrigatório)</h4>
+      <ul>
+        <li>
+          <strong>Seções obrigatórias:</strong> <code>executive_summary</code>, <code>growth_score</code>,
+          <code>diagnostico_quantitativo</code>, <code>gaps_estrategicos</code>, <code>financial_opportunities</code>,
+          <code>prioritized_roadmap</code>, <code>impact_effort_matrix</code>, <code>growth_scenarios</code>,
+          <code>strategic_risks</code> e <code>final_verdict</code>.
+        </li>
+        <li>
+          <strong><code>executive_summary.resumo_direto</code> completo:</strong> <code>nao_precisa</code> (string),
+          <code>precisa</code> (array 3–5 itens) e <code>potencial_real</code> (array 3–4 itens).
+        </li>
+        <li>
+          <strong><code>growth_score</code> preenchido:</strong> <code>overall_score</code>, <code>efficiency_score</code>,
+          <code>margin_health</code> e <code>retention_score</code> devem estar entre 0 e 100, e <code>scale_readiness</code>
+          deve refletir a maturidade (Operacional → Dominante).
+        </li>
+        <li>
+          <strong><code>growth_scenarios</code> com cálculo:</strong> cada cenário deve ter <code>receita_mensal_projetada</code>
+          e <code>receita_anual_projetada</code> calculados com base em dados reais do contexto (quando existirem).
+        </li>
+      </ul>
+
+      <h4>8.4.3.3) <code>executive_summary</code> (como preencher, campo a campo)</h4>
+      <p>
+        Esta seção é a “capa executiva”. Ela precisa ser curta, mas <strong>não genérica</strong>: deve citar 1–3 números
+        que sustentem o diagnóstico (ex.: ticket vs benchmark, % de ruptura, % de cupom, receita do período).
+      </p>
+      <ul>
+        <li>
+          <strong><code>resumo_direto.nao_precisa</code>:</strong> o que <em>não</em> resolve o gargalo central (ex.:
+          “vender mais barato”, “postar mais sem funil”).
+        </li>
+        <li>
+          <strong><code>resumo_direto.precisa</code>:</strong> 3–5 ações executivas (ex.: corrigir ruptura em best-sellers,
+          elevar ticket via kits, criar investimento mínimo em aquisição com CAC controlado).
+        </li>
+        <li>
+          <strong><code>resumo_direto.potencial_real</code>:</strong> 3–4 alavancas de potencial (ex.: ticket, conversão,
+          retenção, margem).
+        </li>
+        <li>
+          <strong><code>potencial_crescimento_estimado_percentual</code>:</strong> número 0–100 de potencial (leitura executiva;
+          não confundir com <code>growth_scenarios</code>).
+        </li>
+      </ul>
+      <pre><code>{
+  "executive_summary": {
+    "resumo_direto": {
+      "nao_precisa": "baixar preços para competir",
+      "precisa": [
+        "repor best-sellers (ruptura está travando conversão)",
+        "reposicionar ticket com kits (ticket está 40% abaixo do benchmark)",
+        "investir em aquisição com CAC controlado (demanda do nicho em alta)"
+      ],
+      "potencial_real": [
+        "aumentar ticket médio via bundles",
+        "reduzir dependência de cupom com proposta de valor",
+        "elevar conversão nas páginas mais visitadas"
+      ]
+    },
+    "diagnostico_principal": "A loja tem demanda e produtos vencedores, mas perde receita por ruptura e por ticket abaixo do benchmark. O crescimento depende de corrigir operação (estoque) e ajustar posicionamento (valor percebido) antes de escalar aquisição.",
+    "maior_gargalo": "Ruptura de best-sellers e baixa disponibilidade do catálogo",
+    "maior_oportunidade": "Aumentar ticket com kits e precificação baseada em benchmark",
+    "risco_mais_relevante": "Margem corroída por cupom/frete sem elevar valor percebido",
+    "potencial_crescimento_estimado_percentual": 35
+  }
+}</code></pre>
+
+      <h4>8.4.3.4) <code>growth_score</code> (scores 0–100 + maturidade)</h4>
+      <p>
+        O Growth Score é uma quantificação (heurística) do quão preparada a loja está para crescer com eficiência.
+        O prompt exige valores de 0 a 100, mas <strong>não define uma fórmula determinística</strong>; o Strategist deve
+        inferir a pontuação a partir das métricas disponíveis (internas + benchmarks + externos).
+      </p>
+      <ul>
+        <li><strong><code>efficiency_score</code>:</strong> capacidade de converter e operar (cancelamento, ruptura, funil).</li>
+        <li><strong><code>margin_health</code>:</strong> saúde de margem e disciplina de descontos (cupom/frete vs ticket).</li>
+        <li><strong><code>retention_score</code>:</strong> potencial de recompra/recorrência (quando houver sinais no histórico).</li>
+        <li><strong><code>overall_score</code>:</strong> leitura agregada (recomendado: média ponderada dos anteriores).</li>
+      </ul>
+      <p>
+        O <strong><code>scale_readiness</code></strong> deve traduzir a maturidade em um estágio:
+        Operacional (base frágil) → Estruturada (base ok, gaps claros) → Escalável (pode investir e crescer) →
+        Otimizada (processos e métricas sob controle) → Dominante (lidera nicho).
+      </p>
+
+      <h4>8.4.3.5) <code>diagnostico_quantitativo</code> (strings que devem conter números)</h4>
+      <p>
+        Apesar de serem campos textuais, estes itens devem conter comparações numéricas (diferença absoluta e/ou percentual),
+        sempre que o contexto trouxer dados suficientes.
+      </p>
+      <ul>
+        <li><strong><code>ticket_medio_vs_benchmark</code>:</strong> ticket atual vs benchmark do nicho + gap (%).</li>
+        <li><strong><code>dependencia_desconto</code>:</strong> uso de cupons (% de pedidos) e impacto no ticket.</li>
+        <li><strong><code>risco_margem</code>:</strong> riscos de margem (desconto total, frete, pricing vs mercado).</li>
+        <li><strong><code>estrutura_catalogo</code>:</strong> catálogo ativo, ruptura, best-sellers vs long tail.</li>
+        <li><strong><code>potencial_retencao</code>:</strong> sinais de recompra/relacionamento ou gaps de pós-compra.</li>
+      </ul>
+
+      <h4>8.4.3.6) <code>financial_opportunities</code> (como calcular impacto)</h4>
+      <p>
+        Cada item deve representar uma alavanca com impacto financeiro estimado. Recomendação de cálculo (conforme
+        filosofia do prompt): explicitar a base e a premissa.
+      </p>
+      <ul>
+        <li><strong>Ticket:</strong> <code>pedidos_base</code> × <code>+R$ ticket</code>.</li>
+        <li><strong>Conversion:</strong> <code>visitas_base</code> × (<code>taxa_nova - taxa_atual</code>) × <code>ticket</code>.</li>
+        <li><strong>Retention:</strong> <code>clientes_base</code> × <code>+% recompra</code> × <code>ticket</code>.</li>
+        <li><strong>Margin:</strong> <code>receita_base</code> × <code>+% margem</code>.</li>
+      </ul>
+      <p class="muted">
+        Observação: quando só existirem dados de pedidos/ticket do período, o agente pode estimar impacto “mensal” normalizando
+        para 30 dias usando <code>orders_summary.period_days</code>.
+      </p>
+
+      <h4>8.4.3.7) <code>growth_scenarios</code> (projeções conservador/base/agressivo)</h4>
+      <p>
+        Os cenários devem transformar um baseline em projeções mensais e anuais. O baseline mais comum é a receita do período
+        (<code>ticket_medio</code> × <code>pedidos_mes</code>) ajustada para 30 dias quando o contexto não for mensal.
+      </p>
+      <pre><code>// Exemplo de normalização (quando period_days = 15):
+receita_15d = ticket_medio * pedidos_15d
+receita_mensal_estimada = receita_15d * (30 / 15)
+receita_anual_estimada = receita_mensal_estimada * 12</code></pre>
+      <p>
+        Para cada cenário, o Strategist deve explicar <code>o_que_precisa_melhorar</code> (ex.: “estoque + ticket + aquisição”)
+        e manter as projeções coerentes com o restante do diagnóstico.
+      </p>
+
+      <h4>8.4.3.8) <code>final_verdict</code> (conclusão + próximo degrau)</h4>
+      <p>
+        Esta seção fecha o framework: qual o estágio atual e o que falta para subir de nível. Deve ser coerente com
+        <code>growth_score</code>, com o diagnóstico quantitativo e com as recomendações HIGH.
+      </p>
+
+      <h4>8.4.4) Normalização no backend (StrategistAgentService)</h4>
+      <p>
+        O backend valida e normaliza as sugestões antes de passá-las para o Critic. Ele aceita variações de formato (V4/V5),
+        converte nomes de campos e padroniza <code>expected_impact</code>. Também pode rebaixar HIGH sem dados específicos.
+      </p>
+      <p class="muted">
+        Nota técnica: a execução do Strategist rota temperatura por contagem de análises anteriores (0.5, 0.6, 0.7, 0.65, 0.55).
+      </p>
+
+      <hr />
+
+      <h3>8.5) Critic Agent (validação e seleção final de 9 sugestões)</h3>
+      <p>
+        O Critic é o “filtro de qualidade” final de IA. Ele recebe as 18 sugestões do Strategist (6 HIGH + 6 MEDIUM + 6 LOW)
+        e deve:
+      </p>
+      <ul>
+        <li>validar números e consistência (não aceitar métricas inventadas);</li>
+        <li>rejeitar temas repetidos/saturados e sugestões genéricas;</li>
+        <li>melhorar sugestões promissoras (corrigir cálculos, tornar ações específicas e viáveis);</li>
+        <li>selecionar as <strong>9 melhores</strong> para entrega final, com distribuição <strong>3 HIGH + 3 MEDIUM + 3 LOW</strong>.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Regra crítica (HIGH):</strong> as 3 HIGH finais devem ser estratégicas (categorias como
+        <code>strategy</code>/<code>investment</code>/<code>market</code>/<code>growth</code>/<code>financial</code>/<code>positioning</code>)
+        e, quando existirem dados externos, precisam ancorar em evidência (concorrentes/mercado/benchmarks).
+      </div>
+
+      <h4>8.5.1) Schema (JSON — conforme prompt)</h4>
+      <pre><code>{
+  "reasoning": {
+    "quality_assessment": "Avaliação geral das 18 sugestões recebidas",
+    "selection_criteria": "Por que estas 9 foram escolhidas e não as outras 9",
+    "decisions_summary": "X selecionadas, Y melhoradas, Z descartadas",
+    "weak_spots": ["sugestão N: motivo da fraqueza/descarte"],
+    "improvements_made": ["sugestão N: o que foi melhorado e por quê"]
+  },
+  "review_summary": {
+    "received": 18,
+    "selected": 9,
+    "approved": 0,
+    "improved": 0,
+    "discarded": 0,
+    "replacements_created": 0
+  },
+  "suggestions": [
+    {
+      "review_react": {
+        "thought": "Análise da qualidade: dados reais? ação viável? resultado quantificado?",
+        "action": "APROVAR/MELHORAR/REJEITAR - justificativa",
+        "observation": "O que mudou, quality score estimado"
+      },
+      "original_title": "Título original do Strategist",
+      "status": "approved|improved|replaced",
+      "changes_made": "Nenhuma | Descrição das melhorias | Motivo da substituição",
+      "verificacoes": {
+        "V1_numeros": {"resultado": "ok|corrigido|nao_verificavel", "detalhe": "Ticket médio confere: R$ 85"},
+        "V2_originalidade": {"resultado": "ok|rejeitado", "detalhe": "Tema inédito"},
+        "V3_especificidade": {"resultado": "ok|rejeitado|melhorado", "detalhe": "Usa dados específicos da loja"},
+        "V4_viabilidade": {"resultado": "ok|rejeitado", "detalhe": "Viável via Nuvemshop nativo"},
+        "V5_impacto": {"resultado": "ok|corrigido|nao_verificavel", "detalhe": "120 pedidos × R$85 × 15% = R$1.530/mês"},
+        "V6_alinhamento": {"resultado": "ok|nao_aplicavel", "detalhe": "Resolve problema_1 do Analyst"}
+      },
+      "verificacao_status": "VERIFICADA|DADO_CORRIGIDO|NAO_VERIFICAVEL",
+      "score_qualidade": 8,
+      "final": {
+        "priority": 1,
+        "expected_impact": "high|medium|low",
+        "category": "strategy|investment|market|growth|financial|positioning|inventory|pricing|product|customer|conversion|marketing|coupon|operational",
+        "title": "Título final (pode ser igual ao original ou melhorado)",
+        "problem": "Problema com dado específico",
+        "action": "Passos numerados",
+        "expected_result": "Resultado com número (R$ ou %)",
+        "data_source": "Fonte do dado",
+        "implementation": {
+          "type": "nativo|app|terceiro",
+          "app_name": "nome ou null",
+          "complexity": "baixa|media|alta",
+          "cost": "R$ X/mês ou R$ 0"
+        },
+        "competitor_reference": "Obrigatório para HIGH quando dados disponíveis; opcional para MEDIUM/LOW",
+        "insight_origem": "problema_1|problema_2|problema_3|problema_4|problema_5|best_practice",
+        "nivel_confianca": "alto|medio|baixo"
+      }
+    }
+  ],
+  "distribution_check": {"high": 3, "medium": 3, "low": 3, "valid": true},
+  "competitor_citations_check": {
+    "count": 2,
+    "minimum_required": 2,
+    "valid": true,
+    "competitors_cited": ["Concorrente A", "Concorrente B"]
+  },
+  "temas_rejeitados_por_saturacao": ["Tema 1", "Tema 2"],
+  "quality_summary": {
+    "total_verificadas": 0,
+    "total_corrigidas": 0,
+    "total_nao_verificaveis": 0,
+    "score_medio": 0
+  }
+}</code></pre>
+
+      <h4>8.5.2) Framework de verificação V1–V6 (como o Critic decide)</h4>
+      <p>
+        O prompt obriga o Critic a executar 6 verificações em <strong>cada</strong> sugestão. O objetivo é impedir
+        recomendações “bonitas” porém erradas, repetidas ou inviáveis.
+      </p>
+      <ul>
+        <li>
+          <strong>V1 — Números:</strong> checa se ticket, quantidade de SKUs, percentuais e faturamento conferem com os dados de entrada
+          (ex.: <code>orders_summary</code>, <code>products_summary</code>, <code>inventory_summary</code>, <code>coupons_summary</code>).
+          Se divergir, corrige e recalcula impacto.
+        </li>
+        <li>
+          <strong>V2 — Originalidade:</strong> rejeita temas já saturados no histórico. O Critic recebe lista de temas saturados
+          e também sugestões anteriores para comparar e evitar repetição.
+        </li>
+        <li>
+          <strong>V3 — Especificidade:</strong> se a sugestão servir para “qualquer loja”, ela é rejeitada ou reescrita para
+          ficar específica (com números reais e ações compatíveis com a loja analisada).
+        </li>
+        <li>
+          <strong>V4 — Viabilidade:</strong> valida se é possível na plataforma (Nuvemshop) conforme recursos permitidos no prompt.
+          Sugestões em zonas “IMPOSSÍVEL” devem ser rejeitadas.
+        </li>
+        <li>
+          <strong>V5 — Impacto:</strong> exige que o resultado seja verificável (base × premissa = impacto). Se faltar,
+          o Critic completa o cálculo e/ou ajusta impacto para algo realista.
+        </li>
+        <li>
+          <strong>V6 — Alinhamento:</strong> verifica se resolve um dos 5 problemas do Analyst (obrigatório para HIGH; prioriza
+          problema_1..problema_3).
+        </li>
+      </ul>
+
+      <h4>8.5.3) Normalização no backend (CriticAgentService)</h4>
+      <p>
+        O backend aceita variações de formato e normaliza para um array de <code>approved_suggestions</code>, cada uma com
+        <code>final_version</code> (o que será persistido) e metadados de qualidade/validação.
+      </p>
+      <ul>
+        <li>suporta formato “V5” (itens com <code>status</code> + <code>final</code>) e formato legado “V4” (<code>approved_suggestions</code>);</li>
+        <li>normaliza campos: <code>problem</code> → <code>description</code>, <code>action</code> → <code>recommended_action</code>, <code>data_source</code> → <code>data_justification</code>;</li>
+        <li>propaga metadados: <code>verificacao_status</code> e <code>score_qualidade</code> são anexados em <code>specific_data</code> ao salvar;</li>
+        <li><strong>enforceDistribution:</strong> mantém no máximo 3 por nível (HIGH/MEDIUM/LOW) e reatribui prioridades 1..N (alvo 9).</li>
+      </ul>
+      <p class="muted">
+        Importante: a distribuição 3-3-3 é reforçada por código (pós-normalização). Se o Critic retornar mais itens em algum nível,
+        o excesso pode ser descartado pelo slicing.
+      </p>
+
+      <hr />
+
+      <h3>8.6) Lite Analyst (diagnóstico rápido: métricas + até 3 anomalias)</h3>
+      <p>
+        O Lite Analyst é usado exclusivamente no pipeline LITE. Ele existe para reduzir tokens e latência: recebe um
+        <code>store_data</code> compactado (7 dias) e retorna:
+      </p>
+      <ul>
+        <li><strong>metrics</strong>: métricas essenciais (vendas, AOV, cancelamento, estoque e cupons);</li>
+        <li><strong>anomalies</strong>: no máximo 3 anomalias priorizadas por impacto financeiro;</li>
+        <li><strong>overall_health</strong>: score 0–100 + classificação + pontos principais.</li>
+      </ul>
+
+      <h4>8.6.1) Entrada (store_data compactado — LiteStoreAnalysisService)</h4>
+      <p>
+        O backend monta um payload com janela reduzida (<code>period_days = 7</code>) e sem listas extensas. Estrutura
+        (exemplo de shape):
+      </p>
+      <pre><code>{
+  "period_days": 7,
+  "orders": {
+    "total": 0,
+    "total_revenue": 0,
+    "average_order_value": 0,
+    "cancellation_rate": 0
+  },
+  "products": {
+    "total": 0,
+    "active": 0,
+    "out_of_stock": 0,
+    "low_stock": 0,
+    "best_sellers_count": 0,
+    "gifts_filtered": 0
+  },
+  "coupons": {
+    "usage_rate": 0,
+    "ticket_impact": 0,
+    "total_discount": 0
+  }
+}</code></pre>
+      <p class="muted">
+        Observação: o pipeline LITE não envia “top 10 best sellers com detalhes” nem “lista completa de produtos sem estoque” —
+        ele trabalha com contagens e poucos agregados.
+      </p>
+
+      <h4>8.6.2) Schema (JSON — conforme prompt)</h4>
+      <pre><code>{
+  "metrics": {
+    "sales": {"total": 0, "daily_average": 0, "trend": "crescendo|estável|caindo"},
+    "average_order_value": {"value": 0, "benchmark": 150},
+    "cancellation_rate": 0,
+    "inventory": {"out_of_stock_products": 0, "critical_stock_products": 0},
+    "coupons": {"usage_rate": 0, "ticket_impact": 0}
+  },
+  "anomalies": [
+    {"type": "string", "description": "string", "severity": "alto|médio|baixo"}
+  ],
+  "overall_health": {
+    "score": 0,
+    "classification": "crítico|atenção|saudável|excelente",
+    "main_points": ["ponto 1", "ponto 2"]
+  }
+}</code></pre>
+
+      <h4>8.6.3) Cálculo do Health Score (Lite — pesos do prompt)</h4>
+      <p>
+        O prompt define 5 componentes (somando 100 pontos) e orienta “subtrair proporcionalmente” quando a métrica estiver
+        abaixo do ideal:
+      </p>
+      <ul>
+        <li><strong>Estoque saudável (sem ruptura de best-sellers):</strong> +30</li>
+        <li><strong>Cancelamento ≤ 3%:</strong> +25</li>
+        <li><strong>Ticket médio ≥ benchmark:</strong> +20</li>
+        <li><strong>Tendência de vendas estável/crescendo:</strong> +15</li>
+        <li><strong>Uso de cupons sem impacto negativo no ticket:</strong> +10</li>
+      </ul>
+      <p class="muted">
+        Nota: diferente do FULL (onde o Analyst tem regras mais extensas e um modelo de overrides), aqui o cálculo é mais
+        simplificado e depende de heurística do agente ao “subtrair proporcionalmente”.
+      </p>
+
+      <h4>8.6.4) Normalização no backend (LiteStoreAnalysisService)</h4>
+      <p>
+        O backend normaliza a estrutura para garantir chaves mínimas, mesmo quando o JSON vier incompleto:
+      </p>
+      <ul>
+        <li>faz merge de <code>metrics</code> e <code>overall_health</code> com defaults;</li>
+        <li>se o parse falhar, usa um default (<code>score = 50</code>, <code>classification = attention</code>) e mantém a análise concluída;</li>
+        <li>transforma <code>anomalies</code> diretamente em <code>alerts</code> na análise LITE (não há oportunidades).</li>
+      </ul>
+
+      <hr />
+
+      <h3>8.7) Lite Strategist (6 sugestões — distribuição 2-2-2)</h3>
+      <p>
+        O Lite Strategist é a etapa de recomendações do pipeline LITE. Ele recebe o resultado do Lite Analyst e deve gerar
+        <strong>exatamente 6</strong> sugestões acionáveis, com impacto distribuído em <strong>2 HIGH + 2 MEDIUM + 2 LOW</strong>.
+        Não existe Critic no LITE: a validação é básica (campos obrigatórios + normalização de impacto) e depois entram os
+        filtros de unicidade contra histórico.
+      </p>
+
+      <h4>8.7.1) Critérios de impacto (regras do prompt)</h4>
+      <ul>
+        <li><strong>HIGH:</strong> potencial &gt; R$ 5.000/mês <em>ou</em> melhoria de conversão &gt; 20%.</li>
+        <li><strong>MEDIUM:</strong> potencial R$ 1.000–5.000/mês <em>ou</em> melhoria de conversão 5–20%.</li>
+        <li><strong>LOW:</strong> potencial &lt; R$ 1.000/mês <em>ou</em> melhoria operacional/UX.</li>
+      </ul>
+
+      <h4>8.7.2) Schema (JSON — conforme prompt)</h4>
+      <pre><code>{
+  "suggestions": [
+    {
+      "category": "strategy|investment|market|growth|financial|positioning|inventory|pricing|product|customer|conversion|marketing|coupon|operational",
+      "title": "Título com número específico (máx 100 chars)",
+      "description": "Problema identificado com base nos dados",
+      "recommended_action": "1. Passo um\n2. Passo dois\n3. Passo três",
+      "expected_impact": "high|medium|low",
+      "target_metrics": ["receita|conversao|ticket_medio|volume_pedidos|estoque|margem|recompra|abandono"],
+      "implementation_time": "immediate|1_week",
+      "specific_data": {"chave": "valor extraído da análise"},
+      "data_justification": "Fonte do dado na análise fornecida"
+    }
+  ]
+}</code></pre>
+
+      <h4>8.7.3) Normalização/validação no backend (LiteStoreAnalysisService)</h4>
+      <p>
+        Após extrair o JSON, o backend aplica validação mínima e adapta o formato para o salvamento reutilizando o método
+        comum de persistência:
+      </p>
+      <ul>
+        <li>exige campos obrigatórios: <code>category</code>, <code>title</code>, <code>description</code>, <code>expected_impact</code>;</li>
+        <li>normaliza <code>expected_impact</code> para <code>high|medium|low</code> (valores fora disso viram <code>medium</code>);</li>
+        <li>embrulha cada sugestão em <code>{ final_version, final_priority }</code> para compatibilidade com o salvamento;</li>
+        <li>deduplica contra histórico (tema/título) antes de persistir — isso pode reduzir o total abaixo de 6.</li>
+      </ul>
+      <p class="muted">
+        Como não existe Critic no LITE, a qualidade final depende muito do cumprimento das regras do prompt (título com número,
+        ações implementáveis e impacto coerente).
+      </p>
+
+      <hr />
+
+      <h3>8.8) SimilarityCheck (prompt auxiliar — atualmente não utilizado no pipeline)</h3>
+      <p>
+        Existe um prompt chamado <code>SimilarityCheckPrompt</code> cujo objetivo é analisar <strong>todas</strong> as sugestões
+        anteriores e produzir “zonas proibidas” (reformulações a evitar) e “abordagens permitidas” (oportunidades ainda não exploradas).
+        Ele foi desenhado para reduzir repetição semântica <em>antes</em> do Strategist gerar novas recomendações.
+      </p>
+
+      <div class="callout">
+        <strong>Importante:</strong> na versão atual do código, esse prompt <strong>não é executado</strong> em nenhuma etapa
+        (não há chamadas para <code>SimilarityCheckPrompt</code> fora do próprio arquivo). A prevenção de repetição é feita por:
+        <code>ThemeKeywords</code> (saturação), Jaccard nos títulos e embeddings (pgvector), conforme seção 7.
+      </div>
+
+      <h4>8.8.1) Schema (JSON — conforme prompt)</h4>
+      <pre><code>{
+  "prohibited_zones": [
+    {
+      "id": 0,
+      "original_title": "string",
+      "problem_category": "estoque|ticket|conversao|retencao|cupons|marketing|operacional|produto",
+      "problem_description": "string",
+      "solution_type": "reposicao|desconto|email|fidelidade|upsell|crosssell|bundle|social|conteudo|ux",
+      "keywords": [],
+      "prohibited_variations": ["variação 1", "variação 2", "variação 3"]
+    }
+  ],
+  "allowed_approaches": {
+    "estoque": [],
+    "ticket": [],
+    "conversao": [],
+    "retencao": [],
+    "cupons": [],
+    "marketing": [],
+    "operacional": [],
+    "produto": []
+  },
+  "coverage_summary": {
+    "categories_covered": [],
+    "categories_gaps": [],
+    "total_analyzed": 0
+  },
+  "strategist_guidance": "Resumo do que evitar e onde há oportunidades"
+}</code></pre>
+
+      <h4>8.8.2) Como seria usado (se fosse integrado)</h4>
+      <ul>
+        <li>entrada: <code>previous_suggestions</code> (histórico completo ou recorte);</li>
+        <li>saída: <code>prohibited_zones</code> alimentaria o bloco de “zonas proibidas” do Strategist/Critic;</li>
+        <li><code>allowed_approaches</code> ajudaria a forçar diversidade por categoria (oportunidades ainda não cobertas).</li>
+      </ul>
+      <p class="muted">
+        Como esse prompt não roda hoje, a diversidade é garantida por regras do Strategist/Critic e por filtros programáticos
+        (saturação por keyword + similaridade por título/embedding).
+      </p>
+
+      <hr />
+    </section>
+
+    <section class="page-break" id="api-ui">
+      <h2>9) Persistência, API e UI (como os dados aparecem)</h2>
+      <p>
+        Esta seção descreve como os resultados do pipeline viram dados persistidos e, em seguida, como são expostos pela API
+        e renderizados no Frontend.
+      </p>
+
+      <h3>9.1) Persistência: <code>Analysis</code> (tabela <code>analyses</code>)</h3>
+      <p>
+        A entidade <code>Analysis</code> funciona como o “envelope” da execução. Ao final, o serviço marca como concluída
+        (método <code>markAsCompleted()</code>) e salva:
+      </p>
+      <ul>
+        <li><strong><code>summary</code> (array):</strong> resumo leve para UI (health + insight + premium_summary no FULL).</li>
+        <li><strong><code>alerts</code> (array):</strong> até 3 alertas derivados do diagnóstico (FULL: <code>alertas</code> V4 ou fallback <code>anomalies</code>).</li>
+        <li><strong><code>opportunities</code> (array):</strong> oportunidades derivadas de <code>oportunidades</code> (V3) ou <code>identified_patterns</code> (legado).</li>
+        <li><strong><code>raw_agent_outputs</code> (array):</strong> outputs brutos por agente (debug/admin).</li>
+        <li><strong>progresso:</strong> <code>current_stage</code>, <code>total_stages</code>, <code>stage_data</code> e logs.</li>
+      </ul>
+
+      <h3>9.2) Estrutura do <code>summary</code> (FULL vs LITE)</h3>
+      <p>O backend monta um <code>summary</code> com as seguintes chaves principais:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Chave</th>
+            <th>Tipo</th>
+            <th>Como é calculado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>health_score</code></td>
+            <td>number</td>
+            <td>FULL: <code>health_score.score_final</code> (V3) ou <code>overall_health.score</code> (legado). LITE: <code>overall_health.score</code>.</td>
+          </tr>
+          <tr>
+            <td><code>health_status</code></td>
+            <td>string</td>
+            <td>FULL: <code>health_score.classificacao</code> ou <code>overall_health.classification</code>. LITE: <code>overall_health.classification</code>.</td>
+          </tr>
+          <tr>
+            <td><code>main_insight</code></td>
+            <td>string</td>
+            <td>FULL: <code>resumo_executivo</code> (preferencial), fallback em <code>health_score.explicacao</code> ou pontos do legacy.</td>
+          </tr>
+          <tr>
+            <td><code>premium_summary</code></td>
+            <td>object|null</td>
+            <td>Somente FULL: extraído do Strategist (Growth Intelligence Framework™).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>9.3) Como <code>alerts</code> são extraídos (FULL/LITE)</h3>
+      <p>
+        O sistema expõe alertas “quentes” (danger/warning) para chamar atenção sem poluir a UI:
+      </p>
+      <ul>
+        <li><strong>FULL:</strong> prioriza <code>alertas.criticos</code> (danger) e <code>alertas.atencao</code> (warning) e limita a 3.</li>
+        <li><strong>Fallback FULL:</strong> se não houver <code>alertas</code> V4, usa <code>anomalies</code> (ordenadas por severidade) e também limita a 3.</li>
+        <li><strong>LITE:</strong> converte todas as <code>anomalies</code> em <code>alerts</code> (sem oportunidades).</li>
+      </ul>
+
+      <h3>9.4) Como <code>opportunities</code> são extraídas (FULL)</h3>
+      <p>
+        O FULL mapeia oportunidades do output do Analyst (V3: <code>oportunidades</code>, legado: <code>identified_patterns</code>)
+        para um formato consistente:
+      </p>
+      <ul>
+        <li><code>title</code> e <code>description</code> (textos)</li>
+        <li><code>potential_revenue</code> (quando existir)</li>
+        <li><code>type</code>, <code>base_dados</code>, <code>calculo_roi</code> (rastreabilidade do cálculo)</li>
+      </ul>
+
+      <h3>9.5) Persistência: <code>Suggestion</code> (tabela <code>suggestions</code>)</h3>
+      <p>
+        O pipeline FULL persiste apenas as sugestões aprovadas (pós-Critic e filtros). Cada registro salva a versão final
+        normalizada, com rastreabilidade e metadados:
+      </p>
+      <ul>
+        <li><strong><code>category</code>, <code>title</code>, <code>description</code>:</strong> texto final.</li>
+        <li><strong><code>recommended_action</code>:</strong> pode ser string (com quebras de linha) ou JSON array (melhor para “steps”).</li>
+        <li><strong><code>expected_impact</code>:</strong> <code>high|medium|low</code>.</li>
+        <li><strong><code>priority</code>:</strong> ordem final 1..N (a UI usa como <code>priority_order</code>).</li>
+        <li><strong><code>specific_data</code>:</strong> anexa detalhes como <code>expected_result</code>, <code>implementation</code>,
+          <code>competitor_reference</code>, <code>insight_origem</code>, <code>nivel_confianca</code>, <code>verificacao_status</code> e <code>score_qualidade</code>.</li>
+      </ul>
+      <p class="muted">
+        Observação: ao aceitar uma sugestão para acompanhamento, o backend tenta sincronizar “steps” a partir de
+        <code>recommended_action</code> — isso só funciona automaticamente quando <code>recommended_action</code> é um array.
+      </p>
+
+      <h3>9.6) Contrato da API (Resources)</h3>
+      <p>
+        A API expõe a análise via <code>AnalysisResource</code> e sugestões via <code>SuggestionResource</code>. Exemplo
+        (shape, campos principais):
+      </p>
+      <pre><code>{
+  "id": "uuid",
+  "status": "Completed",
+  "analysis_type": "general",
+  "summary": {
+    "health_score": 72,
+    "health_status": "saudavel",
+    "main_insight": "Resumo executivo do Analyst",
+    "premium_summary": { "...": "Growth Intelligence Framework" }
+  },
+  "premium_summary": { "...": "atalho do summary.premium_summary" },
+  "alerts": [{"type": "danger|warning", "title": "...", "message": "..."}],
+  "opportunities": [{"title": "...", "description": "...", "potential_revenue": 0}],
+  "suggestions": [
+    {
+      "id": "uuid",
+      "category": "inventory|pricing|...",
+      "title": "...",
+      "description": "...",
+      "recommended_action": ["passo 1", "passo 2"],
+      "expected_impact": "high|medium|low",
+      "priority": "high|medium|low",
+      "priority_order": 1,
+      "specific_data": {"expected_result": "...", "score_qualidade": 8}
+    }
+  ],
+  "current_stage": 9,
+  "total_stages": 9,
+  "progress_percentage": 100
+}</code></pre>
+
+      <h3>9.7) Como a UI consome (Frontend)</h3>
+      <ul>
+        <li><strong>Resumo Estratégico:</strong> <code>StrategicSummaryPanel.vue</code> lê <code>premium_summary</code> e renderiza seções (executivo, score, oportunidades, roadmap, cenários, riscos e veredito).</li>
+        <li><strong>Passos da sugestão:</strong> <code>SuggestionStepsPanel.vue</code> aceita <code>recommended_action</code> como array ou string; se for string, tenta parsear JSON e depois quebra por linhas/numeração.</li>
+        <li><strong>Prioridade:</strong> a UI usa <code>priority</code> (que mapeia <code>expected_impact</code>) e usa <code>priority_order</code> para ordenação exibida.</li>
+      </ul>
+    </section>
+
+    <section class="page-break" id="exemplos-fim-a-fim">
+      <h2>10) Exemplos fim-a-fim (concretos)</h2>
+      <p>
+        Os exemplos abaixo são <strong>hipotéticos</strong> e servem para demonstrar, com números e passo a passo, como o
+        pipeline conecta dados → diagnóstico → recomendações → validação → resultado persistido/API/UI.
+      </p>
+
+      <div class="callout warn">
+        <strong>Nota:</strong> como parte do processo é inferencial (IA), o conteúdo textual exato varia. O que não deveria
+        variar é o <em>contrato</em> (campos/estrutura) e a coerência numérica (base × premissa = impacto).
+      </div>
+
+      <h3>10.1) Exemplo FULL (15 dias) — ruptura + dependência de cupom</h3>
+      <h4>10.1.1) Dados internos (entrada do pipeline)</h4>
+      <p>O backend prepara agregados da janela FULL (<code>period_days = 15</code>). Exemplo simplificado:</p>
+      <pre><code>{
+  "orders_summary": {
+    "period_days": 15,
+    "total": 120,
+    "total_revenue": 10200,
+    "average_order_value": 85,
+    "cancellation_rate": 6.0
+  },
+  "products_summary": {
+    "total": 300,
+    "active": 240,
+    "out_of_stock": 60
+  },
+  "coupons_summary": {
+    "usage_rate": 40,
+    "avg_discount_percent": 18,
+    "ticket_impact_percent": -12
+  }
+}</code></pre>
+      <p>
+        A partir disso, o pipeline também calcula auxiliares usados pelos agentes (ex.: <code>out_of_stock_pct</code>,
+        <code>ticket_medio</code>, <code>pedidos_mes</code> = total do período).
+      </p>
+
+      <h4>10.1.2) Analyst: diagnóstico + Health Score + alertas/oportunidades</h4>
+      <p>
+        Com os números acima, o Analyst gera um briefing (problema_1..problema_5), oportunidades e calcula o Health Score.
+        Aplicando a regra de pontuação documentada na seção 8.3:
+      </p>
+      <ul>
+        <li><strong>Estoque:</strong> 60/300 = 20% sem estoque → <strong>+20</strong></li>
+        <li><strong>Cancelamento:</strong> 6% → <strong>+0</strong> (acima de 5%)</li>
+        <li><strong>Ticket:</strong> R$ 85 vs benchmark (ex.: R$ 110) → 0,77 → <strong>+10</strong></li>
+        <li><strong>Pedidos:</strong> tendência estável → <strong>+10</strong></li>
+        <li><strong>Cupons:</strong> 40% de uso → <strong>+0</strong> (acima de 35%)</li>
+      </ul>
+      <p>
+        Score base = 20 + 0 + 10 + 10 + 0 = <strong>40</strong>. Sem overrides adicionais, <code>score_final = 40</code> e
+        <code>classificacao = atencao</code> (26–50).
+      </p>
+      <p>Exemplo de shape de saída do Analyst (parcial):</p>
+      <pre><code>{
+  "resumo_executivo": "A loja está perdendo vendas por ruptura e opera com dependência alta de cupom, corroendo ticket e margem.",
+  "health_score": {
+    "score_base": 40,
+    "score_final": 40,
+    "classificacao": "atencao",
+    "componentes": { "...": "..." },
+    "overrides": []
+  },
+  "alertas": {
+    "criticos": [{"tipo": "stock_out", "titulo": "Ruptura de estoque", "descricao": "20% do catálogo sem estoque..."}],
+    "atencao": [{"tipo": "coupon_dependency", "titulo": "Alta dependência de cupom", "descricao": "40% dos pedidos com cupom..."}],
+    "monitoramento": []
+  },
+  "oportunidades": [
+    {"tipo": "bundle_opportunity", "titulo": "Kits para elevar ticket", "potencial_receita": "R$ 3.000-6.000/mês"}
+  ]
+}</code></pre>
+
+      <h4>10.1.3) Strategist: 18 sugestões + Premium Summary</h4>
+      <p>
+        O Strategist transforma o briefing em 18 sugestões (6/6/6) e preenche o <code>premium_summary</code>. Exemplo de
+        sugestão HIGH estratégica (parcial):
+      </p>
+      <pre><code>{
+  "expected_impact": "high",
+  "category": "market",
+  "title": "Reposicionar ticket de R$ 85 para R$ 105 (+24%) com kits e valor percebido (benchmark nicho R$ 110)",
+  "problem": "Ticket médio R$ 85 está ~23% abaixo do benchmark do nicho (R$ 110), limitando margem e capacidade de investir.",
+  "action": "1. Criar 6 kits com best-sellers (faixa R$ 99–149)\n2. Ajustar pricing dos top 5 SKUs +8%\n3. Adicionar prova social (reviews) nas páginas dos kits",
+  "expected_result": "Normalizando para 30 dias: receita_15d=R$10.200 → ~R$20.400/mês. Se +R$20 no ticket em 240 pedidos/mês: +R$4.800/mês.",
+  "data_source": "orders_summary + benchmark do nicho + catálogo/estoque",
+  "competitor_reference": "Concorrentes do nicho operam com ticket 20–30% maior e usam kits para elevar valor percebido."
+}</code></pre>
+      <p>
+        Para o Premium Summary, o agente deve normalizar o baseline para “mensal” quando necessário (se o contexto vier em
+        15 dias). Exemplo de cenário base:
+      </p>
+      <pre><code>receita_15d = 10.200
+receita_mensal_estimada = 10.200 * (30/15) = 20.400
+cenário base (+25%) = 25.500/mês | 306.000/ano</code></pre>
+
+      <h4>10.1.4) Critic: valida, corrige e seleciona 9 (3-3-3)</h4>
+      <p>
+        O Critic checa V1–V6. Exemplo de correção típica: o Strategist citou ticket ou pedidos errados e o Critic recalcula
+        o impacto no <code>expected_result</code> e no <code>score_qualidade</code>.
+      </p>
+      <pre><code>{
+  "original_title": "Reposicionar ticket de R$ 85 para R$ 105...",
+  "status": "improved",
+  "verificacao_status": "DADO_CORRIGIDO",
+  "score_qualidade": 9,
+  "verificacoes": {
+    "V1_numeros": {"resultado": "corrigido", "detalhe": "Ticket médio confirmado: R$ 85 (não R$ 92)"},
+    "V5_impacto": {"resultado": "corrigido", "detalhe": "240 pedidos/mês × +R$20 = +R$4.800/mês"}
+  },
+  "final": {
+    "expected_impact": "high",
+    "category": "market",
+    "title": "Reposicionar ticket de R$ 85 para R$ 105 (+24%) com kits",
+    "problem": "…",
+    "action": "…",
+    "expected_result": "+R$ 4.800/mês (240 pedidos × +R$ 20)",
+    "data_source": "orders_summary + benchmarks"
+  }
+}</code></pre>
+
+      <h4>10.1.5) O que é salvo e aparece na UI</h4>
+      <p>
+        Ao final, o backend salva <code>analysis.summary</code> (incluindo <code>premium_summary</code>) e salva 9 registros em
+        <code>suggestions</code>. A UI mostra:
+      </p>
+      <ul>
+        <li>Health Score + insight (do Analyst);</li>
+        <li>Resumo Estratégico (premium_summary);</li>
+        <li>9 sugestões (com passos em <code>recommended_action</code>).</li>
+      </ul>
+
+      <h3>10.2) Exemplo LITE (7 dias) — diagnóstico compacto</h3>
+      <h4>10.2.1) Entrada compactada</h4>
+      <pre><code>{
+  "period_days": 7,
+  "orders": {"total": 40, "total_revenue": 3200, "average_order_value": 80, "cancellation_rate": 2.5},
+  "products": {"total": 250, "active": 210, "out_of_stock": 30, "low_stock": 15, "best_sellers_count": 20},
+  "coupons": {"usage_rate": 20, "ticket_impact": -3, "total_discount": 180}
+}</code></pre>
+
+      <h4>10.2.2) Lite Analyst: métricas + anomalias + overall_health</h4>
+      <pre><code>{
+  "metrics": {
+    "sales": {"total": 3200, "daily_average": 457, "trend": "estável"},
+    "average_order_value": {"value": 80, "benchmark": 150},
+    "cancellation_rate": 2.5,
+    "inventory": {"out_of_stock_products": 30, "critical_stock_products": 15},
+    "coupons": {"usage_rate": 20, "ticket_impact": -3}
+  },
+  "anomalies": [
+    {"type": "estoque", "description": "30 produtos sem estoque e 15 em estoque crítico", "severity": "alto"},
+    {"type": "ticket", "description": "Ticket médio 47% abaixo do benchmark (R$80 vs R$150)", "severity": "médio"}
+  ],
+  "overall_health": {"score": 55, "classification": "atenção", "main_points": ["Estoque crítico e ticket abaixo do benchmark"]}
+}</code></pre>
+
+      <h4>10.2.3) Lite Strategist: 6 sugestões (2-2-2)</h4>
+      <pre><code>{
+  "suggestions": [
+    {
+      "expected_impact": "high",
+      "category": "inventory",
+      "title": "Repor 5 best-sellers esgotados que representavam R$ 1.200/semana",
+      "description": "…",
+      "recommended_action": "1. Identificar SKUs\n2. Repor urgente\n3. Ativar avise-me",
+      "data_justification": "products.out_of_stock + histórico de pedidos"
+    }
+  ]
+}</code></pre>
+      <p class="muted">
+        No LITE não há Critic nem Premium Summary. Após validação mínima, as sugestões passam por dedup contra histórico e são persistidas.
+      </p>
+    </section>
+
+    <section class="page-break" id="apendice">
+      <h2>11) Apêndice (glossário, listas e referências)</h2>
+
+      <h3>11.1) Glossário</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Termo</th>
+            <th>Significado no EcommPilot</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>FULL</strong></td>
+            <td>Pipeline completo (9 etapas) com dados externos, RAG, Strategist + Critic e filtros finais.</td>
+          </tr>
+          <tr>
+            <td><strong>LITE</strong></td>
+            <td>Pipeline compacto (2 etapas) com janela menor (7 dias), 6 sugestões e sem Premium Summary.</td>
+          </tr>
+          <tr>
+            <td><strong>Health Score</strong></td>
+            <td>Score 0–100 calculado pelo Analyst (FULL) ou Lite Analyst (LITE) segundo regras do prompt.</td>
+          </tr>
+          <tr>
+            <td><strong>Alertas</strong></td>
+            <td>Mensagens curtas priorizadas (até 3 no FULL) para destacar risco imediato (danger/warning).</td>
+          </tr>
+          <tr>
+            <td><strong>Oportunidades</strong></td>
+            <td>Leituras de potencial (ex.: bundles, retenção, pricing) extraídas do diagnóstico do Analyst (FULL).</td>
+          </tr>
+          <tr>
+            <td><strong>RAG</strong></td>
+            <td>Busca de benchmarks/estratégias em base interna (texto/embeddings) para contextualizar recomendações.</td>
+          </tr>
+          <tr>
+            <td><strong>Embeddings / pgvector</strong></td>
+            <td>Representação vetorial para busca semântica e filtro de similaridade (threshold típico 0.85).</td>
+          </tr>
+          <tr>
+            <td><strong>Saturação de tema</strong></td>
+            <td>Detecção de repetição por palavras-chave (ThemeKeywords). 3+ ocorrências bloqueiam programaticamente.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>11.2) Enumerações relevantes (API/UI)</h3>
+      <h4>11.2.1) Status de Analysis</h4>
+      <ul>
+        <li><code>Pending</code>, <code>Processing</code>, <code>Completed</code>, <code>Failed</code></li>
+      </ul>
+
+      <h4>11.2.2) Status de Suggestion</h4>
+      <ul>
+        <li><strong>Tela de análise:</strong> <code>new</code>, <code>rejected</code> (aliases: <code>pending</code>, <code>ignored</code>)</li>
+        <li><strong>Acompanhamento:</strong> <code>accepted</code>, <code>in_progress</code>, <code>completed</code></li>
+      </ul>
+
+      <h4>11.2.3) Impacto / prioridade</h4>
+      <ul>
+        <li><code>high</code>, <code>medium</code>, <code>low</code></li>
+        <li>
+          Na API, <code>SuggestionResource.priority</code> é um alias de <code>expected_impact</code> para compatibilidade com o Frontend.
+        </li>
+      </ul>
+
+      <h3>11.3) Categorias aceitas nas sugestões (Strategist/Critic)</h3>
+      <p>
+        O ecossistema usa categorias para organizar recomendações. No Strategist/Critic V7, HIGH devem ser estratégicas e
+        MEDIUM/LOW tendem a ser táticas.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Grupo</th>
+            <th>Categorias</th>
+            <th>Interpretação</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Estratégicas (HIGH)</td>
+            <td><code>strategy</code>, <code>investment</code>, <code>market</code>, <code>growth</code>, <code>financial</code>, <code>positioning</code></td>
+            <td>Decisões de negócio: metas, investimento, mercado, posicionamento, alavancas financeiras.</td>
+          </tr>
+          <tr>
+            <td>Táticas (MEDIUM/LOW)</td>
+            <td><code>inventory</code>, <code>pricing</code>, <code>product</code>, <code>customer</code>, <code>conversion</code>, <code>marketing</code>, <code>coupon</code>, <code>operational</code></td>
+            <td>Execução: estoque, páginas, checkout, cupons, aquisição, atendimento e operações.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>11.4) Temas e palavras-chave (ThemeKeywords)</h3>
+      <p>
+        A saturação por tema usa palavras-chave em título + descrição para contar repetição e bloquear temas com 3+ ocorrências.
+        Lista atual (centralizada em <code>ThemeKeywords.php</code>):
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Tema</th>
+            <th>Palavras-chave</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Quiz de Recomendação</td><td>quiz, questionário, personalizado, recomendação, personalização</td></tr>
+          <tr><td>Frete Grátis</td><td>frete grátis, frete gratuito, entrega grátis, frete gratis</td></tr>
+          <tr><td>Programa de Fidelidade</td><td>fidelidade, pontos, cashback, loyalty, recompensa</td></tr>
+          <tr><td>Kits e Combos</td><td>kit, combo, bundle, cronograma, pack</td></tr>
+          <tr><td>Gestão de Estoque</td><td>estoque, avise-me, reposição, inventário, ruptura</td></tr>
+          <tr><td>Email Marketing</td><td>email, e-mail, newsletter, automação, pós-venda</td></tr>
+          <tr><td>Conteúdo em Vídeo</td><td>vídeo, video, tutorial, youtube, reels</td></tr>
+          <tr><td>Modelo de Assinatura</td><td>assinatura, recorrência, subscription, clube</td></tr>
+          <tr><td>Cupons e Descontos</td><td>cupom, desconto, promoção, voucher, código</td></tr>
+          <tr><td>Otimização de Checkout</td><td>checkout, carrinho, conversão, abandono, finalização</td></tr>
+          <tr><td>Atendimento via WhatsApp</td><td>whatsapp, telegram, chat, mensagem, zap</td></tr>
+          <tr><td>Reviews e UGC</td><td>review, ugc, avaliação, depoimento, fotos, vídeos, antes e depois</td></tr>
+          <tr><td>Pós-Compra</td><td>pós-compra, pos-compra, follow-up, acompanhamento</td></tr>
+          <tr><td>Marketing de Influenciadores</td><td>influenciador, micro-influenciador, embaixador, embaixadora, parceria, afiliado</td></tr>
+          <tr><td>Gamificação</td><td>gamificação, gamificacao, desafio, milhas, níveis</td></tr>
+          <tr><td>Hub de Conteúdo</td><td>conteúdo, conteudo, hub, guia, educativo</td></tr>
+          <tr><td>Campanha de Carnaval</td><td>carnaval, folia, fantasia, bloco</td></tr>
+          <tr><td>Aumento de Ticket Médio</td><td>ticket médio, ticket, aov, valor médio</td></tr>
+          <tr><td>Redução de Cancelamento</td><td>cancelamento, cancelado, desistência, churn</td></tr>
+          <tr><td>Reativação de Clientes</td><td>reativação, reativar, inativos, dormentes, win-back</td></tr>
+          <tr><td>Upsell</td><td>upsell, up-sell, upgrade, premium</td></tr>
+          <tr><td>Cross-sell</td><td>cross-sell, cross sell, venda cruzada, produtos relacionados, compre junto</td></tr>
+          <tr><td>Estratégia de Precificação</td><td>preço, pricing, margem, precificação</td></tr>
+          <tr><td>SEO</td><td>seo, google, busca, orgânico, ranqueamento</td></tr>
+          <tr><td>Remarketing</td><td>remarketing, retargeting, pixel, público similar</td></tr>
+        </tbody>
+      </table>
+
+      <h3>11.5) Chaves/flags que costumam alterar comportamento</h3>
+      <ul>
+        <li><code>analysis.v2.use_history_summary</code>: usa resumo otimizado de histórico (reduz tokens) quando habilitado.</li>
+        <li><code>ai.embeddings.provider</code>: habilita embeddings para RAG e filtro semântico de similaridade (requer pgvector).</li>
+      </ul>
+    </section>
+
+    <!-- CONTENT END -->
+  </body>
+</html>

@@ -114,10 +114,10 @@ class LiteStoreAnalysisService
 
         $paidOrders = $orders->filter(fn ($o) => $o->isPaid());
 
-        // Products (top 20 best sellers + basic counts)
+        // Products (top 20 best sellers + basic counts, applying analysis config)
         $allProductsCount = $store->products()->count();
-        $products = $store->products()->excludeGifts()->get();
-        $giftsFiltered = $allProductsCount - $products->count();
+        $products = $store->analysisProducts()->get();
+        $excludedCount = $allProductsCount - $products->count();
         $bestSellers = $this->getBestSellers($paidOrders, 20);
 
         // Compact coupon summary (no detailed list)
@@ -148,7 +148,7 @@ class LiteStoreAnalysisService
                 'out_of_stock' => $products->filter(fn ($p) => $p->isOutOfStock())->count(),
                 'low_stock' => $products->filter(fn ($p) => $p->hasLowStock())->count(),
                 'best_sellers_count' => count($bestSellers),
-                'gifts_filtered' => $giftsFiltered,
+                'excluded_count' => $excludedCount,
             ],
             'coupons' => [
                 'usage_rate' => $usageRate,
@@ -291,8 +291,7 @@ class LiteStoreAnalysisService
      */
     private function identifyNiche(Store $store): string
     {
-        $categories = $store->products()
-            ->excludeGifts()
+        $categories = $store->analysisProducts()
             ->whereNotNull('categories')
             ->pluck('categories')
             ->flatten()

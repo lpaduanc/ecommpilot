@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Guia para Clientes — Análise Inteligente (EcommPilot)</title>
+    <style>
+      :root {
+        --text: #111827;
+        --muted: #374151;
+        --border: #e5e7eb;
+        --bg-soft: #f8fafc;
+        --bg-thead: #f3f4f6;
+        --blue: #2563eb;
+        --amber: #b45309;
+        --red: #b91c1c;
+      }
+
+      @page {
+        size: A4;
+        margin: 18mm 16mm;
+      }
+
+      html {
+        font-size: 12pt;
+      }
+
+      body {
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          Arial,
+          "Noto Sans",
+          "Liberation Sans",
+          sans-serif;
+        color: var(--text);
+        line-height: 1.35;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        page-break-after: avoid;
+        break-after: avoid-page;
+      }
+
+      h1 {
+        font-size: 24pt;
+        margin: 0 0 6mm;
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        font-size: 16pt;
+        margin: 10mm 0 4mm;
+        letter-spacing: -0.01em;
+      }
+
+      h3 {
+        font-size: 13pt;
+        margin: 6mm 0 3mm;
+      }
+
+      h4 {
+        font-size: 11.5pt;
+        margin: 5mm 0 2mm;
+      }
+
+      p,
+      li {
+        margin: 0 0 4mm;
+      }
+
+      ul,
+      ol {
+        margin: 0 0 4mm;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10.5pt;
+        margin: 0 0 6mm;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 6pt 7pt;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--bg-thead);
+        text-align: left;
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration: none;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 10.5pt;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+
+      .callout {
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--blue);
+        border-radius: 10pt;
+        padding: 10pt 12pt;
+        background: var(--bg-soft);
+        margin: 0 0 6mm;
+      }
+
+      .callout.warn {
+        border-left-color: var(--amber);
+      }
+
+      .callout.danger {
+        border-left-color: var(--red);
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2pt 6pt;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #fff;
+        font-size: 9.5pt;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8pt;
+        margin: 0 0 6mm;
+      }
+
+      @media print {
+        .no-print {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Guia para Clientes — Como interpretar sua Análise Inteligente</h1>
+      <p class="small">
+        Produto: EcommPilot • Atualizado em <time datetime="2026-02-14">14/02/2026</time>
+      </p>
+      <p>
+        Este guia explica, em linguagem simples, como a análise funciona e como você deve interpretar os números,
+        principalmente o <strong>Resumo Estratégico</strong>. Aqui você encontrará exemplos práticos e explicações sobre:
+        como as sugestões são pensadas, como estimamos potenciais de impacto e como definimos os cenários de crescimento.
+      </p>
+      <div class="callout warn">
+        <strong>Importante:</strong> os números são <strong>estimativas</strong> com base nos dados disponíveis e em premissas
+        razoáveis. Eles servem para orientar decisões e priorização — não são garantia de resultado.
+      </div>
+    </header>
+
+    <section class="page-break" id="sumario">
+      <h2>Sumário</h2>
+      <ol>
+        <li><a href="#o-que-voce-recebe">O que você recebe no final</a></li>
+        <li><a href="#de-onde-vem-os-dados">De onde vêm os dados</a></li>
+        <li><a href="#saude-da-loja">Saúde da loja (Health Score)</a></li>
+        <li><a href="#resumo-estrategico">Resumo Estratégico (como ler)</a></li>
+        <li><a href="#sugestoes">Sugestões (como são pensadas)</a></li>
+        <li><a href="#potenciais-calculos">Potenciais e cálculos (como estimamos impacto)</a></li>
+        <li><a href="#cenarios-crescimento">Cenários de crescimento (conservador/base/agressivo)</a></li>
+        <li><a href="#boas-praticas">Boas práticas para executar</a></li>
+        <li><a href="#glossario">Glossário</a></li>
+      </ol>
+    </section>
+
+    <section class="page-break" id="o-que-voce-recebe">
+      <h2>1) O que você recebe no final</h2>
+      <p>
+        Ao concluir a análise, você verá um conjunto de informações organizadas para ajudar você a <strong>entender</strong>
+        a situação atual da loja e <strong>decidir</strong> o que fazer primeiro.
+      </p>
+
+      <div class="grid-2">
+        <div class="callout">
+          <h3 style="margin-top: 0">1.1) Saúde da loja</h3>
+          <p class="muted">
+            Um score de 0 a 100 e uma classificação (ex.: “atenção”, “saudável”), indicando o quão bem a operação está para crescer.
+          </p>
+          <p>
+            Use para entender se o foco inicial deve ser “arrumar a base” (estoque, cancelamentos, ticket, etc.) antes de
+            investir pesado em crescimento.
+          </p>
+        </div>
+        <div class="callout">
+          <h3 style="margin-top: 0">1.2) Resumo Estratégico</h3>
+          <p class="muted">
+            A visão executiva do negócio: diagnóstico, oportunidades financeiras, roadmap 30/60/90 dias e cenários de crescimento.
+          </p>
+          <p>
+            Use para alinhar expectativas, escolher onde investir energia e dinheiro e entender o “porquê” por trás das sugestões.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="callout">
+          <h3 style="margin-top: 0">1.3) Alertas e oportunidades</h3>
+          <p class="muted">
+            Alertas destacam riscos imediatos (ex.: ruptura, cancelamento alto). Oportunidades apontam alavancas de crescimento.
+          </p>
+          <p>
+            Use como “lista de atenção”: o que pode estar causando perda de receita agora e o que pode ser explorado para ganhar mais.
+          </p>
+        </div>
+        <div class="callout">
+          <h3 style="margin-top: 0">1.4) Sugestões priorizadas</h3>
+          <p class="muted">
+            Um conjunto de ações recomendadas, com prioridade e impacto estimado, para você executar (passo a passo).
+          </p>
+          <p>
+            Use como plano prático: comece pelas prioridades mais altas e avance para melhorias de médio e baixo impacto.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break" id="de-onde-vem-os-dados">
+      <h2>2) De onde vêm os dados</h2>
+      <p>
+        A análise combina dados da sua própria loja com referências de mercado, quando disponíveis. Isso evita recomendações
+        genéricas e ajuda a quantificar oportunidades.
+      </p>
+
+      <h3>2.1) Dados da loja</h3>
+      <ul>
+        <li><strong>Pedidos e faturamento:</strong> volume de pedidos e receita no período analisado.</li>
+        <li><strong>Ticket médio:</strong> valor médio por pedido.</li>
+        <li><strong>Cancelamentos:</strong> taxa de cancelamento no período.</li>
+        <li><strong>Catálogo e estoque:</strong> quantidade de produtos ativos e quantos estão sem estoque.</li>
+        <li><strong>Cupons:</strong> uso de cupons e relação com o ticket.</li>
+      </ul>
+
+      <h3>2.2) Benchmarks e referências</h3>
+      <p>
+        Quando possível, comparamos seus números com benchmarks do seu nicho (ex.: ticket médio esperado, padrões de margem,
+        práticas comuns do setor). Esses benchmarks ajudam a responder: “estou abaixo, dentro ou acima do esperado?”.
+      </p>
+
+      <h3>2.3) Dados externos (quando habilitado/disponível)</h3>
+      <p>
+        Em alguns casos, usamos sinais de mercado e concorrência (por exemplo: tendências de busca e referências competitivas).
+        Quando não há dados externos confiáveis, a análise se apoia mais nos seus dados internos e benchmarks.
+      </p>
+      <div class="callout">
+        <strong>Transparência:</strong> recomendações com baixa certeza devem ser tratadas como hipóteses para testar.
+        Já recomendações baseadas em números diretos da loja tendem a ser mais confiáveis.
+      </div>
+    </section>
+
+    <section class="page-break" id="saude-da-loja">
+      <h2>3) Saúde da loja (Health Score)</h2>
+      <p>
+        O Health Score é um indicador de 0 a 100 que resume se a loja está com a “base” pronta para crescer. Ele não mede
+        apenas vendas — ele mede <strong>saúde operacional</strong> e <strong>eficiência</strong>.
+      </p>
+
+      <h3>3.1) O que significa o número</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Faixa</th>
+            <th>Leitura</th>
+            <th>O que fazer primeiro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0–25</td>
+            <td><strong>Crítico</strong></td>
+            <td>Corrigir base (estoque, cancelamento, operação) antes de escalar marketing.</td>
+          </tr>
+          <tr>
+            <td>26–50</td>
+            <td><strong>Atenção</strong></td>
+            <td>Atacar os gargalos principais com ações de curto prazo + 1 ou 2 mudanças estruturais.</td>
+          </tr>
+          <tr>
+            <td>51–75</td>
+            <td><strong>Saudável</strong></td>
+            <td>Otimizar conversão e ticket, profissionalizar aquisição e começar a escalar com controle.</td>
+          </tr>
+          <tr>
+            <td>76–100</td>
+            <td><strong>Excelente</strong></td>
+            <td>Foco em crescimento: aquisição, retenção, expansão de mix e ganho de participação de mercado.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>3.2) Como interpretar (exemplo prático)</h3>
+      <p>
+        Se a loja tem muitos produtos sem estoque e cancelamento alto, normalmente o score cai, porque isso representa perda
+        direta de receita e baixa confiabilidade operacional. Nesses casos, a análise tende a priorizar:
+      </p>
+      <ul>
+        <li>corrigir ruptura e garantir disponibilidade de best-sellers;</li>
+        <li>reduzir cancelamentos (meios de pagamento, prazos, comunicação, logística);</li>
+        <li>revisar dependência de cupons e impacto no ticket/margem.</li>
+      </ul>
+      <div class="callout warn">
+        <strong>Como usar:</strong> pense no Health Score como “prontidão para crescer”. Se ele está baixo, crescer com tráfego
+        pago pode “vazar” (você paga para trazer gente, mas perde por estoque/checkout/cancelamento).
+      </div>
+    </section>
+
+    <section class="page-break" id="resumo-estrategico">
+      <h2>4) Resumo Estratégico (como ler)</h2>
+      <p>
+        O Resumo Estratégico é a visão executiva da análise. Ele organiza a situação em tópicos fixos para você entender,
+        em poucos minutos, o que está travando o crescimento e o que fazer em seguida.
+      </p>
+
+      <h3>4.1) Resumo Direto: “Você NÃO precisa… / Você precisa… / Potencial real…”</h3>
+      <p>
+        Esta parte serve para cortar ruído e direcionar foco:
+      </p>
+      <ul>
+        <li><strong>“Você NÃO precisa”</strong>: ações que parecem intuitivas, mas não atacam o gargalo principal.</li>
+        <li><strong>“Você precisa”</strong>: 3 a 5 decisões estratégicas que movem o negócio.</li>
+        <li><strong>“Potencial real”</strong>: 3 a 4 áreas onde existe dinheiro “na mesa” (ticket, conversão, retenção, margem).</li>
+      </ul>
+      <div class="callout">
+        <strong>Exemplo:</strong> “Você NÃO precisa baixar preços”. Se o gargalo é ruptura e baixa disponibilidade, baixar preços
+        só aumenta a demanda por itens que você não consegue entregar. A ação correta pode ser repor best-sellers e ajustar mix.
+      </div>
+
+      <h3>4.2) Growth Score e maturidade (o que significa cada número)</h3>
+      <p>
+        O Growth Score traz quatro números (0 a 100) e um nível de maturidade. Pense como uma “nota” por área:
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Indicador</th>
+            <th>O que mede</th>
+            <th>Quando tende a cair</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Overall</strong></td>
+            <td>Leitura geral de prontidão para crescer com consistência.</td>
+            <td>Vários gargalos relevantes ao mesmo tempo.</td>
+          </tr>
+          <tr>
+            <td><strong>Eficiência</strong></td>
+            <td>Capacidade de transformar tráfego em pedido e operar sem “vazamento”.</td>
+            <td>Cancelamento alto, ruptura, baixa conversão, operação instável.</td>
+          </tr>
+          <tr>
+            <td><strong>Margem</strong></td>
+            <td>Saúde de margem e disciplina de descontos/custos para sustentar investimento.</td>
+            <td>Dependência de cupom/frete grátis corroendo ticket e margem.</td>
+          </tr>
+          <tr>
+            <td><strong>Retenção</strong></td>
+            <td>Potencial de recompra (clientes voltando e comprando de novo).</td>
+            <td>Ausência de pós-compra, baixa recompra, relacionamento fraco.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        O nível de maturidade (Operacional → Dominante) traduz se a loja está pronta para escalar. Uma loja “Operacional”
+        geralmente deve fortalecer base e processos; uma loja “Escalável” pode investir em aquisição com mais segurança.
+      </p>
+
+      <h3>4.3) Diagnóstico quantitativo (o que você deve procurar)</h3>
+      <p>
+        Aqui o resumo compara métricas com referências e aponta “gaps” com números. Você deve buscar:
+      </p>
+      <ul>
+        <li><strong>Ticket vs benchmark:</strong> se está abaixo, existe alavanca de valor percebido (kits, precificação, mix).</li>
+        <li><strong>Dependência de desconto:</strong> se cupom aparece demais, pode haver risco de margem e de “viciar” a compra.</li>
+        <li><strong>Estrutura de catálogo:</strong> muitos itens sem estoque ou poucos produtos “vencedores” podem travar o crescimento.</li>
+        <li><strong>Potencial de retenção:</strong> falta de pós-compra ou recorrência reduz LTV e aumenta custo para crescer.</li>
+      </ul>
+
+      <h3>4.4) Oportunidades financeiras (mensal e anual)</h3>
+      <p>
+        Esta seção lista oportunidades com impacto estimado. Você verá:
+      </p>
+      <ul>
+        <li><strong>Tipo de impacto:</strong> ticket, conversão, retenção ou margem.</li>
+        <li><strong>Impacto mensal:</strong> quanto pode aumentar no mês, dadas as premissas.</li>
+        <li><strong>Impacto anual:</strong> projeção do mensal × 12.</li>
+      </ul>
+      <div class="callout warn">
+        <strong>Como interpretar:</strong> oportunidades financeiras são “alvos” para priorização. Se você executar parte do plano,
+        o impacto tende a ser menor; se executar com excelência, tende a se aproximar dos cenários base/agressivo.
+      </div>
+
+      <h3>4.5) Roadmap 30/60/90 dias e Matriz Impacto × Esforço</h3>
+      <p>
+        O roadmap transforma as ideias em sequência: o que fazer primeiro (30 dias), depois (60) e por fim (90). A matriz ajuda
+        a identificar:
+      </p>
+      <ul>
+        <li><strong>Quick wins:</strong> alto impacto e baixo esforço.</li>
+        <li><strong>High impact:</strong> alto impacto e maior esforço (normalmente projetos).</li>
+        <li><strong>Fill-ins:</strong> baixo impacto e baixo esforço (melhorias complementares).</li>
+        <li><strong>Avoid:</strong> baixo impacto e alto esforço (não priorizar agora).</li>
+      </ul>
+
+      <h3>4.6) Cenários e veredito final</h3>
+      <p>
+        Os cenários (conservador/base/agressivo) mostram “se eu executar, onde posso chegar?”. O veredito final resume o estágio
+        atual e qual é o próximo degrau para avançar.
+      </p>
+    </section>
+
+    <section class="page-break" id="sugestoes">
+      <h2>5) Sugestões (como são pensadas)</h2>
+      <p>
+        As sugestões são criadas para resolver problemas reais identificados nos dados e para explorar oportunidades do nicho.
+        Elas são priorizadas para você saber o que fazer primeiro.
+      </p>
+
+      <h3>5.1) Prioridades e impacto</h3>
+      <p>
+        Você verá níveis de impacto como <span class="badge">HIGH</span>, <span class="badge">MEDIUM</span> e
+        <span class="badge">LOW</span>. Em termos simples:
+      </p>
+      <ul>
+        <li><strong>HIGH:</strong> ações com potencial grande de resultado e/ou que destravam crescimento (normalmente mais estratégicas).</li>
+        <li><strong>MEDIUM:</strong> ações táticas com impacto mensurável, geralmente de curto/médio prazo.</li>
+        <li><strong>LOW:</strong> melhorias rápidas (quick wins) e ajustes operacionais/UX.</li>
+      </ul>
+
+      <h3>5.2) Como evitamos sugestões genéricas</h3>
+      <ul>
+        <li>Usamos números da própria loja (ex.: percentuais de ruptura, ticket, cancelamento, uso de cupom).</li>
+        <li>Quando disponíveis, usamos referências externas (mercado/concorrentes/benchmarks) para decisões estratégicas.</li>
+        <li>Evitamos repetir temas que você já recebeu várias vezes (para não “chover no molhado”).</li>
+      </ul>
+
+      <h3>5.3) Passo a passo (como executar)</h3>
+      <p>
+        Cada sugestão vem com um conjunto de passos para execução. Em geral, recomendamos:
+      </p>
+      <ol>
+        <li>Começar pelas 1–3 primeiras sugestões.</li>
+        <li>Executar por 7–14 dias e medir o efeito (ticket, conversão, cancelamento, estoque, etc.).</li>
+        <li>Ajustar premissas (ex.: desconto, frete, orçamento de mídia) antes de escalar.</li>
+      </ol>
+    </section>
+
+    <section class="page-break" id="potenciais-calculos">
+      <h2>6) Potenciais e cálculos (como estimamos impacto)</h2>
+      <p>
+        Os potenciais de impacto são estimativas baseadas em uma lógica simples: <strong>uma base real</strong> (seus dados)
+        multiplicada por <strong>uma melhoria provável</strong> (premissa). Em termos práticos, usamos um raciocínio do tipo
+        “base × premissa = resultado”.
+      </p>
+
+      <h3>6.1) Primeiro passo: definir o “baseline”</h3>
+      <p>
+        Para estimar impacto mensal, começamos com uma base de receita. Se o período analisado não for um mês inteiro, fazemos
+        uma conversão proporcional.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Como estimamos</th>
+            <th>Exemplo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Receita no período = ticket médio × número de pedidos pagos no período</td>
+            <td>R$ 85 × 120 pedidos = R$ 10.200 (em 15 dias)</td>
+          </tr>
+          <tr>
+            <td>Receita mensal estimada = (receita do período ÷ dias do período) × 30</td>
+            <td>(10.200 ÷ 15) × 30 = R$ 20.400/mês</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.2) Segundo passo: escolher a alavanca (ticket, conversão, retenção ou margem)</h3>
+      <p>
+        As estimativas aparecem normalmente em uma dessas quatro categorias. Veja como interpretá-las e como o cálculo costuma ser feito:
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Alavanca</th>
+            <th>Exemplo de premissa</th>
+            <th>Como calcular (forma simples)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Ticket</strong></td>
+            <td>+R$ 20 no ticket médio</td>
+            <td>Pedidos/mês × (+R$ no ticket)</td>
+          </tr>
+          <tr>
+            <td><strong>Conversão</strong></td>
+            <td>de 1,2% para 1,5%</td>
+            <td>Visitas × (taxa nova − taxa atual) × ticket</td>
+          </tr>
+          <tr>
+            <td><strong>Retenção</strong></td>
+            <td>+5% de recompra</td>
+            <td>Clientes × (% adicional) × ticket (ou LTV)</td>
+          </tr>
+          <tr>
+            <td><strong>Margem</strong></td>
+            <td>+2 p.p. de margem</td>
+            <td>Receita × (aumento de margem)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.3) Por que às vezes o potencial vem como faixa (ex.: “R$ 1.000–3.000/mês”)</h3>
+      <p>
+        Quando a confiança na premissa é menor (por exemplo: falta de informação sobre tráfego, custo de mídia, margem real),
+        o potencial pode ser apresentado como faixa. Isso é saudável: indica que você deve <strong>testar</strong> antes de escalar.
+      </p>
+      <div class="callout">
+        <strong>Exemplo:</strong> “Cupom de primeira compra pode gerar +R$ 1.000–3.000/mês”.
+        A faixa muda conforme adesão, tráfego, ticket e atratividade da oferta.
+      </div>
+    </section>
+
+    <section class="page-break" id="cenarios-crescimento">
+      <h2>7) Cenários de crescimento (conservador/base/agressivo)</h2>
+      <p>
+        Os cenários mostram onde você pode chegar se executar as recomendações com diferentes níveis de intensidade e risco.
+        Em geral, eles são definidos como percentuais de crescimento em cima do baseline mensal estimado.
+      </p>
+
+      <h3>7.1) Como calculamos receita mensal e anual projetada</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Etapa</th>
+            <th>Como pensar</th>
+            <th>Exemplo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1) Baseline mensal</td>
+            <td>Convertemos o período analisado para 30 dias (se necessário).</td>
+            <td>R$ 10.200 em 15 dias → R$ 20.400/mês</td>
+          </tr>
+          <tr>
+            <td>2) Aplicar crescimento (%)</td>
+            <td>Receita projetada = baseline × (1 + crescimento)</td>
+            <td>Base (+25%): 20.400 × 1,25 = R$ 25.500/mês</td>
+          </tr>
+          <tr>
+            <td>3) Projeção anual</td>
+            <td>Receita anual = receita mensal projetada × 12</td>
+            <td>25.500 × 12 = R$ 306.000/ano</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>7.2) O que define “conservador”, “base” e “agressivo”</h3>
+      <p>
+        A diferença entre os cenários não é mágica: é o quanto você consegue executar, medir e ajustar.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Cenário</th>
+            <th>Como interpretar</th>
+            <th>O que normalmente acontece na prática</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Conservador</strong></td>
+            <td>Execução parcial e mais cautelosa, com menor risco.</td>
+            <td>Você aplica quick wins e corrige 1 gargalo principal; aprende e estabiliza.</td>
+          </tr>
+          <tr>
+            <td><strong>Base</strong></td>
+            <td>Execução consistente do roadmap e acompanhamento semanal.</td>
+            <td>Você implementa as prioridades e começa a escalar com controle (melhora de conversão/ticket/estoque).</td>
+          </tr>
+          <tr>
+            <td><strong>Agressivo</strong></td>
+            <td>Execução forte e rápida, com investimento e testes mais intensos.</td>
+            <td>Além de corrigir base, você acelera aquisição e otimiza funil; exige mais disciplina e monitoramento.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Regra de ouro:</strong> o cenário “agressivo” só é saudável quando a base está sólida. Se estoque e cancelamento
+        estiverem problemáticos, escalar aquisição pode aumentar estresse operacional e frustração do cliente.
+      </div>
+
+      <h3>7.3) Por que os cenários não são garantia</h3>
+      <ul>
+        <li>Porque dependem de execução (tempo, equipe, orçamento, consistência).</li>
+        <li>Porque premissas variam: sazonalidade, concorrência, custos de mídia, mudanças no mix.</li>
+        <li>Porque resultados reais exigem medir e iterar (não é “apertar um botão”).</li>
+      </ul>
+    </section>
+
+    <section class="page-break" id="boas-praticas">
+      <h2>8) Boas práticas para executar</h2>
+      <ol>
+        <li><strong>Comece pequeno:</strong> execute 1–3 sugestões e meça por 7–14 dias.</li>
+        <li><strong>Escolha 1 métrica principal por ciclo:</strong> ticket, conversão, cancelamento, ruptura ou recompra.</li>
+        <li><strong>Registre aprendizados:</strong> o que funcionou, o que não funcionou e por quê.</li>
+        <li><strong>Evite “promoção por ansiedade”:</strong> descontos sem estratégia podem destruir margem e percepção de valor.</li>
+        <li><strong>Priorize base antes de escalar mídia:</strong> estoque e operação precisam aguentar o crescimento.</li>
+      </ol>
+      <div class="callout">
+        <strong>Dica:</strong> use o Roadmap 30/60/90 como ritmo. Se uma ação “do 90” virar urgência, normalmente é sinal de que
+        a base (do 30) ainda não está firme.
+      </div>
+    </section>
+
+    <section class="page-break" id="glossario">
+      <h2>9) Glossário</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Termo</th>
+            <th>Explicação simples</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Ticket médio</strong></td>
+            <td>Valor médio por pedido.</td>
+          </tr>
+          <tr>
+            <td><strong>Conversão</strong></td>
+            <td>Percentual de visitantes que vira pedido.</td>
+          </tr>
+          <tr>
+            <td><strong>Ruptura</strong></td>
+            <td>Produto sem estoque (você perde venda porque não consegue entregar).</td>
+          </tr>
+          <tr>
+            <td><strong>Margem</strong></td>
+            <td>Quanto sobra após custos para sustentar operação e investimento em crescimento.</td>
+          </tr>
+          <tr>
+            <td><strong>Retenção / recompra</strong></td>
+            <td>Clientes voltando a comprar (base para crescer com menos custo).</td>
+          </tr>
+          <tr>
+            <td><strong>Baseline</strong></td>
+            <td>Sua base atual (receita/métricas) usada como ponto de partida para cálculos.</td>
+          </tr>
+          <tr>
+            <td><strong>Quick win</strong></td>
+            <td>Melhoria rápida, de baixo esforço, que gera impacto perceptível.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="small muted">
+        Este documento é um guia de interpretação e priorização. Se você quiser, podemos transformar o Roadmap em um plano de
+        execução semanal com responsáveis, prazos e metas.
+      </p>
+    </section>
+  </body>
+</html>
+
