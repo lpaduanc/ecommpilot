@@ -58,7 +58,7 @@ const lowStockProductsData = computed(() => shouldUseMocks.value ? mockLowStockP
 const isSingleDayPeriod = computed(() => {
     const { period, startDate, endDate } = dashboardStore.filters;
 
-    if (period === 'today') {
+    if (period === 'today' || period === 'yesterday') {
         return true;
     }
 

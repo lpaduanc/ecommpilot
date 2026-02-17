@@ -18,6 +18,8 @@ import {
     SparklesIcon,
     ChartBarIcon,
     XMarkIcon,
+    CalendarIcon,
+    ChevronDownIcon,
 } from '@heroicons/vue/24/outline';
 
 const route = useRoute();
@@ -53,11 +55,7 @@ function memoizedFormat(key, value, formatter) {
     return result;
 }
 
-// Cleanup on unmount
-onUnmounted(() => {
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-    formatCache.clear();
-});
+// Cleanup on unmount - merged with period listener cleanup below in onMounted/onUnmounted
 
 const products = ref([]);
 const selectedProduct = ref(null);
@@ -73,6 +71,36 @@ const perPageOptions = [10, 20, 50, 100];
 // Filtros
 const selectedAbcCategory = ref(null);
 const selectedStockHealth = ref(null);
+
+// Period filter state
+const showPeriodDropdown = ref(false);
+const selectedPeriod = ref('yesterday');
+const customStartDate = ref('');
+const customEndDate = ref('');
+
+const periodOptions = [
+    { value: 'yesterday', label: 'Ontem' },
+    { value: 'today', label: 'Hoje' },
+    { value: 'last_7_days', label: 'Últimos 7 dias' },
+    { value: 'last_15_days', label: 'Últimos 15 dias' },
+    { value: 'last_30_days', label: 'Últimos 30 dias' },
+    { value: 'this_month', label: 'Este mês' },
+    { value: 'last_month', label: 'Último mês' },
+    { value: 'all_time', label: 'Todo o período' },
+    { value: 'custom', label: 'Personalizado' },
+];
+
+const currentPeriodLabel = computed(() => {
+    if (selectedPeriod.value === 'custom' && customStartDate.value && customEndDate.value) {
+        const start = new Date(customStartDate.value + 'T00:00:00');
+        const end = new Date(customEndDate.value + 'T00:00:00');
+        return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
+    }
+    const option = periodOptions.find(o => o.value === selectedPeriod.value);
+    return option?.label || 'Ontem';
+});
+
+const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');
 
 // Dados agregados da API
 const apiTotals = ref(null);
@@ -124,21 +152,28 @@ const totals = computed(() => {
 
 // Filtros ativos
 const hasActiveFilters = computed(() => {
-    return selectedAbcCategory.value || selectedStockHealth.value;
+    return selectedAbcCategory.value || selectedStockHealth.value || selectedPeriod.value !== 'yesterday';
 });
 
 async function fetchProducts() {
     isLoading.value = true;
     try {
-        const response = await api.get('/products', {
-            params: {
-                search: searchQuery.value,
-                page: currentPage.value,
-                per_page: perPage.value,
-                abc_category: selectedAbcCategory.value,
-                stock_health: selectedStockHealth.value,
-            },
-        });
+        const params = {
+            search: searchQuery.value,
+            page: currentPage.value,
+            per_page: perPage.value,
+            abc_category: selectedAbcCategory.value,
+            stock_health: selectedStockHealth.value,
+            period: selectedPeriod.value,
+        };
+
+        // Add custom dates if custom period
+        if (selectedPeriod.value === 'custom') {
+            if (customStartDate.value) params.start_date = customStartDate.value;
+            if (customEndDate.value) params.end_date = customEndDate.value;
+        }
+
+        const response = await api.get('/products', { params });
         products.value = response.data.data;
         totalPages.value = response.data.last_page;
         totalItems.value = response.data.total;
@@ -258,9 +293,38 @@ function applyStockHealthFilter(health) {
     fetchProducts();
 }
 
+function selectPeriod(period) {
+    selectedPeriod.value = period;
+    if (period !== 'custom') {
+        showPeriodDropdown.value = false;
+        currentPage.value = 1;
+        fetchProducts();
+    }
+}
+
+function applyCustomPeriod() {
+    if (customStartDate.value && customEndDate.value) {
+        showPeriodDropdown.value = false;
+        currentPage.value = 1;
+        fetchProducts();
+    }
+}
+
+// Click outside to close period dropdown
+function handlePeriodClickOutside(event) {
+    const dropdown = document.getElementById('products-period-dropdown');
+    const button = document.getElementById('products-period-button');
+    if (dropdown && button && !dropdown.contains(event.target) && !button.contains(event.target)) {
+        showPeriodDropdown.value = false;
+    }
+}
+
 function clearFilters() {
     selectedAbcCategory.value = null;
     selectedStockHealth.value = null;
+    selectedPeriod.value = 'yesterday';
+    customStartDate.value = '';
+    customEndDate.value = '';
     currentPage.value = 1;
     fetchProducts();
 }
@@ -273,7 +337,14 @@ watch(() => route.query.search, (newSearch) => {
 });
 
 onMounted(() => {
+    document.addEventListener('click', handlePeriodClickOutside);
     fetchProducts();
+});
+
+onUnmounted(() => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    formatCache.clear();
+    document.removeEventListener('click', handlePeriodClickOutside);
 });
 </script>
 
@@ -308,9 +379,99 @@ onMounted(() => {
                         </div>
                     </div>
                     
-                    <!-- Search Bar -->
-                    <div class="flex items-center gap-3 w-full lg:w-auto">
-                        <div class="relative flex-1 max-w-full sm:max-w-md">
+                    <!-- Search Bar and Period Selector -->
+                    <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        <!-- Period Selector -->
+                        <div class="relative">
+                            <button
+                                id="products-period-button"
+                                @click.stop="showPeriodDropdown = !showPeriodDropdown"
+                                type="button"
+                                class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium transition-all hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+                            >
+                                <CalendarIcon class="w-5 h-5" aria-hidden="true" />
+                                <span class="hidden sm:inline">{{ currentPeriodLabel }}</span>
+                                <ChevronDownIcon class="w-4 h-4" aria-hidden="true" />
+                            </button>
+
+                            <!-- Period Dropdown -->
+                            <Teleport to="body">
+                                <transition
+                                    enter-active-class="transition ease-out duration-200"
+                                    enter-from-class="opacity-0 translate-y-1"
+                                    enter-to-class="opacity-100 translate-y-0"
+                                    leave-active-class="transition ease-in duration-150"
+                                    leave-from-class="opacity-100 translate-y-0"
+                                    leave-to-class="opacity-0 translate-y-1"
+                                >
+                                    <div
+                                        v-if="showPeriodDropdown"
+                                        id="products-period-dropdown"
+                                        class="fixed left-4 right-4 sm:left-auto sm:right-10 sm:w-80 rounded-2xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-white/10 z-[9999] p-4 top-20"
+                                    >
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Período</h3>
+                                            <button @click="showPeriodDropdown = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                                <XMarkIcon class="w-5 h-5" />
+                                            </button>
+                                        </div>
+
+                                        <!-- Period Options -->
+                                        <div class="grid grid-cols-2 gap-2 mb-4">
+                                            <button
+                                                v-for="option in periodOptions"
+                                                :key="option.value"
+                                                @click="selectPeriod(option.value)"
+                                                :class="[
+                                                    'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                                                    selectedPeriod === option.value
+                                                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                                                        : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                ]"
+                                            >
+                                                {{ option.label }}
+                                            </button>
+                                        </div>
+
+                                        <!-- Custom Date Range -->
+                                        <div v-if="isCustomPeriod" class="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Inicial</label>
+                                                <div class="relative">
+                                                    <CalendarIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                    <input
+                                                        v-model="customStartDate"
+                                                        type="date"
+                                                        class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Final</label>
+                                                <div class="relative">
+                                                    <CalendarIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                                    <input
+                                                        v-model="customEndDate"
+                                                        type="date"
+                                                        class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button
+                                                @click="applyCustomPeriod"
+                                                :disabled="!customStartDate || !customEndDate"
+                                                class="w-full px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                                            >
+                                                Aplicar Período
+                                            </button>
+                                        </div>
+                                    </div>
+                                </transition>
+                            </Teleport>
+                        </div>
+
+                        <!-- Search Input -->
+                        <div class="relative flex-1 min-w-[150px] max-w-full sm:max-w-md">
                             <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                             <input
                                 v-model="searchQuery"

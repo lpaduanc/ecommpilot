@@ -72,7 +72,7 @@ const showOpportunityDetail = ref(false);
 const countdownInterval = ref(null);
 const showChat = ref(false);
 const isResendingEmail = ref(false);
-const emailAlertDismissed = ref(false);
+const dismissedEmailAlerts = ref(new Set());
 const showChatPanel = ref(false);
 const chatPanelContext = ref(null);
 
@@ -524,7 +524,7 @@ onUnmounted(() => {
 
         <!-- Alerta de E-mail não enviado - TOPO DA PÁGINA -->
         <div
-            v-if="currentAnalysis?.status === 'completed' && currentAnalysis?.email_error && !currentAnalysis?.email_sent_at && !emailAlertDismissed"
+            v-if="currentAnalysis?.status === 'completed' && currentAnalysis?.email_error && !currentAnalysis?.email_sent_at && !dismissedEmailAlerts.has(currentAnalysis?.id)"
             class="bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-300 dark:border-rose-700 rounded-xl p-5"
         >
             <div class="flex items-start gap-4">
@@ -536,12 +536,20 @@ onUnmounted(() => {
                         E-mail não enviado
                     </h3>
                     <p class="text-sm text-rose-600 dark:text-rose-300 mt-1">
-                        Não foi possível enviar o e-mail com os resultados desta análise.
+                        Não foi possível enviar o e-mail de resultados da
+                        <span class="font-semibold">{{ currentAnalysis.analysis_type_label || 'Análise' }}</span>
+                        concluída em
+                        <span class="font-semibold">{{ formatAnalysisDate(currentAnalysis.completed_at || currentAnalysis.created_at) }}</span>.
                         Clique no botão abaixo para tentar novamente.
                     </p>
-                    <p class="text-xs text-rose-500 dark:text-rose-400 mt-2">
-                        Erro: {{ currentAnalysis.email_error }}
-                    </p>
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="text-xs text-rose-500 dark:text-rose-400">
+                            Erro: {{ currentAnalysis.email_error }}
+                        </span>
+                        <span class="text-xs text-rose-400 dark:text-rose-500 font-mono">
+                            &mdash; ID: {{ String(currentAnalysis.id).slice(0, 8) }}...
+                        </span>
+                    </div>
                     <div class="flex items-center gap-3 mt-4">
                         <BaseButton
                             variant="danger"
@@ -553,7 +561,7 @@ onUnmounted(() => {
                             Reenviar E-mail da Análise
                         </BaseButton>
                         <button
-                            @click="emailAlertDismissed = true"
+                            @click="dismissedEmailAlerts = new Set([...dismissedEmailAlerts, currentAnalysis.id])"
                             class="px-4 py-2 text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-lg transition-colors"
                         >
                             Lembrar mais tarde
@@ -672,8 +680,15 @@ onUnmounted(() => {
                     <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                         {{ formatAnalysisDate(analysis.created_at) }}
                     </div>
-                    <div class="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">
-                        {{ analysis.id }}
+                    <div class="flex items-center gap-1.5">
+                        <div class="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">
+                            {{ String(analysis.id).slice(0, 8) }}...
+                        </div>
+                        <ExclamationTriangleIcon
+                            v-if="analysis.email_error && !analysis.email_sent_at"
+                            class="w-3.5 h-3.5 text-rose-500 dark:text-rose-400 flex-shrink-0"
+                            title="E-mail não enviado"
+                        />
                     </div>
                 </button>
             </div>

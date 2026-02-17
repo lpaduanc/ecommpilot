@@ -440,6 +440,10 @@ class ProcessAnalysisJob implements ShouldQueue
                 'healthStatus' => $mailData->healthStatus,
                 'mainInsight' => $mailData->mainInsight,
                 'suggestions' => $mailData->suggestions,
+                'analysisType' => $mailData->analysisType,
+                'analysisTypeLabel' => $mailData->analysisTypeLabel,
+                'premiumSummary' => $mailData->premiumSummary,
+                'alerts' => $mailData->alerts,
             ])->render();
 
             // Send email directly via EmailConfigurationService (bypasses Laravel Mail caching)

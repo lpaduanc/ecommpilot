@@ -18,7 +18,7 @@ class AdminIntegrationsController extends Controller
     {
         $settings = [
             'enabled' => SystemSetting::get('external_data.enabled', false),
-            'serpapi_key' => $this->getMaskedApiKey('external_data.serpapi_key'),
+            'serpapi_key' => SystemSetting::get('external_data.serpapi_key', ''),
             'serpapi_key_configured' => ! empty(SystemSetting::get('external_data.serpapi_key')),
             'trends' => [
                 'enabled' => SystemSetting::get('external_data.trends.enabled', true),
@@ -33,9 +33,9 @@ class AdminIntegrationsController extends Controller
             ],
             'decodo' => [
                 'enabled' => SystemSetting::get('external_data.decodo.enabled', false),
-                'username' => $this->getMaskedApiKey('external_data.decodo.username'),
+                'username' => SystemSetting::get('external_data.decodo.username', ''),
                 'username_configured' => ! empty(SystemSetting::get('external_data.decodo.username')),
-                'password' => $this->getMaskedApiKey('external_data.decodo.password'),
+                'password' => SystemSetting::get('external_data.decodo.password', ''),
                 'password_configured' => ! empty(SystemSetting::get('external_data.decodo.password')),
                 'headless' => SystemSetting::get('external_data.decodo.headless', 'html'),
                 'js_rendering' => SystemSetting::get('external_data.decodo.js_rendering', false),
@@ -79,8 +79,8 @@ class AdminIntegrationsController extends Controller
             'description' => 'Ativa ou desativa a coleta de dados externos (Google Trends, preços de mercado, concorrentes)',
         ]);
 
-        // Save API key only if provided (not empty and not masked)
-        if (! empty($validated['serpapi_key']) && ! $this->isMaskedValue($validated['serpapi_key'])) {
+        // Save API key only if provided
+        if (! empty($validated['serpapi_key'])) {
             SystemSetting::set('external_data.serpapi_key', $validated['serpapi_key'], [
                 'type' => 'string',
                 'group' => 'external_data',
@@ -137,8 +137,8 @@ class AdminIntegrationsController extends Controller
             'description' => 'Ativa a API de Web Scraping Decodo para análise de concorrentes',
         ]);
 
-        // Save Decodo username only if provided and not masked
-        if (! empty($validated['decodo']['username']) && ! $this->isMaskedValue($validated['decodo']['username'])) {
+        // Save Decodo username only if provided
+        if (! empty($validated['decodo']['username'])) {
             SystemSetting::set('external_data.decodo.username', $validated['decodo']['username'], [
                 'type' => 'string',
                 'group' => 'external_data',
@@ -148,8 +148,8 @@ class AdminIntegrationsController extends Controller
             ]);
         }
 
-        // Save Decodo password only if provided and not masked
-        if (! empty($validated['decodo']['password']) && ! $this->isMaskedValue($validated['decodo']['password'])) {
+        // Save Decodo password only if provided
+        if (! empty($validated['decodo']['password'])) {
             SystemSetting::set('external_data.decodo.password', $validated['decodo']['password'], [
                 'type' => 'string',
                 'group' => 'external_data',
@@ -396,47 +396,5 @@ class AdminIntegrationsController extends Controller
                 'error_id' => $errorId,
             ], 500);
         }
-    }
-
-    /**
-     * Get masked API key for display.
-     */
-    private function getMaskedApiKey(string $key): ?string
-    {
-        $value = SystemSetting::get($key);
-
-        if (empty($value)) {
-            return null;
-        }
-
-        // Return masked version (first 4 and last 4 characters)
-        if (strlen($value) > 8) {
-            return substr($value, 0, 4).'****'.substr($value, -4);
-        }
-
-        return '********';
-    }
-
-    /**
-     * Check if a value is masked (contains **** or ••••).
-     */
-    private function isMaskedValue(string $value): bool
-    {
-        // Check for asterisks (from getMaskedApiKey)
-        if (str_contains($value, '****') || str_contains($value, '********')) {
-            return true;
-        }
-
-        // Check for bullet points (from frontend placeholder)
-        if (str_contains($value, '••••')) {
-            return true;
-        }
-
-        // Check if the entire string is only asterisks or bullet points
-        if (preg_match('/^[*•]+$/', $value)) {
-            return true;
-        }
-
-        return false;
     }
 }

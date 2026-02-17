@@ -68,6 +68,7 @@ onUnmounted(() => {
 });
 
 const periodOptions = [
+    { value: 'yesterday', label: 'Ontem' },
     { value: 'today', label: 'Hoje' },
     { value: 'last_7_days', label: 'Últimos 7 dias' },
     { value: 'last_15_days', label: 'Últimos 15 dias' },
@@ -91,7 +92,7 @@ const currentPeriodLabel = computed(() => {
         return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
     }
     const option = periodOptions.find(o => o.value === storePeriod);
-    return option?.label || 'Últimos 15 dias';
+    return option?.label || 'Ontem';
 });
 
 function selectPeriod(period) {
@@ -120,7 +121,7 @@ function applyCustomPeriod() {
 }
 
 function clearFilters() {
-    selectedPeriod.value = 'last_15_days';
+    selectedPeriod.value = 'yesterday';
     startDate.value = '';
     endDate.value = '';
 

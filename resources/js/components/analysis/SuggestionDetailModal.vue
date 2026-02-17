@@ -2,6 +2,7 @@
 import { computed, ref, watch, onUnmounted } from 'vue';
 import { useAuthStore } from '../../stores/authStore';
 import { useAnalysisStore } from '../../stores/analysisStore';
+import ActionTimeline from './ActionTimeline.vue';
 import {
     CheckCircleIcon,
     ChatBubbleLeftRightIcon,
@@ -113,49 +114,6 @@ const currentStatusOption = computed(() =>
     trackingStatusOptions.value.find(o => o.value === currentStatus.value) || trackingStatusOptions.value[0]
 );
 
-// Parse action steps from recommended_action
-const actionSteps = computed(() => {
-    if (!props.suggestion) return [];
-
-    const action = props.suggestion.recommended_action;
-    if (!action) return [];
-
-    // If it's already an array, use it directly
-    if (Array.isArray(action)) {
-        return action.filter(s => s && typeof s === 'string' && s.trim());
-    }
-
-    // If it's a string, try to parse it
-    if (typeof action === 'string') {
-        // Try JSON parse first
-        try {
-            const parsed = JSON.parse(action);
-            if (Array.isArray(parsed)) {
-                return parsed.filter(s => s && typeof s === 'string' && s.trim());
-            }
-        } catch (e) {
-            // Not JSON, continue with string parsing
-        }
-
-        // Try splitting by newlines
-        const lines = action.split(/\\n|\n/).filter(l => l.trim());
-        if (lines.length > 1) {
-            return lines.map(l => l.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
-        }
-
-        // Try splitting by numbered pattern "1. ... 2. ... 3. ..."
-        const numbered = action.split(/(?=\d+\.\s)/).filter(s => s.trim());
-        if (numbered.length > 1) {
-            return numbered.map(s => s.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
-        }
-
-        // Return as single step
-        return [action.trim()];
-    }
-
-    return [];
-});
-
 function selectStatus(status) {
     showStatusDropdown.value = false;
 
@@ -263,26 +221,13 @@ function handleManageWorkflow() {
                             </p>
                         </div>
 
-                        <!-- Action Steps (from AI) -->
-                        <div v-if="actionSteps.length > 0">
-                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                        <!-- Action Steps Timeline (from AI) -->
+                        <div v-if="suggestion.recommended_action">
+                            <h3 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 mb-4">
                                 <ListBulletIcon class="w-5 h-5 text-primary-500" />
-                                Passos Recomendados
+                                Plano de Ação
                             </h3>
-                            <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-100 dark:border-gray-700">
-                                <div class="space-y-3">
-                                    <div
-                                        v-for="(step, index) in actionSteps"
-                                        :key="index"
-                                        class="flex items-start gap-3 bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700 hover:border-primary-200 dark:hover:border-primary-700 transition-colors"
-                                    >
-                                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-white flex items-center justify-center text-xs font-bold shadow-sm">
-                                            {{ index + 1 }}
-                                        </div>
-                                        <p class="flex-1 text-gray-700 dark:text-gray-300 text-sm leading-relaxed pt-0.5">{{ step }}</p>
-                                    </div>
-                                </div>
-                            </div>
+                            <ActionTimeline :recommended-action="suggestion.recommended_action" />
                         </div>
 
                         <!-- Quick Actions -->

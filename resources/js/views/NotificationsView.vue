@@ -40,6 +40,7 @@ const statusOptions = [
 
 const periodOptions = [
     { value: 'all', label: 'Todos os períodos' },
+    { value: 'yesterday', label: 'Ontem' },
     { value: 'today', label: 'Hoje' },
     { value: 'week', label: 'Última semana' },
     { value: 'month', label: 'Último mês' },

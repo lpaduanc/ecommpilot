@@ -34,6 +34,14 @@ class AnalysisCompletedMail extends Mailable
 
     public string $mainInsight;
 
+    public string $analysisType;
+
+    public string $analysisTypeLabel;
+
+    public array $premiumSummary;
+
+    public array $alerts;
+
     /**
      * Create a new message instance.
      */
@@ -54,6 +62,21 @@ class AnalysisCompletedMail extends Mailable
         $this->healthStatus = $this->translateHealthStatus($summary['health_status'] ?? 'unknown');
         $mainInsight = $summary['main_insight'] ?? 'Análise concluída com sucesso.';
         $this->mainInsight = is_array($mainInsight) ? implode(' ', $mainInsight) : $mainInsight;
+
+        // Analysis type
+        $analysisTypeEnum = $analysis->analysis_type;
+        $this->analysisType = $analysisTypeEnum instanceof \App\Enums\AnalysisType
+            ? $analysisTypeEnum->value
+            : (is_string($analysisTypeEnum) ? $analysisTypeEnum : 'general');
+        $this->analysisTypeLabel = $analysisTypeEnum instanceof \App\Enums\AnalysisType
+            ? $analysisTypeEnum->label()
+            : 'Análise Geral';
+
+        // Premium summary
+        $this->premiumSummary = $summary['premium_summary'] ?? [];
+
+        // Alerts
+        $this->alerts = $analysis->alerts ?? [];
 
         // Get suggestions grouped by priority
         $this->suggestions = $analysis->persistentSuggestions()
@@ -149,6 +172,42 @@ class AnalysisCompletedMail extends Mailable
             'critical' => 'Crítico',
             default => 'Não Disponível',
         };
+    }
+
+    /**
+     * Format a value as Brazilian Real currency.
+     * Handles strings like "R$ 15000", "15000.50", "R$15.000,00" etc.
+     */
+    public static function formatBRL(mixed $value): string
+    {
+        if (is_array($value)) {
+            return json_encode($value);
+        }
+
+        $raw = (string) $value;
+
+        // Already well-formatted (e.g. "R$ 15.000,00")
+        if (preg_match('/^R\$\s?[\d.,]+$/', $raw) && str_contains($raw, '.') && str_contains($raw, ',')) {
+            return $raw;
+        }
+
+        // Strip currency symbol and whitespace
+        $clean = preg_replace('/[R$\s]/', '', $raw);
+
+        // Detect BR format (dots as thousands, comma as decimal): "15.000,50"
+        if (preg_match('/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/', $clean)) {
+            $clean = str_replace('.', '', $clean);
+            $clean = str_replace(',', '.', $clean);
+        } elseif (str_contains($clean, ',') && ! str_contains($clean, '.')) {
+            // Simple comma decimal: "15000,50"
+            $clean = str_replace(',', '.', $clean);
+        }
+
+        if (! is_numeric($clean)) {
+            return $raw; // Return as-is if we can't parse
+        }
+
+        return 'R$ '.number_format((float) $clean, 2, ',', '.');
     }
 
     /**

@@ -18,8 +18,8 @@ export const useDiscountStore = defineStore('discount', {
         sortBy: 'used',
         sortOrder: 'desc',
 
-        // Period filter - default to last 15 days
-        period: 'last_15_days',
+        // Period filter - default to yesterday
+        period: 'yesterday',
         startDate: null,
         endDate: null,
 
@@ -63,6 +63,7 @@ export const useDiscountStore = defineStore('discount', {
         // Period label for display
         periodLabel: (state) => {
             const labels = {
+                'yesterday': 'Ontem',
                 'today': 'Hoje',
                 'last_7_days': 'Últimos 7 dias',
                 'last_15_days': 'Últimos 15 dias',
@@ -72,7 +73,7 @@ export const useDiscountStore = defineStore('discount', {
                 'all_time': 'Todo o período',
                 'custom': 'Personalizado',
             };
-            return labels[state.period] || 'Últimos 15 dias';
+            return labels[state.period] || 'Ontem';
         },
 
         isCustomPeriod: (state) => state.period === 'custom',
@@ -261,7 +262,7 @@ export const useDiscountStore = defineStore('discount', {
             this.typeFilter = null;
             this.sortBy = 'used';
             this.sortOrder = 'desc';
-            this.period = 'last_15_days';
+            this.period = 'yesterday';
             this.startDate = null;
             this.endDate = null;
             this.currentPage = 1;

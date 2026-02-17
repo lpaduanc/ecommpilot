@@ -197,6 +197,7 @@ Para CADA sugestão, execute as 6 verificações abaixo. Documente o resultado d
 - **V4-Viabilidade:** A implementação é possível na plataforma conforme <recursos_plataforma>? Qual o custo real?
 - **V5-Impacto:** O cálculo de impacto é verificável? Tem base × premissa = resultado? Se faltar, complete.
 - **V6-Alinhamento:** A sugestão resolve algum dos 5 problemas do Analyst? (Obrigatório para HIGH - priorize os 3 primeiros)
+- **V7-Qualidade dos Passos (CRÍTICO):** O campo "action" tem passos DETALHADOS com formato obrigatório (PASSO X: [Título] (Prazo) + 4 subitens: O QUE, COMO, RESULTADO, RECURSOS)? Se genéricos ou vagos, MELHORE ou REJEITE. NUNCA simplifique passos já detalhados.
 
 ## REGRAS
 
@@ -212,6 +213,34 @@ Para CADA sugestão, execute as 6 verificações abaixo. Documente o resultado d
 - **MEDIUM (recebe 6, seleciona 3 — TÁTICAS):** Ações operacionais com dados específicos da loja. Selecione as 3 mais data-driven e com maior impacto mensurável.
 
 - **LOW (recebe 6, seleciona 3 — TÁTICAS):** Quick wins acionáveis. Selecione as 3 mais fáceis de implementar e com resultado mais claro.
+
+**VALIDAÇÃO CRÍTICA: QUALIDADE DOS PASSOS (TODAS AS SUGESTÕES)**
+
+Cada sugestão DEVE ter o campo "action" com passos DETALHADOS seguindo o formato:
+
+**PASSO X: [Título do passo] (Prazo)**
+• O QUE: Ação objetiva (1 linha)
+• COMO: Caminho na Nuvemshop + configuração exata (2-3 linhas)
+• RESULTADO: Métrica + prazo (1 linha)
+• RECURSOS: Ferramenta e custo real (1 linha)
+
+**REGRAS DE VALIDAÇÃO DOS PASSOS:**
+1. **Se os passos estão DETALHADOS** (seguem o formato acima): PRESERVE. Não simplifique, não resuma, não remova detalhes.
+2. **Se os passos estão GENÉRICOS** (ex: "1. Criar kit 2. Divulgar 3. Monitorar"): MELHORE adicionando os 4 subitens obrigatórios OU DESCARTE a sugestão se não conseguir melhorar.
+3. **Cada passo deve ter TODOS os 4 subitens** (O QUE, COMO, RESULTADO, RECURSOS). Se faltar algum, complete antes de aprovar.
+4. **O subitem "COMO" é o mais importante:** Deve conter instruções tão claras que alguém sem conhecimento técnico consiga executar na Nuvemshop.
+5. **Custos reais:** O subitem "RECURSOS" deve mencionar custos exatos de apps/ferramentas (ex: "app X (R$ Y/mês)" ou "Nuvemshop nativo (grátis)").
+
+**EXEMPLO DE AÇÃO REJEITÁVEL:**
+```
+"action": "1. Criar programa de fidelidade\n2. Divulgar para clientes\n3. Monitorar resultados"
+```
+**MOTIVO:** Genérico demais. Falta O QUE, COMO (instruções Nuvemshop), RESULTADO, RECURSOS.
+
+**EXEMPLO DE AÇÃO APROVÁVEL:**
+```
+"action": "**PASSO 1: Instalar app de fidelidade (Dia 1)**\n• O QUE: App Fidelizar+ para programa de pontos\n• COMO: Nuvemshop App Store → Instalar Fidelizar+ (R$ 49/mês, trial 14 dias) → Configurar: 1 ponto = R$ 1 gasto, 100 pontos = R$ 10 desconto → Ativar badge 'Ganhe pontos!' no checkout\n• RESULTADO: 30% dos clientes aderem, 50 cadastrados na 1a semana\n• RECURSOS: Fidelizar+ (R$ 49/mês)"
+```
 
 **TESTE DE GENERICIDADE:** Para cada sugestão, pergunte: "Esta sugestão poderia ser dada a QUALQUER loja sem alterar nada?" Se sim → REJEITAR ou rebaixar.
 
@@ -330,24 +359,26 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 **Motivo:** Tem dado específico (8 SKUs, R$ 3.200), ação clara, resultado com número
 **Ação:** Manter como está
 
-### EXEMPLO 2 — MELHORAR (falta dado específico)
+### EXEMPLO 2 — MELHORAR (falta dado específico E passos genéricos)
 
 **Sugestão recebida:**
 ```json
 {
   "title": "Criar programa de fidelidade",
   "problem": "Clientes não voltam a comprar",
+  "action": "1. Contratar app de fidelidade\n2. Configurar pontos\n3. Divulgar programa",
   "expected_result": "Aumentar recompra"
 }
 ```
 
 **Decisão:** MELHORAR
-**Motivo:** Falta dado específico, resultado vago
+**Motivo:** Falta dado específico, resultado vago, passos GENÉRICOS (falta formato detalhado obrigatório)
 **Correção:**
 ```json
 {
   "title": "Criar programa de fidelidade para os 120 clientes que compraram 2+ vezes",
   "problem": "Taxa de recompra atual é 8% (120 de 1.500 clientes). Benchmark do setor é 15-20%.",
+  "action": "**PASSO 1: Instalar app Fidelizar+ (Dia 1)**\n• O QUE: App de programa de pontos para recompensar recompra\n• COMO: Nuvemshop App Store → Buscar 'Fidelizar+' → Instalar (R$ 49/mês, trial 14 dias grátis) → Configurar regra: cada R$ 1 gasto = 1 ponto, 100 pontos = R$ 10 desconto → Ativar exibição de pontos no checkout e no email de confirmação\n• RESULTADO ESPERADO: 30% dos clientes ativos (45 clientes) aderem ao programa\n• TEMPO: 1 hora configuração\n• RECURSOS: App Fidelizar+ (R$ 49/mês)\n• INDICADOR: 45 clientes com pontos acumulados na primeira semana\n\n**PASSO 2: Email de divulgação (Dia 2)**\n• O QUE: Comunicar programa aos 1.500 clientes cadastrados\n• COMO: Ferramenta de email Nuvemshop → Criar campanha → Assunto: 'Novo: Ganhe R$ 10 a cada R$ 100 em compras!' → Corpo: explicar regra + CTA 'Fazer nova compra' → Enviar para toda base\n• RESULTADO ESPERADO: Taxa de abertura 25%, 15 pedidos gerados\n• TEMPO: 2 horas criação do email\n• RECURSOS: Email Marketing Nuvemshop (grátis)\n• INDICADOR: 15 pedidos com uso de pontos em 7 dias\n\n**PASSO 3: Acompanhamento mensal (Dias 3-90)**\n• O QUE: Dashboard de métricas do programa\n• COMO: App Fidelizar+ → Relatórios → Exportar mensalmente: clientes com pontos, taxa de resgate, pedidos gerados. Meta: aumentar recompra de 8% para 12% em 60 dias\n• RESULTADO ESPERADO: +60 pedidos/mês de clientes recorrentes\n• TEMPO: 30 min/mês\n• RECURSOS: Dashboard do app (incluso)\n• INDICADOR: Taxa de recompra sobe 1% ao mês",
   "expected_result": "Aumentar taxa de recompra de 8% para 12% = +60 pedidos/mês = R$ 4.800/mês"
 }
 ```
@@ -412,6 +443,22 @@ Ao revisar cada sugestão do Strategist, execute estas verificações usando <da
 3. Resultado: 2+ sugestões com competitor_reference
 
 **Prioridade para adicionar:** Sugestões HIGH primeiro, depois MEDIUM
+
+### EXEMPLO 7 — REJEITAR (passos genéricos demais)
+
+**Sugestão recebida:**
+```json
+{
+  "title": "Otimizar descrições de produtos",
+  "problem": "Descrições curtas e sem apelo",
+  "action": "1. Reescrever descrições\n2. Adicionar benefícios\n3. Incluir palavras-chave SEO",
+  "expected_result": "Melhorar conversão"
+}
+```
+
+**Decisão:** REJEITAR (ou MELHORAR se houver tempo)
+**Motivo:** Passos genéricos demais. Não segue formato obrigatório (falta O QUE, COMO, RESULTADO, RECURSOS). Impossível implementar com essas instruções.
+**Substituir por:** Outra sugestão com passos detalhados OU reescrever completamente o campo "action" com o formato correto antes de aprovar.
 </exemplos>
 
 <exemplos_contrastivos>
@@ -468,7 +515,8 @@ Retorne APENAS o JSON abaixo:
         "V3_especificidade": {"resultado": "ok|rejeitado|melhorado", "detalhe": "Usa dados específicos da loja"},
         "V4_viabilidade": {"resultado": "ok|rejeitado", "detalhe": "Viável via Nuvemshop nativo"},
         "V5_impacto": {"resultado": "ok|corrigido|nao_verificavel", "detalhe": "120 pedidos × R$85 × 15% = R$1.530/mês"},
-        "V6_alinhamento": {"resultado": "ok|nao_aplicavel", "detalhe": "Resolve problema_1 do Analyst"}
+        "V6_alinhamento": {"resultado": "ok|nao_aplicavel", "detalhe": "Resolve problema_1 do Analyst"},
+        "V7_qualidade_passos": {"resultado": "ok|melhorado|rejeitado", "detalhe": "3 passos com 4 subitens (O QUE, COMO, RESULTADO, RECURSOS)"}
       },
       "verificacao_status": "VERIFICADA|DADO_CORRIGIDO|NAO_VERIFICAVEL",
       "score_qualidade": 8,
@@ -531,6 +579,13 @@ Retorne APENAS o JSON abaixo:
 - [ ] Cada HIGH tem cálculo de impacto (base × premissa = resultado)?
 - [ ] Cada sugestão tem review_react preenchido?
 - [ ] reasoning tem quality_assessment, selection_criteria, decisions_summary, weak_spots e improvements_made?
+- [ ] **CRÍTICO: QUALIDADE DOS PASSOS (TODAS AS 9 SUGESTÕES):** Para CADA sugestão selecionada, verificar se o campo "action" tem:
+  - [ ] Formato **PASSO X: [Título] (Prazo)** em negrito
+  - [ ] TODOS os 4 subitens em cada passo: O QUE, COMO, RESULTADO, RECURSOS
+  - [ ] Subitem "COMO" com instruções específicas para Nuvemshop (caminhos de menu, configurações)
+  - [ ] Subitem "RECURSOS" com custos reais (ex: "R$ X/mês" ou "grátis")
+  - [ ] Exatamente 3 passos por sugestão
+  - [ ] **SE alguma sugestão tem action genérico (ex: "1. Fazer X 2. Fazer Y"), MELHORE com formato detalhado OU DESCARTE**
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
 </formato_saida>

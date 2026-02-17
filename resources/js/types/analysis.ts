@@ -86,14 +86,19 @@ export interface Suggestion {
   id: string;  // UUID
   title: string;
   description: string;
+  recommended_action?: string | string[];  // Action steps (can be string or array)
+  expected_impact?: string;  // high | medium | low
   priority: SuggestionPriority;
   is_done: boolean;
   status?: SuggestionStatus;
+  category?: string;  // strategy|investment|market|growth|financial|positioning|marketing|pricing|inventory|product|customer|conversion|coupon|operational
   steps?: SuggestionStep[];
   comments?: SuggestionComment[];
   steps_count?: number;
   completed_steps_count?: number;
   comments_count?: number;
+  is_on_analysis_page?: boolean;
+  is_on_tracking_page?: boolean;
 }
 
 /**
@@ -178,7 +183,7 @@ export interface AnalysisSummary {
 }
 
 /**
- * Premium Summary Types (Growth Intelligence Framework)
+ * Premium Summary Types (Growth Intelligence)
  */
 
 export interface GrowthScenario {

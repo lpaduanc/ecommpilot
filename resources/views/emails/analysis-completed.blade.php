@@ -78,7 +78,7 @@
                 <!-- Container - 90% width -->
                 <table role="presentation" class="container" width="90%" cellpadding="0" cellspacing="0" style="max-width: 900px; width: 90%;">
 
-                    <!-- Header Compacto -->
+                    <!-- Header -->
                     <tr>
                         <td align="center" style="padding-bottom: 12px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -103,7 +103,7 @@
                         <td>
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);">
 
-                                <!-- Greeting + Period em linha -->
+                                <!-- Greeting + Period + Analysis Type Badge -->
                                 <tr>
                                     <td class="content-cell" style="padding: 20px 20px 16px 20px;">
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -114,6 +114,12 @@
                                                     </p>
                                                     <p style="margin: 8px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.5; color: #4b5563;">
                                                         A análise de IA da sua loja <strong style="color: #1f2937;">{{ $storeName }}</strong> foi concluída. Confira os resultados abaixo.
+                                                    </p>
+                                                    <!-- Analysis Type Badge -->
+                                                    <p style="margin: 10px 0 0 0;">
+                                                        <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; background-color: #ede9fe; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 600; color: #6366f1;">
+                                                            {{ $analysisTypeLabel }}
+                                                        </span>
                                                     </p>
                                                 </td>
                                                 <td style="vertical-align: top; text-align: right; padding-left: 16px;">
@@ -171,7 +177,7 @@
                                                                     Insight Principal
                                                                 </p>
                                                                 <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.5; color: #1f2937;">
-                                                                    {{ $mainInsight }}
+                                                                    {{ is_array($mainInsight) ? implode(' ', $mainInsight) : $mainInsight }}
                                                                 </p>
                                                             </td>
                                                         </tr>
@@ -181,6 +187,303 @@
                                         </table>
                                     </td>
                                 </tr>
+
+                                @if(!empty($premiumSummary))
+                                <!-- Divider -->
+                                <tr>
+                                    <td style="padding: 0 20px;">
+                                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;">
+                                    </td>
+                                </tr>
+
+                                <!-- Premium Summary -->
+                                <tr>
+                                    <td style="padding: 16px 20px 4px 20px;">
+                                        <p style="margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #1f2937;">
+                                            Resumo Estratégico
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                @if(!empty($premiumSummary['growth_score']))
+                                @php
+                                    $growthScore = $premiumSummary['growth_score'];
+                                    $overallScore = is_numeric($growthScore['overall_score'] ?? null) ? (int) $growthScore['overall_score'] : 0;
+                                    $efficiencyScore = is_numeric($growthScore['efficiency_score'] ?? null) ? (int) $growthScore['efficiency_score'] : null;
+                                    $marginHealth = is_numeric($growthScore['margin_health'] ?? null) ? (int) $growthScore['margin_health'] : null;
+                                    $retentionScore = is_numeric($growthScore['retention_score'] ?? null) ? (int) $growthScore['retention_score'] : null;
+                                    $growthScoreColor = match(true) {
+                                        $overallScore >= 80 => '#10b981',
+                                        $overallScore >= 60 => '#f59e0b',
+                                        $overallScore >= 40 => '#f97316',
+                                        default => '#ef4444',
+                                    };
+                                    $growthBarWidth = min(100, max(0, $overallScore));
+                                @endphp
+                                <!-- Growth Score Row -->
+                                <tr>
+                                    <td style="padding: 0 20px 12px 20px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 10px; border-left: 4px solid #8b5cf6;">
+                                            <tr>
+                                                <td style="padding: 14px 16px;">
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            <td style="vertical-align: middle;">
+                                                                <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px;">
+                                                                    Growth Score Geral
+                                                                </p>
+                                                                <!-- Progress bar via nested table -->
+                                                                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #e5e7eb; border-radius: 4px; height: 8px;">
+                                                                    <tr>
+                                                                        <td style="width: {{ $growthBarWidth }}%; background-color: {{ $growthScoreColor }}; border-radius: 4px; height: 8px; line-height: 8px; font-size: 1px;">&nbsp;</td>
+                                                                        @if($growthBarWidth < 100)
+                                                                        <td style="width: {{ 100 - $growthBarWidth }}%; height: 8px; line-height: 8px; font-size: 1px;">&nbsp;</td>
+                                                                        @endif
+                                                                    </tr>
+                                                                </table>
+                                                            </td>
+                                                            <td style="vertical-align: middle; text-align: right; padding-left: 16px; white-space: nowrap;">
+                                                                <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 28px; font-weight: 700; color: {{ $growthScoreColor }};">{{ $overallScore }}</span>
+                                                                <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #9ca3af;">/100</span>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    @if($efficiencyScore !== null || $marginHealth !== null || $retentionScore !== null)
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 10px;">
+                                                        <tr>
+                                                            @if($efficiencyScore !== null)
+                                                            <td style="text-align: center; padding: 0 4px;">
+                                                                <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 18px; font-weight: 700; color: #374151;">{{ $efficiencyScore }}</p>
+                                                                <p style="margin: 2px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #9ca3af;">Eficiência</p>
+                                                            </td>
+                                                            @endif
+                                                            @if($marginHealth !== null)
+                                                            <td style="text-align: center; padding: 0 4px;">
+                                                                <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 18px; font-weight: 700; color: #374151;">{{ $marginHealth }}</p>
+                                                                <p style="margin: 2px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #9ca3af;">Margem</p>
+                                                            </td>
+                                                            @endif
+                                                            @if($retentionScore !== null)
+                                                            <td style="text-align: center; padding: 0 4px;">
+                                                                <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 18px; font-weight: 700; color: #374151;">{{ $retentionScore }}</p>
+                                                                <p style="margin: 2px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #9ca3af;">Retenção</p>
+                                                            </td>
+                                                            @endif
+                                                        </tr>
+                                                    </table>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                @endif
+
+                                @if(!empty($premiumSummary['executive_summary']['resumo_direto']))
+                                @php
+                                    $resumo = $premiumSummary['executive_summary']['resumo_direto'];
+                                    $precisa = $resumo['precisa'] ?? [];
+                                    $potencialReal = $resumo['potencial_real'] ?? [];
+                                @endphp
+                                <!-- Executive Summary -->
+                                <tr>
+                                    <td style="padding: 0 20px 12px 20px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 10px; border-left: 4px solid #6366f1;">
+                                            <tr>
+                                                <td style="padding: 14px 16px;">
+                                                    <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #1f2937;">
+                                                        Diagnóstico Executivo
+                                                    </p>
+                                                    @if(!empty($precisa))
+                                                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: #6366f1; font-weight: 600;">
+                                                        O que sua loja precisa
+                                                    </p>
+                                                    @foreach($precisa as $item)
+                                                    <p style="margin: 3px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.45; color: #374151;">
+                                                        &bull; {{ is_array($item) ? ($item['text'] ?? $item['title'] ?? implode(' ', array_filter($item, 'is_string'))) : $item }}
+                                                    </p>
+                                                    @endforeach
+                                                    @endif
+                                                    @if(!empty($potencialReal))
+                                                    <p style="margin: 10px 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: #10b981; font-weight: 600;">
+                                                        Potencial real identificado
+                                                    </p>
+                                                    @foreach($potencialReal as $item)
+                                                    <p style="margin: 3px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.45; color: #374151;">
+                                                        &bull; {{ is_array($item) ? ($item['text'] ?? $item['title'] ?? implode(' ', array_filter($item, 'is_string'))) : $item }}
+                                                    </p>
+                                                    @endforeach
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                @endif
+
+                                @if(!empty($premiumSummary['prioritized_roadmap']))
+                                @php
+                                    $roadmap = $premiumSummary['prioritized_roadmap'];
+                                    $dias030 = $roadmap['0_30_dias'] ?? $roadmap['30_dias'] ?? [];
+                                    $dias3160 = $roadmap['31_60_dias'] ?? $roadmap['60_dias'] ?? [];
+                                    $dias6190 = $roadmap['61_90_dias'] ?? $roadmap['90_dias'] ?? [];
+                                @endphp
+                                <!-- Prioritized Roadmap -->
+                                <tr>
+                                    <td style="padding: 0 20px 12px 20px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 10px; border-left: 4px solid #f59e0b;">
+                                            <tr>
+                                                <td style="padding: 14px 16px;">
+                                                    <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #1f2937;">
+                                                        Roadmap Priorizado (90 dias)
+                                                    </p>
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            @if(!empty($dias030))
+                                                            <td style="vertical-align: top; padding-right: 12px; width: 33%;">
+                                                                <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: #ef4444; text-transform: uppercase;">
+                                                                    0–30 dias
+                                                                </p>
+                                                                @foreach(array_slice((array)$dias030, 0, 2) as $item)
+                                                                <p style="margin: 2px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; line-height: 1.4; color: #374151;">
+                                                                    &bull; {{ is_array($item) ? ($item['acao'] ?? $item['title'] ?? json_encode($item)) : $item }}
+                                                                </p>
+                                                                @endforeach
+                                                            </td>
+                                                            @endif
+                                                            @if(!empty($dias3160))
+                                                            <td style="vertical-align: top; padding-right: 12px; width: 33%;">
+                                                                <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: #f59e0b; text-transform: uppercase;">
+                                                                    31–60 dias
+                                                                </p>
+                                                                @foreach(array_slice((array)$dias3160, 0, 2) as $item)
+                                                                <p style="margin: 2px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; line-height: 1.4; color: #374151;">
+                                                                    &bull; {{ is_array($item) ? ($item['acao'] ?? $item['title'] ?? json_encode($item)) : $item }}
+                                                                </p>
+                                                                @endforeach
+                                                            </td>
+                                                            @endif
+                                                            @if(!empty($dias6190))
+                                                            <td style="vertical-align: top; width: 33%;">
+                                                                <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: #10b981; text-transform: uppercase;">
+                                                                    61–90 dias
+                                                                </p>
+                                                                @foreach(array_slice((array)$dias6190, 0, 2) as $item)
+                                                                <p style="margin: 2px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; line-height: 1.4; color: #374151;">
+                                                                    &bull; {{ is_array($item) ? ($item['acao'] ?? $item['title'] ?? json_encode($item)) : $item }}
+                                                                </p>
+                                                                @endforeach
+                                                            </td>
+                                                            @endif
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                @endif
+
+                                @if(!empty($premiumSummary['growth_scenarios']))
+                                @php
+                                    $scenarios = $premiumSummary['growth_scenarios'];
+                                    $scenarioList = [
+                                        'conservador' => ['label' => 'Conservador', 'color' => '#6b7280'],
+                                        'base'        => ['label' => 'Base',        'color' => '#6366f1'],
+                                        'agressivo'   => ['label' => 'Agressivo',   'color' => '#10b981'],
+                                    ];
+                                @endphp
+                                <!-- Growth Scenarios -->
+                                <tr>
+                                    <td style="padding: 0 20px 12px 20px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 10px; border-left: 4px solid #10b981;">
+                                            <tr>
+                                                <td style="padding: 14px 16px;">
+                                                    <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #1f2937;">
+                                                        Cenários de Crescimento
+                                                    </p>
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            @foreach($scenarioList as $key => $meta)
+                                                            @if(!empty($scenarios[$key]))
+                                                            @php $sc = $scenarios[$key]; @endphp
+                                                            <td style="vertical-align: top; text-align: center; padding: 0 6px; width: 33%;">
+                                                                <p style="margin: 0 0 2px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: {{ $meta['color'] }}; text-transform: uppercase; letter-spacing: 0.3px;">
+                                                                    {{ $meta['label'] }}
+                                                                </p>
+                                                                @if(!empty($sc['crescimento_percentual']))
+                                                                <p style="margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: {{ $meta['color'] }};">
+                                                                    +{{ is_numeric($sc['crescimento_percentual']) ? $sc['crescimento_percentual'] : $sc['crescimento_percentual'] }}%
+                                                                </p>
+                                                                @endif
+                                                                @if(!empty($sc['receita_mensal_projetada']))
+                                                                <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; color: #1f2937;">
+                                                                    {{ \App\Mail\AnalysisCompletedMail::formatBRL($sc['receita_mensal_projetada']) }}
+                                                                </p>
+                                                                <p style="margin: 1px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #9ca3af;">
+                                                                    /mês
+                                                                </p>
+                                                                @endif
+                                                                @if(!empty($sc['receita_anual_projetada']))
+                                                                <p style="margin: 4px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; color: #6b7280;">
+                                                                    {{ \App\Mail\AnalysisCompletedMail::formatBRL($sc['receita_anual_projetada']) }}/ano
+                                                                </p>
+                                                                @endif
+                                                            </td>
+                                                            @endif
+                                                            @endforeach
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                @endif
+
+                                @endif
+                                {{-- end !empty($premiumSummary) --}}
+
+                                @if(!empty($alerts))
+                                <!-- Divider -->
+                                <tr>
+                                    <td style="padding: 0 20px;">
+                                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;">
+                                    </td>
+                                </tr>
+
+                                <!-- Alerts Section -->
+                                <tr>
+                                    <td style="padding: 16px 20px 4px 20px;">
+                                        <h2 style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; color: #1f2937;">
+                                            Alertas
+                                        </h2>
+                                        <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; color: #6b7280;">
+                                            Pontos de atenção identificados na sua loja
+                                        </p>
+                                    </td>
+                                </tr>
+                                @foreach($alerts as $alert)
+                                <tr>
+                                    <td style="padding: 0 20px 8px 20px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                                            <tr>
+                                                <td style="padding: 10px 14px;">
+                                                    @php
+                                                        $alertText = is_array($alert) ? ($alert['message'] ?? $alert['description'] ?? $alert['title'] ?? '') : $alert;
+                                                        $alertDisplay = is_array($alertText) ? json_encode($alertText) : $alertText;
+                                                    @endphp
+                                                    <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.45; color: #92400e;">
+                                                        {{ $alertDisplay }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                @endforeach
+                                <tr><td style="padding: 0 20px 8px 20px;"></td></tr>
+                                @endif
 
                                 <!-- Divider -->
                                 <tr>
@@ -196,13 +499,17 @@
                                             Recomendações Personalizadas
                                         </h2>
                                         <p style="margin: 4px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #6b7280;">
-                                            {{ count($suggestions) }} sugestões para melhorar sua loja
+                                            @if(count($suggestions) > 6)
+                                                Exibindo as 6 principais de {{ count($suggestions) }} recomendações
+                                            @else
+                                                {{ count($suggestions) }} sugestões para melhorar sua loja
+                                            @endif
                                         </p>
                                     </td>
                                 </tr>
 
-                                <!-- Suggestions List -->
-                                @foreach($suggestions as $index => $suggestion)
+                                <!-- Suggestions List (max 6) -->
+                                @foreach(array_slice($suggestions, 0, 6) as $index => $suggestion)
                                 @php
                                     $impactColor = match($suggestion['expected_impact']) {
                                         'high' => '#dc2626',
@@ -244,12 +551,12 @@
 
                                                     <!-- Title -->
                                                     <h3 style="margin: 10px 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 600; color: #1f2937;">
-                                                        {{ $suggestion['title'] }}
+                                                        {{ is_array($suggestion['title'] ?? '') ? implode(' ', $suggestion['title']) : ($suggestion['title'] ?? '') }}
                                                     </h3>
 
                                                     <!-- Description -->
                                                     <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.45; color: #4b5563;">
-                                                        {{ $suggestion['description'] }}
+                                                        {{ is_array($suggestion['description'] ?? '') ? implode(' ', $suggestion['description']) : ($suggestion['description'] ?? '') }}
                                                     </p>
 
                                                     <!-- Action -->
@@ -259,8 +566,9 @@
                                                                 <p style="margin: 0 0 3px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #6366f1; font-weight: 600;">
                                                                     Ação Recomendada
                                                                 </p>
+                                                                @php $recAction = $suggestion['recommended_action'] ?? ''; @endphp
                                                                 <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.5; color: #1f2937;">
-                                                                    {!! nl2br(e($suggestion['recommended_action'])) !!}
+                                                                    {!! nl2br(e(is_array($recAction) ? implode("\n", array_map(fn($v) => is_array($v) ? ($v['step'] ?? $v['action'] ?? json_encode($v)) : $v, $recAction)) : $recAction)) !!}
                                                                 </p>
                                                             </td>
                                                         </tr>
@@ -271,6 +579,26 @@
                                     </td>
                                 </tr>
                                 @endforeach
+
+                                @if(count($suggestions) > 6)
+                                <!-- More suggestions notice -->
+                                <tr>
+                                    <td style="padding: 0 20px 12px 20px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ede9fe; border-radius: 8px;">
+                                            <tr>
+                                                <td style="padding: 12px 16px; text-align: center;">
+                                                    <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #5b21b6;">
+                                                        Mais {{ count($suggestions) - 6 }} recomendações disponíveis na plataforma.
+                                                        <a href="{{ config('app.url') }}/analysis" target="_blank" style="color: #6366f1; font-weight: 600; text-decoration: underline;">
+                                                            Ver todas
+                                                        </a>
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                @endif
 
                                 <!-- CTA Button -->
                                 <tr>
@@ -291,7 +619,7 @@
                         </td>
                     </tr>
 
-                    <!-- Footer Compacto -->
+                    <!-- Footer -->
                     <tr>
                         <td style="padding: 16px 0;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">

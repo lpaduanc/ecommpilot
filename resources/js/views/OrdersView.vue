@@ -41,11 +41,12 @@ const cityFilter = ref('');
 
 // Period filter state
 const showPeriodDropdown = ref(false);
-const selectedPeriod = ref(null); // null = sem filtro de data
+const selectedPeriod = ref('yesterday'); // default: ontem
 const customStartDate = ref('');
 const customEndDate = ref('');
 
 const periodOptions = [
+    { value: 'yesterday', label: 'Ontem' },
     { value: 'today', label: 'Hoje' },
     { value: 'last_7_days', label: 'Últimos 7 dias' },
     { value: 'last_15_days', label: 'Últimos 15 dias' },
@@ -190,7 +191,7 @@ function clearFilters() {
     stateFilter.value = '';
     cityFilter.value = '';
     searchQuery.value = '';
-    selectedPeriod.value = null;
+    selectedPeriod.value = 'yesterday';
     customStartDate.value = '';
     customEndDate.value = '';
     filterOptions.value.cities = [];
@@ -331,7 +332,7 @@ const hasActiveFilters = computed(() => {
 });
 
 const currentPeriodLabel = computed(() => {
-    if (!selectedPeriod.value) return 'Período';
+    if (!selectedPeriod.value) return 'Ontem';
     if (selectedPeriod.value === 'custom' && customStartDate.value && customEndDate.value) {
         // Usar T00:00:00 para evitar problema de timezone (UTC vs local)
         const start = new Date(customStartDate.value + 'T00:00:00');
@@ -339,7 +340,7 @@ const currentPeriodLabel = computed(() => {
         return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
     }
     const option = periodOptions.find(o => o.value === selectedPeriod.value);
-    return option?.label || 'Período';
+    return option?.label || 'Ontem';
 });
 
 const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');
@@ -354,6 +355,12 @@ function getDateRange(period) {
     switch (period) {
         case 'today':
             startDate = new Date(today);
+            break;
+        case 'yesterday':
+            startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 1);
+            endDate = new Date(startDate);
+            endDate.setHours(23, 59, 59, 999);
             break;
         case 'last_7_days':
             startDate = new Date(today);
@@ -402,7 +409,7 @@ function applyCustomPeriod() {
 }
 
 function clearPeriodFilter() {
-    selectedPeriod.value = null;
+    selectedPeriod.value = 'yesterday';
     customStartDate.value = '';
     customEndDate.value = '';
     showPeriodDropdown.value = false;

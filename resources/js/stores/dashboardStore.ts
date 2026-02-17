@@ -84,7 +84,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const error = ref<string | null>(null);
 
   const filters = ref<DashboardFilters>({
-    period: 'last_30_days',
+    period: 'yesterday',
     startDate: null,
     endDate: null,
     categories: [],
@@ -339,7 +339,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
    */
   function resetFilters(): void {
     filters.value = {
-      period: 'last_30_days',
+      period: 'yesterday',
       startDate: null,
       endDate: null,
       categories: [],

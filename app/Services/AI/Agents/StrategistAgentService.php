@@ -92,6 +92,7 @@ class StrategistAgentService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => $temperature,
+            'max_tokens' => 32768,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
@@ -187,7 +188,7 @@ class StrategistAgentService
         // Validar qualidade das sugestões HIGH (rebaixar se não tiverem dados específicos)
         $finalSuggestions = $this->validateHighPrioritySuggestions($validatedSuggestions);
 
-        // Extract premium_summary (Growth Intelligence Framework™)
+        // Extract premium_summary
         $premiumSummary = $json['premium_summary'] ?? null;
         if ($premiumSummary) {
             Log::channel($this->logChannel)->info('    [STRATEGIST] Premium summary extraido', [

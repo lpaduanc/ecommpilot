@@ -268,7 +268,7 @@ class DashboardService
      */
     private function generateCacheKey(Store $store, array $filters): string
     {
-        $period = $filters['period'] ?? 'last_15_days';
+        $period = $filters['period'] ?? 'yesterday';
         $startDate = ! empty($filters['start_date']) ? $filters['start_date'] : null;
         $endDate = ! empty($filters['end_date']) ? $filters['end_date'] : null;
 
@@ -284,7 +284,7 @@ class DashboardService
 
     private function getDateRange(array $filters): array
     {
-        $period = $filters['period'] ?? 'last_15_days';
+        $period = $filters['period'] ?? 'yesterday';
 
         // Handle custom period with explicit date range
         if ($period === 'custom') {
@@ -307,6 +307,10 @@ class DashboardService
             'today' => [
                 'start' => now()->startOfDay(),
                 'end' => now()->endOfDay(),
+            ],
+            'yesterday' => [
+                'start' => now()->subDay()->startOfDay(),
+                'end' => now()->subDay()->endOfDay(),
             ],
             'last_7_days' => [
                 'start' => now()->subDays(7)->startOfDay(),

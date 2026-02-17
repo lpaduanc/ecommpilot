@@ -708,6 +708,10 @@ class AnalysisController extends Controller
                 'healthStatus' => $mailData->healthStatus,
                 'mainInsight' => $mailData->mainInsight,
                 'suggestions' => $mailData->suggestions,
+                'analysisType' => $mailData->analysisType,
+                'analysisTypeLabel' => $mailData->analysisTypeLabel,
+                'premiumSummary' => $mailData->premiumSummary,
+                'alerts' => $mailData->alerts,
             ])->render();
 
             // Enviar via EmailConfigurationService

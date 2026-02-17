@@ -321,6 +321,7 @@ class CriticAgentService
 
     /**
      * Enforce strict 3-3-3 distribution of suggestions (exactly 3 per impact level, 9 total).
+     * Redistributes excess from HIGH to MEDIUM/LOW to avoid losing approved suggestions.
      */
     private function enforceDistribution(array $suggestions): array
     {
@@ -328,7 +329,7 @@ class CriticAgentService
         $medium = [];
         $low = [];
 
-        // Separate by impact
+        // Separate by impact and sort by quality_score DESC (best first)
         foreach ($suggestions as $suggestion) {
             $impact = $suggestion['final_version']['expected_impact'] ?? 'medium';
             switch ($impact) {
@@ -344,13 +345,75 @@ class CriticAgentService
             }
         }
 
+        // Sort each category by quality_score DESC to keep best ones
+        usort($high, fn ($a, $b) => ($b['quality_score'] ?? 0) <=> ($a['quality_score'] ?? 0));
+        usort($medium, fn ($a, $b) => ($b['quality_score'] ?? 0) <=> ($a['quality_score'] ?? 0));
+        usort($low, fn ($a, $b) => ($b['quality_score'] ?? 0) <=> ($a['quality_score'] ?? 0));
+
         Log::channel($this->logChannel)->info('    [CRITIC] Distribuicao antes do rebalanceamento', [
             'high' => count($high),
             'medium' => count($medium),
             'low' => count($low),
         ]);
 
-        // Cap each category at max 3 (strict 3-3-3 = 9 total)
+        // Redistribute excess from HIGH to MEDIUM/LOW
+        if (count($high) > 3) {
+            $excessHigh = array_slice($high, 3); // Items beyond top 3
+            $high = array_slice($high, 0, 3);
+
+            Log::channel($this->logChannel)->info('    [CRITIC] Redistribuindo excesso de HIGH', [
+                'excess_count' => count($excessHigh),
+                'will_redistribute_to' => 'MEDIUM e LOW',
+            ]);
+
+            // Downgrade excess to MEDIUM or LOW based on what needs filling
+            foreach ($excessHigh as $item) {
+                if (count($medium) < 3) {
+                    $item['final_version']['expected_impact'] = 'medium';
+                    $medium[] = $item;
+                    Log::channel($this->logChannel)->info('    [CRITIC] Rebaixado HIGH → MEDIUM', [
+                        'title' => $item['final_version']['title'] ?? 'N/A',
+                        'quality_score' => $item['quality_score'] ?? 0,
+                    ]);
+                } elseif (count($low) < 3) {
+                    $item['final_version']['expected_impact'] = 'low';
+                    $low[] = $item;
+                    Log::channel($this->logChannel)->info('    [CRITIC] Rebaixado HIGH → LOW', [
+                        'title' => $item['final_version']['title'] ?? 'N/A',
+                        'quality_score' => $item['quality_score'] ?? 0,
+                    ]);
+                } else {
+                    // If all categories are full, keep it as MEDIUM (best fallback)
+                    $item['final_version']['expected_impact'] = 'medium';
+                    $medium[] = $item;
+                    Log::channel($this->logChannel)->info('    [CRITIC] Adicionado excesso HIGH como MEDIUM extra', [
+                        'title' => $item['final_version']['title'] ?? 'N/A',
+                    ]);
+                }
+            }
+        }
+
+        // Redistribute excess from MEDIUM to LOW if needed
+        if (count($medium) > 3) {
+            $excessMedium = array_slice($medium, 3);
+            $medium = array_slice($medium, 0, 3);
+
+            Log::channel($this->logChannel)->info('    [CRITIC] Redistribuindo excesso de MEDIUM', [
+                'excess_count' => count($excessMedium),
+            ]);
+
+            foreach ($excessMedium as $item) {
+                if (count($low) < 3) {
+                    $item['final_version']['expected_impact'] = 'low';
+                    $low[] = $item;
+                    Log::channel($this->logChannel)->info('    [CRITIC] Rebaixado MEDIUM → LOW', [
+                        'title' => $item['final_version']['title'] ?? 'N/A',
+                    ]);
+                }
+            }
+        }
+
+        // Final cap to ensure max 3 per category
         $high = array_slice($high, 0, 3);
         $medium = array_slice($medium, 0, 3);
         $low = array_slice($low, 0, 3);

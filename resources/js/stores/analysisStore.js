@@ -175,7 +175,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     async function fetchAnalysisTypes() {
         try {
             const response = await api.get('/analysis/types');
-            analysisTypes.value = response.data.types.filter(t => t.available);
+            analysisTypes.value = response.data.types;
         } catch {
             analysisTypes.value = [];
         }

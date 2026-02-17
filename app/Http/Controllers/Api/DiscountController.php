@@ -46,7 +46,7 @@ class DiscountController extends Controller
             'per_page' => $request->input('per_page', 10),
             'sort_by' => $request->input('sort_by', 'used'),
             'sort_order' => $request->input('sort_order', 'desc'),
-            'period' => $request->input('period', 'last_15_days'),
+            'period' => $request->input('period', 'yesterday'),
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
         ];
@@ -81,7 +81,7 @@ class DiscountController extends Controller
             'per_page' => $request->input('per_page', 10),
             'sort_by' => $request->input('sort_by', 'used'),
             'sort_order' => $request->input('sort_order', 'desc'),
-            'period' => $request->input('period', 'last_15_days'),
+            'period' => $request->input('period', 'yesterday'),
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
         ];

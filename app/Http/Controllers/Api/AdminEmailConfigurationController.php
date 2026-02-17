@@ -9,6 +9,7 @@ use App\Models\EmailConfiguration;
 use App\Services\EmailConfigurationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AdminEmailConfigurationController extends Controller
 {

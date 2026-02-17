@@ -38,8 +38,8 @@ enum AnalysisType: string
     public function available(): bool
     {
         return match ($this) {
-            self::General, self::Financial, self::Conversion, self::Competitors => true,
-            self::Campaigns, self::Tracking => false,
+            self::General => true,
+            self::Financial, self::Conversion, self::Competitors, self::Campaigns, self::Tracking => false,
         };
     }
 

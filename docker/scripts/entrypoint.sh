@@ -27,6 +27,18 @@ chown -R laravel:laravel /var/www/html/vendor 2>/dev/null || true
 chown -R laravel:laravel /var/www/html/storage 2>/dev/null || true
 chown -R laravel:laravel /var/www/html/bootstrap/cache 2>/dev/null || true
 
+# Ensure log files are writable by laravel user (php-fpm master runs as root
+# and may create log files owned by root, blocking the laravel worker processes)
+chmod 775 /var/www/html/storage/logs 2>/dev/null || true
+find /var/www/html/storage/logs -name "*.log" -exec chown laravel:laravel {} \; -exec chmod 664 {} \; 2>/dev/null || true
+
+# Make framework cache dirs world-writable so both root (queue worker) and
+# laravel (php-fpm) can create/overwrite compiled views and cache files
+chmod 777 /var/www/html/storage/framework/views 2>/dev/null || true
+chmod 777 /var/www/html/storage/framework/cache 2>/dev/null || true
+chmod 777 /var/www/html/storage/framework/cache/data 2>/dev/null || true
+chmod 777 /var/www/html/storage/framework/sessions 2>/dev/null || true
+
 # Configure git safe directory (needed for composer)
 git config --global --add safe.directory /var/www/html 2>/dev/null || true
 
@@ -45,10 +57,16 @@ else
     echo "Vendor directory OK"
 fi
 
-# Generate app key if not set
-if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "" ]; then
+# Generate app key only if not already present in .env file
+# IMPORTANT: Check the .env file directly, NOT the shell environment variable,
+# because APP_KEY is not passed as a container env var in docker-compose.yml.
+# Previously this checked $APP_KEY (always empty), causing key:generate --force
+# to run on EVERY container restart, invalidating all encrypted data in the DB.
+if ! grep -q "^APP_KEY=base64:" /var/www/html/.env 2>/dev/null; then
     echo "Generating application key..."
     su-exec laravel php artisan key:generate --force
+else
+    echo "APP_KEY already set in .env, skipping generation"
 fi
 
 # Clear caches for development

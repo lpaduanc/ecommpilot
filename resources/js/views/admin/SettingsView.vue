@@ -49,6 +49,7 @@ const showAnthropicKey = ref(false);
 // Email settings visibility
 const showSmtpPassword = ref(false);
 const showMailgunKey = ref(false);
+const showSesKey = ref(false);
 const showSesSecret = ref(false);
 const showPostmarkToken = ref(false);
 const showResendKey = ref(false);
@@ -903,20 +904,20 @@ onMounted(() => {
                         <div class="flex items-center gap-3">
                             <div class="text-2xl">✨</div>
                             <div>
-                                <h2 class="text-lg font-semibold text-gray-900">Google Gemini</h2>
-                                <p class="text-sm text-gray-500">Configurações do Gemini Pro e Flash</p>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Google Gemini</h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Configurações do Gemini Pro e Flash</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
                             <span
                                 v-if="settings.gemini.is_configured"
-                                class="px-3 py-1 text-xs font-medium rounded-full bg-success-100 text-success-700"
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400"
                             >
                                 Configurado
                             </span>
                             <span
                                 v-else
-                                class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600"
+                                class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                             >
                                 Não configurado
                             </span>
@@ -925,7 +926,7 @@ onMounted(() => {
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
                             <div class="relative">
                                 <input
                                     :type="showGeminiKey ? 'text' : 'password'"
@@ -936,7 +937,7 @@ onMounted(() => {
                                 <button
                                     type="button"
                                     @click="showGeminiKey = !showGeminiKey"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                 >
                                     <EyeIcon v-if="!showGeminiKey" class="w-5 h-5" />
                                     <EyeSlashIcon v-else class="w-5 h-5" />
@@ -945,7 +946,7 @@ onMounted(() => {
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Modelo</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Modelo</label>
                             <select v-model="settings.gemini.model" class="input">
                                 <option
                                     v-for="model in availableModels.gemini"
@@ -958,7 +959,7 @@ onMounted(() => {
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Temperatura ({{ settings.gemini.temperature }})
                             </label>
                             <input
@@ -969,14 +970,14 @@ onMounted(() => {
                                 step="0.1"
                                 class="w-full"
                             />
-                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                            <div class="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
                                 <span>Preciso</span>
                                 <span>Criativo</span>
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
                             <input
                                 type="number"
                                 v-model.number="settings.gemini.max_tokens"
@@ -1004,7 +1005,7 @@ onMounted(() => {
                         v-if="testResults.gemini"
                         :class="[
                             'mt-4 p-4 rounded-xl',
-                            testResults.gemini.success ? 'bg-success-50' : 'bg-danger-50'
+                            testResults.gemini.success ? 'bg-success-50 dark:bg-success-900/20' : 'bg-danger-50 dark:bg-danger-900/20'
                         ]"
                     >
                         <div class="flex items-start gap-3">
@@ -1017,12 +1018,12 @@ onMounted(() => {
                                 class="w-5 h-5 text-danger-500 mt-0.5"
                             />
                             <div>
-                                <p :class="testResults.gemini.success ? 'text-success-700' : 'text-danger-700'">
+                                <p :class="testResults.gemini.success ? 'text-success-700 dark:text-success-400' : 'text-danger-700 dark:text-danger-400'">
                                     {{ testResults.gemini.message }}
                                 </p>
                                 <p
                                     v-if="testResults.gemini.response"
-                                    class="text-sm text-gray-600 mt-1"
+                                    class="text-sm text-gray-600 dark:text-gray-400 mt-1"
                                 >
                                     Resposta: "{{ testResults.gemini.response }}"
                                 </p>
@@ -1070,7 +1071,7 @@ onMounted(() => {
                                 <button
                                     type="button"
                                     @click="showAnthropicKey = !showAnthropicKey"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                 >
                                     <EyeIcon v-if="!showAnthropicKey" class="w-5 h-5" />
                                     <EyeSlashIcon v-else class="w-5 h-5" />
@@ -1103,7 +1104,7 @@ onMounted(() => {
                                 step="0.1"
                                 class="w-full"
                             />
-                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                            <div class="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
                                 <span>Preciso</span>
                                 <span>Criativo</span>
                             </div>
@@ -1387,10 +1388,11 @@ onMounted(() => {
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuário</label>
                                     <input
-                                        type="text"
+                                        type="password"
                                         v-model="emailForm.config.username"
                                         placeholder="user@example.com"
                                         class="input"
+                                        autocomplete="off"
                                     />
                                 </div>
 
@@ -1406,7 +1408,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showSmtpPassword = !showSmtpPassword"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showSmtpPassword" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />
@@ -1465,7 +1467,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showMailgunKey = !showMailgunKey"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showMailgunKey" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />
@@ -1515,12 +1517,22 @@ onMounted(() => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Access Key ID</label>
-                                    <input
-                                        type="text"
-                                        v-model="emailForm.config.key"
-                                        placeholder="AKIA..."
-                                        class="input"
-                                    />
+                                    <div class="relative">
+                                        <input
+                                            :type="showSesKey ? 'text' : 'password'"
+                                            v-model="emailForm.config.key"
+                                            placeholder="AKIA..."
+                                            class="input pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            @click="showSesKey = !showSesKey"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                                        >
+                                            <EyeIcon v-if="!showSesKey" class="w-4 h-4" />
+                                            <EyeSlashIcon v-else class="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div>
@@ -1535,7 +1547,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showSesSecret = !showSesSecret"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showSesSecret" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />
@@ -1595,7 +1607,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showPostmarkToken = !showPostmarkToken"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showPostmarkToken" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />
@@ -1645,7 +1657,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showResendKey = !showResendKey"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showResendKey" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />
@@ -1695,7 +1707,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showEmailApiKey = !showEmailApiKey"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showEmailApiKey" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />
@@ -1715,7 +1727,7 @@ onMounted(() => {
                                         <button
                                             type="button"
                                             @click="showMailjetSecretKey = !showMailjetSecretKey"
-                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                                         >
                                             <EyeIcon v-if="!showMailjetSecretKey" class="w-4 h-4" />
                                             <EyeSlashIcon v-else class="w-4 h-4" />

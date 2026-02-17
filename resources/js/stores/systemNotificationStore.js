@@ -38,19 +38,29 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
 
         // Filter by period
         if (filters.value.period !== 'all') {
-            const now = new Date();
-            const periods = {
-                today: 1,
-                week: 7,
-                month: 30,
-            };
-            const days = periods[filters.value.period];
-            const cutoff = new Date(now.setDate(now.getDate() - days));
+            if (filters.value.period === 'yesterday') {
+                const now = new Date();
+                const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+                const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+                filtered = filtered.filter(n => {
+                    const d = new Date(n.created_at);
+                    return d >= yesterdayStart && d <= yesterdayEnd;
+                });
+            } else {
+                const now = new Date();
+                const periods = {
+                    today: 1,
+                    week: 7,
+                    month: 30,
+                };
+                const days = periods[filters.value.period];
+                const cutoff = new Date(now.setDate(now.getDate() - days));
 
-            filtered = filtered.filter(n => {
-                const notificationDate = new Date(n.created_at);
-                return notificationDate >= cutoff;
-            });
+                filtered = filtered.filter(n => {
+                    const notificationDate = new Date(n.created_at);
+                    return notificationDate >= cutoff;
+                });
+            }
         }
 
         return filtered;

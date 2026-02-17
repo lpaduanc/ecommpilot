@@ -771,7 +771,7 @@ class StoreAnalysisService
             // Salvar output bruto para debug
             $this->rawAgentOutputs['strategist'] = $generatedSuggestions;
 
-            // Extrair premium_summary (Growth Intelligence Framework™)
+            // Extrair premium_summary
             $this->premiumSummary = $generatedSuggestions['premium_summary'] ?? null;
 
             Log::channel($this->logChannel)->info('<<< Strategist Agent concluido', [
@@ -898,7 +898,21 @@ class StoreAnalysisService
             // V6: Programmatic enforcement of saturated theme blocking
             $filteredSuggestions = $this->filterSaturatedThemes($filteredSuggestions, $saturatedThemes ?? []);
 
-            if (count($filteredSuggestions) < 9) {
+            // SAFETY NET ADICIONAL: Se o filtro removeu TODAS as sugestoes mas o Critic aprovou algumas,
+            // fazer bypass e usar as sugestoes do Critic diretamente
+            if (empty($filteredSuggestions) && ! empty($criticizedSuggestions['approved_suggestions'])) {
+                Log::channel($this->logChannel)->warning('>>> SAFETY NET ETAPA 9: Filtro removeu TODAS as sugestoes - fazendo bypass', [
+                    'analysis_id' => $analysis->id,
+                    'critic_approved' => count($criticizedSuggestions['approved_suggestions']),
+                    'action' => 'Usando sugestoes do Critic diretamente (bypass de similaridade)',
+                ]);
+
+                $filteredSuggestions = $criticizedSuggestions['approved_suggestions'];
+
+                Log::channel($this->logChannel)->info('>>> SAFETY NET ETAPA 9: Bypass concluido', [
+                    'suggestions_restored' => count($filteredSuggestions),
+                ]);
+            } elseif (count($filteredSuggestions) < 9) {
                 Log::channel($this->logChannel)->warning('>>> ALERTA: Filtro de similaridade removeu sugestoes abaixo do minimo de 9', [
                     'analysis_id' => $analysis->id,
                     'input' => count($criticizedSuggestions['approved_suggestions'] ?? []),
@@ -1579,6 +1593,7 @@ class StoreAnalysisService
     /**
      * Filter suggestions by similarity to avoid repetitions.
      * Checks both against existing suggestions in DB and within the current batch.
+     * Uses adaptive threshold based on existing suggestions count.
      */
     private function filterBySimilarity(array $suggestions, int $storeId): array
     {
@@ -1590,7 +1605,27 @@ class StoreAnalysisService
             return $suggestions;
         }
 
+        // Count existing pending suggestions to determine adaptive threshold
+        $pendingSuggestionsCount = Suggestion::where('store_id', $storeId)
+            ->whereIn('status', ['new', 'accepted', 'in_progress'])
+            ->count();
+
+        // Adaptive threshold based on existing suggestions count
+        $threshold = match (true) {
+            $pendingSuggestionsCount <= 10 => 0.85,  // Original threshold for stores with few suggestions
+            $pendingSuggestionsCount <= 25 => 0.90,  // Slightly higher for moderate history
+            $pendingSuggestionsCount <= 50 => 0.93,  // Higher for large history
+            default => 0.95,                          // Very high for stores with 50+ suggestions
+        };
+
+        Log::channel($this->logChannel)->info('>>> Threshold adaptativo de similaridade', [
+            'pending_suggestions_count' => $pendingSuggestionsCount,
+            'threshold_used' => $threshold,
+            'reasoning' => $pendingSuggestionsCount <= 10 ? 'low_history' : ($pendingSuggestionsCount <= 25 ? 'moderate_history' : ($pendingSuggestionsCount <= 50 ? 'large_history' : 'very_large_history')),
+        ]);
+
         $filteredSuggestions = [];
+        $similarityData = []; // Track similarity scores for safety net
 
         foreach ($suggestions as $suggestion) {
             $finalVersion = $suggestion['final_version'] ?? [];
@@ -1608,20 +1643,64 @@ class StoreAnalysisService
                 ];
 
                 // Check similarity with existing suggestions in DB
-                // Threshold de 0.85 = sugestões com 85%+ de similaridade são filtradas
                 // Exclui rejected/ignored/completed e considera apenas últimos 90 dias
-                // Isso evita sugestões muito parecidas mas não filtra todo o histórico
-                if (! $this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
+                $isTooSimilar = $this->embedding->isTooSimilarFiltered($embedding, $storeId, $threshold, ['rejected', 'ignored', 'completed'], 90);
+
+                if (! $isTooSimilar) {
                     $suggestion['embedding'] = $embedding;
                     $filteredSuggestions[] = $suggestion;
                 } else {
-                    Log::info('Suggestion filtered due to DB similarity: '.$finalVersion['title']);
+                    // Store similarity data for potential safety net recovery
+                    $similarityData[] = [
+                        'suggestion' => $suggestion,
+                        'embedding' => $embedding,
+                        'title' => $finalVersion['title'] ?? 'N/A',
+                    ];
+                    Log::channel($this->logChannel)->info('>>> Sugestao filtrada por similaridade', [
+                        'title' => $finalVersion['title'],
+                        'threshold' => $threshold,
+                    ]);
                 }
             } catch (\Exception $e) {
                 Log::warning('Could not check similarity: '.$e->getMessage());
                 // Include suggestion anyway if similarity check fails
                 $filteredSuggestions[] = $suggestion;
             }
+        }
+
+        // SAFETY NET: If ALL suggestions were filtered but we had approved suggestions from Critic,
+        // allow the least similar ones to pass (up to 9)
+        if (empty($filteredSuggestions) && ! empty($similarityData)) {
+            Log::channel($this->logChannel)->warning('>>> SAFETY NET ATIVADO: Todas as sugestoes foram filtradas por similaridade', [
+                'original_count' => count($suggestions),
+                'filtered_count' => count($similarityData),
+                'action' => 'Permitindo passar as menos similares (ate 9)',
+            ]);
+
+            // Sort by quality_score DESC to recover the best ones
+            usort($similarityData, function ($a, $b) {
+                $qualityA = $a['suggestion']['quality_score'] ?? 0;
+                $qualityB = $b['suggestion']['quality_score'] ?? 0;
+
+                return $qualityB <=> $qualityA;
+            });
+
+            // Allow up to 9 best suggestions to pass
+            $recoveredCount = 0;
+            foreach (array_slice($similarityData, 0, 9) as $item) {
+                $item['suggestion']['embedding'] = $item['embedding'];
+                $filteredSuggestions[] = $item['suggestion'];
+                $recoveredCount++;
+
+                Log::channel($this->logChannel)->info('>>> SAFETY NET: Recuperando sugestao', [
+                    'title' => $item['title'],
+                    'quality_score' => $item['suggestion']['quality_score'] ?? 0,
+                ]);
+            }
+
+            Log::channel($this->logChannel)->info('>>> SAFETY NET CONCLUIDO', [
+                'recovered_count' => $recoveredCount,
+            ]);
         }
 
         return $filteredSuggestions;

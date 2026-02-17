@@ -434,13 +434,23 @@ class EmailConfigurationService
     {
         $configuration = EmailConfiguration::findOrFail($id);
 
+        try {
+            $settings = $configuration->settings;
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            Log::warning('Email config settings could not be decrypted (APP_KEY may have changed)', [
+                'config_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            $settings = [];
+        }
+
         return [
             'id' => $configuration->id,
             'name' => $configuration->name,
             'identifier' => $configuration->identifier,
             'provider' => $configuration->provider,
             'is_active' => $configuration->is_active,
-            'settings' => $configuration->settings,
+            'settings' => $settings,
             'created_at' => $configuration->created_at,
             'updated_at' => $configuration->updated_at,
         ];

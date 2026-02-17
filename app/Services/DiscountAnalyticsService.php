@@ -29,7 +29,7 @@ class DiscountAnalyticsService
      */
     private function parsePeriodDates(array $params): array
     {
-        $period = $params['period'] ?? 'last_15_days';
+        $period = $params['period'] ?? 'yesterday';
         $startDate = $params['start_date'] ?? null;
         $endDate = $params['end_date'] ?? null;
 
@@ -45,6 +45,7 @@ class DiscountAnalyticsService
         $now = now();
         $start = match ($period) {
             'today' => $now->copy()->startOfDay(),
+            'yesterday' => $now->copy()->subDay()->startOfDay(),
             'last_7_days' => $now->copy()->subDays(6)->startOfDay(),
             'last_15_days' => $now->copy()->subDays(14)->startOfDay(),
             'last_30_days' => $now->copy()->subDays(29)->startOfDay(),
@@ -55,6 +56,7 @@ class DiscountAnalyticsService
         };
 
         $end = match ($period) {
+            'yesterday' => $now->copy()->subDay()->endOfDay(),
             'last_month' => $now->copy()->subMonth()->endOfMonth(),
             default => $now->copy()->endOfDay(),
         };

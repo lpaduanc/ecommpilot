@@ -26,11 +26,12 @@ const { formatCurrency, formatPercentage } = useFormatters();
 
 // Period selector state
 const showPeriodDropdown = ref(false);
-const selectedPeriod = ref('last_15_days');
+const selectedPeriod = ref('yesterday');
 const customStartDate = ref('');
 const customEndDate = ref('');
 
 const periodOptions = [
+    { value: 'yesterday', label: 'Ontem' },
     { value: 'today', label: 'Hoje' },
     { value: 'last_7_days', label: 'Últimos 7 dias' },
     { value: 'last_15_days', label: 'Últimos 15 dias' },
@@ -45,7 +46,7 @@ const perPageOptions = [10, 20, 50, 100];
 
 const currentPeriodLabel = computed(() => {
     const option = periodOptions.find(o => o.value === selectedPeriod.value);
-    return option?.label || 'Últimos 15 dias';
+    return option?.label || 'Ontem';
 });
 
 const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');

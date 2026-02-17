@@ -29,7 +29,7 @@ class ProductController extends Controller
             ]);
         }
 
-        $periodDays = $request->input('period_days', 30);
+        $periodDays = $this->resolvePeriodDays($request);
 
         // Build base query with filters that can be applied at database level
         $query = SyncedProduct::where('store_id', $store->id)
@@ -91,6 +91,9 @@ class ProductController extends Controller
 
         // Calculate analytics ONLY for products on current page
         $analyticsData = $this->analyticsService->calculateProductAnalytics($store, $paginator->getCollection(), $periodDays);
+
+        // Fix total_products to reflect all matching products, not just current page
+        $analyticsData['totals']['total_products'] = $paginator->total();
 
         // Attach analytics to current page products
         foreach ($paginator as $product) {
@@ -187,5 +190,39 @@ class ProductController extends Controller
             'revenue_generated' => round($revenueGenerated, 2),
             'average_per_day' => $averagePerDay,
         ]);
+    }
+
+    /**
+     * Convert named period to days, falling back to period_days param or default.
+     */
+    private function resolvePeriodDays(Request $request): int
+    {
+        $period = $request->input('period');
+
+        if ($period === 'custom') {
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
+            if ($startDate && $endDate) {
+                return max(1, (int) \Carbon\Carbon::parse($startDate)->diffInDays(\Carbon\Carbon::parse($endDate)) + 1);
+            }
+
+            return 30;
+        }
+
+        if ($period) {
+            return match ($period) {
+                'yesterday' => 1,
+                'today' => 1,
+                'last_7_days' => 7,
+                'last_15_days' => 15,
+                'last_30_days' => 30,
+                'this_month' => (int) now()->day,
+                'last_month' => (int) now()->subMonth()->daysInMonth,
+                'all_time' => 3650,
+                default => (int) $request->input('period_days', 30),
+            };
+        }
+
+        return (int) $request->input('period_days', 1); // default: yesterday (1 day)
     }
 }
