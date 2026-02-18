@@ -199,6 +199,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     function logout() {
+        // Limpa o chat ao fazer logout (import lazy para evitar dependência circular)
+        import('./chatStore').then(({ useChatStore }) => {
+            const chatStore = useChatStore();
+            chatStore.resetLocalState();
+        }).catch(() => {});
+
         user.value = null;
         token.value = null;
         localStorage.removeItem('token');

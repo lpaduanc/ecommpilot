@@ -2,23 +2,22 @@
 
 namespace App\Services;
 
-use App\Enums\PaymentStatus;
 use App\Models\Analysis;
 use App\Models\ChatConversation;
-use App\Models\SyncedOrder;
-use App\Models\SyncedProduct;
 use App\Models\User;
 use App\Services\AI\AIManager;
-use Carbon\Carbon;
+use App\Services\AI\JsonExtractor;
+use Illuminate\Support\Facades\Log;
 
 class ChatbotService
 {
     private const DEFAULT_PERIOD_DAYS = 15;
 
-    private const MAX_PERIOD_DAYS = 30;
+    private const ALL_TIME_DAYS = 3650;
 
     public function __construct(
-        private AIManager $aiManager
+        private AIManager $aiManager,
+        private ChatContextBuilder $contextBuilder,
     ) {}
 
     public function getResponse(
@@ -37,19 +36,19 @@ class ChatbotService
         // Detect if user requested a specific period
         $periodInfo = $this->detectRequestedPeriod($message);
 
-        // Fetch real store data based on question type
-        $storeData = $this->getStoreData($store, $periodInfo['days']);
+        // Step 1: AI-powered intent extraction to determine what data to fetch
+        $queries = $store ? $this->extractQueryIntents($message) : [];
 
-        // Add period notice if user requested more than max
-        $periodNotice = $periodInfo['exceeded_max']
-            ? "\n\nNOTA IMPORTANTE: O período máximo de análise é de {self::MAX_PERIOD_DAYS} dias. Mostrando dados dos últimos {self::MAX_PERIOD_DAYS} dias."
-            : '';
+        // Step 2: Fetch enriched store data based on extracted intents
+        $storeData = $store
+            ? $this->contextBuilder->build($store, $queries, $periodInfo['days'])
+            : $this->getEmptyStoreData($periodInfo['days']);
 
-        // Build appropriate system prompt
+        // Step 3: Build system prompt with enriched data and generate response
         if ($isSuggestionContext) {
             $systemPrompt = $this->buildSuggestionDiscussionPrompt($store, $storeData, $context['suggestion']);
         } else {
-            $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis, $storeData, $periodNotice);
+            $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis, $storeData);
         }
 
         $messages = [
@@ -80,39 +79,213 @@ class ChatbotService
         ]);
     }
 
+    /**
+     * Use a lightweight AI call to extract structured query intents from the user message.
+     * Returns an array of queries with type and params for ChatContextBuilder.
+     */
+    private function extractQueryIntents(string $message): array
+    {
+        $prompt = $this->buildIntentExtractionPrompt();
+
+        try {
+            $response = $this->aiManager->chat([
+                ['role' => 'system', 'content' => $prompt],
+                ['role' => 'user', 'content' => $message],
+            ], [
+                'temperature' => 0.1,
+                'max_tokens' => 300,
+            ]);
+
+            $parsed = JsonExtractor::extract($response);
+
+            if ($parsed && isset($parsed['queries']) && is_array($parsed['queries'])) {
+                return $this->sanitizeQueries($parsed['queries']);
+            }
+
+            return [];
+        } catch (\Exception $e) {
+            Log::warning('ChatbotService: Intent extraction failed, using empty queries', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    private function buildIntentExtractionPrompt(): string
+    {
+        return <<<'PROMPT'
+        Você é um classificador de intenções para um chatbot de e-commerce.
+        Dada a mensagem do usuário, determine quais consultas ao banco de dados são necessárias.
+
+        CONSULTAS DISPONÍVEIS:
+        - top_products: {} → Produtos mais vendidos (ranking geral)
+        - products_catalog: {} → Listar catálogo de produtos da loja
+        - products_by_coupon: {"codes": ["CODIGO1", "CODIGO2"]} → Produtos vendidos com cupons específicos
+        - stock_status: {} → Produtos com estoque baixo ou esgotado
+        - coupon_stats: {} → Estatísticas gerais de cupons/descontos
+        - coupon_details: {"codes": ["CODIGO1"]} → Detalhes de cupons específicos
+        - order_status: {} → Breakdown de status dos pedidos
+        - top_customers: {} → Clientes que mais compram
+        - customer_orders: {"name_or_email": "nome ou email"} → Pedidos de um cliente específico
+        - revenue_by_product: {"product_name": "nome do produto"} → Receita de um produto específico
+
+        REGRAS:
+        - Extraia códigos de cupom exatos mencionados (ex: "cupom PROMO10" → codes: ["PROMO10"])
+        - Extraia nomes de produtos mencionados (ex: "shampoo loiro" → product_name: "shampoo loiro")
+        - Extraia nomes/emails de clientes mencionados
+        - Se a pergunta não precisa de dados do banco, retorne queries vazio
+        - Múltiplas queries são permitidas (ex: produtos de um cupom + detalhes do cupom)
+        - Perguntas sobre vendas/faturamento geralmente precisam de top_products
+        - Perguntas gerais como "como vai minha loja?" → top_products
+
+        Responda APENAS com JSON válido, sem texto adicional:
+        {"queries": [{"type": "nome_da_query", "params": {}}]}
+        PROMPT;
+    }
+
+    /**
+     * Sanitize and validate extracted queries.
+     */
+    private function sanitizeQueries(array $queries): array
+    {
+        $validTypes = [
+            'top_products', 'products_catalog', 'products_by_coupon',
+            'stock_status', 'coupon_stats', 'coupon_details',
+            'order_status', 'top_customers', 'customer_orders',
+            'revenue_by_product',
+        ];
+
+        $sanitized = [];
+        foreach ($queries as $query) {
+            if (! is_array($query) || ! isset($query['type'])) {
+                continue;
+            }
+
+            if (! in_array($query['type'], $validTypes)) {
+                continue;
+            }
+
+            $params = $query['params'] ?? [];
+            if (! is_array($params)) {
+                $params = [];
+            }
+
+            // Validate and sanitize params with allowlist per query type
+            $sanitized[] = [
+                'type' => $query['type'],
+                'params' => $this->validateQueryParams($query['type'], $params),
+            ];
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Validate and sanitize query parameters using allowlists per query type.
+     */
+    private function validateQueryParams(string $type, array $params): array
+    {
+        return match ($type) {
+            'products_by_coupon', 'coupon_details' => [
+                'codes' => $this->validateCouponCodes($params['codes'] ?? []),
+            ],
+            'customer_orders' => [
+                'name_or_email' => $this->validateSearchString($params['name_or_email'] ?? ''),
+            ],
+            'revenue_by_product' => [
+                'product_name' => $this->validateSearchString($params['product_name'] ?? ''),
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * Validate coupon codes: only alphanumeric, hyphens, underscores.
+     */
+    private function validateCouponCodes(mixed $codes): array
+    {
+        if (! is_array($codes)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(function ($c) {
+                if (! is_string($c)) {
+                    return null;
+                }
+
+                return preg_replace('/[^A-Z0-9\-_]/i', '', mb_substr($c, 0, 30));
+            }, array_slice($codes, 0, 10)),
+            fn ($c) => $c !== null && $c !== ''
+        ));
+    }
+
+    /**
+     * Validate search strings: alphanumeric, accented chars, basic punctuation.
+     * Escapes LIKE metacharacters to prevent wildcard amplification.
+     */
+    private function validateSearchString(mixed $value): string
+    {
+        if (! is_string($value)) {
+            return '';
+        }
+
+        // Allowlist: letters (including accented), numbers, spaces, @, ., -
+        $clean = preg_replace('/[^a-zA-Z0-9áéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ@.\- ]/u', '', $value);
+
+        // Escape LIKE metacharacters
+        $clean = str_replace(['%', '_'], ['\\%', '\\_'], $clean);
+
+        return mb_substr($clean, 0, 100);
+    }
+
     private function detectRequestedPeriod(string $message): array
     {
         $days = self::DEFAULT_PERIOD_DAYS;
-        $exceededMax = false;
+        $lower = mb_strtolower($message);
 
-        // Check for explicit period mentions
+        // All-time patterns (check first — most specific intent)
+        $allTimePatterns = [
+            'desde o come', 'desde o início', 'desde o inicio', 'desde sempre',
+            'todo o período', 'todo o periodo', 'todo período', 'todo periodo',
+            'todo o tempo', 'todo tempo', 'histórico completo', 'historico completo',
+            'todos os tempos', 'all time', 'desde que comecei',
+            'desde a primeira', 'desde o primeiro', 'desde que abri',
+            'desde que inaugurei', 'desde que lancei', 'desde que criei',
+            'desde que existe', 'toda a história', 'toda a historia',
+        ];
+
+        foreach ($allTimePatterns as $pattern) {
+            if (str_contains($lower, $pattern)) {
+                return ['days' => self::ALL_TIME_DAYS];
+            }
+        }
+
+        // Specific period patterns (ordered from most to least specific)
         $patterns = [
-            '/(\d+)\s*dias?/i' => fn ($m) => (int) $m[1],
+            '/(\d+)\s*anos?/i' => fn ($m) => (int) $m[1] * 365,
+            '/(\d+)\s*m[eê]s(?:es)?/i' => fn ($m) => (int) $m[1] * 30,
             '/(\d+)\s*semanas?/i' => fn ($m) => (int) $m[1] * 7,
+            '/(\d+)\s*dias?/i' => fn ($m) => (int) $m[1],
+            '/(?:último|ultimo|esse)\s*ano/i' => fn () => 365,
+            '/(?:últimos|ultimos)\s*(\d+)\s*m[eê]s(?:es)?/i' => fn ($m) => (int) $m[1] * 30,
+            '/(?:último|ultimo)\s*trimestre/i' => fn () => 90,
+            '/(?:último|ultimo)\s*semestre/i' => fn () => 180,
             '/(?:último|ultimo)\s*m[eê]s/i' => fn () => 30,
-            '/30\s*dias?/i' => fn () => 30,
             '/uma?\s*semana/i' => fn () => 7,
             '/duas?\s*semanas?/i' => fn () => 14,
-            '/quinze(?:na)?|15\s*dias?/i' => fn () => 15,
+            '/quinze(?:na)?/i' => fn () => 15,
         ];
 
         foreach ($patterns as $pattern => $extractor) {
             if (preg_match($pattern, $message, $matches)) {
-                $requestedDays = $extractor($matches);
-                if ($requestedDays > self::MAX_PERIOD_DAYS) {
-                    $days = self::MAX_PERIOD_DAYS;
-                    $exceededMax = true;
-                } else {
-                    $days = max(1, $requestedDays);
-                }
+                $days = max(1, $extractor($matches));
                 break;
             }
         }
 
-        return [
-            'days' => $days,
-            'exceeded_max' => $exceededMax,
-        ];
+        return ['days' => $days];
     }
 
     /**
@@ -121,6 +294,11 @@ class ChatbotService
     private function buildSuggestionDiscussionPrompt(?object $store, array $storeData, array $suggestion): string
     {
         $storeName = $store?->name ?? 'sua loja';
+        $storeNiche = $store?->niche ?? 'não definido';
+        $storeNicheSubcategory = $store?->niche_subcategory ?? '';
+        $nicheContext = $storeNicheSubcategory
+            ? "Segmento/Nicho: {$storeNiche} — {$storeNicheSubcategory}"
+            : "Segmento/Nicho: {$storeNiche}";
         $storeDataJson = json_encode($storeData, JSON_UNESCAPED_UNICODE);
 
         $categoryLabel = $this->getCategoryLabel($suggestion['category'] ?? 'geral');
@@ -133,10 +311,25 @@ class ChatbotService
 
         CONTEXTO DA LOJA:
         Loja: {$storeName}
+        {$nicheContext}
         Período de dados: {$storeData['period']['start']} a {$storeData['period']['end']}
 
         DADOS DA LOJA:
         {$storeDataJson}
+
+        LEGENDA DOS DADOS:
+        - summary: resumo do período (receita, pedidos, ticket médio)
+        - daily_stats: d=data, r=receita, p=pedidos, t=ticket médio
+        - top_products: n=nome, q=quantidade vendida, r=receita
+        - products_catalog: n=nome, p=preço, e=estoque
+        - products_by_coupon: n=nome produto, cupom=código do cupom, q=quantidade, r=receita
+        - stock: low_stock=produtos com estoque baixo, out_of_stock_count=esgotados
+        - coupons: resumo de cupons + lista de cupons ativos (code, type, val, used, max, exp)
+        - coupon_details: detalhes e estatísticas de cupons específicos
+        - order_status: status dos pedidos com contagem
+        - top_customers: n=nome, p=nº pedidos, t=total gasto
+        - customer_orders: pedidos de um cliente específico (client, email, total, status, date, items)
+        - product_revenue: receita detalhada de produto específico (n=nome, q=qtd, r=receita, orders=nº pedidos)
 
         SUGESTÃO EM DISCUSSÃO:
         - Título: {$suggestion['title']}
@@ -165,6 +358,13 @@ class ChatbotService
         - Ofereça passos práticos e acionáveis
         - Se o usuário pedir detalhes específicos, use os dados da loja para contextualizar
         - NÃO use emojis excessivamente
+
+        RESTRIÇÃO DE ESCOPO - BLOQUEIO OBRIGATÓRIO:
+        Você SÓ pode responder sobre assuntos diretamente relacionados à loja "{$storeName}", seu segmento "{$storeNiche}" e à sugestão em discussão.
+        - NÃO responda sobre assuntos fora de e-commerce (receitas, carros, programação, política, etc.)
+        - NÃO responda sobre como a plataforma Ecommpilot funciona internamente
+        - NÃO dê estratégias para segmentos/nichos diferentes de "{$storeNiche}"
+        - Se a pergunta for fora do escopo, responda: "Desculpe, só posso ajudar com assuntos relacionados à sua loja **{$storeName}** e à sugestão em discussão. Como posso te ajudar com essa sugestão?"
         PROMPT;
     }
 
@@ -221,9 +421,14 @@ class ChatbotService
         return $action;
     }
 
-    private function buildSystemPrompt(?object $store, ?Analysis $analysis, array $storeData, string $periodNotice = ''): string
+    private function buildSystemPrompt(?object $store, ?Analysis $analysis, array $storeData): string
     {
         $storeName = $store?->name ?? 'sua loja';
+        $storeNiche = $store?->niche ?? 'não definido';
+        $storeNicheSubcategory = $store?->niche_subcategory ?? '';
+        $nicheContext = $storeNicheSubcategory
+            ? "Segmento/Nicho: {$storeNiche} — {$storeNicheSubcategory}"
+            : "Segmento/Nicho: {$storeNiche}";
 
         $analysisContext = '';
         if ($analysis && $analysis->isCompleted()) {
@@ -239,14 +444,26 @@ class ChatbotService
 
         CONTEXTO:
         Loja: {$storeName}
+        {$nicheContext}
         Período: {$storeData['period']['start']} a {$storeData['period']['end']}
         {$analysisContext}
 
         DADOS DA LOJA (últimos {$storeData['period']['days']} dias):
         {$storeDataJson}
 
-        LEGENDA: Dados diários: d=Data, r=Receita, p=Pedidos, t=Ticket médio | Produtos: n=Nome, q=Qtd vendida, r=Receita, e=Estoque | Clientes: n=Nome, p=Pedidos, t=Total gasto
-        {$periodNotice}
+        LEGENDA DOS DADOS:
+        - summary: resumo do período (receita, pedidos, ticket médio)
+        - daily_stats: d=data, r=receita, p=pedidos, t=ticket médio
+        - top_products: n=nome, q=quantidade vendida, r=receita
+        - products_catalog: n=nome, p=preço, e=estoque
+        - products_by_coupon: n=nome produto, cupom=código do cupom, q=quantidade, r=receita
+        - stock: low_stock=produtos com estoque baixo, out_of_stock_count=esgotados
+        - coupons: resumo de cupons + lista de cupons ativos (code, type, val, used, max, exp)
+        - coupon_details: detalhes e estatísticas de cupons específicos
+        - order_status: status dos pedidos com contagem
+        - top_customers: n=nome, p=nº pedidos, t=total gasto
+        - customer_orders: pedidos de um cliente específico (client, email, total, status, date, items)
+        - product_revenue: receita detalhada de produto específico (n=nome, q=qtd, r=receita, orders=nº pedidos)
 
         FORMATO DE RESPOSTA - USE MARKDOWN:
         Quando responder sobre vendas, receita, produtos ou métricas, formate SEMPRE usando Markdown:
@@ -265,17 +482,45 @@ class ChatbotService
         REGRAS:
         - SEMPRE responda em português brasileiro
         - Seja prestativo, amigável e profissional
-        - Use os dados reais fornecidos acima para criar tabelas e análises
+        - Use os dados reais fornecidos acima para criar tabelas e análises com NOMES REAIS dos produtos
         - SEMPRE inclua uma tabela com os dados diários quando perguntado sobre vendas/faturamento
+        - Quando dados específicos estiverem presentes (top_products, products_by_coupon, coupons, etc.), USE-OS obrigatoriamente na resposta
+        - Se products_by_coupon estiver presente, mostre uma tabela com os produtos vendidos com cada cupom
         - Forneça insights baseados nos dados (tendências, anomalias, padrões)
         - Sugira ações concretas baseadas nos dados
         - NÃO use emojis excessivamente
         - Quando sugerir ações, seja específico para os dados da loja
-        - Se perguntado sobre algo fora do escopo de e-commerce/marketing, redirecione educadamente
+
+        RESTRIÇÃO DE ESCOPO - BLOQUEIO OBRIGATÓRIO:
+        Você SÓ pode responder sobre assuntos diretamente relacionados à loja "{$storeName}" e seu segmento "{$storeNiche}".
+
+        PERMITIDO (responda normalmente):
+        - Vendas, receita, faturamento, pedidos, ticket médio da loja
+        - Produtos, catálogo, estoque, preços da loja
+        - Cupons, descontos, promoções da loja
+        - Clientes, compradores da loja
+        - Estratégias de marketing e vendas PARA O SEGMENTO da loja ({$storeNiche})
+        - Métricas, KPIs, tendências de e-commerce relevantes ao segmento
+        - Dicas de precificação, conversão, retenção para o nicho da loja
+
+        BLOQUEADO (recuse educadamente):
+        - Assuntos que NÃO são sobre e-commerce (receitas, carros, programação, política, etc.)
+        - Perguntas sobre como a plataforma Ecommpilot funciona internamente (código, telas, arquitetura)
+        - Estratégias para segmentos/nichos DIFERENTES do segmento da loja ativa
+          Exemplo: se a loja é de roupas, NÃO responda sobre estratégias de venda de shampoos ou cosméticos
+        - Qualquer conteúdo que não ajude o lojista a operar/melhorar SUA loja específica
+
+        Quando a pergunta for BLOQUEADA, responda com:
+        "Desculpe, só posso ajudar com assuntos relacionados à sua loja **{$storeName}** e ao segmento de **{$storeNiche}**. Posso te ajudar com vendas, produtos, cupons, estoque, clientes ou estratégias de marketing para o seu nicho. Como posso te ajudar?"
 
         CAPACIDADES:
         - Mostrar dados detalhados de vendas por dia com tabelas
-        - Analisar performance de produtos
+        - Analisar performance de produtos com nomes e receitas reais
+        - Correlacionar produtos vendidos com cupons específicos
+        - Informar sobre cupons ativos, descontos e promoções
+        - Detalhar situação do estoque (baixo, esgotado)
+        - Listar clientes mais ativos com valores gastos
+        - Buscar pedidos de clientes específicos
         - Identificar tendências e padrões
         - Calcular métricas como ticket médio, taxa de conversão
         - Sugerir ações baseadas nos dados
@@ -285,130 +530,11 @@ class ChatbotService
         PROMPT;
     }
 
-    private function getStoreData(?object $store, ?int $days = null): array
-    {
-        $days = $days ?? self::DEFAULT_PERIOD_DAYS;
-
-        if (! $store) {
-            \Log::warning('ChatbotService: No store provided');
-
-            return $this->getEmptyStoreData($days);
-        }
-
-        try {
-            $endDate = Carbon::now();
-            $startDate = Carbon::now()->subDays($days);
-
-            // Get paid orders in period using query scope
-            $orders = SyncedOrder::where('store_id', $store->id)
-                ->whereBetween('external_created_at', [$startDate, $endDate])
-                ->where('payment_status', PaymentStatus::Paid)
-                ->get();
-
-            // Calculate daily stats (simplified to reduce tokens)
-            $dailyStats = [];
-            foreach ($orders->groupBy(fn ($order) => $order->external_created_at->format('Y-m-d')) as $date => $dayOrders) {
-                $revenue = $dayOrders->sum('total');
-                $count = $dayOrders->count();
-                $avgTicket = $count > 0 ? $revenue / $count : 0;
-                $dailyStats[$date] = [
-                    'd' => Carbon::parse($date)->format('d/m/Y'),
-                    'r' => 'R$ '.number_format($revenue, 2, ',', '.'),
-                    'p' => $count,
-                    't' => 'R$ '.number_format($avgTicket, 2, ',', '.'),
-                ];
-            }
-
-            // Sort by date descending
-            krsort($dailyStats);
-
-            // Calculate totals
-            $totalRevenue = $orders->sum('total');
-            $totalOrders = $orders->count();
-            $averageTicket = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
-
-            // Get best selling products (top 5, simplified)
-            $productSales = [];
-            foreach ($orders as $order) {
-                if (! is_array($order->items)) {
-                    continue;
-                }
-                foreach ($order->items as $item) {
-                    $productId = $item['product_id'] ?? null;
-                    $productName = $item['name'] ?? 'Produto';
-                    $quantity = $item['quantity'] ?? 1;
-                    $price = $item['price'] ?? 0;
-
-                    if (! isset($productSales[$productId])) {
-                        $productSales[$productId] = ['n' => $productName, 'q' => 0, 'r' => 0];
-                    }
-                    $productSales[$productId]['q'] += $quantity;
-                    $productSales[$productId]['r'] += $price * $quantity;
-                }
-            }
-
-            // Sort by revenue and get top 5
-            usort($productSales, fn ($a, $b) => $b['r'] <=> $a['r']);
-            $topProducts = array_map(function ($p) {
-                return ['n' => $p['n'], 'q' => $p['q'], 'r' => 'R$ '.number_format($p['r'], 2, ',', '.')];
-            }, array_slice($productSales, 0, 5));
-
-            // Get products with low stock (top 5)
-            $lowStockProducts = SyncedProduct::where('store_id', $store->id)
-                ->where('is_active', true)
-                ->whereNotNull('stock_quantity')
-                ->where('stock_quantity', '>', 0)
-                ->where('stock_quantity', '<=', 5)
-                ->orderBy('stock_quantity')
-                ->limit(5)
-                ->get(['name', 'stock_quantity'])
-                ->map(fn ($p) => ['n' => $p->name, 'e' => $p->stock_quantity])
-                ->toArray();
-
-            // Get top customers (top 5, simplified)
-            $customerOrders = $orders->groupBy('customer_email')
-                ->map(function ($customerOrders) {
-                    return [
-                        'n' => $customerOrders->first()->customer_name,
-                        'p' => $customerOrders->count(),
-                        't' => 'R$ '.number_format($customerOrders->sum('total'), 2, ',', '.'),
-                    ];
-                })
-                ->sortByDesc(fn ($c) => $c['p'])
-                ->take(5)
-                ->values()
-                ->toArray();
-
-            return [
-                'period' => [
-                    'start' => $startDate->format('d/m/Y'),
-                    'end' => $endDate->format('d/m/Y'),
-                    'days' => $days,
-                ],
-                'summary' => [
-                    'total_revenue' => $totalRevenue,
-                    'total_revenue_formatted' => 'R$ '.number_format($totalRevenue, 2, ',', '.'),
-                    'total_orders' => $totalOrders,
-                    'average_ticket' => $averageTicket,
-                    'average_ticket_formatted' => 'R$ '.number_format($averageTicket, 2, ',', '.'),
-                ],
-                'daily_stats' => array_values($dailyStats),
-                'top_products' => $topProducts,
-                'low_stock_products' => $lowStockProducts,
-                'top_customers' => $customerOrders,
-            ];
-        } catch (\Exception $e) {
-            \Log::warning('Error fetching store data for chat: '.$e->getMessage());
-
-            return $this->getEmptyStoreData($days);
-        }
-    }
-
     private function getEmptyStoreData(?int $days = null): array
     {
         $days = $days ?? self::DEFAULT_PERIOD_DAYS;
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subDays($days);
+        $endDate = now();
+        $startDate = now()->subDays($days);
 
         return [
             'period' => [
@@ -424,9 +550,6 @@ class ChatbotService
                 'average_ticket_formatted' => 'R$ 0,00',
             ],
             'daily_stats' => [],
-            'top_products' => [],
-            'low_stock_products' => [],
-            'top_customers' => [],
         ];
     }
 

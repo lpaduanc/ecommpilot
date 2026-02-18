@@ -27,17 +27,12 @@ onMounted(() => {
         // Em preview mode, carrega mensagens mockadas
         chatStore.messages = [...mockChatMessages];
     } else if (authStore.canAccessAiChat) {
-        // Com acesso real, inicializa normalmente
-        chatStore.resetLocalState();
-        chatStore.addWelcomeMessage();
+        // Carrega conversa existente do backend (persiste entre navegações)
+        chatStore.fetchConversation();
     }
 });
 
 onBeforeUnmount(() => {
-    // Limpa o chat ao sair da página (backend e frontend)
-    if (authStore.canAccessAiChat && !shouldUseMocks.value) {
-        chatStore.resetAndClearBackend();
-    }
     // Desabilita preview mode ao sair
     if (isInPreviewMode.value) {
         disablePreviewMode();
@@ -66,11 +61,11 @@ onBeforeUnmount(() => {
         <!-- Conteúdo - mostra se tiver acesso OU estiver em preview mode -->
         <div
             v-if="showContent"
-            class="min-h-screen -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8"
+            class="flex flex-col h-[calc(100vh-4rem)] lg:h-[calc(100vh-5rem)] overflow-hidden -m-4 sm:-m-6 lg:-m-8 -mt-4 sm:-mt-6 lg:-mt-8"
             :class="shouldUseMocks ? 'preview-mode-disabled' : ''"
         >
             <!-- Hero Header with Gradient -->
-            <div class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
+            <div class="shrink-0 relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-950 to-secondary-950 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
                 <!-- Background Elements -->
                 <div class="absolute inset-0 overflow-hidden">
                     <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 dark:bg-primary-500/10 rounded-full blur-3xl"></div>
@@ -105,7 +100,7 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Beta Warning Banner -->
-            <div class="bg-gradient-to-r from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/10 border-b border-amber-200 dark:border-amber-800 px-4 sm:px-6 lg:px-8 py-4">
+            <div class="shrink-0 bg-gradient-to-r from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/10 border-b border-amber-200 dark:border-amber-800 px-4 sm:px-6 lg:px-8 py-4">
                 <div class="max-w-7xl mx-auto">
                     <div class="flex items-start gap-3">
                         <div class="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -122,8 +117,8 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Chat Container -->
-            <div class="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950 min-h-[calc(100vh-200px)]">
-                <div class="w-full">
+            <div class="flex-1 min-h-0 flex flex-col px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950">
+                <div class="w-full flex-1 min-h-0 flex flex-col">
                     <ChatContainer />
                 </div>
             </div>

@@ -32,6 +32,7 @@ import {
     ArrowLeftIcon,
     EnvelopeIcon,
     LightBulbIcon,
+    ShieldExclamationIcon,
 } from '@heroicons/vue/24/outline';
 import {
     mockCurrentAnalysis,
@@ -75,6 +76,7 @@ const isResendingEmail = ref(false);
 const dismissedEmailAlerts = ref(new Set());
 const showChatPanel = ref(false);
 const chatPanelContext = ref(null);
+const showAIDisclaimer = ref(false);
 
 // Análises anteriores
 const selectedHistoricalId = ref(null);
@@ -132,7 +134,7 @@ const recentAnalyses = computed(() => {
         .slice(0, 4);  // Mostra todas até 4 análises
 });
 
-async function handleRequestAnalysis() {
+function handleRequestAnalysis() {
     if (isStoreSyncing.value) {
         notificationStore.warning('Aguarde a sincronização da loja ser concluída antes de solicitar uma nova análise.');
         return;
@@ -145,6 +147,12 @@ async function handleRequestAnalysis() {
         showRateLimitWarning.value = true;
         return;
     }
+
+    showAIDisclaimer.value = true;
+}
+
+async function confirmAnalysisRequest() {
+    showAIDisclaimer.value = false;
 
     const analysisType = featureModulesEnabled ? selectedAnalysisType.value : 'general';
     const result = await analysisStore.requestNewAnalysis(analysisType);
@@ -901,6 +909,53 @@ onUnmounted(() => {
                 >
                     Entendi
                 </button>
+            </div>
+        </BaseModal>
+
+        <!-- AI Disclaimer Modal -->
+        <BaseModal
+            :show="showAIDisclaimer"
+            @close="showAIDisclaimer = false"
+            size="md"
+        >
+            <div class="py-4">
+                <div class="flex justify-center mb-5">
+                    <div class="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                        <ShieldExclamationIcon class="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white text-center mb-4">
+                    Antes de iniciar a an&aacute;lise
+                </h3>
+
+                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-5">
+                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                        As an&aacute;lises s&atilde;o geradas por <span class="font-semibold">intelig&ecirc;ncia artificial</span> com base nos dados da sua loja.
+                        Embora nosso sistema utilize modelos avan&ccedil;ados e m&uacute;ltiplas camadas de valida&ccedil;&atilde;o, os resultados s&atilde;o
+                        <span class="font-semibold">recomenda&ccedil;&otilde;es &mdash; n&atilde;o garantias</span>.
+                    </p>
+                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mt-3">
+                        A IA pode interpretar dados de forma imprecisa ou sugerir a&ccedil;&otilde;es que n&atilde;o se aplicam ao seu contexto espec&iacute;fico.
+                        <span class="font-semibold">Valide sempre as informa&ccedil;&otilde;es</span> e use seu conhecimento do neg&oacute;cio antes de tomar decis&otilde;es.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button
+                        @click="showAIDisclaimer = false"
+                        class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        @click="confirmAnalysisRequest"
+                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary-500 to-secondary-500 shadow-md hover:shadow-lg transition-all"
+                    >
+                        <SparklesIcon class="w-4 h-4" />
+                        Entendi, iniciar an&aacute;lise
+                    </button>
+                </div>
             </div>
         </BaseModal>
 

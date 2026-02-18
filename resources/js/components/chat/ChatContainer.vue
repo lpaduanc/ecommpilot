@@ -87,7 +87,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col flex-1 min-h-0">
         <!-- Messages Area -->
         <BaseCard padding="none" class="flex-1 overflow-hidden flex flex-col">
             <div
@@ -125,7 +125,7 @@ onMounted(() => {
             </div>
 
             <!-- Quick Suggestions - Only visible when showQuickSuggestions is true -->
-            <div v-if="showQuickSuggestions" class="border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-900 px-4 sm:px-6 py-4">
+            <div v-if="showQuickSuggestions" class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/50 dark:to-gray-900 px-4 sm:px-6 py-4">
                 <div class="w-full">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-6 h-6 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
@@ -149,7 +149,7 @@ onMounted(() => {
         </BaseCard>
 
         <!-- Input Area -->
-        <div class="mt-4">
+        <div class="mt-4 shrink-0">
             <BaseCard padding="normal">
                 <ChatInput
                     @send="handleSendMessage"
