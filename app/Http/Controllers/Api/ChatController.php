@@ -263,7 +263,9 @@ class ChatController extends Controller
     {
         $user = $request->user();
 
+        // Only clear general conversations (not suggestion chats, which are permanent)
         ChatConversation::where('user_id', $user->id)
+            ->whereNull('suggestion_id')
             ->active()
             ->update(['status' => 'closed']);
 

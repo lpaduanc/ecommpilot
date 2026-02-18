@@ -9,6 +9,7 @@ export const useChatStore = defineStore('chat', () => {
     const error = ref(null);
     const conversationId = ref(null);
     const upgradeRequired = ref(false);
+    const currentContext = ref(null);
     
     const hasMessages = computed(() => messages.value.length > 0);
     
@@ -21,6 +22,7 @@ export const useChatStore = defineStore('chat', () => {
     async function fetchConversation() {
         isLoading.value = true;
         error.value = null;
+        currentContext.value = null; // General chat has no suggestion context
 
         try {
             const response = await api.get('/chat/conversation');
@@ -45,7 +47,10 @@ export const useChatStore = defineStore('chat', () => {
     async function sendMessage(content, context = null) {
         isSending.value = true;
         error.value = null;
-        
+
+        // Use stored context for suggestion chats if no explicit context passed
+        const effectiveContext = context || currentContext.value;
+
         // Add user message immediately
         const userMessage = {
             id: Date.now(),
@@ -54,12 +59,12 @@ export const useChatStore = defineStore('chat', () => {
             created_at: new Date().toISOString(),
         };
         messages.value.push(userMessage);
-        
+
         try {
             const payload = { message: content };
-            
-            if (context) {
-                payload.context = context;
+
+            if (effectiveContext) {
+                payload.context = effectiveContext;
             }
             
             const response = await api.post('/chat/message', payload);
@@ -138,6 +143,7 @@ export const useChatStore = defineStore('chat', () => {
     function resetLocalState() {
         messages.value = [];
         conversationId.value = null;
+        currentContext.value = null;
         error.value = null;
         isLoading.value = false;
         isSending.value = false;
@@ -165,7 +171,7 @@ export const useChatStore = defineStore('chat', () => {
         // Reset local state for fresh conversation
         resetLocalState();
 
-        // Build context object
+        // Build context object and store it for follow-up messages
         const context = {
             type: 'suggestion',
             suggestion: {
@@ -178,6 +184,7 @@ export const useChatStore = defineStore('chat', () => {
                 priority: suggestion.priority,
             }
         };
+        currentContext.value = context;
 
         // Send initial message to trigger AI response with 5 suggestions
         const initialMessage = `Quero discutir esta sugestão: "${suggestion.title}"`;
@@ -194,6 +201,21 @@ export const useChatStore = defineStore('chat', () => {
         isLoading.value = true;
         error.value = null;
 
+        // Build and store context so follow-up messages keep the suggestion association
+        const context = {
+            type: 'suggestion',
+            suggestion: {
+                id: suggestion.id,
+                title: suggestion.title,
+                category: suggestion.category,
+                description: suggestion.description,
+                recommended_action: suggestion.recommended_action || suggestion.action_steps,
+                expected_impact: suggestion.expected_impact || suggestion.priority,
+                priority: suggestion.priority,
+            }
+        };
+        currentContext.value = context;
+
         try {
             // Try to fetch existing conversation for this suggestion
             const response = await api.get(`/chat/conversation/suggestion/${suggestion.id}`);
@@ -205,21 +227,9 @@ export const useChatStore = defineStore('chat', () => {
                 return { success: true, hasHistory: true };
             } else {
                 // No existing conversation - start a new one
-                resetLocalState();
-
-                // Build context object
-                const context = {
-                    type: 'suggestion',
-                    suggestion: {
-                        id: suggestion.id,
-                        title: suggestion.title,
-                        category: suggestion.category,
-                        description: suggestion.description,
-                        recommended_action: suggestion.recommended_action || suggestion.action_steps,
-                        expected_impact: suggestion.expected_impact || suggestion.priority,
-                        priority: suggestion.priority,
-                    }
-                };
+                messages.value = [];
+                conversationId.value = null;
+                error.value = null;
 
                 // Send initial message to trigger AI response
                 const initialMessage = `Quero discutir esta sugestão: "${suggestion.title}"`;
@@ -241,6 +251,7 @@ export const useChatStore = defineStore('chat', () => {
         isSending,
         error,
         conversationId,
+        currentContext,
         upgradeRequired,
         hasMessages,
         lastMessage,
