@@ -41,7 +41,7 @@ const cityFilter = ref('');
 
 // Period filter state
 const showPeriodDropdown = ref(false);
-const selectedPeriod = ref('yesterday'); // default: ontem
+const selectedPeriod = ref(''); // sem filtro de período por padrão
 const customStartDate = ref('');
 const customEndDate = ref('');
 
@@ -191,7 +191,7 @@ function clearFilters() {
     stateFilter.value = '';
     cityFilter.value = '';
     searchQuery.value = '';
-    selectedPeriod.value = 'yesterday';
+    selectedPeriod.value = '';
     customStartDate.value = '';
     customEndDate.value = '';
     filterOptions.value.cities = [];
@@ -332,7 +332,7 @@ const hasActiveFilters = computed(() => {
 });
 
 const currentPeriodLabel = computed(() => {
-    if (!selectedPeriod.value) return 'Ontem';
+    if (!selectedPeriod.value) return 'Período';
     if (selectedPeriod.value === 'custom' && customStartDate.value && customEndDate.value) {
         // Usar T00:00:00 para evitar problema de timezone (UTC vs local)
         const start = new Date(customStartDate.value + 'T00:00:00');
@@ -340,7 +340,7 @@ const currentPeriodLabel = computed(() => {
         return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
     }
     const option = periodOptions.find(o => o.value === selectedPeriod.value);
-    return option?.label || 'Ontem';
+    return option?.label || 'Período';
 });
 
 const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');
@@ -409,7 +409,7 @@ function applyCustomPeriod() {
 }
 
 function clearPeriodFilter() {
-    selectedPeriod.value = 'yesterday';
+    selectedPeriod.value = '';
     customStartDate.value = '';
     customEndDate.value = '';
     showPeriodDropdown.value = false;

@@ -154,34 +154,112 @@ class ChatbotService
         Dada a mensagem do usuário (e o histórico recente da conversa, se disponível), determine quais consultas ao banco de dados são necessárias.
 
         CONSULTAS DISPONÍVEIS:
+
+        PRODUTOS:
         - top_products: {} → Produtos mais vendidos (ranking geral)
         - products_catalog: {} → Listar catálogo de produtos da loja
+        - product_search: {"search": "nome ou SKU"} → Buscar produto específico por nome ou SKU com detalhes completos
+        - products_by_category: {"category": "nome da categoria"} → Produtos filtrados por categoria
         - products_by_coupon: {"codes": ["CODIGO1", "CODIGO2"]} → Produtos vendidos com cupons específicos
+        - revenue_by_product: {"product_name": "nome do produto"} → Receita de um produto específico
+        - new_products: {} → Produtos adicionados recentemente ao catálogo
+        - discounted_products: {} → Produtos em promoção (com desconto ativo)
+        - product_margins: {} → Margem de lucro dos produtos (requer dados de custo cadastrados)
+        - product_abc: {} → Classificação ABC dos produtos (quais geram 80% da receita)
+        - price_analysis: {} → Análise de distribuição de preços dos produtos
+
+        ESTOQUE:
         - stock_status: {} → Produtos com estoque baixo ou esgotado
+        - excess_stock: {} → Produtos com EXCESSO de estoque (maior quantidade em estoque)
+        - slow_moving_products: {} → Produtos encalhados (têm estoque mas não venderam no período)
+        - stock_summary: {} → Resumo geral do estoque (valor total, saúde, distribuição)
+
+        PEDIDOS:
+        - order_status: {} → Breakdown de status dos pedidos
+        - recent_orders: {} → Últimos pedidos realizados (mais recentes)
+        - order_search: {"order_number": "12345"} → Buscar pedido específico por número
+        - high_value_orders: {} → Pedidos com maior valor total
+        - cancelled_orders: {} → Pedidos cancelados ou reembolsados
+        - payment_methods: {} → Receita e pedidos por método de pagamento
+        - orders_by_region: {} → Vendas por estado/cidade (distribuição geográfica)
+        - shipping_analysis: {} → Análise de custos de frete (médio, grátis, por faixa de valor)
+        - sales_by_weekday: {} → Vendas por dia da semana (qual dia vende mais)
+        - pending_orders: {} → Pedidos não pagos/abandonados
+        - best_selling_days: {} → Dias com maior faturamento (datas específicas)
+        - sales_by_hour: {} → Vendas por horário do dia (qual hora vende mais)
+        - discount_impact: {} → Impacto dos descontos (pedidos com vs sem desconto)
+        - order_items_analysis: {} → Análise de itens por pedido (média, distribuição)
+
+        CLIENTES:
+        - top_customers: {} → Clientes que mais compram
+        - repeat_customers: {} → Clientes recorrentes (compraram mais de uma vez)
+        - customer_orders: {"name_or_email": "nome ou email"} → Pedidos de um cliente específico
+        - customer_details: {"name_or_email": "nome ou email"} → Perfil completo de um cliente (total gasto, nº pedidos, desde quando)
+        - customer_segments: {} → Segmentação de clientes por faixa de gasto (VIP, regular, ocasional)
+        - new_vs_returning: {} → Clientes novos vs recorrentes no período
+
+        CUPONS:
         - coupon_stats: {} → Estatísticas gerais de cupons/descontos
         - coupon_details: {"codes": ["CODIGO1"]} → Detalhes de cupons específicos
-        - order_status: {} → Breakdown de status dos pedidos
-        - top_customers: {} → Clientes que mais compram
-        - customer_orders: {"name_or_email": "nome ou email"} → Pedidos de um cliente específico
-        - revenue_by_product: {"product_name": "nome do produto"} → Receita de um produto específico
+        - coupon_ranking: {} → Ranking dos cupons por receita gerada (qual cupom performa melhor)
+
+        ANÁLISE AI:
         - analysis_summary: {} → Resumo da última análise AI (saúde da loja, score, insights)
         - active_suggestions: {} → Sugestões ativas/pendentes da análise (título, categoria, impacto)
         - knowledge_base: {} → Busca boas práticas e benchmarks do segmento na base de conhecimento
         - cross_domain_analysis: {} → Sinaliza que o usuário quer correlacionar dados de múltiplos domínios
+        - store_overview: {} → Visão geral completa da loja (KPIs, taxa de conversão, crescimento vs período anterior)
+        - period_comparison: {} → Comparação do período atual vs anterior (receita, pedidos, ticket, clientes)
+        - revenue_by_category: {} → Receita por categoria de produto
 
-        REGRAS:
+        REGRAS GERAIS:
         - Se o usuário usar pronomes ("ele", "esse", "desse", "dela", "desse produto"), use o HISTÓRICO da conversa para resolver a referência e extrair o query correto com os parâmetros certos
         - Extraia códigos de cupom exatos mencionados (ex: "cupom PROMO10" → codes: ["PROMO10"])
         - Extraia nomes de produtos mencionados (ex: "shampoo loiro" → product_name: "shampoo loiro")
         - Extraia nomes/emails de clientes mencionados
+        - Extraia nomes de categorias mencionadas (ex: "produtos de moda" → category: "moda")
+        - Extraia números de pedido mencionados (ex: "pedido 12345" → order_number: "12345")
         - Se a pergunta não precisa de dados do banco, retorne queries vazio
         - Múltiplas queries são permitidas (ex: produtos de um cupom + detalhes do cupom)
+
+        MAPEAMENTO DE PERGUNTAS:
         - Perguntas sobre vendas/faturamento geralmente precisam de top_products
         - Perguntas gerais como "como vai minha loja?" → top_products
+        - Perguntas sobre "excesso de estoque", "estoque alto", "sobrando estoque" → excess_stock
+        - Perguntas sobre "produtos encalhados", "sem venda", "não venderam", "estoque parado" → slow_moving_products
+        - Perguntas sobre buscar/encontrar um produto específico → product_search
+        - Perguntas sobre "promoção", "desconto", "liquidação", "produtos em oferta" → discounted_products
+        - Perguntas sobre "produtos novos", "adicionei recentemente", "últimos produtos cadastrados" → new_products
+        - Perguntas sobre "margem", "lucro", "custo", "rentabilidade", "lucratividade" → product_margins
+        - Perguntas sobre "forma de pagamento", "método de pagamento", "pix", "cartão", "boleto" → payment_methods
+        - Perguntas sobre "região", "estado", "cidade", "localização", "onde vendem mais", "geografia" → orders_by_region
+        - Perguntas sobre "frete", "custo de envio", "frete grátis", "entrega" → shipping_analysis
+        - Perguntas sobre "dia da semana", "qual dia vende mais", "melhor dia", "segunda", "sábado" → sales_by_weekday
+        - Perguntas sobre "últimos pedidos", "pedidos recentes", "pedidos de hoje", "últimas vendas" → recent_orders
+        - Perguntas sobre buscar um pedido específico por número → order_search
+        - Perguntas sobre "maiores pedidos", "pedidos mais caros", "maiores compras" → high_value_orders
+        - Perguntas sobre "cancelamentos", "reembolsos", "pedidos cancelados", "devoluções" → cancelled_orders
+        - Perguntas sobre "clientes recorrentes", "clientes fiéis", "compraram mais de uma vez", "recompra" → repeat_customers
+        - Perguntas sobre perfil/dados de um cliente específico → customer_details
+        - Perguntas sobre "qual cupom", "melhor cupom", "cupom que mais vendeu", "ranking de cupons" → coupon_ranking
+        - Perguntas sobre "categoria", "tipo de produto", "segmento de produtos" → products_by_category
         - Perguntas sobre "análise", "saúde da loja", "score", "diagnóstico", "relatório" → analysis_summary
         - Perguntas sobre "sugestões", "recomendações", "o que fazer", "melhorias", "próximos passos" → active_suggestions
         - Perguntas estratégicas ("como aumentar vendas?", "melhores práticas", "benchmark", "estratégia") → knowledge_base
         - Se o usuário quer correlacionar dados de diferentes áreas (ex: produto+cupom+campanha) → cross_domain_analysis (adicione junto com as outras queries relevantes)
+        - Perguntas sobre "classificação ABC", "curva ABC", "quais produtos importam", "80/20", "pareto" → product_abc
+        - Perguntas sobre "faixa de preço", "distribuição de preço", "preço médio dos produtos" → price_analysis
+        - Perguntas sobre "valor do estoque", "saúde do estoque", "resumo do estoque" → stock_summary
+        - Perguntas sobre "pedidos pendentes", "pedidos não pagos", "carrinho abandonado", "abandonos" → pending_orders
+        - Perguntas sobre "melhor dia de vendas", "dia que mais vendeu", "pico de vendas" → best_selling_days
+        - Perguntas sobre "horário", "hora que mais vende", "melhor horário", "pico de horário" → sales_by_hour
+        - Perguntas sobre "impacto do desconto", "pedidos com desconto", "vale dar desconto" → discount_impact
+        - Perguntas sobre "itens por pedido", "quantos produtos por pedido", "combos", "cross-sell" → order_items_analysis
+        - Perguntas sobre "segmentação", "clientes VIP", "classificação de clientes", "perfil dos clientes" → customer_segments
+        - Perguntas sobre "clientes novos", "novos vs recorrentes", "aquisição de clientes" → new_vs_returning
+        - Perguntas sobre "visão geral", "overview", "resumo geral", "KPIs", "indicadores", "taxa de conversão" → store_overview
+        - Perguntas sobre "comparação", "vs período anterior", "mês passado", "evolução", "crescimento" → period_comparison
+        - Perguntas sobre "receita por categoria", "categoria mais lucrativa", "vendas por categoria" → revenue_by_category
 
         Responda APENAS com JSON válido, sem texto adicional:
         {"queries": [{"type": "nome_da_query", "params": {}}]}
@@ -194,11 +272,20 @@ class ChatbotService
     private function sanitizeQueries(array $queries): array
     {
         $validTypes = [
-            'top_products', 'products_catalog', 'products_by_coupon',
-            'stock_status', 'coupon_stats', 'coupon_details',
-            'order_status', 'top_customers', 'customer_orders',
-            'revenue_by_product', 'cross_domain_analysis',
-            'analysis_summary', 'active_suggestions', 'knowledge_base',
+            'top_products', 'products_catalog', 'product_search',
+            'products_by_category', 'products_by_coupon', 'revenue_by_product',
+            'new_products', 'discounted_products', 'product_margins',
+            'stock_status', 'excess_stock', 'slow_moving_products',
+            'order_status', 'recent_orders', 'order_search',
+            'high_value_orders', 'cancelled_orders',
+            'payment_methods', 'orders_by_region', 'shipping_analysis', 'sales_by_weekday',
+            'top_customers', 'repeat_customers', 'customer_orders', 'customer_details',
+            'coupon_stats', 'coupon_details', 'coupon_ranking',
+            'analysis_summary', 'active_suggestions', 'knowledge_base', 'cross_domain_analysis',
+            'product_abc', 'price_analysis', 'stock_summary',
+            'pending_orders', 'best_selling_days', 'sales_by_hour', 'discount_impact', 'order_items_analysis',
+            'customer_segments', 'new_vs_returning',
+            'store_overview', 'period_comparison', 'revenue_by_category',
         ];
 
         $sanitized = [];
@@ -240,6 +327,18 @@ class ChatbotService
             ],
             'revenue_by_product' => [
                 'product_name' => $this->validateSearchString($params['product_name'] ?? ''),
+            ],
+            'product_search' => [
+                'search' => $this->validateSearchString($params['search'] ?? ''),
+            ],
+            'products_by_category' => [
+                'category' => $this->validateSearchString($params['category'] ?? ''),
+            ],
+            'order_search' => [
+                'order_number' => $this->validateOrderNumber($params['order_number'] ?? ''),
+            ],
+            'customer_details' => [
+                'name_or_email' => $this->validateSearchString($params['name_or_email'] ?? ''),
             ],
             default => [],
         };
@@ -283,6 +382,18 @@ class ChatbotService
         $clean = str_replace(['%', '_'], ['\\%', '\\_'], $clean);
 
         return mb_substr($clean, 0, 100);
+    }
+
+    /**
+     * Validate order numbers: only alphanumeric, hyphens, #.
+     */
+    private function validateOrderNumber(mixed $value): string
+    {
+        if (! is_string($value)) {
+            return '';
+        }
+
+        return preg_replace('/[^A-Z0-9\-#]/i', '', mb_substr($value, 0, 30));
     }
 
     private function detectRequestedPeriod(string $message): array
@@ -363,18 +474,18 @@ class ChatbotService
         {$storeDataJson}
 
         LEGENDA DOS DADOS:
-        - summary: resumo do período (receita, pedidos, ticket médio)
-        - daily_stats: d=data, r=receita, p=pedidos, t=ticket médio
-        - top_products: n=nome, q=quantidade vendida, r=receita
-        - products_catalog: n=nome, p=preço, e=estoque
-        - products_by_coupon: n=nome produto, cupom=código do cupom, q=quantidade, r=receita
-        - stock: low_stock=produtos com estoque baixo, out_of_stock_count=esgotados
-        - coupons: resumo de cupons + lista de cupons ativos (code, type, val, used, max, exp)
-        - coupon_details: detalhes e estatísticas de cupons específicos
-        - order_status: status dos pedidos com contagem
-        - top_customers: n=nome, p=nº pedidos, t=total gasto
-        - customer_orders: pedidos de um cliente específico (client, email, total, status, date, items)
-        - product_revenue: receita detalhada de produto específico (n=nome, q=qtd, r=receita, orders=nº pedidos)
+        - summary: resumo (receita, pedidos, ticket médio) | daily_stats: d, r, p, t
+        - top_products: n, q, r | products_catalog: n, p, e | product_search: n, p, e, sku, cat, promo, custo
+        - products_by_category: n, p, e, cat | products_by_coupon: n, cupom, q, r | product_revenue: n, q, r, orders
+        - new_products: n, p, e, cat, criado | discounted_products: n, p, de, desc, e | product_margins: n, p, custo, margem, lucro, e
+        - stock: low_stock, out_of_stock_count | excess_stock: n, e, vendidos, p | slow_moving: count, products
+        - order_status | recent_orders: numero, cliente, total, status, data | order_search: detalhes completos do pedido
+        - high_value_orders: numero, cliente, total, itens, data | cancelled_orders: total, receita perdida, orders
+        - payment_methods: metodo, pedidos, receita, ticket | orders_by_region: estado, cidade, pedidos, receita
+        - shipping_analysis: frete médio, grátis, faixas | sales_by_weekday: dia, pedidos, receita, ticket
+        - top_customers: n, p, t | repeat_customers: total, rate, customers | customer_details: perfil completo
+        - coupons: resumo + ativos | coupon_details: detalhes | coupon_ranking: ranking por receita
+        - analysis_summary | active_suggestions | knowledge_base | proactive_alerts
 
         SUGESTÃO EM DISCUSSÃO:
         - Título: {$suggestion['title']}
@@ -513,22 +624,64 @@ class ChatbotService
         {$storeDataJson}
 
         LEGENDA DOS DADOS:
-        - summary: resumo do período (receita, pedidos, ticket médio)
-        - daily_stats: d=data, r=receita, p=pedidos, t=ticket médio
+        PRODUTOS:
         - top_products: n=nome, q=quantidade vendida, r=receita
         - products_catalog: n=nome, p=preço, e=estoque
+        - product_search: busca de produto (n=nome, p=preço, e=estoque, sku, cat=categorias, promo=preço original, custo)
+        - products_by_category: produtos por categoria (n=nome, p=preço, e=estoque, cat=categorias)
         - products_by_coupon: n=nome produto, cupom=código do cupom, q=quantidade, r=receita
+        - product_revenue: receita de produto (n=nome, q=qtd, r=receita, orders=nº pedidos)
+        - new_products: produtos recém-adicionados (n=nome, p=preço, e=estoque, cat=categorias, criado=data)
+        - discounted_products: em promoção (n=nome, p=preço atual, de=preço original, desc=% desconto, e=estoque)
+        - product_margins: margem de lucro (n=nome, p=preço, custo, margem=%, lucro=valor, e=estoque)
+        - product_abc: classificação ABC (summary com contagem A/B/C, products=[n, receita, categoria, pct])
+        - price_analysis: distribuição de preços (min, max, media, mediana, ranges=faixas com contagem)
+
+        ESTOQUE:
         - stock: low_stock=produtos com estoque baixo, out_of_stock_count=esgotados
-        - coupons: resumo de cupons + lista de cupons ativos (code, type, val, used, max, exp)
-        - coupon_details: detalhes e estatísticas de cupons específicos
+        - excess_stock: excesso de estoque (n=nome, e=estoque, vendidos=qtd vendida no período, p=preço)
+        - slow_moving: encalhados (count=total, products=[n=nome, e=estoque, p=preço])
+        - stock_summary: resumo (total_products, total_value, avg_price, health=distribuição por saúde, out_of_stock)
+
+        PEDIDOS:
+        - summary: resumo do período (receita, pedidos, ticket médio)
+        - daily_stats: d=data, r=receita, p=pedidos, t=ticket médio
         - order_status: status dos pedidos com contagem
+        - recent_orders: últimos pedidos (numero, cliente, email, total, status, pagamento, data, itens)
+        - order_search: pedido específico (numero, cliente, email, total, desconto, frete, status, pagamento, metodo, data, itens=[nome, qtd, preço])
+        - high_value_orders: maiores pedidos (numero, cliente, total, itens_count, metodo, data)
+        - cancelled_orders: cancelados/reembolsados (total_cancelled, total_refunded, lost_revenue, orders=[numero, cliente, total, status, data])
+        - payment_methods: por forma de pagamento (metodo, pedidos, receita, ticket)
+        - orders_by_region: por estado/cidade (estado, cidade, pedidos, receita)
+        - shipping_analysis: frete (avg_shipping, free_shipping_count, free_shipping_pct, total_shipping, ranges=faixas de valor)
+        - sales_by_weekday: vendas por dia da semana (dia, pedidos, receita, ticket)
+        - pending_orders: não pagos (total, valor_perdido, orders=[numero, cliente, total, status, data])
+        - best_selling_days: melhores dias (data, receita, pedidos, ticket)
+        - sales_by_hour: por hora (hora, pedidos, receita)
+        - discount_impact: impacto desconto (com_desconto vs sem_desconto: pedidos, receita, ticket, pct_desconto)
+        - order_items_analysis: itens/pedido (media, max, distribuição, top_combos)
+
+        CLIENTES:
         - top_customers: n=nome, p=nº pedidos, t=total gasto
-        - customer_orders: pedidos de um cliente específico (client, email, total, status, date, items)
-        - product_revenue: receita detalhada de produto específico (n=nome, q=qtd, r=receita, orders=nº pedidos)
-        - analysis_summary: dados da última análise AI (health_score, health_status, main_insight, premium summary condensado)
-        - active_suggestions: sugestões ativas da análise (t=título, cat=categoria, imp=impacto, st=status)
-        - proactive_alerts: alertas proativos detectados (type=tipo, msg=mensagem). Tipos: critical_stock, expiring_coupon, revenue_trend, unused_coupons
-        - knowledge_base: boas práticas do setor (strategies=estratégias, benchmarks=referências do setor, relevant=resultados semânticos)
+        - repeat_customers: recorrentes (total_customers, repeat_count, repeat_rate=%, customers=[n, email, pedidos, total])
+        - customer_orders: pedidos de cliente (client, email, total, status, date, items)
+        - customer_details: perfil completo (n=nome, email, telefone, total_pedidos, total_gasto, ticket_medio, cliente_desde)
+        - customer_segments: segmentos (vip/regular/ocasional: count, receita, ticket, pct)
+        - new_vs_returning: novos vs recorrentes (new_count, returning_count, new_revenue, returning_revenue)
+
+        CUPONS:
+        - coupons: resumo + ativos (code, type, val, used, max, exp)
+        - coupon_details: detalhes e estatísticas de cupons específicos
+        - coupon_ranking: ranking por receita (code, receita, pedidos, ticket_medio, total_desconto, uses)
+
+        ANÁLISE AI:
+        - analysis_summary: health_score, health_status, main_insight, premium summary
+        - active_suggestions: t=título, cat=categoria, imp=impacto, st=status
+        - proactive_alerts: alertas (type, msg). Tipos: critical_stock, expiring_coupon, revenue_trend, unused_coupons
+        - knowledge_base: strategies, benchmarks, relevant (resultados semânticos)
+        - store_overview: KPIs completos (receita, pedidos, ticket, conversão, clientes, crescimento vs anterior)
+        - period_comparison: comparação (current vs previous: receita, pedidos, ticket, clientes com % mudança)
+        - revenue_by_category: receita por categoria (cat=nome, receita, pedidos, pct)
 
         FORMATO DE RESPOSTA - USE MARKDOWN:
         Quando responder sobre vendas, receita, produtos ou métricas, formate SEMPRE usando Markdown:
@@ -583,22 +736,13 @@ class ChatbotService
         "Desculpe, só posso ajudar com assuntos relacionados à sua loja **{$storeName}** e ao segmento de **{$storeNiche}**. Posso te ajudar com vendas, produtos, cupons, estoque, clientes ou estratégias de marketing para o seu nicho. Como posso te ajudar?"
 
         CAPACIDADES:
-        - Mostrar dados detalhados de vendas por dia com tabelas
-        - Analisar performance de produtos com nomes e receitas reais
-        - Correlacionar produtos vendidos com cupons específicos
-        - Informar sobre cupons ativos, descontos e promoções
-        - Detalhar situação do estoque (baixo, esgotado)
-        - Listar clientes mais ativos com valores gastos
-        - Buscar pedidos de clientes específicos
-        - Identificar tendências e padrões
-        - Calcular métricas como ticket médio, taxa de conversão
-        - Sugerir ações baseadas nos dados
-        - Explicar métricas e KPIs
-        - Informar health score e diagnóstico da última análise AI
-        - Listar sugestões ativas e status de implementação
-        - Alertar proativamente sobre estoque crítico de best-sellers, cupons expirando, tendências de receita
-        - Comparar métricas da loja com benchmarks e boas práticas do setor
-        - Correlacionar dados de diferentes áreas (produto + cupom + cliente) para insights combinados
+        PRODUTOS: Ranking de mais vendidos, busca por nome/SKU/categoria, produtos novos no catálogo, produtos em promoção, margem de lucro, receita por produto, classificação ABC (curva 80/20), análise de distribuição de preços
+        ESTOQUE: Estoque baixo/esgotado, excesso de estoque vs vendas, produtos encalhados sem vendas, resumo geral com valor do estoque e saúde
+        PEDIDOS: Vendas diárias, últimos pedidos, busca por nº do pedido, maiores pedidos, cancelamentos/reembolsos, por forma de pagamento, por região, análise de frete, vendas por dia da semana, pedidos pendentes/abandonados, melhores dias de vendas, vendas por horário, impacto de descontos, análise de itens por pedido
+        CLIENTES: Top compradores, clientes recorrentes e taxa de recompra, perfil completo de cliente, pedidos de cliente específico, segmentação (VIP/regular/ocasional), novos vs recorrentes
+        CUPONS: Estatísticas gerais, detalhes de cupom específico, ranking de cupons por receita
+        ANÁLISE AI: Health score, sugestões ativas, benchmarks do setor, alertas proativos (estoque crítico, cupons expirando, tendência de receita), visão geral com KPIs e taxa de conversão, comparação de períodos, receita por categoria
+        CORRELAÇÃO: Combinar dados de múltiplas áreas (produto + cupom + cliente) para insights cruzados
         {$crossDomainInstruction}
 
         Agora, responda à mensagem do usuário de forma útil, personalizada e bem formatada usando Markdown.

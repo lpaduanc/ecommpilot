@@ -74,7 +74,7 @@ const selectedStockHealth = ref(null);
 
 // Period filter state
 const showPeriodDropdown = ref(false);
-const selectedPeriod = ref('yesterday');
+const selectedPeriod = ref('');
 const customStartDate = ref('');
 const customEndDate = ref('');
 
@@ -97,7 +97,7 @@ const currentPeriodLabel = computed(() => {
         return `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`;
     }
     const option = periodOptions.find(o => o.value === selectedPeriod.value);
-    return option?.label || 'Ontem';
+    return option?.label || 'Período';
 });
 
 const isCustomPeriod = computed(() => selectedPeriod.value === 'custom');
@@ -322,7 +322,7 @@ function handlePeriodClickOutside(event) {
 function clearFilters() {
     selectedAbcCategory.value = null;
     selectedStockHealth.value = null;
-    selectedPeriod.value = 'yesterday';
+    selectedPeriod.value = '';
     customStartDate.value = '';
     customEndDate.value = '';
     currentPage.value = 1;
