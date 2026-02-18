@@ -531,8 +531,16 @@ class ChatContextBuilder
         ];
 
         if ($premiumSummary) {
+            $executiveSummary = $premiumSummary['executive_summary'] ?? '';
+            if (is_array($executiveSummary)) {
+                $executiveSummary = implode(' ', array_filter(array_map(
+                    fn ($v) => is_string($v) ? $v : json_encode($v, JSON_UNESCAPED_UNICODE),
+                    $executiveSummary
+                )));
+            }
+
             $result['premium'] = [
-                'executive_summary' => mb_substr($premiumSummary['executive_summary'] ?? '', 0, 300),
+                'executive_summary' => mb_substr((string) $executiveSummary, 0, 300),
                 'growth_score' => $premiumSummary['growth_score'] ?? null,
                 'strategic_risks' => array_slice($premiumSummary['strategic_risks'] ?? [], 0, 3),
             ];
