@@ -14,12 +14,17 @@ import {
     XMarkIcon,
     PresentationChartBarIcon,
     ArrowRightIcon,
+    LightBulbIcon,
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     premiumSummary: {
         type: Object,
         required: true,
+    },
+    storeName: {
+        type: String,
+        default: '',
     },
 });
 
@@ -101,7 +106,7 @@ onMounted(() => {
             <!-- Resumo Direto -->
             <div v-if="executiveSummary.resumo_direto" class="space-y-4">
                 <div class="text-xl text-gray-900 dark:text-gray-100 leading-relaxed">
-                    Você <span class="font-bold text-rose-600 dark:text-rose-400">NÃO</span> precisa
+                    A <span v-if="storeName" class="font-bold">{{ storeName }}</span><span v-else class="font-bold">sua loja</span>{{ ' ' }}<span class="font-bold text-rose-600 dark:text-rose-400">NÃO</span> precisa
                     <span class="font-bold">{{ executiveSummary.resumo_direto.nao_precisa }}</span>.
                 </div>
 
@@ -252,17 +257,22 @@ onMounted(() => {
             </div>
 
             <!-- Final Verdict -->
-            <div v-if="finalVerdict.conclusao_estrategica" class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-3">
-                <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {{ finalVerdict.conclusao_estrategica }}
-                </p>
+            <div v-if="finalVerdict.conclusao_estrategica" class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div class="bg-indigo-50 dark:bg-indigo-950/40 border-l-4 border-indigo-500 rounded-r-xl px-5 py-4 space-y-3">
+                    <div class="flex items-start gap-3">
+                        <LightBulbIcon class="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" />
+                        <p class="text-base text-indigo-900 dark:text-indigo-100 leading-relaxed font-medium">
+                            {{ finalVerdict.conclusao_estrategica }}
+                        </p>
+                    </div>
 
-                <div v-if="finalVerdict.current_stage && finalVerdict.next_stage_requirement" class="flex items-center gap-2 text-sm">
-                    <span class="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium">
-                        {{ finalVerdict.current_stage }}
-                    </span>
-                    <ArrowRightIcon class="w-4 h-4 text-gray-400" />
-                    <span class="text-gray-500 dark:text-gray-400">{{ finalVerdict.next_stage_requirement }}</span>
+                    <div v-if="finalVerdict.current_stage && finalVerdict.next_stage_requirement" class="flex items-center gap-2 text-sm ml-8">
+                        <span class="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-semibold">
+                            {{ finalVerdict.current_stage }}
+                        </span>
+                        <ArrowRightIcon class="w-4 h-4 text-indigo-400" />
+                        <span class="text-indigo-600 dark:text-indigo-400">{{ finalVerdict.next_stage_requirement }}</span>
+                    </div>
                 </div>
             </div>
         </div>

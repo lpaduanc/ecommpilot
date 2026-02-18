@@ -726,6 +726,7 @@ onUnmounted(() => {
                     <StrategicSummaryPanel
                         v-if="premiumSummary"
                         :premium-summary="premiumSummary"
+                        :store-name="integrationStore.activeStore?.name"
                     />
 
                     <!-- Suggestions -->

@@ -78,20 +78,31 @@ export const useChatStore = defineStore('chat', () => {
             
             return { success: true, response: response.data.response };
         } catch (err) {
-            // Remove failed user message
-            messages.value.pop();
-
             // Check for upgrade required (403)
             if (err.response?.status === 403 && err.response?.data?.upgrade_required) {
+                // Remove user message for upgrade errors
+                messages.value.pop();
                 upgradeRequired.value = true;
                 error.value = err.response.data.message || 'Seu plano não inclui acesso ao Assistente IA.';
                 return { success: false, message: error.value, upgradeRequired: true };
             }
 
-            const message = err.response?.data?.message || 'Erro ao enviar mensagem';
-            error.value = message;
+            // For other errors, keep user message and show error as assistant response
+            const errorContent = err.response?.data?.message
+                || 'Desculpe, ocorreu um erro inesperado. Estamos trabalhando para resolver o mais rápido possível. Por favor, tente novamente em alguns minutos.';
 
-            return { success: false, message };
+            const errorAssistantMessage = {
+                id: 'error-' + Date.now(),
+                role: 'assistant',
+                content: errorContent,
+                created_at: new Date().toISOString(),
+                isError: true,
+            };
+            messages.value.push(errorAssistantMessage);
+
+            error.value = errorContent;
+
+            return { success: false, message: errorContent };
         } finally {
             isSending.value = false;
         }

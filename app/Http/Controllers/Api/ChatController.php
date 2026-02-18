@@ -253,7 +253,7 @@ class ChatController extends Controller
             $userMessage?->delete();
 
             return response()->json([
-                'message' => 'Desculpe, não foi possível processar sua mensagem. Tente novamente.',
+                'message' => 'Desculpe, ocorreu um erro inesperado. Estamos trabalhando para resolver o mais rápido possível. Por favor, tente novamente em alguns minutos.',
                 'error_id' => $errorId,
             ], 500);
         }

@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Enums\PaymentStatus;
+use App\Models\Analysis;
 use App\Models\Store;
+use App\Models\Suggestion;
 use App\Models\SyncedCoupon;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
+use App\Services\AI\RAG\KnowledgeBaseService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +19,7 @@ class ChatContextBuilder
     public function __construct(
         private DashboardService $dashboardService,
         private DiscountAnalyticsService $discountAnalyticsService,
+        private KnowledgeBaseService $knowledgeBaseService,
     ) {}
 
     /**
@@ -24,7 +28,7 @@ class ChatContextBuilder
      * @param  array  $queries  Structured query intents from AI extraction
      *                          e.g. [['type' => 'products_by_coupon', 'params' => ['codes' => ['PROMO10']]]]
      */
-    public function build(Store $store, array $queries, int $days): array
+    public function build(Store $store, array $queries, int $days, ?string $userMessage = null): array
     {
         $data = $this->buildBaseData($store, $days);
 
@@ -52,6 +56,10 @@ class ChatContextBuilder
                     'revenue_by_product' => $data['product_revenue'] = $this->fetchRevenueByProduct(
                         $store, $params['product_name'] ?? '', $days
                     ),
+                    'analysis_summary' => $data['analysis_summary'] = $this->fetchAnalysisSummary($store),
+                    'active_suggestions' => $data['active_suggestions'] = $this->fetchActiveSuggestions($store),
+                    'knowledge_base' => $data['knowledge_base'] = $this->fetchKnowledgeBase($store, $userMessage),
+                    'cross_domain_analysis' => null,
                     default => null,
                 };
             } catch (\Exception $e) {
@@ -493,5 +501,260 @@ class ChatContextBuilder
             ->take(7)
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Fetch latest completed analysis summary for the store.
+     */
+    private function fetchAnalysisSummary(Store $store): array
+    {
+        $analysis = Analysis::where('store_id', $store->id)
+            ->completed()
+            ->latest()
+            ->first();
+
+        if (! $analysis) {
+            return ['available' => false];
+        }
+
+        $summary = $analysis->summary ?? [];
+        $premiumSummary = $summary['premium_summary'] ?? null;
+
+        $result = [
+            'available' => true,
+            'date' => $analysis->completed_at?->format('d/m/Y'),
+            'type' => $analysis->analysis_type?->value ?? 'general',
+            'health_score' => $summary['health_score'] ?? null,
+            'health_status' => $summary['health_status'] ?? null,
+            'main_insight' => $summary['main_insight'] ?? null,
+            'suggestions_count' => $analysis->persistentSuggestions()->count(),
+        ];
+
+        if ($premiumSummary) {
+            $result['premium'] = [
+                'executive_summary' => mb_substr($premiumSummary['executive_summary'] ?? '', 0, 300),
+                'growth_score' => $premiumSummary['growth_score'] ?? null,
+                'strategic_risks' => array_slice($premiumSummary['strategic_risks'] ?? [], 0, 3),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fetch active/pending suggestions for the store.
+     */
+    private function fetchActiveSuggestions(Store $store): array
+    {
+        return Suggestion::where('store_id', $store->id)
+            ->whereIn('status', [
+                Suggestion::STATUS_NEW,
+                Suggestion::STATUS_ACCEPTED,
+                Suggestion::STATUS_IN_PROGRESS,
+            ])
+            ->orderBy('priority')
+            ->limit(10)
+            ->get(['title', 'category', 'expected_impact', 'status', 'priority'])
+            ->map(fn ($s) => [
+                't' => mb_substr($s->title, 0, 80),
+                'cat' => $s->category,
+                'imp' => $s->expected_impact,
+                'st' => $s->status,
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Fetch knowledge base strategies and benchmarks for the store's niche.
+     */
+    private function fetchKnowledgeBase(Store $store, ?string $message): array
+    {
+        $niche = $store->niche ?? 'general';
+        $subcategory = $store->niche_subcategory;
+        $results = [];
+
+        try {
+            $strategies = $this->knowledgeBaseService->searchStrategies($niche, $subcategory);
+            $results['strategies'] = array_slice(
+                array_map(fn ($s) => [
+                    'title' => $s['title'],
+                    'content' => mb_substr($s['content'], 0, 200),
+                ], $strategies),
+                0, 3
+            );
+        } catch (\Exception $e) {
+            Log::warning('ChatContextBuilder: Strategy search failed', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $benchmarks = $this->knowledgeBaseService->searchBenchmarks($niche, $subcategory);
+            $results['benchmarks'] = array_slice(
+                array_map(fn ($b) => [
+                    'title' => $b['title'],
+                    'content' => mb_substr($b['content'], 0, 200),
+                ], $benchmarks),
+                0, 2
+            );
+        } catch (\Exception $e) {
+            Log::warning('ChatContextBuilder: Benchmark search failed', ['error' => $e->getMessage()]);
+        }
+
+        if ($message) {
+            try {
+                $semantic = $this->knowledgeBaseService->search(
+                    $message,
+                    'strategy',
+                    $niche,
+                    $subcategory,
+                    3
+                );
+                $results['relevant'] = array_slice(
+                    array_map(fn ($r) => [
+                        'title' => $r['title'],
+                        'content' => mb_substr($r['content'], 0, 200),
+                    ], $semantic),
+                    0, 3
+                );
+            } catch (\Exception $e) {
+                Log::warning('ChatContextBuilder: Semantic search failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Generate proactive insights by detecting notable patterns in store data.
+     * Runs lightweight queries and returns alerts for the AI to mention naturally.
+     */
+    public function generateProactiveInsights(Store $store, int $days = 15): array
+    {
+        $alerts = [];
+
+        try {
+            $alerts = array_merge($alerts, $this->checkTopSellerStockAlerts($store, $days));
+        } catch (\Exception $e) {
+            Log::warning('Proactive: top-seller stock check failed', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $alerts = array_merge($alerts, $this->checkExpiringCoupons($store));
+        } catch (\Exception $e) {
+            Log::warning('Proactive: expiring coupons check failed', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $alerts = array_merge($alerts, $this->checkRevenueTrend($store, $days));
+        } catch (\Exception $e) {
+            Log::warning('Proactive: revenue trend check failed', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $alerts = array_merge($alerts, $this->checkUnusedCoupons($store));
+        } catch (\Exception $e) {
+            Log::warning('Proactive: unused coupons check failed', ['error' => $e->getMessage()]);
+        }
+
+        return $alerts;
+    }
+
+    private function checkTopSellerStockAlerts(Store $store, int $days): array
+    {
+        $topProducts = $this->fetchTopProducts($store, $days);
+        $topNames = array_column(array_slice($topProducts, 0, 5), 'n');
+
+        if (empty($topNames)) {
+            return [];
+        }
+
+        $criticalStock = SyncedProduct::where('store_id', $store->id)
+            ->whereIn('name', $topNames)
+            ->where('stock_quantity', '<=', 5)
+            ->where('stock_quantity', '>=', 0)
+            ->active()
+            ->whereNull('deleted_at')
+            ->get(['name', 'stock_quantity']);
+
+        $alerts = [];
+        foreach ($criticalStock as $product) {
+            $alerts[] = [
+                'type' => 'critical_stock',
+                'msg' => "Produto mais vendido \"{$product->name}\" com apenas {$product->stock_quantity} un. em estoque",
+            ];
+        }
+
+        return $alerts;
+    }
+
+    private function checkExpiringCoupons(Store $store): array
+    {
+        $expiring = SyncedCoupon::where('store_id', $store->id)
+            ->active()
+            ->whereNull('deleted_at')
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [now(), now()->addDays(7)])
+            ->limit(3)
+            ->get(['code', 'end_date']);
+
+        return $expiring->map(fn ($c) => [
+            'type' => 'expiring_coupon',
+            'msg' => "Cupom {$c->code} expira em ".Carbon::parse($c->end_date)->format('d/m/Y'),
+        ])->toArray();
+    }
+
+    private function checkRevenueTrend(Store $store, int $days): array
+    {
+        $currentStart = now()->subDays($days);
+        $previousStart = now()->subDays($days * 2);
+        $previousEnd = now()->subDays($days);
+
+        $currentRevenue = (float) SyncedOrder::where('store_id', $store->id)
+            ->where('payment_status', PaymentStatus::Paid)
+            ->whereBetween('external_created_at', [$currentStart, now()])
+            ->whereNull('deleted_at')
+            ->sum('total');
+
+        $previousRevenue = (float) SyncedOrder::where('store_id', $store->id)
+            ->where('payment_status', PaymentStatus::Paid)
+            ->whereBetween('external_created_at', [$previousStart, $previousEnd])
+            ->whereNull('deleted_at')
+            ->sum('total');
+
+        if ($previousRevenue > 0) {
+            $change = (($currentRevenue - $previousRevenue) / $previousRevenue) * 100;
+            $direction = $change >= 0 ? 'subiu' : 'caiu';
+            $changeAbs = abs(round($change, 1));
+
+            if ($changeAbs >= 10) {
+                return [[
+                    'type' => 'revenue_trend',
+                    'msg' => "Receita {$direction} {$changeAbs}% vs período anterior (R$ ".
+                        number_format($currentRevenue, 2, ',', '.').' vs R$ '.
+                        number_format($previousRevenue, 2, ',', '.').')',
+                ]];
+            }
+        }
+
+        return [];
+    }
+
+    private function checkUnusedCoupons(Store $store): array
+    {
+        $unused = SyncedCoupon::where('store_id', $store->id)
+            ->active()
+            ->whereNull('deleted_at')
+            ->where('used', 0)
+            ->limit(3)
+            ->get(['code', 'type', 'value']);
+
+        if ($unused->isEmpty()) {
+            return [];
+        }
+
+        return [[
+            'type' => 'unused_coupons',
+            'msg' => $unused->count().' cupom(ns) ativo(s) nunca utilizado(s): '.
+                $unused->pluck('code')->implode(', '),
+        ]];
     }
 }

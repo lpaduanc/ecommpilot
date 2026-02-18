@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { SparklesIcon, UserIcon, HandThumbUpIcon, HandThumbDownIcon, ClipboardDocumentIcon, CheckIcon } from '@heroicons/vue/24/outline';
+import { SparklesIcon, UserIcon, HandThumbUpIcon, HandThumbDownIcon, ClipboardDocumentIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 import { logger } from '@/utils/logger';
 
 const props = defineProps({
@@ -13,6 +13,7 @@ const copied = ref(false);
 
 const isUser = computed(() => props.message.role === 'user');
 const isWelcome = computed(() => props.message.id === 'welcome');
+const isError = computed(() => props.message.isError === true);
 
 // Configure marked for safe rendering
 marked.setOptions({
@@ -61,10 +62,13 @@ async function copyMessage() {
                 'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm',
                 isUser
                     ? 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600'
-                    : 'bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30'
+                    : isError
+                        ? 'bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30'
+                        : 'bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30'
             ]"
         >
             <UserIcon v-if="isUser" class="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            <ExclamationTriangleIcon v-else-if="isError" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
             <SparklesIcon v-else class="w-5 h-5 text-primary-600 dark:text-primary-400" />
         </div>
 
@@ -138,6 +142,14 @@ async function copyMessage() {
                     <p class="whitespace-pre-wrap text-sm leading-relaxed">{{ message.content }}</p>
                 </div>
 
+                <!-- Error Message -->
+                <div
+                    v-else-if="isError"
+                    class="px-5 py-4 rounded-2xl shadow-sm bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/10 text-amber-900 dark:text-amber-100 rounded-tl-md border border-amber-200 dark:border-amber-800 max-w-none"
+                >
+                    <p class="text-sm leading-relaxed">{{ message.content }}</p>
+                </div>
+
                 <!-- Assistant Message with Markdown -->
                 <div
                     v-else
@@ -150,8 +162,8 @@ async function copyMessage() {
                 </div>
             </div>
 
-            <!-- Action Buttons for Assistant Messages -->
-            <div v-if="!isUser" class="flex items-center gap-1 mt-2.5">
+            <!-- Action Buttons for Assistant Messages (not for error messages) -->
+            <div v-if="!isUser && !isError" class="flex items-center gap-1 mt-2.5">
                 <button
                     @click="() => {}"
                     class="p-2 text-gray-400 hover:text-success-600 dark:hover:text-success-400 hover:bg-success-50 dark:hover:bg-success-900/20 rounded-lg transition-all"

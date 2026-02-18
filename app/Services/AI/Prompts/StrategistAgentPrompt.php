@@ -310,7 +310,7 @@ Além das 18 sugestões, preencha a seção "premium_summary" no JSON com análi
 
 FORMATO OBRIGATÓRIO do "resumo_direto":
 - Preencha o campo "resumo_direto" com uma mensagem incisiva e provocativa.
-- "nao_precisa": uma frase curta do que a loja NÃO precisa fazer (ex: "vender mais barato", "aumentar o catálogo", "dar mais desconto")
+- "nao_precisa": APENAS o complemento verbal do que a loja NÃO precisa fazer. O frontend já renderiza "A [Nome da Loja] NÃO precisa" antes deste valor, então retorne SOMENTE o complemento. Exemplos corretos: "vender mais barato", "aumentar o catálogo", "dar mais desconto", "de mais descontos generalizados". Exemplos ERRADOS: "A Loja X NÃO precisa vender mais barato", "Você não precisa dar mais desconto".
 - "precisa": lista de 3-5 ações que a loja PRECISA fazer (ex: "Vender com mais inteligência", "Monetizar base existente", "Trabalhar recorrência")
 - "potencial_real": lista de 3-4 áreas onde está o potencial real (ex: "Assinatura", "Pós-compra", "Social", "Personalização")
 - Seja direto, incisivo e orientado a decisão. Nada genérico. Use dados da loja para personalizar.
@@ -346,6 +346,8 @@ Estime oportunidades como:
 - Se aumentar recompra em 5% → impacto projetado
 
 Use projeções realistas baseadas nos dados atuais.
+ORDENE as oportunidades do MAIOR impacto financeiro para o MENOR.
+NÃO inclua labels de prioridade (como "HIGH", "MEDIUM", "LOW") nem tags entre parênteses nas descrições das ações.
 
 ----------------------------------------
 5. PLANO DE AÇÃO 30-60-90 DIAS
@@ -355,7 +357,8 @@ Divida em:
 - 31–60 dias (estruturação)
 - 61–90 dias (escala)
 
-Inclua impacto esperado e prioridade.
+Cada item deve ser uma frase de ação direta e concisa. NÃO inclua labels de prioridade (como "HIGH", "MEDIUM", "LOW") nem tags entre parênteses no final das frases.
+Dentro de cada período, ORDENE os itens do MAIOR impacto para o MENOR.
 
 ----------------------------------------
 6. ROADMAP PRIORIZADO (IMPACTO X ESFORÇO)
@@ -366,7 +369,7 @@ Classifique ações como:
 - fill_ins (baixo impacto, baixo esforço)
 - avoid (baixo impacto, alto esforço)
 
-Ordene por impacto financeiro.
+Ordene por impacto financeiro. NÃO inclua labels de prioridade (como "HIGH", "MEDIUM", "LOW") nem tags entre parênteses nas frases.
 
 ----------------------------------------
 7. SIMULAÇÃO DE CENÁRIOS
@@ -491,7 +494,7 @@ Retorne APENAS o JSON abaixo, sem texto adicional:
   "premium_summary": {
     "executive_summary": {
       "resumo_direto": {
-        "nao_precisa": "Frase do que NÃO precisa (ex: 'vender mais barato')",
+        "nao_precisa": "APENAS complemento verbal (ex: 'vender mais barato', 'dar mais desconto'). NÃO inclua nome da loja nem 'Você não precisa'.",
         "precisa": ["ação estratégica 1", "ação estratégica 2", "ação estratégica 3"],
         "potencial_real": ["área de potencial 1", "área de potencial 2", "área de potencial 3"]
       },
@@ -584,7 +587,7 @@ Antes de gerar o JSON final, verifique CADA condição. SE alguma falhar, corrij
 8. **React preenchido:** Verifique se CADA sugestão tem o campo "react" com thought, action e observation.
 9. **Reasoning completo:** Verifique se "reasoning" tem diagnostic, market_opportunities, categories_to_cover e high_alternatives.
 10. **Sem duplicatas temáticas:** Cada sugestão aborda um tema/problema DIFERENTE? SE houver 2 sugestões sobre o mesmo tema, substitua uma.
-11. **Premium summary completo:** Verifique se "premium_summary" tem TODAS as seções: executive_summary (com resumo_direto), growth_score, diagnostico_quantitativo, gaps_estrategicos, financial_opportunities, prioritized_roadmap, impact_effort_matrix, growth_scenarios, strategic_risks e final_verdict. O resumo_direto DEVE ter nao_precisa (string), precisa (array 3-5 items) e potencial_real (array 3-4 items).
+11. **Premium summary completo:** Verifique se "premium_summary" tem TODAS as seções: executive_summary (com resumo_direto), growth_score, diagnostico_quantitativo, gaps_estrategicos, financial_opportunities, prioritized_roadmap, impact_effort_matrix, growth_scenarios, strategic_risks e final_verdict. O resumo_direto DEVE ter nao_precisa (string com APENAS o complemento verbal, sem nome da loja e sem "Você não precisa" — ex: "vender mais barato"), precisa (array 3-5 items) e potencial_real (array 3-4 items).
 12. **Cenários com números reais:** Cada cenário (conservador/base/agressivo) tem receita_mensal_projetada e receita_anual_projetada calculados com base nos dados reais da loja? SE não, calcule usando os dados de store_context.
 13. **Growth Score calculado:** O growth_score tem overall_score, efficiency_score, margin_health e retention_score preenchidos com valores de 0 a 100? SE algum está em 0, calcule baseado nos dados disponíveis.
 14. **CAMPO "action" DETALHADO (CRÍTICO):** Para CADA uma das 18 sugestões, verifique se o campo "action" tem:

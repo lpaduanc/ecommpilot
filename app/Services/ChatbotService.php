@@ -37,18 +37,30 @@ class ChatbotService
         $periodInfo = $this->detectRequestedPeriod($message);
 
         // Step 1: AI-powered intent extraction to determine what data to fetch
-        $queries = $store ? $this->extractQueryIntents($message) : [];
+        $queries = $store ? $this->extractQueryIntents($message, $chatHistory) : [];
 
         // Step 2: Fetch enriched store data based on extracted intents
         $storeData = $store
-            ? $this->contextBuilder->build($store, $queries, $periodInfo['days'])
+            ? $this->contextBuilder->build($store, $queries, $periodInfo['days'], $message)
             : $this->getEmptyStoreData($periodInfo['days']);
+
+        // Step 2.5: Generate proactive insights (lightweight, always runs for general chat)
+        if ($store && ! $isSuggestionContext) {
+            try {
+                $proactiveAlerts = $this->contextBuilder->generateProactiveInsights($store, $periodInfo['days']);
+                if (! empty($proactiveAlerts)) {
+                    $storeData['proactive_alerts'] = $proactiveAlerts;
+                }
+            } catch (\Exception $e) {
+                Log::warning('ChatbotService: Proactive insights failed', ['error' => $e->getMessage()]);
+            }
+        }
 
         // Step 3: Build system prompt with enriched data and generate response
         if ($isSuggestionContext) {
             $systemPrompt = $this->buildSuggestionDiscussionPrompt($store, $storeData, $context['suggestion']);
         } else {
-            $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis, $storeData);
+            $systemPrompt = $this->buildSystemPrompt($store, $latestAnalysis, $storeData, $queries);
         }
 
         $messages = [
@@ -73,27 +85,50 @@ class ChatbotService
 
         $messages[] = ['role' => 'user', 'content' => $message];
 
-        return $this->aiManager->chat($messages, [
-            'temperature' => 0.7,
-            'max_tokens' => 4000,
-        ]);
+        try {
+            return $this->aiManager->chat($messages, [
+                'temperature' => 0.7,
+                'max_tokens' => 4000,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('ChatbotService: AI response failed', [
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
+            ]);
+
+            return 'Desculpe, ocorreu um erro inesperado ao processar sua mensagem. '
+                .'Estamos trabalhando para resolver o mais rápido possível. '
+                .'Por favor, tente novamente em alguns minutos.';
+        }
     }
 
     /**
      * Use a lightweight AI call to extract structured query intents from the user message.
      * Returns an array of queries with type and params for ChatContextBuilder.
      */
-    private function extractQueryIntents(string $message): array
+    private function extractQueryIntents(string $message, array $chatHistory = []): array
     {
         $prompt = $this->buildIntentExtractionPrompt();
 
         try {
-            $response = $this->aiManager->chat([
+            $messages = [
                 ['role' => 'system', 'content' => $prompt],
-                ['role' => 'user', 'content' => $message],
-            ], [
+            ];
+
+            // Add last 5 messages for multi-turn context (resolve pronouns/references)
+            $recentHistory = array_slice($chatHistory, -5);
+            foreach ($recentHistory as $msg) {
+                $messages[] = [
+                    'role' => $msg['role'],
+                    'content' => mb_substr($msg['content'], 0, 200),
+                ];
+            }
+
+            $messages[] = ['role' => 'user', 'content' => $message];
+
+            $response = $this->aiManager->chat($messages, [
                 'temperature' => 0.1,
-                'max_tokens' => 300,
+                'max_tokens' => 400,
             ]);
 
             $parsed = JsonExtractor::extract($response);
@@ -116,7 +151,7 @@ class ChatbotService
     {
         return <<<'PROMPT'
         Você é um classificador de intenções para um chatbot de e-commerce.
-        Dada a mensagem do usuário, determine quais consultas ao banco de dados são necessárias.
+        Dada a mensagem do usuário (e o histórico recente da conversa, se disponível), determine quais consultas ao banco de dados são necessárias.
 
         CONSULTAS DISPONÍVEIS:
         - top_products: {} → Produtos mais vendidos (ranking geral)
@@ -129,8 +164,13 @@ class ChatbotService
         - top_customers: {} → Clientes que mais compram
         - customer_orders: {"name_or_email": "nome ou email"} → Pedidos de um cliente específico
         - revenue_by_product: {"product_name": "nome do produto"} → Receita de um produto específico
+        - analysis_summary: {} → Resumo da última análise AI (saúde da loja, score, insights)
+        - active_suggestions: {} → Sugestões ativas/pendentes da análise (título, categoria, impacto)
+        - knowledge_base: {} → Busca boas práticas e benchmarks do segmento na base de conhecimento
+        - cross_domain_analysis: {} → Sinaliza que o usuário quer correlacionar dados de múltiplos domínios
 
         REGRAS:
+        - Se o usuário usar pronomes ("ele", "esse", "desse", "dela", "desse produto"), use o HISTÓRICO da conversa para resolver a referência e extrair o query correto com os parâmetros certos
         - Extraia códigos de cupom exatos mencionados (ex: "cupom PROMO10" → codes: ["PROMO10"])
         - Extraia nomes de produtos mencionados (ex: "shampoo loiro" → product_name: "shampoo loiro")
         - Extraia nomes/emails de clientes mencionados
@@ -138,6 +178,10 @@ class ChatbotService
         - Múltiplas queries são permitidas (ex: produtos de um cupom + detalhes do cupom)
         - Perguntas sobre vendas/faturamento geralmente precisam de top_products
         - Perguntas gerais como "como vai minha loja?" → top_products
+        - Perguntas sobre "análise", "saúde da loja", "score", "diagnóstico", "relatório" → analysis_summary
+        - Perguntas sobre "sugestões", "recomendações", "o que fazer", "melhorias", "próximos passos" → active_suggestions
+        - Perguntas estratégicas ("como aumentar vendas?", "melhores práticas", "benchmark", "estratégia") → knowledge_base
+        - Se o usuário quer correlacionar dados de diferentes áreas (ex: produto+cupom+campanha) → cross_domain_analysis (adicione junto com as outras queries relevantes)
 
         Responda APENAS com JSON válido, sem texto adicional:
         {"queries": [{"type": "nome_da_query", "params": {}}]}
@@ -153,7 +197,8 @@ class ChatbotService
             'top_products', 'products_catalog', 'products_by_coupon',
             'stock_status', 'coupon_stats', 'coupon_details',
             'order_status', 'top_customers', 'customer_orders',
-            'revenue_by_product',
+            'revenue_by_product', 'cross_domain_analysis',
+            'analysis_summary', 'active_suggestions', 'knowledge_base',
         ];
 
         $sanitized = [];
@@ -421,7 +466,7 @@ class ChatbotService
         return $action;
     }
 
-    private function buildSystemPrompt(?object $store, ?Analysis $analysis, array $storeData): string
+    private function buildSystemPrompt(?object $store, ?Analysis $analysis, array $storeData, array $queries = []): string
     {
         $storeName = $store?->name ?? 'sua loja';
         $storeNiche = $store?->niche ?? 'não definido';
@@ -429,6 +474,22 @@ class ChatbotService
         $nicheContext = $storeNicheSubcategory
             ? "Segmento/Nicho: {$storeNiche} — {$storeNicheSubcategory}"
             : "Segmento/Nicho: {$storeNiche}";
+
+        // Build cross-domain correlation instruction if detected
+        $crossDomainInstruction = '';
+        $queryTypes = array_column($queries, 'type');
+        if (in_array('cross_domain_analysis', $queryTypes)) {
+            $crossDomainInstruction = <<<'CROSS'
+
+
+        INSTRUÇÃO DE CORRELAÇÃO CROSS-DOMAIN:
+        Os dados acima vêm de múltiplos domínios. Você DEVE:
+        1. Identificar relações entre os datasets (ex: produto mais vendido + cupom mais usado)
+        2. Sugerir combinações estratégicas (ex: "aplique o cupom X no produto Y para amplificar vendas")
+        3. Quantificar o potencial de cada correlação usando os dados disponíveis
+        4. Propor uma campanha ou ação concreta que combine os dados correlacionados
+        CROSS;
+        }
 
         $analysisContext = '';
         if ($analysis && $analysis->isCompleted()) {
@@ -464,6 +525,10 @@ class ChatbotService
         - top_customers: n=nome, p=nº pedidos, t=total gasto
         - customer_orders: pedidos de um cliente específico (client, email, total, status, date, items)
         - product_revenue: receita detalhada de produto específico (n=nome, q=qtd, r=receita, orders=nº pedidos)
+        - analysis_summary: dados da última análise AI (health_score, health_status, main_insight, premium summary condensado)
+        - active_suggestions: sugestões ativas da análise (t=título, cat=categoria, imp=impacto, st=status)
+        - proactive_alerts: alertas proativos detectados (type=tipo, msg=mensagem). Tipos: critical_stock, expiring_coupon, revenue_trend, unused_coupons
+        - knowledge_base: boas práticas do setor (strategies=estratégias, benchmarks=referências do setor, relevant=resultados semânticos)
 
         FORMATO DE RESPOSTA - USE MARKDOWN:
         Quando responder sobre vendas, receita, produtos ou métricas, formate SEMPRE usando Markdown:
@@ -490,6 +555,10 @@ class ChatbotService
         - Sugira ações concretas baseadas nos dados
         - NÃO use emojis excessivamente
         - Quando sugerir ações, seja específico para os dados da loja
+        - Se proactive_alerts estiver presente e a pergunta for genérica (ex: "como vai minha loja?", "alguma novidade?"), mencione os alertas proativos naturalmente na resposta
+        - NÃO force alertas proativos quando a pergunta é específica e não tem relação com os alertas
+        - Se knowledge_base estiver presente, use benchmarks e estratégias para enriquecer suas recomendações com referências do setor
+        - Quando tiver benchmarks, compare métricas da loja com médias do setor (ex: "seu ticket médio está acima da média do setor")
 
         RESTRIÇÃO DE ESCOPO - BLOQUEIO OBRIGATÓRIO:
         Você SÓ pode responder sobre assuntos diretamente relacionados à loja "{$storeName}" e seu segmento "{$storeNiche}".
@@ -525,6 +594,12 @@ class ChatbotService
         - Calcular métricas como ticket médio, taxa de conversão
         - Sugerir ações baseadas nos dados
         - Explicar métricas e KPIs
+        - Informar health score e diagnóstico da última análise AI
+        - Listar sugestões ativas e status de implementação
+        - Alertar proativamente sobre estoque crítico de best-sellers, cupons expirando, tendências de receita
+        - Comparar métricas da loja com benchmarks e boas práticas do setor
+        - Correlacionar dados de diferentes áreas (produto + cupom + cliente) para insights combinados
+        {$crossDomainInstruction}
 
         Agora, responda à mensagem do usuário de forma útil, personalizada e bem formatada usando Markdown.
         PROMPT;
