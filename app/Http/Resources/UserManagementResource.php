@@ -24,6 +24,15 @@ class UserManagementResource extends JsonResource
             'created_at' => $this->created_at?->toISOString(),
             'permissions' => $this->permissions->pluck('name')->toArray(),
             'is_first_user' => $this->parent_user_id === null,
+            'assigned_stores' => $this->whenLoaded('assignedStores', function () {
+                return $this->assignedStores->map(fn ($store) => [
+                    'id' => $store->id,
+                    'name' => $store->name,
+                ]);
+            }, []),
+            'store_ids' => $this->whenLoaded('assignedStores', function () {
+                return $this->assignedStores->pluck('id')->toArray();
+            }, []),
         ];
     }
 }

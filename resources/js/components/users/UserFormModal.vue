@@ -6,6 +6,7 @@ import BaseModal from '../common/BaseModal.vue';
 import BaseInput from '../common/BaseInput.vue';
 import BaseButton from '../common/BaseButton.vue';
 import PermissionCheckbox from './PermissionCheckbox.vue';
+import LoadingSpinner from '../common/LoadingSpinner.vue';
 
 const props = defineProps({
     show: {
@@ -25,6 +26,8 @@ const notificationStore = useNotificationStore();
 
 const isLoading = ref(false);
 const isLoadingPermissions = ref(false);
+const isLoadingStores = ref(false);
+const availableStores = ref([]);
 
 const form = reactive({
     name: '',
@@ -32,6 +35,7 @@ const form = reactive({
     password: '',
     password_confirmation: '',
     permissions: [],
+    store_ids: [],
 });
 
 const errors = reactive({
@@ -47,16 +51,6 @@ const title = computed(() => isEditMode.value ? 'Editar Usuário' : 'Novo Usuár
 
 // Estrutura de permissões agrupadas por categoria
 const permissionCategories = ref([
-    {
-        name: 'Usuários',
-        key: 'users',
-        permissions: [
-            { key: 'users.view', label: 'Visualizar' },
-            { key: 'users.create', label: 'Criar' },
-            { key: 'users.edit', label: 'Editar' },
-            { key: 'users.delete', label: 'Excluir' },
-        ],
-    },
     {
         name: 'Dashboard',
         key: 'dashboard',
@@ -109,7 +103,7 @@ const permissionCategories = ref([
         ],
     },
     {
-        name: 'Marketing',
+        name: 'Marketing e Descontos',
         key: 'marketing',
         permissions: [
             { key: 'marketing.access', label: 'Acessar' },
@@ -167,12 +161,37 @@ function togglePermission(permissionKey) {
     }
 }
 
+const allStoresSelected = computed({
+    get: () => availableStores.value.length > 0 && form.store_ids.length === availableStores.value.length,
+    set: (value) => {
+        if (value) {
+            form.store_ids = availableStores.value.map(s => s.id);
+        } else {
+            form.store_ids = [];
+        }
+    },
+});
+
+function isStoreSelected(storeId) {
+    return form.store_ids.includes(storeId);
+}
+
+function toggleStore(storeId) {
+    const index = form.store_ids.indexOf(storeId);
+    if (index > -1) {
+        form.store_ids.splice(index, 1);
+    } else {
+        form.store_ids.push(storeId);
+    }
+}
+
 function clearForm() {
     form.name = '';
     form.email = '';
     form.password = '';
     form.password_confirmation = '';
     form.permissions = [];
+    form.store_ids = [];
     clearErrors();
 }
 
@@ -228,6 +247,11 @@ function validateForm() {
         }
     }
 
+    if (form.store_ids.length === 0 && availableStores.value.length > 0) {
+        notificationStore.warning('Selecione pelo menos uma loja para o usuário.');
+        isValid = false;
+    }
+
     return isValid;
 }
 
@@ -242,6 +266,7 @@ async function loadUser() {
         form.name = result.user.name;
         form.email = result.user.email;
         form.permissions = result.user.permissions || [];
+        form.store_ids = result.user.store_ids || [];
     } else {
         notificationStore.error(result.message);
         emit('close');
@@ -258,6 +283,7 @@ async function handleSubmit() {
         name: form.name,
         email: form.email,
         permissions: form.permissions,
+        store_ids: form.store_ids,
     };
 
     // Adiciona senha apenas se foi preenchida
@@ -302,6 +328,14 @@ function handleClose() {
 // Carrega o usuário quando o modal abre em modo de edição
 watch(() => props.show, async (newVal) => {
     if (newVal) {
+        // Carrega as lojas disponíveis
+        isLoadingStores.value = true;
+        const storesResult = await userStore.fetchClientStores();
+        if (storesResult.success) {
+            availableStores.value = storesResult.stores;
+        }
+        isLoadingStores.value = false;
+
         if (isEditMode.value) {
             await loadUser();
         } else {
@@ -368,6 +402,66 @@ onMounted(async () => {
                         :error="errors.password_confirmation"
                         :disabled="isLoading"
                     />
+                </div>
+            </div>
+
+            <!-- Lojas -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                        Acesso às Lojas
+                    </h4>
+                    <label v-if="availableStores.length > 1" class="flex items-center gap-2 text-sm font-medium text-primary-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            v-model="allStoresSelected"
+                            :disabled="isLoading"
+                            class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        Selecionar todas
+                    </label>
+                </div>
+
+                <div v-if="isLoadingStores" class="flex items-center justify-center py-4">
+                    <LoadingSpinner size="sm" />
+                    <span class="ml-2 text-sm text-gray-500">Carregando lojas...</span>
+                </div>
+
+                <div v-else-if="availableStores.length === 0" class="text-sm text-gray-500 dark:text-gray-400 py-2">
+                    Nenhuma loja cadastrada. Cadastre uma loja primeiro.
+                </div>
+
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <label
+                        v-for="store in availableStores"
+                        :key="store.id"
+                        :class="[
+                            'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200',
+                            isStoreSelected(store.id)
+                                ? 'border-primary-300 bg-primary-50 dark:border-primary-700 dark:bg-primary-900/30'
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50',
+                            isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                        ]"
+                    >
+                        <input
+                            type="checkbox"
+                            :checked="isStoreSelected(store.id)"
+                            @change="toggleStore(store.id)"
+                            :disabled="isLoading"
+                            class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <div class="flex-1 min-w-0">
+                            <p :class="[
+                                'text-sm font-medium truncate',
+                                isStoreSelected(store.id) ? 'text-primary-900 dark:text-primary-100' : 'text-gray-900 dark:text-gray-100'
+                            ]">
+                                {{ store.name }}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {{ store.platform || 'Nuvemshop' }}
+                            </p>
+                        </div>
+                    </label>
                 </div>
             </div>
 

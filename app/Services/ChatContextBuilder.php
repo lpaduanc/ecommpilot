@@ -217,7 +217,7 @@ class ChatContextBuilder
             'n' => $p['name'],
             'q' => $p['quantity_sold'],
             'r' => 'R$ '.number_format($p['revenue'], 2, ',', '.'),
-        ], array_slice($results, 0, 10));
+        ], array_slice($results, 0, 25));
     }
 
     private function fetchProductsCatalog(Store $store): array

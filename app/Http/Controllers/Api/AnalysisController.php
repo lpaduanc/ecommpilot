@@ -60,7 +60,9 @@ class AnalysisController extends Controller
             ]);
         }
 
-        $analysis = Analysis::where('user_id', $user->id)
+        $ownerUserId = $user->getOwnerUser()->id;
+
+        $analysis = Analysis::where('user_id', $ownerUserId)
             ->where('store_id', $store->id)
             ->completed()
             ->latest()
@@ -170,9 +172,11 @@ class AnalysisController extends Controller
             'analysis_type' => ['sometimes', 'string', 'in:'.implode(',', $availableValues)],
         ]);
 
+        $ownerUserId = $user->getOwnerUser()->id;
+
         // Create analysis
         $analysis = Analysis::create([
-            'user_id' => $user->id,
+            'user_id' => $ownerUserId,
             'store_id' => $store->id,
             'status' => AnalysisStatus::Pending,
             'analysis_type' => $validated['analysis_type'] ?? 'general',
@@ -221,7 +225,9 @@ class AnalysisController extends Controller
             return response()->json([]);
         }
 
-        $analyses = Analysis::where('user_id', $user->id)
+        $ownerUserId = $user->getOwnerUser()->id;
+
+        $analyses = Analysis::where('user_id', $ownerUserId)
             ->where('store_id', $store->id)
             ->completed()
             ->latest()
@@ -240,8 +246,10 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
+        $ownerUserId = $user->getOwnerUser()->id;
+
         // Verify analysis ownership
-        if ($analysis->user_id !== $user->id || $analysis->store_id !== $store->id) {
+        if ($analysis->user_id !== $ownerUserId || $analysis->store_id !== $store->id) {
             return response()->json(['message' => 'Análise não encontrada.'], 404);
         }
 
@@ -257,8 +265,10 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
+        $ownerUserId = $user->getOwnerUser()->id;
+
         // Verify analysis ownership
-        if ($analysis->user_id !== $user->id || $analysis->store_id !== $store->id) {
+        if ($analysis->user_id !== $ownerUserId || $analysis->store_id !== $store->id) {
             return response()->json(['message' => 'Análise não encontrada.'], 404);
         }
 
@@ -672,8 +682,10 @@ class AnalysisController extends Controller
             return response()->json(['message' => 'Nenhuma loja ativa.'], 400);
         }
 
+        $ownerUserId = $user->getOwnerUser()->id;
+
         // Verify analysis ownership and status
-        if ($analysis->user_id !== $user->id || $analysis->store_id !== $store->id) {
+        if ($analysis->user_id !== $ownerUserId || $analysis->store_id !== $store->id) {
             return response()->json(['message' => 'Análise não encontrada ou ainda não foi concluída.'], 404);
         }
 

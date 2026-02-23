@@ -229,6 +229,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('users')->middleware('can:users.view')->group(function () {
         Route::get('/', [UserManagementController::class, 'index']);
         Route::get('/permissions', [UserManagementController::class, 'permissions']);
+        Route::get('/client-stores', [UserManagementController::class, 'clientStores']);
         Route::post('/', [UserManagementController::class, 'store'])->middleware('can:users.create');
         Route::get('/{user}', [UserManagementController::class, 'show']);
         Route::put('/{user}', [UserManagementController::class, 'update'])->middleware('can:users.edit');

@@ -63,6 +63,12 @@ watch(messages, () => {
     scrollToBottom();
 }, { deep: true });
 
+watch(isSending, (sending) => {
+    if (sending) {
+        scrollToBottom();
+    }
+});
+
 // Watch for initial context (suggestion discussion)
 watch(() => props.initialContext, async (newContext) => {
     if (newContext && newContext.type === 'suggestion' && newContext.suggestion && !hasProcessedContext.value) {

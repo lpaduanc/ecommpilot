@@ -57,13 +57,14 @@ class AnalysisService
         }
 
         $storeId = $store?->id ?? $user->active_store_id;
+        $ownerUserId = $user->getOwnerUser()->id;
 
         if (! $storeId) {
             return false;
         }
 
         // Get last SUCCESSFUL or PROCESSING analysis (ignore failed ones for rate limit)
-        $lastAnalysis = Analysis::where('user_id', $user->id)
+        $lastAnalysis = Analysis::where('user_id', $ownerUserId)
             ->where('store_id', $storeId)
             ->whereIn('status', [AnalysisStatus::Completed, AnalysisStatus::Processing, AnalysisStatus::Pending])
             ->latest()
@@ -84,13 +85,14 @@ class AnalysisService
         }
 
         $storeId = $store?->id ?? $user->active_store_id;
+        $ownerUserId = $user->getOwnerUser()->id;
 
         if (! $storeId) {
             return null;
         }
 
         // Get last SUCCESSFUL or PROCESSING analysis (ignore failed ones)
-        $lastAnalysis = Analysis::where('user_id', $user->id)
+        $lastAnalysis = Analysis::where('user_id', $ownerUserId)
             ->where('store_id', $storeId)
             ->whereIn('status', [AnalysisStatus::Completed, AnalysisStatus::Processing, AnalysisStatus::Pending])
             ->latest()
@@ -108,13 +110,14 @@ class AnalysisService
     public function getPendingAnalysis(User $user, ?Store $store = null): ?Analysis
     {
         $storeId = $store?->id ?? $user->active_store_id;
+        $ownerUserId = $user->getOwnerUser()->id;
 
         if (! $storeId) {
             return null;
         }
 
         // First, check for pending or processing analyses
-        $pendingOrProcessing = Analysis::where('user_id', $user->id)
+        $pendingOrProcessing = Analysis::where('user_id', $ownerUserId)
             ->where('store_id', $storeId)
             ->whereIn('status', [AnalysisStatus::Pending, AnalysisStatus::Processing])
             ->latest()
@@ -126,7 +129,7 @@ class AnalysisService
 
         // If no pending/processing, check for recently failed analyses (last 10 minutes)
         // This allows the frontend to show the error message
-        return Analysis::where('user_id', $user->id)
+        return Analysis::where('user_id', $ownerUserId)
             ->where('store_id', $storeId)
             ->where('status', AnalysisStatus::Failed)
             ->where('updated_at', '>=', now()->subMinutes(10))

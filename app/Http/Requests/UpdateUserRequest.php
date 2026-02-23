@@ -28,6 +28,8 @@ class UpdateUserRequest extends FormRequest
             'password' => ['nullable', 'string', 'min:8'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
+            'store_ids' => ['nullable', 'array'],
+            'store_ids.*' => ['integer', 'exists:stores,id'],
         ];
     }
 

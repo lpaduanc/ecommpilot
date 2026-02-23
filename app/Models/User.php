@@ -8,6 +8,7 @@ use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -82,16 +83,37 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Get stores accessible to this user.
-     * Employees access their parent's stores, clients access their own.
+     * Stores explicitly assigned to this employee via pivot table.
      */
-    public function accessibleStores(): HasMany
+    public function assignedStores(): BelongsToMany
     {
-        $query = $this->isEmployee()
-            ? $this->getOwnerUser()->stores()
-            : $this->stores();
+        return $this->belongsToMany(Store::class, 'store_user')->withTimestamps();
+    }
 
-        return $query->where('sync_status', '!=', \App\Enums\SyncStatus::Disconnected);
+    /**
+     * Get stores accessible to this user.
+     * - Employees with assigned stores: only those assigned stores (from parent's stores).
+     * - Employees without assigned stores: all parent's stores (backwards compatibility).
+     * - Clients: their own stores.
+     *
+     * Returns an Eloquent Builder (not HasMany) to support all callers uniformly.
+     */
+    public function accessibleStores()
+    {
+        if ($this->isEmployee()) {
+            $owner = $this->getOwnerUser();
+            $assignedStoreIds = $this->assignedStores()->pluck('stores.id')->toArray();
+
+            if (! empty($assignedStoreIds)) {
+                return Store::where('user_id', $owner->id)
+                    ->whereIn('id', $assignedStoreIds)
+                    ->where('sync_status', '!=', \App\Enums\SyncStatus::Disconnected);
+            }
+
+            return $owner->stores()->where('sync_status', '!=', \App\Enums\SyncStatus::Disconnected);
+        }
+
+        return $this->stores()->where('sync_status', '!=', \App\Enums\SyncStatus::Disconnected);
     }
 
     public function activeStore(): BelongsTo
@@ -188,11 +210,20 @@ class User extends Authenticatable implements MustVerifyEmail
             return true;
         }
 
-        // Employees: check if parent user owns the store
+        // Employees: check assigned stores (if any), else fall back to all parent stores
         if ($this->isEmployee()) {
             $owner = $this->getOwnerUser();
+            $ownerHasStore = $owner->stores()->where('id', $storeId)->exists();
+            if (! $ownerHasStore) {
+                return false;
+            }
 
-            return $owner->stores()->where('id', $storeId)->exists();
+            $assignedStoreIds = $this->assignedStores()->pluck('stores.id')->toArray();
+            if (empty($assignedStoreIds)) {
+                return true; // backwards compatibility: no assignments = access to all parent stores
+            }
+
+            return in_array($storeId, $assignedStoreIds);
         }
 
         // Regular clients: only access to their own stores

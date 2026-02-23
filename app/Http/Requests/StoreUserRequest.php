@@ -27,6 +27,8 @@ class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', 'min:8'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
+            'store_ids' => ['nullable', 'array'],
+            'store_ids.*' => ['integer', 'exists:stores,id'],
         ];
     }
 

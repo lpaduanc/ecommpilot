@@ -433,7 +433,7 @@ onMounted(() => {
                 <table class="w-full min-w-[600px] text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-900/50">
                         <tr class="border-b border-gray-200 dark:border-gray-700">
-                            <th class="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Ação</th>
+                            <!-- <th class="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Ação</th> -->
                             <th class="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Tipo</th>
                             <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Impacto Mensal</th>
                             <th class="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Impacto Anual</th>
@@ -441,7 +441,7 @@ onMounted(() => {
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                         <tr v-for="(opp, index) in financialOpportunities" :key="index" class="hover:bg-gray-50 dark:hover:bg-gray-900/30">
-                            <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ opp.action }}</td>
+                            <!-- <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ opp.action }}</td> -->
                             <td class="px-4 py-3">
                                 <span
                                     :class="[
@@ -461,7 +461,7 @@ onMounted(() => {
                         </tr>
                         <!-- Total Row -->
                         <tr class="bg-purple-50 dark:bg-purple-900/20 font-bold">
-                            <td colspan="2" class="px-4 py-3 text-purple-900 dark:text-purple-100">Total</td>
+                            <td colspan="1" class="px-4 py-3 text-purple-900 dark:text-purple-100">Total</td>
                             <td class="px-4 py-3 text-right text-purple-900 dark:text-purple-100">
                                 {{ formatCurrency(totalMonthlyImpact) }}
                             </td>

@@ -143,6 +143,19 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         }
     }
 
+    async function fetchClientStores() {
+        try {
+            const response = await api.get('/users/client-stores');
+            return { success: true, stores: response.data.data || [] };
+        } catch (err) {
+            return {
+                success: false,
+                stores: [],
+                message: err.response?.data?.message || 'Erro ao carregar lojas',
+            };
+        }
+    }
+
     function clearCurrentUser() {
         currentUser.value = null;
     }
@@ -174,6 +187,7 @@ export const useUserManagementStore = defineStore('userManagement', () => {
         updateUser,
         deleteUser,
         fetchPermissions,
+        fetchClientStores,
         clearCurrentUser,
         clearError,
         setPerPage,

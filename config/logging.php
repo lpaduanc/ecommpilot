@@ -81,6 +81,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'chat' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/chat.log'),
+            'level' => env('LOG_LEVEL_CHAT', 'info'),
+            'days' => env('LOG_DAILY_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
         'embeddings' => [
             'driver' => 'daily',
             'path' => storage_path('logs/embeddings.log'),

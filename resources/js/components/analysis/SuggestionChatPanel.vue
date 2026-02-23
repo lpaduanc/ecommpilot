@@ -56,10 +56,8 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Chat Container with same layout as ChatView -->
-                    <div class="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950">
-                        <div class="w-full h-full">
-                            <ChatContainer :initial-context="initialContext" :show-quick-suggestions="false" />
-                        </div>
+                    <div class="flex-1 min-h-0 overflow-hidden flex flex-col bg-gradient-to-b from-gray-100 to-gray-50 dark:from-gray-900 dark:to-gray-950">
+                        <ChatContainer :initial-context="initialContext" :show-quick-suggestions="false" class="h-full" />
                     </div>
                 </div>
             </div>

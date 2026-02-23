@@ -134,10 +134,22 @@ class UserManagementController extends Controller
 
             $user->syncPermissions($permissions);
 
+            // Assign specific stores to the employee (optional)
+            $storeIds = $request->input('store_ids', []);
+            if (! empty($storeIds)) {
+                $validStoreIds = $parentUser->stores()->whereIn('id', $storeIds)->pluck('id')->toArray();
+                $user->assignedStores()->sync($validStoreIds);
+
+                // Set active_store_id to first assigned store
+                if (! empty($validStoreIds)) {
+                    $user->update(['active_store_id' => $validStoreIds[0]]);
+                }
+            }
+
             DB::commit();
 
             return response()->json([
-                'user' => new UserManagementResource($user->load('permissions')),
+                'user' => new UserManagementResource($user->load(['permissions', 'assignedStores'])),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -166,7 +178,7 @@ class UserManagementController extends Controller
 
         // Admin pode ver qualquer usuário
         if ($parentUser->role === UserRole::Admin) {
-            $user->load('permissions');
+            $user->load(['permissions', 'assignedStores']);
 
             return response()->json([
                 'user' => new UserManagementResource($user),
@@ -180,7 +192,7 @@ class UserManagementController extends Controller
             ], 404);
         }
 
-        $user->load('permissions');
+        $user->load(['permissions', 'assignedStores']);
 
         return response()->json([
             'user' => new UserManagementResource($user),
@@ -237,10 +249,22 @@ class UserManagementController extends Controller
 
             $user->syncPermissions($permissions);
 
+            // Sync assigned stores if provided
+            if ($request->has('store_ids')) {
+                $storeIds = $request->input('store_ids', []);
+                $validStoreIds = $parentUser->stores()->whereIn('id', $storeIds)->pluck('id')->toArray();
+                $user->assignedStores()->sync($validStoreIds);
+
+                // If current active_store_id is no longer assigned, update it
+                if (! empty($validStoreIds) && ! in_array($user->active_store_id, $validStoreIds)) {
+                    $user->update(['active_store_id' => $validStoreIds[0]]);
+                }
+            }
+
             DB::commit();
 
             return response()->json([
-                'user' => new UserManagementResource($user->load('permissions')),
+                'user' => new UserManagementResource($user->load(['permissions', 'assignedStores'])),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -257,6 +281,26 @@ class UserManagementController extends Controller
                 'error_id' => $errorId,
             ], 500);
         }
+    }
+
+    /**
+     * List the parent client's stores for the employee assignment form dropdown.
+     */
+    public function clientStores(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Get the actual owner: employees use their parent, clients use themselves
+        $owner = $user->isEmployee() ? $user->getOwnerUser() : $user;
+
+        $stores = $owner->stores()
+            ->select('id', 'name', 'platform', 'sync_status')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'data' => $stores,
+        ]);
     }
 
     /**

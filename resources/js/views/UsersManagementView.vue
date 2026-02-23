@@ -17,6 +17,7 @@ import {
     ShieldCheckIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
+    BuildingStorefrontIcon,
 } from '@heroicons/vue/24/outline';
 
 const authStore = useAuthStore();
@@ -96,6 +97,12 @@ function formatDate(dateString) {
 
 function getPermissionsCount(user) {
     return user.permissions?.length || 0;
+}
+
+function getStoresLabel(user) {
+    const stores = user.assigned_stores;
+    if (!stores || stores.length === 0) return null;
+    return stores.map(s => s.name).join(', ');
 }
 
 // Debounce para o search
@@ -232,6 +239,15 @@ onMounted(() => {
                                         <p class="font-semibold text-gray-900 dark:text-gray-100">{{ formatDate(user.created_at) }}</p>
                                     </div>
                                 </div>
+                                <div v-if="getStoresLabel(user)" class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2.5 mb-3">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Lojas</p>
+                                    <div class="flex items-center gap-1.5">
+                                        <BuildingStorefrontIcon class="w-4 h-4 text-primary-600 flex-shrink-0" />
+                                        <p class="font-semibold text-gray-900 dark:text-gray-100 text-xs truncate">
+                                            {{ getStoresLabel(user) }}
+                                        </p>
+                                    </div>
+                                </div>
 
                                 <!-- Actions -->
                                 <div class="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -269,6 +285,9 @@ onMounted(() => {
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Permissões
+                                    </th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Lojas
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Data de Criação
@@ -310,6 +329,15 @@ onMounted(() => {
                                                 {{ getPermissionsCount(user) === 1 ? 'permissão' : 'permissões' }}
                                             </span>
                                         </div>
+                                    </td>
+                                    <td class="px-6 py-4 max-w-[200px]">
+                                        <div v-if="getStoresLabel(user)" class="flex items-center gap-2">
+                                            <BuildingStorefrontIcon class="w-4 h-4 text-primary-600 flex-shrink-0" />
+                                            <span class="text-sm text-gray-900 dark:text-gray-100 truncate" :title="getStoresLabel(user)">
+                                                {{ getStoresLabel(user) }}
+                                            </span>
+                                        </div>
+                                        <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
                                     </td>
                                     <td class="px-6 py-4">
                                         <p class="text-sm text-gray-900 dark:text-gray-100">{{ formatDate(user.created_at) }}</p>

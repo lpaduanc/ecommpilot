@@ -7,6 +7,7 @@ use App\Models\ChatConversation;
 use App\Models\User;
 use App\Services\AI\AIManager;
 use App\Services\AI\JsonExtractor;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ChatbotService
@@ -26,22 +27,37 @@ class ChatbotService
         string $message,
         ?array $context = null
     ): string {
+        $startTime = microtime(true);
         $store = $user->activeStore;
         $latestAnalysis = $this->getLatestAnalysis($user);
         $chatHistory = $conversation ? $this->getChatHistory($conversation) : [];
 
         // Check if this is a suggestion discussion context
         $isSuggestionContext = isset($context['type']) && $context['type'] === 'suggestion';
+        $chatType = $isSuggestionContext ? 'suggestion' : 'general';
 
         // Detect if user requested a specific period
         $periodInfo = $this->detectRequestedPeriod($message);
 
         // Step 1: AI-powered intent extraction to determine what data to fetch
+        $intentStartTime = microtime(true);
         $queries = $store ? $this->extractQueryIntents($message, $chatHistory) : [];
+        $intentDuration = round((microtime(true) - $intentStartTime) * 1000);
 
-        // Step 2: Fetch enriched store data based on extracted intents
+        // Step 1.5: Keyword-based fallback when AI extraction returns empty
+        if ($store && empty($queries)) {
+            $queries = $this->fallbackQueryExtraction($message);
+            if (! empty($queries)) {
+                Log::channel('chat')->info('[CHAT] Fallback de keywords ativado', [
+                    'message' => mb_substr($message, 0, 200),
+                    'fallback_queries' => array_column($queries, 'type'),
+                ]);
+            }
+        }
+
+        // Step 2: Fetch enriched store data based on extracted intents (with caching)
         $storeData = $store
-            ? $this->contextBuilder->build($store, $queries, $periodInfo['days'], $message)
+            ? $this->getCachedStoreData($store, $queries, $periodInfo['days'], $message)
             : $this->getEmptyStoreData($periodInfo['days']);
 
         // Step 2.5: Generate proactive insights (lightweight, always runs for general chat)
@@ -76,6 +92,7 @@ class ChatbotService
         }
 
         // Format message based on context type
+        $originalMessage = $message;
         if ($isSuggestionContext) {
             $message = $this->formatSuggestionUserMessage($context['suggestion'], $message);
         } elseif ($context) {
@@ -85,12 +102,66 @@ class ChatbotService
 
         $messages[] = ['role' => 'user', 'content' => $message];
 
+        // Calculate estimated input tokens (system prompt + history + user message)
+        $inputChars = mb_strlen($systemPrompt);
+        foreach ($chatHistory as $msg) {
+            $inputChars += mb_strlen($msg['content']);
+        }
+        $inputChars += mb_strlen($message);
+        $estimatedInputTokens = (int) ceil($inputChars / 3);
+
+        // Compute storeData keys present (for legend/data tracking)
+        $storeDataKeys = array_diff(array_keys($storeData), ['period']);
+
         try {
-            return $this->aiManager->chat($messages, [
+            $responseStartTime = microtime(true);
+            $response = $this->aiManager->chat($messages, [
                 'temperature' => 0.7,
                 'max_tokens' => 4000,
             ]);
+            $responseDuration = round((microtime(true) - $responseStartTime) * 1000);
+            $totalDuration = round((microtime(true) - $startTime) * 1000);
+
+            $estimatedOutputTokens = (int) ceil(mb_strlen($response) / 3);
+
+            Log::channel('chat')->info('[CHAT] Mensagem processada', [
+                'user_id' => $user->id,
+                'store_id' => $store?->id,
+                'conversation_id' => $conversation?->id,
+                'chat_type' => $chatType,
+                'user_message' => mb_substr($originalMessage, 0, 500),
+                'queries_extracted' => array_column($queries, 'type'),
+                'store_data_keys' => array_values($storeDataKeys),
+                'store_data_size_bytes' => strlen(json_encode($storeData, JSON_UNESCAPED_UNICODE)),
+                'system_prompt_chars' => mb_strlen($systemPrompt),
+                'history_messages_count' => count($chatHistory),
+                'estimated_input_tokens' => $estimatedInputTokens,
+                'estimated_output_tokens' => $estimatedOutputTokens,
+                'estimated_total_tokens' => $estimatedInputTokens + $estimatedOutputTokens,
+                'model_intent' => 'gemini-2.5-flash-lite',
+                'model_response' => $this->getResponseModel(),
+                'intent_extraction_ms' => $intentDuration,
+                'response_generation_ms' => $responseDuration,
+                'total_duration_ms' => $totalDuration,
+                'period_days' => $periodInfo['days'],
+            ]);
+
+            return $response;
         } catch (\Exception $e) {
+            $totalDuration = round((microtime(true) - $startTime) * 1000);
+
+            Log::channel('chat')->error('[CHAT] Erro ao processar mensagem', [
+                'user_id' => $user->id,
+                'store_id' => $store?->id,
+                'conversation_id' => $conversation?->id,
+                'chat_type' => $chatType,
+                'user_message' => mb_substr($originalMessage, 0, 500),
+                'queries_extracted' => array_column($queries, 'type'),
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
+                'total_duration_ms' => $totalDuration,
+            ]);
+
             Log::error('ChatbotService: AI response failed', [
                 'error' => $e->getMessage(),
                 'exception_class' => get_class($e),
@@ -129,6 +200,7 @@ class ChatbotService
             $response = $this->aiManager->chat($messages, [
                 'temperature' => 0.1,
                 'max_tokens' => 400,
+                'model' => 'gemini-2.5-flash-lite',
             ]);
 
             $parsed = JsonExtractor::extract($response);
@@ -145,6 +217,55 @@ class ChatbotService
 
             return [];
         }
+    }
+
+    /**
+     * Keyword-based fallback when AI intent extraction returns empty queries.
+     * Maps common Portuguese keywords to query types without an API call.
+     */
+    private function fallbackQueryExtraction(string $message): array
+    {
+        $lower = mb_strtolower($message);
+        $queries = [];
+
+        $keywordMap = [
+            'top_products' => ['mais vendido', 'mais vendidos', 'mais vende', 'ranking de produto', 'produto mais', 'vendas de produto', 'vendeu mais', 'vendem mais', 'top produto'],
+            'products_catalog' => ['catálogo', 'catalogo', 'listar produto', 'meus produto', 'todos os produto', 'lista de produto'],
+            'stock_status' => ['estoque baixo', 'esgotado', 'sem estoque', 'falta de estoque', 'acabando'],
+            'recent_orders' => ['últimos pedidos', 'ultimos pedidos', 'pedidos recentes', 'pedidos de hoje', 'últimas vendas', 'ultimas vendas'],
+            'top_customers' => ['melhores clientes', 'top clientes', 'clientes que mais', 'quem mais compra', 'quem mais comprou'],
+            'coupon_ranking' => ['cupom', 'cupons', 'desconto', 'descontos', 'promoção', 'promoções'],
+            'order_status' => ['status dos pedidos', 'status pedido', 'pedidos pagos', 'pedidos pendentes'],
+            'payment_methods' => ['forma de pagamento', 'método de pagamento', 'pix', 'cartão de crédito', 'boleto'],
+            'orders_by_region' => ['região', 'estado', 'cidade', 'onde vende', 'localização', 'geografia'],
+            'repeat_customers' => ['clientes recorrentes', 'clientes fiéis', 'recompra', 'compraram mais de uma vez'],
+            'analysis_summary' => ['saúde da loja', 'score', 'diagnóstico', 'health score'],
+            'store_overview' => ['visão geral', 'overview', 'kpi', 'indicadores', 'como vai minha loja', 'como está minha loja'],
+            'revenue_by_category' => ['receita por categoria', 'categoria mais', 'vendas por categoria'],
+        ];
+
+        foreach ($keywordMap as $queryType => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($lower, $keyword)) {
+                    $queries[] = ['type' => $queryType, 'params' => []];
+                    break;
+                }
+            }
+        }
+
+        // Broad fallback: if message mentions product/sales concepts but no specific match
+        if (empty($queries) && preg_match('/\b(produto|vend[aeiou]|kit|receita|faturamento|pedido|cliente|compra)\b/iu', $lower)) {
+            $queries[] = ['type' => 'top_products', 'params' => []];
+            $queries[] = ['type' => 'products_catalog', 'params' => []];
+        }
+
+        // Enrich product-related queries: add products_catalog for broader context
+        $queryTypes = array_column($queries, 'type');
+        if (in_array('top_products', $queryTypes) && ! in_array('products_catalog', $queryTypes)) {
+            $queries[] = ['type' => 'products_catalog', 'params' => []];
+        }
+
+        return $queries;
     }
 
     private function buildIntentExtractionPrompt(): string
@@ -456,6 +577,7 @@ class ChatbotService
             ? "Segmento/Nicho: {$storeNiche} — {$storeNicheSubcategory}"
             : "Segmento/Nicho: {$storeNiche}";
         $storeDataJson = json_encode($storeData, JSON_UNESCAPED_UNICODE);
+        $legendSection = $this->buildDynamicLegend($storeData);
 
         $categoryLabel = $this->getCategoryLabel($suggestion['category'] ?? 'geral');
         $impactLabel = $this->getImpactLabel($suggestion['expected_impact'] ?? 'medium');
@@ -473,19 +595,7 @@ class ChatbotService
         DADOS DA LOJA:
         {$storeDataJson}
 
-        LEGENDA DOS DADOS:
-        - summary: resumo (receita, pedidos, ticket médio) | daily_stats: d, r, p, t
-        - top_products: n, q, r | products_catalog: n, p, e | product_search: n, p, e, sku, cat, promo, custo
-        - products_by_category: n, p, e, cat | products_by_coupon: n, cupom, q, r | product_revenue: n, q, r, orders
-        - new_products: n, p, e, cat, criado | discounted_products: n, p, de, desc, e | product_margins: n, p, custo, margem, lucro, e
-        - stock: low_stock, out_of_stock_count | excess_stock: n, e, vendidos, p | slow_moving: count, products
-        - order_status | recent_orders: numero, cliente, total, status, data | order_search: detalhes completos do pedido
-        - high_value_orders: numero, cliente, total, itens, data | cancelled_orders: total, receita perdida, orders
-        - payment_methods: metodo, pedidos, receita, ticket | orders_by_region: estado, cidade, pedidos, receita
-        - shipping_analysis: frete médio, grátis, faixas | sales_by_weekday: dia, pedidos, receita, ticket
-        - top_customers: n, p, t | repeat_customers: total, rate, customers | customer_details: perfil completo
-        - coupons: resumo + ativos | coupon_details: detalhes | coupon_ranking: ranking por receita
-        - analysis_summary | active_suggestions | knowledge_base | proactive_alerts
+        {$legendSection}
 
         SUGESTÃO EM DISCUSSÃO:
         - Título: {$suggestion['title']}
@@ -514,6 +624,15 @@ class ChatbotService
         - Ofereça passos práticos e acionáveis
         - Se o usuário pedir detalhes específicos, use os dados da loja para contextualizar
         - NÃO use emojis excessivamente
+
+        REGRA CRÍTICA - USO OBRIGATÓRIO DOS DADOS:
+        - Você TEM acesso aos dados reais da loja (produtos, vendas, clientes, estoque, etc.) fornecidos acima em "DADOS DA LOJA"
+        - SEMPRE use esses dados para responder perguntas do usuário sobre vendas, produtos, clientes, etc.
+        - NUNCA diga que não tem acesso aos dados, que não pode consultar dados, ou que os dados não estão disponíveis
+        - NUNCA sugira ao usuário consultar outra plataforma (Nuvemshop, painel administrativo, relatórios externos, etc.)
+        - NUNCA diga "verifique no seu painel", "consulte os relatórios da Nuvemshop" ou variações
+        - Se os dados solicitados não estiverem presentes em "DADOS DA LOJA", diga: "No momento não tenho esses dados específicos carregados. Posso te ajudar com informações sobre [liste categorias disponíveis nos dados]."
+        - Quando tiver dados parciais, use o que tem e informe que está mostrando os dados disponíveis
 
         RESTRIÇÃO DE ESCOPO - BLOQUEIO OBRIGATÓRIO:
         Você SÓ pode responder sobre assuntos diretamente relacionados à loja "{$storeName}", seu segmento "{$storeNiche}" e à sugestão em discussão.
@@ -577,6 +696,76 @@ class ChatbotService
         return $action;
     }
 
+    /**
+     * Build legend entries only for data keys actually present in storeData.
+     * Reduces system prompt token usage by excluding irrelevant explanations.
+     */
+    private function buildDynamicLegend(array $storeData): string
+    {
+        $legendMap = [
+            'summary' => 'summary: resumo (receita, pedidos, ticket médio)',
+            'daily_stats' => 'daily_stats: d=data, r=receita, p=pedidos, t=ticket médio',
+            'top_products' => 'top_products: n=nome, q=quantidade vendida, r=receita',
+            'products_catalog' => 'products_catalog: n=nome, p=preço, e=estoque',
+            'product_search' => 'product_search: n=nome, p=preço, e=estoque, sku, cat=categorias, promo=preço original, custo',
+            'products_by_category' => 'products_by_category: n=nome, p=preço, e=estoque, cat=categorias',
+            'products_by_coupon' => 'products_by_coupon: n=nome produto, cupom=código do cupom, q=quantidade, r=receita',
+            'product_revenue' => 'product_revenue: n=nome, q=qtd, r=receita, orders=nº pedidos',
+            'new_products' => 'new_products: n=nome, p=preço, e=estoque, cat=categorias, criado=data',
+            'discounted_products' => 'discounted_products: n=nome, p=preço atual, de=preço original, desc=% desconto, e=estoque',
+            'product_margins' => 'product_margins: n=nome, p=preço, custo, margem=%, lucro=valor, e=estoque',
+            'product_abc' => 'product_abc: classificação ABC (summary com contagem A/B/C, products=[n, receita, categoria, pct])',
+            'price_analysis' => 'price_analysis: distribuição de preços (min, max, media, mediana, ranges=faixas com contagem)',
+            'stock' => 'stock: low_stock=produtos com estoque baixo, out_of_stock_count=esgotados',
+            'excess_stock' => 'excess_stock: excesso de estoque (n=nome, e=estoque, vendidos=qtd vendida, p=preço)',
+            'slow_moving' => 'slow_moving: encalhados (count=total, products=[n=nome, e=estoque, p=preço])',
+            'stock_summary' => 'stock_summary: resumo (total_products, total_value, avg_price, health=distribuição, out_of_stock)',
+            'order_status' => 'order_status: status dos pedidos com contagem',
+            'recent_orders' => 'recent_orders: últimos pedidos (numero, cliente, email, total, status, pagamento, data, itens)',
+            'order_search' => 'order_search: pedido específico (numero, cliente, email, total, desconto, frete, status, metodo, data, itens)',
+            'high_value_orders' => 'high_value_orders: maiores pedidos (numero, cliente, total, itens, metodo, data)',
+            'cancelled_orders' => 'cancelled_orders: cancelados/reembolsados (total, receita perdida, orders)',
+            'payment_methods' => 'payment_methods: por forma de pagamento (metodo, pedidos, receita, ticket)',
+            'orders_by_region' => 'orders_by_region: por estado/cidade (estado, cidade, pedidos, receita)',
+            'shipping_analysis' => 'shipping_analysis: frete (avg_shipping, grátis, faixas de valor)',
+            'sales_by_weekday' => 'sales_by_weekday: vendas por dia da semana (dia, pedidos, receita, ticket)',
+            'pending_orders' => 'pending_orders: não pagos (total, valor_perdido, orders)',
+            'best_selling_days' => 'best_selling_days: melhores dias (data, receita, pedidos, ticket)',
+            'sales_by_hour' => 'sales_by_hour: por hora (hora, pedidos, receita)',
+            'discount_impact' => 'discount_impact: impacto desconto (com_desconto vs sem_desconto: pedidos, receita, ticket)',
+            'order_items_analysis' => 'order_items_analysis: itens/pedido (media, max, distribuição)',
+            'top_customers' => 'top_customers: n=nome, p=nº pedidos, t=total gasto',
+            'repeat_customers' => 'repeat_customers: recorrentes (total, rate=%, customers)',
+            'customer_orders' => 'customer_orders: pedidos de cliente (client, email, total, status, date)',
+            'customer_details' => 'customer_details: perfil completo (n, email, telefone, total_pedidos, total_gasto, ticket_medio)',
+            'customer_segments' => 'customer_segments: segmentos (vip/regular/ocasional: count, receita, ticket, pct)',
+            'new_vs_returning' => 'new_vs_returning: novos vs recorrentes (new_count, returning_count, revenue)',
+            'coupons' => 'coupons: resumo + ativos (code, type, val, used, max, exp)',
+            'coupon_details' => 'coupon_details: detalhes e estatísticas de cupons específicos',
+            'coupon_ranking' => 'coupon_ranking: ranking por receita (code, receita, pedidos, ticket_medio)',
+            'analysis_summary' => 'analysis_summary: health_score, health_status, main_insight, premium summary',
+            'active_suggestions' => 'active_suggestions: t=título, cat=categoria, imp=impacto, st=status',
+            'proactive_alerts' => 'proactive_alerts: alertas (type, msg). Tipos: critical_stock, expiring_coupon, revenue_trend, unused_coupons',
+            'knowledge_base' => 'knowledge_base: strategies, benchmarks, relevant (resultados semânticos)',
+            'store_overview' => 'store_overview: KPIs completos (receita, pedidos, ticket, conversão, clientes, crescimento)',
+            'period_comparison' => 'period_comparison: comparação (current vs previous com % mudança)',
+            'revenue_by_category' => 'revenue_by_category: receita por categoria (cat, receita, pedidos, pct)',
+        ];
+
+        $lines = [];
+        foreach ($legendMap as $key => $description) {
+            if (array_key_exists($key, $storeData)) {
+                $lines[] = "- {$description}";
+            }
+        }
+
+        if (empty($lines)) {
+            return 'LEGENDA: summary=resumo, daily_stats: d=data, r=receita, p=pedidos, t=ticket';
+        }
+
+        return "LEGENDA DOS DADOS:\n".implode("\n", $lines);
+    }
+
     private function buildSystemPrompt(?object $store, ?Analysis $analysis, array $storeData, array $queries = []): string
     {
         $storeName = $store?->name ?? 'sua loja';
@@ -609,6 +798,7 @@ class ChatbotService
         }
 
         $storeDataJson = json_encode($storeData, JSON_UNESCAPED_UNICODE);
+        $legendSection = $this->buildDynamicLegend($storeData);
 
         return <<<PROMPT
         Você é um assistente de marketing para e-commerce, especializado em ajudar lojistas a aumentar suas vendas.
@@ -623,65 +813,7 @@ class ChatbotService
         DADOS DA LOJA (últimos {$storeData['period']['days']} dias):
         {$storeDataJson}
 
-        LEGENDA DOS DADOS:
-        PRODUTOS:
-        - top_products: n=nome, q=quantidade vendida, r=receita
-        - products_catalog: n=nome, p=preço, e=estoque
-        - product_search: busca de produto (n=nome, p=preço, e=estoque, sku, cat=categorias, promo=preço original, custo)
-        - products_by_category: produtos por categoria (n=nome, p=preço, e=estoque, cat=categorias)
-        - products_by_coupon: n=nome produto, cupom=código do cupom, q=quantidade, r=receita
-        - product_revenue: receita de produto (n=nome, q=qtd, r=receita, orders=nº pedidos)
-        - new_products: produtos recém-adicionados (n=nome, p=preço, e=estoque, cat=categorias, criado=data)
-        - discounted_products: em promoção (n=nome, p=preço atual, de=preço original, desc=% desconto, e=estoque)
-        - product_margins: margem de lucro (n=nome, p=preço, custo, margem=%, lucro=valor, e=estoque)
-        - product_abc: classificação ABC (summary com contagem A/B/C, products=[n, receita, categoria, pct])
-        - price_analysis: distribuição de preços (min, max, media, mediana, ranges=faixas com contagem)
-
-        ESTOQUE:
-        - stock: low_stock=produtos com estoque baixo, out_of_stock_count=esgotados
-        - excess_stock: excesso de estoque (n=nome, e=estoque, vendidos=qtd vendida no período, p=preço)
-        - slow_moving: encalhados (count=total, products=[n=nome, e=estoque, p=preço])
-        - stock_summary: resumo (total_products, total_value, avg_price, health=distribuição por saúde, out_of_stock)
-
-        PEDIDOS:
-        - summary: resumo do período (receita, pedidos, ticket médio)
-        - daily_stats: d=data, r=receita, p=pedidos, t=ticket médio
-        - order_status: status dos pedidos com contagem
-        - recent_orders: últimos pedidos (numero, cliente, email, total, status, pagamento, data, itens)
-        - order_search: pedido específico (numero, cliente, email, total, desconto, frete, status, pagamento, metodo, data, itens=[nome, qtd, preço])
-        - high_value_orders: maiores pedidos (numero, cliente, total, itens_count, metodo, data)
-        - cancelled_orders: cancelados/reembolsados (total_cancelled, total_refunded, lost_revenue, orders=[numero, cliente, total, status, data])
-        - payment_methods: por forma de pagamento (metodo, pedidos, receita, ticket)
-        - orders_by_region: por estado/cidade (estado, cidade, pedidos, receita)
-        - shipping_analysis: frete (avg_shipping, free_shipping_count, free_shipping_pct, total_shipping, ranges=faixas de valor)
-        - sales_by_weekday: vendas por dia da semana (dia, pedidos, receita, ticket)
-        - pending_orders: não pagos (total, valor_perdido, orders=[numero, cliente, total, status, data])
-        - best_selling_days: melhores dias (data, receita, pedidos, ticket)
-        - sales_by_hour: por hora (hora, pedidos, receita)
-        - discount_impact: impacto desconto (com_desconto vs sem_desconto: pedidos, receita, ticket, pct_desconto)
-        - order_items_analysis: itens/pedido (media, max, distribuição, top_combos)
-
-        CLIENTES:
-        - top_customers: n=nome, p=nº pedidos, t=total gasto
-        - repeat_customers: recorrentes (total_customers, repeat_count, repeat_rate=%, customers=[n, email, pedidos, total])
-        - customer_orders: pedidos de cliente (client, email, total, status, date, items)
-        - customer_details: perfil completo (n=nome, email, telefone, total_pedidos, total_gasto, ticket_medio, cliente_desde)
-        - customer_segments: segmentos (vip/regular/ocasional: count, receita, ticket, pct)
-        - new_vs_returning: novos vs recorrentes (new_count, returning_count, new_revenue, returning_revenue)
-
-        CUPONS:
-        - coupons: resumo + ativos (code, type, val, used, max, exp)
-        - coupon_details: detalhes e estatísticas de cupons específicos
-        - coupon_ranking: ranking por receita (code, receita, pedidos, ticket_medio, total_desconto, uses)
-
-        ANÁLISE AI:
-        - analysis_summary: health_score, health_status, main_insight, premium summary
-        - active_suggestions: t=título, cat=categoria, imp=impacto, st=status
-        - proactive_alerts: alertas (type, msg). Tipos: critical_stock, expiring_coupon, revenue_trend, unused_coupons
-        - knowledge_base: strategies, benchmarks, relevant (resultados semânticos)
-        - store_overview: KPIs completos (receita, pedidos, ticket, conversão, clientes, crescimento vs anterior)
-        - period_comparison: comparação (current vs previous: receita, pedidos, ticket, clientes com % mudança)
-        - revenue_by_category: receita por categoria (cat=nome, receita, pedidos, pct)
+        {$legendSection}
 
         FORMATO DE RESPOSTA - USE MARKDOWN:
         Quando responder sobre vendas, receita, produtos ou métricas, formate SEMPRE usando Markdown:
@@ -712,6 +844,15 @@ class ChatbotService
         - NÃO force alertas proativos quando a pergunta é específica e não tem relação com os alertas
         - Se knowledge_base estiver presente, use benchmarks e estratégias para enriquecer suas recomendações com referências do setor
         - Quando tiver benchmarks, compare métricas da loja com médias do setor (ex: "seu ticket médio está acima da média do setor")
+
+        REGRA CRÍTICA - USO OBRIGATÓRIO DOS DADOS:
+        - Você TEM acesso aos dados reais da loja fornecidos acima em "DADOS DA LOJA"
+        - SEMPRE use esses dados para responder perguntas do usuário
+        - NUNCA diga que não tem acesso aos dados, que não pode consultar dados, ou que os dados não estão disponíveis
+        - NUNCA sugira ao usuário consultar outra plataforma (Nuvemshop, painel administrativo, relatórios externos, etc.)
+        - NUNCA diga "verifique no seu painel", "consulte os relatórios da Nuvemshop" ou variações
+        - Se os dados solicitados não estiverem presentes em "DADOS DA LOJA", diga: "No momento não tenho esses dados específicos carregados. Posso te ajudar com informações sobre [liste categorias disponíveis nos dados]."
+        - Quando tiver dados parciais, use o que tem e informe que está mostrando os dados disponíveis
 
         RESTRIÇÃO DE ESCOPO - BLOQUEIO OBRIGATÓRIO:
         Você SÓ pode responder sobre assuntos diretamente relacionados à loja "{$storeName}" e seu segmento "{$storeNiche}".
@@ -749,6 +890,33 @@ class ChatbotService
         PROMPT;
     }
 
+    /**
+     * Get store data with caching to reduce DB queries.
+     * Queries with search params bypass cache (user-specific results).
+     * TTL: 5 minutes (matching DashboardService pattern).
+     */
+    private function getCachedStoreData(object $store, array $queries, int $days, ?string $message): array
+    {
+        // Queries with non-empty params should NOT be cached (user-specific)
+        foreach ($queries as $query) {
+            $params = $query['params'] ?? [];
+            if (! empty(array_filter($params, fn ($v) => $v !== '' && $v !== [] && $v !== null))) {
+                return $this->contextBuilder->build($store, $queries, $days, $message);
+            }
+        }
+
+        // Sort query types for consistent cache keys
+        $queryTypes = array_column($queries, 'type');
+        sort($queryTypes);
+        $queriesHash = md5(json_encode($queryTypes));
+
+        $cacheKey = "chat_context:{$store->id}:{$queriesHash}:{$days}";
+
+        return Cache::remember($cacheKey, 300, function () use ($store, $queries, $days, $message) {
+            return $this->contextBuilder->build($store, $queries, $days, $message);
+        });
+    }
+
     private function getEmptyStoreData(?int $days = null): array
     {
         $days = $days ?? self::DEFAULT_PERIOD_DAYS;
@@ -780,7 +948,7 @@ class ChatbotService
             ->first();
     }
 
-    private function getChatHistory(ChatConversation $conversation, int $limit = 10): array
+    private function getChatHistory(ChatConversation $conversation, int $limit = 5): array
     {
         return $conversation->messages()
             ->orderBy('created_at', 'desc')
@@ -793,5 +961,19 @@ class ChatbotService
             ])
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Get the model name used for the main response call.
+     */
+    private function getResponseModel(): string
+    {
+        try {
+            return $this->aiManager->provider()->getName() === 'gemini'
+                ? (app(\App\Models\SystemSetting::class)::get('ai.gemini.model') ?? 'gemini-2.5-flash')
+                : $this->aiManager->provider()->getName();
+        } catch (\Throwable) {
+            return 'unknown';
+        }
     }
 }
