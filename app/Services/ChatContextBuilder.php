@@ -831,26 +831,25 @@ class ChatContextBuilder
 
     private function fetchTopCustomers(Store $store, int $days): array
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subDays($days);
+        $startDate = now()->subDays($days)->startOfDay();
+        $endDate = now()->endOfDay();
 
-        $orders = SyncedOrder::where('store_id', $store->id)
+        $results = SyncedOrder::where('store_id', $store->id)
             ->whereBetween('external_created_at', [$startDate, $endDate])
             ->where('payment_status', PaymentStatus::Paid)
+            ->whereNull('deleted_at')
+            ->whereNotNull('customer_email')
+            ->selectRaw('customer_name, customer_email, COUNT(*) as orders, SUM(total) as total_spent')
+            ->groupBy('customer_name', 'customer_email')
+            ->orderByDesc('orders')
+            ->limit(7)
             ->get();
 
-        return $orders->groupBy('customer_email')
-            ->map(function ($customerOrders) {
-                return [
-                    'n' => $customerOrders->first()->customer_name,
-                    'p' => $customerOrders->count(),
-                    't' => 'R$ '.number_format($customerOrders->sum('total'), 2, ',', '.'),
-                ];
-            })
-            ->sortByDesc(fn ($c) => $c['p'])
-            ->take(7)
-            ->values()
-            ->toArray();
+        return $results->map(fn ($r) => [
+            'n' => $r->customer_name,
+            'p' => (int) $r->orders,
+            't' => 'R$ '.number_format((float) $r->total_spent, 2, ',', '.'),
+        ])->toArray();
     }
 
     /**
