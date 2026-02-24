@@ -800,13 +800,21 @@ class ChatbotService
         $storeDataJson = json_encode($storeData, JSON_UNESCAPED_UNICODE);
         $legendSection = $this->buildDynamicLegend($storeData);
 
+        $goalsContext = '';
+        if ($store?->monthly_visits) {
+            $goalsContext .= "\n        Visitas Mensais: ".number_format($store->monthly_visits, 0, ',', '.');
+        }
+        if ($store?->monthly_goal) {
+            $goalsContext .= "\n        Meta Mensal: R$ ".number_format($store->monthly_goal, 2, ',', '.');
+        }
+
         return <<<PROMPT
         Você é um assistente de marketing para e-commerce, especializado em ajudar lojistas a aumentar suas vendas.
         Você trabalha para a plataforma Ecommpilot.
 
         CONTEXTO:
         Loja: {$storeName}
-        {$nicheContext}
+        {$nicheContext}{$goalsContext}
         Período: {$storeData['period']['start']} a {$storeData['period']['end']}
         {$analysisContext}
 

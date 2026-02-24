@@ -69,7 +69,9 @@ class FeedbackLoopService
             'revenue_30d' => $paidOrders->sum('total'),
             'orders_30d' => $paidOrders->count(),
             'avg_ticket' => $paidOrders->avg('total') ?? 0,
-            'conversion_rate' => null, // Would need visitor data
+            'conversion_rate' => $store->monthly_visits > 0
+                ? round(($paidOrders->count() / $store->monthly_visits) * 100, 2)
+                : null,
             'cancellation_rate' => $orders->count() > 0
                 ? round(($orders->filter(fn ($o) => $o->isCancelled())->count() / $orders->count()) * 100, 2)
                 : 0,

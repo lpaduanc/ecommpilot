@@ -24,6 +24,17 @@ class AnalystAgentPrompt
         $pedidosMes = $data['pedidos_mes'] ?? 0;
         $faturamentoMes = $ticketMedio * $pedidosMes;
 
+        // Visitas mensais e taxa de conversão
+        $storeGoals = $data['store_goals'] ?? [];
+        $monthlyVisits = (int) ($storeGoals['monthly_visits'] ?? 0);
+        $taxaConversao = ($monthlyVisits > 0 && $pedidosMes > 0)
+            ? round(($pedidosMes / $monthlyVisits) * 100, 2).'%'
+            : 'N/D (sem dado de visitas)';
+        $visitasFormatado = $monthlyVisits > 0
+            ? number_format($monthlyVisits, 0, ',', '.')
+            : 'N/D';
+        $goalsSection = self::formatStoreGoals($storeGoals, $pedidosMes);
+
         // Dados operacionais
         $orders = json_encode($data['orders_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $products = json_encode($data['products_summary'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -384,6 +395,8 @@ Retorne APENAS o JSON abaixo:
 - **Ticket Médio:** R$ {$ticketMedio}
 - **Pedidos/Mês:** {$pedidosMes}
 - **Faturamento:** R$ {$faturamentoMes}/mês
+- **Visitas Mensais:** {$visitasFormatado} (informado pelo lojista)
+- **Taxa de Conversão (tráfego):** {$taxaConversao}
 - **Período:** {$periodDays} dias
 </store_context>
 
@@ -449,6 +462,10 @@ Retorne APENAS o JSON abaixo:
 {$previousSuggestionsSection}
 </previous_suggestions>
 
+<store_goals>
+{$goalsSection}
+</store_goals>
+
 </data>
 
 **RESPONDA APENAS COM O JSON. PORTUGUÊS BRASILEIRO.**
@@ -460,6 +477,51 @@ PROMPT;
     /**
      * Resumo dos dados de mercado
      */
+    private static function formatStoreGoals(array $goals, int $pedidosMes = 0): string
+    {
+        $filtered = array_filter($goals, fn ($v) => ! is_array($v) && ! empty($v) && $v != 0);
+        if (empty($filtered)) {
+            return 'Nenhum objetivo configurado pela loja. Taxa de conversão de tráfego não pode ser calculada.';
+        }
+
+        $labels = [
+            'monthly_goal' => 'Meta Mensal de Faturamento',
+            'annual_goal' => 'Meta Anual de Faturamento',
+            'target_ticket' => 'Ticket Médio Alvo',
+            'monthly_revenue' => 'Receita Mensal Atual',
+            'monthly_visits' => 'Visitas Mensais',
+        ];
+
+        $currencyKeys = ['monthly_goal', 'annual_goal', 'target_ticket', 'monthly_revenue'];
+        $output = "Objetivos configurados pela loja:\n";
+
+        foreach ($filtered as $key => $value) {
+            $label = $labels[$key] ?? $key;
+            $formatted = in_array($key, $currencyKeys)
+                ? 'R$ '.number_format((float) $value, 2, ',', '.')
+                : number_format((float) $value, 0, ',', '.');
+            $output .= "- {$label}: {$formatted}\n";
+        }
+
+        $monthlyVisits = (int) ($goals['monthly_visits'] ?? 0);
+        if ($monthlyVisits > 0 && $pedidosMes > 0) {
+            $convRate = round(($pedidosMes / $monthlyVisits) * 100, 2);
+            $output .= "\nMétricas de tráfego calculadas:\n";
+            $output .= "- Taxa de conversão (pedidos/visitas): {$convRate}%\n";
+            $output .= '- Benchmark e-commerce BR: 1-3% (use para comparar)'."\n";
+        }
+
+        if (! empty($goals['monthly_goal']) && ! empty($goals['monthly_revenue'])) {
+            $gap = (float) $goals['monthly_goal'] - (float) $goals['monthly_revenue'];
+            if ($gap > 0) {
+                $gapPct = round(($gap / (float) $goals['monthly_revenue']) * 100);
+                $output .= "\nGAP para meta mensal: R$ ".number_format($gap, 2, ',', '.')." ({$gapPct}% de aumento necessário)\n";
+            }
+        }
+
+        return $output;
+    }
+
     private static function summarizeMarket(array $marketData, float $ticketLoja): string
     {
         $trends = $marketData['google_trends'] ?? [];

@@ -86,7 +86,7 @@ class GeminiProvider implements AIProviderInterface
 
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
-                Log::channel($this->logChannel)->info("        [GEMINI] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
+                $this->safeLog('info', "        [GEMINI] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
                     'model' => $model,
                     'max_tokens' => $maxTokens,
                     'temperature' => $temperature,
@@ -133,7 +133,7 @@ class GeminiProvider implements AIProviderInterface
                 $outputTokens = $usageMetadata['candidatesTokenCount'] ?? 0;
                 $totalTokens = $usageMetadata['totalTokenCount'] ?? 0;
 
-                Log::channel($this->logChannel)->info('        [GEMINI] Resposta recebida', [
+                $this->safeLog('info', '        [GEMINI] Resposta recebida', [
                     'attempt' => $attempt,
                     'finish_reason' => $finishReason,
                     'input_tokens' => $promptTokens,
@@ -143,7 +143,7 @@ class GeminiProvider implements AIProviderInterface
 
                 // Handle truncation - MAX_TOKENS means the response was cut off
                 if ($finishReason === 'MAX_TOKENS') {
-                    Log::channel($this->logChannel)->warning('        [GEMINI] AVISO: Resposta truncada (MAX_TOKENS)', [
+                    $this->safeLog('warning', '        [GEMINI] AVISO: Resposta truncada (MAX_TOKENS)', [
                         'model' => $model,
                         'max_tokens' => $maxTokens,
                         'input_tokens' => $promptTokens,
@@ -159,7 +159,7 @@ class GeminiProvider implements AIProviderInterface
 
                 $responseText = $parts[0]['text'] ?? '';
 
-                Log::channel($this->logChannel)->info('        [GEMINI] Requisicao concluida com sucesso', [
+                $this->safeLog('info', '        [GEMINI] Requisicao concluida com sucesso', [
                     'model' => $model,
                     'attempt' => $attempt,
                     'input_tokens' => $promptTokens,
@@ -173,7 +173,7 @@ class GeminiProvider implements AIProviderInterface
                 if ($finishReason === 'MAX_TOKENS' && $attempt < $this->maxRetries) {
                     // Double the tokens for the next attempt
                     $maxTokens = min($maxTokens * 2, 65536); // Cap at 65k (Gemini 2.5 limit)
-                    Log::channel($this->logChannel)->info("        [GEMINI] Retry com mais tokens: {$maxTokens}");
+                    $this->safeLog('info', "        [GEMINI] Retry com mais tokens: {$maxTokens}");
                     $payload['generationConfig']['maxOutputTokens'] = $maxTokens;
 
                     continue; // Retry with more tokens
@@ -183,26 +183,26 @@ class GeminiProvider implements AIProviderInterface
 
             } catch (ConnectionException|ConnectException $e) {
                 $lastException = $e;
-                Log::channel($this->logChannel)->warning("        [GEMINI] Erro de conexao na tentativa {$attempt}/{$this->maxRetries}", [
+                $this->safeLog('warning', "        [GEMINI] Erro de conexao na tentativa {$attempt}/{$this->maxRetries}", [
                     'error' => $e->getMessage(),
                 ]);
 
                 if ($attempt < $this->maxRetries) {
                     $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                    Log::channel($this->logChannel)->info("        [GEMINI] Aguardando {$delay}s antes de retry...");
+                    $this->safeLog('info', "        [GEMINI] Aguardando {$delay}s antes de retry...");
                     sleep($delay);
                 }
             } catch (\RuntimeException $e) {
                 // Check if it's a retryable error (5xx or network issues)
                 if (str_contains($e->getMessage(), 'HTTP 5') || str_contains($e->getMessage(), 'HTTP 429')) {
                     $lastException = $e;
-                    Log::channel($this->logChannel)->warning("        [GEMINI] Erro de servidor na tentativa {$attempt}/{$this->maxRetries}", [
+                    $this->safeLog('warning', "        [GEMINI] Erro de servidor na tentativa {$attempt}/{$this->maxRetries}", [
                         'error' => $e->getMessage(),
                     ]);
 
                     if ($attempt < $this->maxRetries) {
                         $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                        Log::channel($this->logChannel)->info("        [GEMINI] Aguardando {$delay}s antes de retry...");
+                        $this->safeLog('info', "        [GEMINI] Aguardando {$delay}s antes de retry...");
                         sleep($delay);
                     }
                 } else {
@@ -213,7 +213,7 @@ class GeminiProvider implements AIProviderInterface
         }
 
         // All retries exhausted
-        Log::channel($this->logChannel)->error('        [GEMINI] ERRO: Falha apos todas as tentativas', [
+        $this->safeLog('error', '        [GEMINI] ERRO: Falha apos todas as tentativas', [
             'attempts' => $this->maxRetries,
             'last_error' => $lastException?->getMessage(),
         ]);
@@ -221,6 +221,18 @@ class GeminiProvider implements AIProviderInterface
         throw new \RuntimeException(
             "Gemini API request failed after {$this->maxRetries} attempts: ".($lastException?->getMessage() ?? 'Unknown error')
         );
+    }
+
+    /**
+     * Safe logging that never throws exceptions.
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel($this->logChannel)->{$level}($message, $context);
+        } catch (\Throwable) {
+            // Logging should never crash the AI call
+        }
     }
 
     public function getName(): string

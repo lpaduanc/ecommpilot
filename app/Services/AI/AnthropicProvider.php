@@ -94,7 +94,7 @@ class AnthropicProvider implements AIProviderInterface
 
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
-                Log::channel($this->logChannel)->info("        [ANTHROPIC] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
+                $this->safeLog('info', "        [ANTHROPIC] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
                     'model' => $payload['model'],
                     'max_tokens' => $payload['max_tokens'],
                     'temperature' => $temperature,
@@ -114,7 +114,7 @@ class AnthropicProvider implements AIProviderInterface
                     if ($statusCode === 429) {
                         // If the request itself exceeds the token limit, don't retry - fallback immediately
                         if (str_contains($error, 'would exceed') || str_contains($error, 'input tokens')) {
-                            Log::channel($this->logChannel)->warning('        [ANTHROPIC] Token limit excedido - fallback para outro provider', [
+                            $this->safeLog('warning', '        [ANTHROPIC] Token limit excedido - fallback para outro provider', [
                                 'error' => $error,
                             ]);
                             // Throw immediately to trigger fallback - waiting won't help
@@ -125,13 +125,13 @@ class AnthropicProvider implements AIProviderInterface
                         $retryAfter = $this->parseRetryAfter($response);
                         $delay = $retryAfter ?? ($this->retryDelays[$attempt - 1] ?? 60);
 
-                        Log::channel($this->logChannel)->warning("        [ANTHROPIC] Rate limit na tentativa {$attempt}/{$this->maxRetries}", [
+                        $this->safeLog('warning', "        [ANTHROPIC] Rate limit na tentativa {$attempt}/{$this->maxRetries}", [
                             'error' => $error,
                             'retry_after' => $delay,
                         ]);
 
                         if ($attempt < $this->maxRetries) {
-                            Log::channel($this->logChannel)->info("        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
+                            $this->safeLog('info', "        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
                             sleep($delay);
 
                             continue;
@@ -174,7 +174,7 @@ class AnthropicProvider implements AIProviderInterface
                 $totalTokens = $inputTokens + $outputTokens;
                 $stopReason = $response->json('stop_reason', 'end_turn');
 
-                Log::channel($this->logChannel)->info('        [ANTHROPIC] Requisicao concluida', [
+                $this->safeLog('info', '        [ANTHROPIC] Requisicao concluida', [
                     'attempt' => $attempt,
                     'stop_reason' => $stopReason,
                     'response_length' => strlen($text),
@@ -186,7 +186,7 @@ class AnthropicProvider implements AIProviderInterface
 
                 // Check for truncation (stop_reason: 'max_tokens')
                 if ($stopReason === 'max_tokens' && $attempt < $this->maxRetries) {
-                    Log::channel($this->logChannel)->warning('        [ANTHROPIC] Resposta truncada (max_tokens), retry com mais tokens');
+                    $this->safeLog('warning', '        [ANTHROPIC] Resposta truncada (max_tokens), retry com mais tokens');
                     $payload['max_tokens'] = min($payload['max_tokens'] * 2, 16384);
 
                     continue;
@@ -196,26 +196,26 @@ class AnthropicProvider implements AIProviderInterface
 
             } catch (ConnectionException $e) {
                 $lastException = $e;
-                Log::channel($this->logChannel)->warning("        [ANTHROPIC] Erro de conexao na tentativa {$attempt}/{$this->maxRetries}", [
+                $this->safeLog('warning', "        [ANTHROPIC] Erro de conexao na tentativa {$attempt}/{$this->maxRetries}", [
                     'error' => $e->getMessage(),
                 ]);
 
                 if ($attempt < $this->maxRetries) {
                     $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                    Log::channel($this->logChannel)->info("        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
+                    $this->safeLog('info', "        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
                     sleep($delay);
                 }
             } catch (RuntimeException $e) {
                 // Check if it's a retryable error
                 if (str_contains($e->getMessage(), 'HTTP 5') || str_contains($e->getMessage(), 'server error')) {
                     $lastException = $e;
-                    Log::channel($this->logChannel)->warning("        [ANTHROPIC] Erro de servidor na tentativa {$attempt}/{$this->maxRetries}", [
+                    $this->safeLog('warning', "        [ANTHROPIC] Erro de servidor na tentativa {$attempt}/{$this->maxRetries}", [
                         'error' => $e->getMessage(),
                     ]);
 
                     if ($attempt < $this->maxRetries) {
                         $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                        Log::channel($this->logChannel)->info("        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
+                        $this->safeLog('info', "        [ANTHROPIC] Aguardando {$delay}s antes de retry...");
                         sleep($delay);
                     }
                 } else {
@@ -226,7 +226,7 @@ class AnthropicProvider implements AIProviderInterface
         }
 
         // All retries exhausted
-        Log::channel($this->logChannel)->error('        [ANTHROPIC] ERRO: Falha apos todas as tentativas', [
+        $this->safeLog('error', '        [ANTHROPIC] ERRO: Falha apos todas as tentativas', [
             'attempts' => $this->maxRetries,
             'last_error' => $lastException?->getMessage(),
         ]);
@@ -248,6 +248,18 @@ class AnthropicProvider implements AIProviderInterface
         }
 
         return null;
+    }
+
+    /**
+     * Safe logging that never throws exceptions.
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel($this->logChannel)->{$level}($message, $context);
+        } catch (\Throwable) {
+            // Logging should never crash the AI call
+        }
     }
 
     public function getName(): string

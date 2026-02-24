@@ -53,6 +53,10 @@ class CollectorAgentPrompt
         $learningContext = $context['learning_context'] ?? [];
         $learningSection = self::formatLearningContext($learningContext);
 
+        // Store goals (metas e visitas)
+        $storeGoals = $context['store_goals'] ?? [];
+        $goalsSection = self::formatStoreGoals($storeGoals);
+
         // V6: Module config para análises especializadas
         $moduleConfig = $context['module_config'] ?? null;
         $focoModulo = '';
@@ -195,7 +199,8 @@ Ao analisar os dados da loja, priorize a coleta destes indicadores:
     "platform": "{$platformName}",
     "operation_time_months": 0,
     "total_orders": 0,
-    "total_revenue": 0
+    "total_revenue": 0,
+    "monthly_visits": 0
   },
   "historical_summary": ["fato1 com número", "fato2 com número", "fato3", "fato4", "fato5", "fato6 (opcional)", "fato7 (opcional)"],
   "success_patterns": [
@@ -230,6 +235,16 @@ Ao analisar os dados da loja, priorize a coleta destes indicadores:
   },
   "identified_gaps": [],
   "data_not_available": [],
+  "goals_analysis": {
+    "has_goals": false,
+    "monthly_goal": 0,
+    "monthly_revenue": 0,
+    "gap_to_goal": 0,
+    "gap_percentage": "0%",
+    "monthly_visits": 0,
+    "estimated_conversion_rate": "0%",
+    "observations": "observações sobre metas vs realidade (ou 'Sem metas configuradas')"
+  },
   "market_context": {
     "tendencia": "{$tendencia}",
     "interesse": {$interesseBusca}
@@ -313,6 +328,10 @@ Ao analisar os dados da loja, priorize a coleta destes indicadores:
 
 **Média concorrentes:** R$ {$mediaPrecosConcorrentes}
 </competitors>
+
+<store_goals>
+{$goalsSection}
+</store_goals>
 
 <learning_context>
 {$learningSection}
@@ -591,6 +610,43 @@ PROMPT;
         }
 
         return $output ?: 'Histórico de feedback ainda em construção.';
+    }
+
+    private static function formatStoreGoals(array $goals): string
+    {
+        $filtered = array_filter($goals, fn ($v) => ! is_array($v) && ! empty($v) && $v != 0);
+        if (empty($filtered)) {
+            return 'Nenhum objetivo específico configurado pela loja.';
+        }
+
+        $labels = [
+            'monthly_goal' => 'Meta Mensal de Faturamento',
+            'annual_goal' => 'Meta Anual de Faturamento',
+            'target_ticket' => 'Ticket Médio Alvo',
+            'monthly_revenue' => 'Receita Mensal Atual',
+            'monthly_visits' => 'Visitas Mensais',
+        ];
+
+        $currencyKeys = ['monthly_goal', 'annual_goal', 'target_ticket', 'monthly_revenue'];
+        $output = "Objetivos configurados pela loja:\n";
+
+        foreach ($filtered as $key => $value) {
+            $label = $labels[$key] ?? $key;
+            $formatted = in_array($key, $currencyKeys)
+                ? 'R$ '.number_format((float) $value, 2, ',', '.')
+                : number_format((float) $value, 0, ',', '.');
+            $output .= "- {$label}: {$formatted}\n";
+        }
+
+        if (! empty($goals['monthly_goal']) && ! empty($goals['monthly_revenue'])) {
+            $gap = (float) $goals['monthly_goal'] - (float) $goals['monthly_revenue'];
+            if ($gap > 0) {
+                $gapPct = round(($gap / (float) $goals['monthly_revenue']) * 100);
+                $output .= "\nGAP para meta: R$ ".number_format($gap, 2, ',', '.')." ({$gapPct}% de aumento necessário)";
+            }
+        }
+
+        return $output;
     }
 
     private static function extractUniqueFeatures(array $competitors): string

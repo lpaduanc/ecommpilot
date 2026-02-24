@@ -492,6 +492,7 @@ class StoreAnalysisService
                 'store_stats' => $storeStats,
                 'benchmarks' => $benchmarks ?? [],
                 'structured_benchmarks' => $structuredBenchmarks ?? [],
+                'store_goals' => $storeGoals,
             ]);
 
             // Remove internal prompt tracking key
@@ -836,6 +837,7 @@ class StoreAnalysisService
                 ],
                 // V6: Module config para análises especializadas
                 'module_config' => $moduleConfig,
+                'store_goals' => $storeGoals,
             ]);
 
             // Coletar prompt para logging no final

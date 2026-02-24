@@ -1797,6 +1797,10 @@ class ChatContextBuilder
             'clientes' => $stats['total_customers'],
             'clientes_change' => $stats['customers_change'].'%',
             'total_produtos' => $stats['total_products'],
+            'visitas_mensais' => $store->monthly_visits,
+            'conversao_trafego' => ($store->monthly_visits && $store->monthly_visits > 0 && $stats['total_orders'] > 0)
+                ? round(($stats['total_orders'] / ($store->monthly_visits * $days / 30)) * 100, 2).'%'
+                : null,
         ];
     }
 
@@ -1834,6 +1838,10 @@ class ChatContextBuilder
                 'ticket' => 'R$ '.number_format($stats['average_ticket'], 2, ',', '.'),
                 'clientes' => $stats['total_customers'],
                 'conversao' => $stats['conversion_rate'].'%',
+                'visitas_estimadas' => $store->monthly_visits ? round($store->monthly_visits * $days / 30) : null,
+                'conversao_trafego' => ($store->monthly_visits > 0 && $stats['total_orders'] > 0)
+                    ? round(($stats['total_orders'] / ($store->monthly_visits * $days / 30)) * 100, 2).'%'
+                    : null,
             ],
             'previous' => [
                 'periodo' => now()->subDays($days * 2)->format('d/m').' a '.now()->subDays($days)->format('d/m'),

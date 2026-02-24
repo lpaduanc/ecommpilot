@@ -42,6 +42,13 @@ RESOURCES;
         $pedidosMes = $data['pedidos_mes'] ?? 0;
         $faturamentoMes = $ticketMedio * $pedidosMes;
 
+        // Visitas mensais e taxa de conversão
+        $storeGoals = $data['store_goals'] ?? [];
+        $monthlyVisits = (int) ($storeGoals['monthly_visits'] ?? 0);
+        $taxaConversao = ($monthlyVisits > 0 && $pedidosMes > 0)
+            ? round(($pedidosMes / $monthlyVisits) * 100, 2).'%'
+            : 'N/D';
+
         // Dados adicionais para validação
         $outOfStockPct = $data['out_of_stock_pct'] ?? 'N/D';
         $analystBriefing = $data['analyst_briefing'] ?? [];
@@ -52,7 +59,7 @@ RESOURCES;
         $productsSummary = $data['products_summary'] ?? [];
         $inventorySummary = $data['inventory_summary'] ?? [];
         $couponsSummary = $data['coupons_summary'] ?? [];
-        $storeMetricsSection = self::formatStoreMetrics($ordersSummary, $productsSummary, $inventorySummary, $couponsSummary);
+        $storeMetricsSection = self::formatStoreMetrics($ordersSummary, $productsSummary, $inventorySummary, $couponsSummary, $monthlyVisits);
 
         // V7: Temas saturados separados
         $previousSuggestionsAll = $data['previous_suggestions'] ?? [];
@@ -149,6 +156,8 @@ Revisar as 18 sugestões do Strategist. Seu trabalho é SELECIONAR as melhores 9
 - **Ticket Médio:** R$ {$ticketMedio}
 - **Pedidos/Mês:** {$pedidosMes}
 - **Faturamento:** R$ {$faturamentoMes}/mês
+- **Visitas Mensais:** {$monthlyVisits}
+- **Taxa de Conversão (tráfego):** {$taxaConversao}
 
 ## DADOS-CHAVE PARA VALIDAÇÃO
 
@@ -668,7 +677,7 @@ PROMPT;
     /**
      * V7: Formatar métricas detalhadas da loja para verificação numérica pelo Critic.
      */
-    private static function formatStoreMetrics(array $orders, array $products, array $inventory, array $coupons): string
+    private static function formatStoreMetrics(array $orders, array $products, array $inventory, array $coupons, int $monthlyVisits = 0): string
     {
         $output = "## PEDIDOS (período de análise)\n";
         $output .= '- Total de pedidos: '.($orders['total'] ?? 0)."\n";
@@ -722,6 +731,20 @@ PROMPT;
             }
         } else {
             $output .= "- Dados de cupons não disponíveis\n";
+        }
+
+        if ($monthlyVisits > 0) {
+            $output .= "\n## TRÁFEGO\n";
+            $output .= '- Visitas mensais: '.number_format($monthlyVisits, 0, ',', '.')."\n";
+            $totalOrders = $orders['total'] ?? 0;
+            if ($totalOrders > 0) {
+                $periodDays = $orders['period_days'] ?? 15;
+                $estimatedVisits = round($monthlyVisits * $periodDays / 30);
+                $convRate = round(($totalOrders / $estimatedVisits) * 100, 2);
+                $output .= "- Visitas estimadas no período ({$periodDays}d): ".number_format($estimatedVisits, 0, ',', '.')."\n";
+                $output .= "- Taxa de conversão (tráfego): {$convRate}%\n";
+                $output .= "- Benchmark e-commerce BR: 1-3%\n";
+            }
         }
 
         return $output;

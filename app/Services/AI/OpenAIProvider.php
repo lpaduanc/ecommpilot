@@ -56,7 +56,7 @@ class OpenAIProvider implements AIProviderInterface
 
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
-                Log::channel('ai')->info("        [OPENAI] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
+                $this->safeLog('info', "        [OPENAI] Chamada API - Tentativa {$attempt}/{$this->maxRetries}", [
                     'model' => $model,
                     'max_tokens' => $maxTokens,
                 ]);
@@ -74,7 +74,7 @@ class OpenAIProvider implements AIProviderInterface
                 $totalTokens = $response->usage->totalTokens ?? 0;
                 $finishReason = $response->choices[0]->finishReason ?? 'unknown';
 
-                Log::channel('ai')->info('        [OPENAI] Requisicao concluida', [
+                $this->safeLog('info', '        [OPENAI] Requisicao concluida', [
                     'attempt' => $attempt,
                     'model' => $model,
                     'finish_reason' => $finishReason,
@@ -86,7 +86,7 @@ class OpenAIProvider implements AIProviderInterface
 
                 // Check for truncation (finish_reason: 'length')
                 if ($finishReason === 'length' && $attempt < $this->maxRetries) {
-                    Log::channel('ai')->warning('        [OPENAI] Resposta truncada (length), retry com mais tokens');
+                    $this->safeLog('warning', '        [OPENAI] Resposta truncada (length), retry com mais tokens');
                     $maxTokens = min($maxTokens * 2, 16384); // OpenAI max is 16k for most models
 
                     continue;
@@ -97,11 +97,11 @@ class OpenAIProvider implements AIProviderInterface
             } catch (TransporterException $e) {
                 // Network/connection errors - retry
                 $lastException = $e;
-                Log::warning("OpenAI connection error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
+                $this->safeLog('warning', "OpenAI connection error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
 
                 if ($attempt < $this->maxRetries) {
                     $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                    Log::info("Retrying OpenAI API in {$delay} seconds...");
+                    $this->safeLog('info', "Retrying OpenAI API in {$delay} seconds...");
                     sleep($delay);
                 }
             } catch (ErrorException $e) {
@@ -111,11 +111,11 @@ class OpenAIProvider implements AIProviderInterface
                 // Retry on server errors (5xx) or rate limits (429)
                 if ($errorCode >= 500 || $errorCode === 429) {
                     $lastException = $e;
-                    Log::warning("OpenAI server error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
+                    $this->safeLog('warning', "OpenAI server error on attempt {$attempt}/{$this->maxRetries}: {$e->getMessage()}");
 
                     if ($attempt < $this->maxRetries) {
                         $delay = $this->retryDelays[$attempt - 1] ?? 30;
-                        Log::info("Retrying OpenAI API in {$delay} seconds...");
+                        $this->safeLog('info', "Retrying OpenAI API in {$delay} seconds...");
                         sleep($delay);
                     }
                 } else {
@@ -126,7 +126,7 @@ class OpenAIProvider implements AIProviderInterface
         }
 
         // All retries exhausted
-        Log::error('OpenAI API request failed after all retries', [
+        $this->safeLog('error', 'OpenAI API request failed after all retries', [
             'attempts' => $this->maxRetries,
             'last_error' => $lastException?->getMessage(),
         ]);
@@ -134,6 +134,18 @@ class OpenAIProvider implements AIProviderInterface
         throw new \RuntimeException(
             "OpenAI API request failed after {$this->maxRetries} attempts: ".($lastException?->getMessage() ?? 'Unknown error')
         );
+    }
+
+    /**
+     * Safe logging that never throws exceptions.
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('ai')->{$level}($message, $context);
+        } catch (\Throwable) {
+            // Logging should never crash the AI call
+        }
     }
 
     public function getName(): string
