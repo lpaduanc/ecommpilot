@@ -97,7 +97,8 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         await fetchUser();
       } catch {
-        logout();
+        // logout is already handled inside fetchUser for 401 errors
+        // no need to logout here for transient errors (500, network, timeout)
       }
     }
 
@@ -183,8 +184,10 @@ export const useAuthStore = defineStore('auth', () => {
       };
     }
 
-    // If failed to fetch user, logout
-    logout();
+    // Only logout if unauthorized (401) - other errors are transient
+    if (result.error.status === 401) {
+      logout();
+    }
     throw new Error(result.error.message);
   }
 

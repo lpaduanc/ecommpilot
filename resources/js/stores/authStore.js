@@ -65,8 +65,11 @@ export const useAuthStore = defineStore('auth', () => {
         if (token.value) {
             try {
                 await fetchUser();
-            } catch {
-                logout();
+            } catch (error) {
+                // Only logout for 401 (unauthorized) - transient errors should not force logout
+                if (error?.response?.status === 401) {
+                    logout();
+                }
             }
         }
         
