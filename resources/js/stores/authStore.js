@@ -212,6 +212,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     async function logoutFromServer() {
+        // Clear general chat from database BEFORE invalidating the token
+        // Suggestion chats are NOT affected (backend only clears general chats)
+        try {
+            const { useChatStore } = await import('./chatStore');
+            const chatStore = useChatStore();
+            await chatStore.clearConversation();
+        } catch {
+            // Ignore - will be cleaned on next login
+        }
+
         try {
             await api.post('/auth/logout');
         } catch {

@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\ActivityLog;
+use App\Models\ChatConversation;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,14 @@ class AuthController extends Controller
         }
 
         $user->recordLogin();
+
+        // Close any active general chat conversations from previous sessions
+        // This ensures chat history is cleared when session expired or browser was closed
+        // Suggestion chats are NOT affected (whereNull('suggestion_id'))
+        ChatConversation::where('user_id', $user->id)
+            ->whereNull('suggestion_id')
+            ->active()
+            ->update(['status' => 'closed']);
 
         ActivityLog::log('user.login', $user);
 

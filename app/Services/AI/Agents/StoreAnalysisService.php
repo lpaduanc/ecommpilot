@@ -900,13 +900,16 @@ class StoreAnalysisService
             // V6: Programmatic enforcement of saturated theme blocking
             $filteredSuggestions = $this->filterSaturatedThemes($filteredSuggestions, $saturatedThemes ?? []);
 
-            // SAFETY NET ADICIONAL: Se o filtro removeu TODAS as sugestoes mas o Critic aprovou algumas,
-            // fazer bypass e usar as sugestoes do Critic diretamente
+            // SAFETY NET: Garantir minimo de 6 sugestoes (2 por nivel de prioridade)
+            // Isso é CRITICO - o cliente deve receber pelo menos 2 sugestoes por nivel
+            $minimumRequired = 6;
+
             if (empty($filteredSuggestions) && ! empty($criticizedSuggestions['approved_suggestions'])) {
+                // Full bypass - filtro removeu TUDO
                 Log::channel($this->logChannel)->warning('>>> SAFETY NET ETAPA 9: Filtro removeu TODAS as sugestoes - fazendo bypass', [
                     'analysis_id' => $analysis->id,
                     'critic_approved' => count($criticizedSuggestions['approved_suggestions']),
-                    'action' => 'Usando sugestoes do Critic diretamente (bypass de similaridade)',
+                    'action' => 'Usando sugestoes do Critic diretamente (bypass de similaridade + temas)',
                 ]);
 
                 $filteredSuggestions = $criticizedSuggestions['approved_suggestions'];
@@ -914,8 +917,58 @@ class StoreAnalysisService
                 Log::channel($this->logChannel)->info('>>> SAFETY NET ETAPA 9: Bypass concluido', [
                     'suggestions_restored' => count($filteredSuggestions),
                 ]);
+            } elseif (count($filteredSuggestions) < $minimumRequired && ! empty($criticizedSuggestions['approved_suggestions'])) {
+                // Partial recovery - recuperar melhores candidatos ate atingir minimo
+                Log::channel($this->logChannel)->warning('>>> SAFETY NET ETAPA 9: Sugestoes abaixo do minimo de '.$minimumRequired.' - recuperando', [
+                    'analysis_id' => $analysis->id,
+                    'current_count' => count($filteredSuggestions),
+                    'minimum_required' => $minimumRequired,
+                ]);
+
+                // Usar titulos normalizados para evitar duplicatas semanticas na mesma analise
+                $includedNormalizedTitles = array_map(
+                    fn ($s) => $this->normalizeTitle($s['final_version']['title'] ?? ''),
+                    $filteredSuggestions
+                );
+
+                // Ordenar por quality_score para recuperar os melhores primeiro
+                $candidates = $criticizedSuggestions['approved_suggestions'];
+                usort($candidates, fn ($a, $b) => ($b['quality_score'] ?? 0) <=> ($a['quality_score'] ?? 0));
+
+                foreach ($candidates as $candidate) {
+                    if (count($filteredSuggestions) >= $minimumRequired) {
+                        break;
+                    }
+
+                    $candidateNormalized = $this->normalizeTitle($candidate['final_version']['title'] ?? '');
+
+                    // Verificar similaridade com todas as sugestoes ja incluidas
+                    $isSimilar = false;
+                    foreach ($includedNormalizedTitles as $existingNormalized) {
+                        if ($this->calculateTitleSimilarity($candidateNormalized, $existingNormalized) >= 0.80) {
+                            $isSimilar = true;
+                            break;
+                        }
+                    }
+
+                    if (! $isSimilar) {
+                        $candidate['recovered_by_minimum_guarantee'] = true;
+                        $filteredSuggestions[] = $candidate;
+                        $includedNormalizedTitles[] = $candidateNormalized;
+
+                        Log::channel($this->logChannel)->info('>>> SAFETY NET MINIMO: Recuperando sugestao para atingir '.$minimumRequired, [
+                            'title' => $candidate['final_version']['title'] ?? 'N/A',
+                            'quality_score' => $candidate['quality_score'] ?? 0,
+                        ]);
+                    }
+                }
+
+                Log::channel($this->logChannel)->info('>>> SAFETY NET MINIMO CONCLUIDO', [
+                    'recovered_to' => count($filteredSuggestions),
+                    'minimum_required' => $minimumRequired,
+                ]);
             } elseif (count($filteredSuggestions) < 9) {
-                Log::channel($this->logChannel)->warning('>>> ALERTA: Filtro de similaridade removeu sugestoes abaixo do minimo de 9', [
+                Log::channel($this->logChannel)->warning('>>> ALERTA: Filtro removeu sugestoes abaixo do ideal de 9', [
                     'analysis_id' => $analysis->id,
                     'input' => count($criticizedSuggestions['approved_suggestions'] ?? []),
                     'output' => count($filteredSuggestions),
@@ -978,6 +1031,92 @@ class StoreAnalysisService
             $finalSuggestions,
             $previousSuggestions['all'] ?? []
         );
+
+        // =====================================================
+        // V7: GARANTIA ABSOLUTA - Mínimo de 6 sugestões (2 por nível de prioridade)
+        // Este é o ÚLTIMO safety net antes de salvar. Se todos os filtros anteriores
+        // removeram demais, recupera do Critic ignorando filtros de tema/similaridade.
+        // =====================================================
+        $absoluteMinimum = 6;
+        if (count($finalSuggestions) < $absoluteMinimum && ! empty($criticizedSuggestions['approved_suggestions'])) {
+            Log::channel($this->logChannel)->warning('>>> GARANTIA ABSOLUTA: Abaixo do minimo de '.$absoluteMinimum.' apos todos os filtros', [
+                'analysis_id' => $analysis->id,
+                'current_count' => count($finalSuggestions),
+                'critic_approved' => count($criticizedSuggestions['approved_suggestions']),
+            ]);
+
+            // Contar distribuição atual por nível de prioridade
+            $currentDist = ['high' => 0, 'medium' => 0, 'low' => 0];
+            foreach ($finalSuggestions as $s) {
+                $impact = $s['final_version']['expected_impact'] ?? 'medium';
+                if (isset($currentDist[$impact])) {
+                    $currentDist[$impact]++;
+                }
+            }
+
+            $existingNormalizedTitles = array_map(
+                fn ($s) => $this->normalizeTitle($s['final_version']['title'] ?? ''),
+                $finalSuggestions
+            );
+
+            // Ordenar candidatos por quality_score
+            $candidates = $criticizedSuggestions['approved_suggestions'];
+            usort($candidates, fn ($a, $b) => ($b['quality_score'] ?? 0) <=> ($a['quality_score'] ?? 0));
+
+            // Priorizar níveis de prioridade que tem menos de 2 sugestões
+            $priority = count($finalSuggestions) + 1;
+            foreach ($candidates as $candidate) {
+                // Parar quando atingir 2 por nível ou o mínimo absoluto
+                $allLevelsHaveMinimum = $currentDist['high'] >= 2 && $currentDist['medium'] >= 2 && $currentDist['low'] >= 2;
+                if ($allLevelsHaveMinimum && count($finalSuggestions) >= $absoluteMinimum) {
+                    break;
+                }
+
+                $candidateImpact = $candidate['final_version']['expected_impact'] ?? 'medium';
+                if (! isset($currentDist[$candidateImpact])) {
+                    $candidateImpact = 'medium';
+                }
+
+                // Pular se este nível já tem 2+ e outros ainda precisam
+                if ($currentDist[$candidateImpact] >= 2) {
+                    $levelsNeedingMore = array_filter($currentDist, fn ($c) => $c < 2);
+                    if (! empty($levelsNeedingMore)) {
+                        continue;
+                    }
+                }
+
+                // Verificar unicidade por titulo normalizado (anti-duplicação)
+                $candidateNormalized = $this->normalizeTitle($candidate['final_version']['title'] ?? '');
+                $isSimilar = false;
+                foreach ($existingNormalizedTitles as $existingNormalized) {
+                    if ($this->calculateTitleSimilarity($candidateNormalized, $existingNormalized) >= 0.80) {
+                        $isSimilar = true;
+                        break;
+                    }
+                }
+
+                if ($isSimilar) {
+                    continue;
+                }
+
+                $candidate['final_priority'] = $priority++;
+                $candidate['recovered_by_absolute_guarantee'] = true;
+                $finalSuggestions[] = $candidate;
+                $existingNormalizedTitles[] = $candidateNormalized;
+                $currentDist[$candidateImpact]++;
+
+                Log::channel($this->logChannel)->info('>>> GARANTIA ABSOLUTA: Recuperando sugestao', [
+                    'title' => $candidate['final_version']['title'] ?? 'N/A',
+                    'impact' => $candidateImpact,
+                    'distribution' => $currentDist,
+                ]);
+            }
+
+            Log::channel($this->logChannel)->info('>>> GARANTIA ABSOLUTA CONCLUIDA', [
+                'final_count' => count($finalSuggestions),
+                'distribution' => $currentDist,
+            ]);
+        }
 
         // Logar estatísticas de deduplicação
         $this->logDeduplicationStats($analysis->id, [
@@ -2189,8 +2328,9 @@ class StoreAnalysisService
      */
     private function saveSuggestions(Analysis $analysis, array $suggestions): void
     {
-        // V6: Final dedup guard - prevent exact duplicates in the same analysis
+        // V7: Final dedup guard - prevent exact AND semantically similar duplicates in the same analysis
         $seenTitles = [];
+        $seenNormalizedTitles = [];
         $dedupedSuggestions = [];
 
         foreach ($suggestions as $suggestion) {
@@ -2200,15 +2340,38 @@ class StoreAnalysisService
 
                 continue;
             }
+
+            // Check exact duplicate
             if (in_array($title, $seenTitles)) {
-                Log::channel($this->logChannel)->warning('saveSuggestions: Duplicate title blocked', [
+                Log::channel($this->logChannel)->warning('saveSuggestions: Duplicate title blocked (exact)', [
                     'title' => $title,
                     'analysis_id' => $analysis->id,
                 ]);
 
                 continue;
             }
+
+            // Check semantically similar duplicate via normalized title
+            $normalizedTitle = $this->normalizeTitle($title);
+            $isSimilar = false;
+            foreach ($seenNormalizedTitles as $seenNormalized) {
+                if ($this->calculateTitleSimilarity($normalizedTitle, $seenNormalized) >= 0.80) {
+                    Log::channel($this->logChannel)->warning('saveSuggestions: Similar title blocked (semantic)', [
+                        'title' => $title,
+                        'similarity_with' => 'normalized match',
+                        'analysis_id' => $analysis->id,
+                    ]);
+                    $isSimilar = true;
+                    break;
+                }
+            }
+
+            if ($isSimilar) {
+                continue;
+            }
+
             $seenTitles[] = $title;
+            $seenNormalizedTitles[] = $normalizedTitle;
             $dedupedSuggestions[] = $suggestion;
         }
 
@@ -2310,11 +2473,13 @@ class StoreAnalysisService
             }
 
             // V6: Also check embeddings for suggestions that pass Jaccard
+            // V7: Threshold relaxado de 0.85 para 0.93 — pool de recovery precisa ser menos restritivo
+            // para garantir candidatos disponíveis ao ensureMinimumSuggestions()
             if (! $isSimilarToHistory && $storeId > 0 && $this->embedding->isConfigured()) {
                 try {
                     $textToEmbed = $title.' '.($suggestion['description'] ?? '');
                     $embedding = $this->embedding->generate($textToEmbed);
-                    if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
+                    if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.93, ['rejected', 'ignored', 'completed'], 90)) {
                         $isSimilarToHistory = true;
                         Log::channel($this->logChannel)->info('Strategist suggestion pre-filtered by EMBEDDING (passed Jaccard)', [
                             'title' => $title,
@@ -2619,12 +2784,12 @@ class StoreAnalysisService
                     'recovered_from_filter' => true,
                 ];
 
-                // V6: Check embedding similarity before recovering
+                // V7: Check embedding similarity before recovering (threshold relaxado para recovery)
                 if ($storeId > 0 && $this->embedding->isConfigured()) {
                     $textToEmbed = ($suggestion['title'] ?? '').' '.($suggestion['description'] ?? '');
                     try {
                         $embedding = $this->embedding->generate($textToEmbed);
-                        if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
+                        if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.93, ['rejected', 'ignored', 'completed'], 90)) {
                             Log::channel($this->logChannel)->info('Recovery candidate rejected by embedding check', [
                                 'title' => $suggestion['title'] ?? 'N/A',
                             ]);
@@ -2681,12 +2846,12 @@ class StoreAnalysisService
                             'promoted_from' => $adjLevel,
                         ];
 
-                        // V6: Check embedding similarity before recovering
+                        // V7: Check embedding similarity before recovering (threshold relaxado para recovery)
                         if ($storeId > 0 && $this->embedding->isConfigured()) {
                             $textToEmbed = ($suggestion['title'] ?? '').' '.($suggestion['description'] ?? '');
                             try {
                                 $embedding = $this->embedding->generate($textToEmbed);
-                                if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.85, ['rejected', 'ignored', 'completed'], 90)) {
+                                if ($this->embedding->isTooSimilarFiltered($embedding, $storeId, 0.93, ['rejected', 'ignored', 'completed'], 90)) {
                                     Log::channel($this->logChannel)->info('Recovery candidate (promoted) rejected by embedding check', [
                                         'title' => $suggestion['title'] ?? 'N/A',
                                     ]);

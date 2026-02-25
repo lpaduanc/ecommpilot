@@ -268,6 +268,12 @@ export const useAuthStore = defineStore('auth', () => {
    * Logout user (client-side only)
    */
   function logout(): void {
+    // Clear chat local state (lazy import to avoid circular dependency)
+    import('./chatStore').then(({ useChatStore }) => {
+      const chatStore = useChatStore();
+      chatStore.resetLocalState();
+    }).catch(() => {});
+
     user.value = null;
     token.value = null;
     localStorage.removeItem('token');
@@ -281,6 +287,16 @@ export const useAuthStore = defineStore('auth', () => {
    * Logout user (with server-side invalidation)
    */
   async function logoutFromServer(): Promise<void> {
+    // Clear general chat from database BEFORE invalidating the token
+    // Suggestion chats are NOT affected (backend only clears general chats)
+    try {
+      const { useChatStore } = await import('./chatStore');
+      const chatStore = useChatStore();
+      await chatStore.clearConversation();
+    } catch {
+      // Ignore - will be cleaned on next login
+    }
+
     try {
       await api.post('/auth/logout');
     } catch (error) {
