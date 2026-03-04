@@ -36,9 +36,11 @@ class NuvemshopService
 
     /**
      * Número máximo de requisições por minuto por loja.
-     * Nuvemshop permite 60/min, usamos 50 para dar margem de segurança.
+     * Nuvemshop permite 60/min, usamos 55 como limite interno.
+     * Jobs paralelos (Products, Orders, Customers, Coupons) compartilham
+     * este bucket, então o limite precisa acomodar picos de concorrência.
      */
-    private const RATE_LIMIT_PER_MINUTE = 50;
+    private const RATE_LIMIT_PER_MINUTE = 55;
 
     /**
      * Threshold de pedidos para usar sincronização paralela.
@@ -457,6 +459,12 @@ class NuvemshopService
         }
 
         $this->bulkUpsertOrders($preparedOrders);
+
+        // Upsert customers derived from this batch of orders.
+        // This ensures new and existing customers (including guest checkouts) are
+        // reflected in synced_customers immediately after each batch of orders is saved,
+        // without waiting for the separate SyncCustomersJob to complete.
+        $this->upsertCustomersFromOrders($store, $orders);
     }
 
     /**
@@ -657,10 +665,39 @@ class NuvemshopService
             $totalSynced += count($allCustomers);
         }
 
+        // Update first_order_at / last_order_at from synced_orders
+        $this->updateCustomerOrderDates($store);
+
         Log::info("Customers sync completed for store {$store->id}", [
             'total_synced' => $totalSynced,
             'incremental' => $updatedSince !== null,
         ]);
+    }
+
+    /**
+     * Update first_order_at and last_order_at on synced_customers
+     * by aggregating MIN/MAX external_created_at from synced_orders.
+     */
+    private function updateCustomerOrderDates(Store $store): void
+    {
+        DB::statement('
+            UPDATE synced_customers sc SET
+                first_order_at = sub.first_order,
+                last_order_at  = sub.last_order
+            FROM (
+                SELECT customer_email, store_id,
+                       MIN(external_created_at) AS first_order,
+                       MAX(external_created_at) AS last_order
+                FROM synced_orders
+                WHERE customer_email IS NOT NULL
+                  AND store_id = ?
+                GROUP BY customer_email, store_id
+            ) sub
+            WHERE sc.email    = sub.customer_email
+              AND sc.store_id = sub.store_id
+              AND sc.store_id = ?
+              AND sc.deleted_at IS NULL
+        ', [$store->id, $store->id]);
     }
 
     /**
@@ -736,14 +773,29 @@ class NuvemshopService
      */
     private function makeRequest(Store $store, string $method, string $endpoint, array $params = []): array
     {
-        // Rate limiting por loja (50 req/min para margem de segurança)
+        // Rate limiting por loja (55 req/min — Nuvemshop permite 60/min)
         $rateLimitKey = "nuvemshop_api:{$store->id}";
 
-        // Aguarda se atingiu rate limit
+        // Aguarda se atingiu rate limit.
+        // Em modo paralelo, múltiplos jobs (Products/Orders/Customers/Coupons) compartilham
+        // o mesmo bucket. Esperar o tempo completo de reset (availableIn) não funciona porque
+        // os outros jobs paralelos reenchem o bucket enquanto este espera. Por isso usamos
+        // intervalos curtos de 5s para verificar se há espaço disponível.
+        $rateLimitWaitStart = null;
         while (RateLimiter::tooManyAttempts($rateLimitKey, self::RATE_LIMIT_PER_MINUTE)) {
-            $seconds = RateLimiter::availableIn($rateLimitKey);
-            Log::channel('sync')->info("[RATE-LIMIT] Aguardando {$seconds}s para loja {$store->id} (limite: ".self::RATE_LIMIT_PER_MINUTE.'/min)');
-            sleep($seconds + 1); // Espera o tempo completo + 1s de buffer
+            if ($rateLimitWaitStart === null) {
+                $rateLimitWaitStart = time();
+                Log::channel('sync')->info("[RATE-LIMIT] Entrando em espera para loja {$store->id} (limite: ".self::RATE_LIMIT_PER_MINUTE.'/min)');
+            }
+            $waitedSeconds = time() - $rateLimitWaitStart;
+            if ($waitedSeconds > 0 && $waitedSeconds % 60 === 0) {
+                Log::channel('sync')->warning("[RATE-LIMIT] Aguardando há {$waitedSeconds}s para loja {$store->id} (limite: ".self::RATE_LIMIT_PER_MINUTE.'/min)');
+            }
+            sleep(5); // Espera intervalo curto e testa novamente
+        }
+        if ($rateLimitWaitStart !== null) {
+            $totalWait = time() - $rateLimitWaitStart;
+            Log::channel('sync')->info("[RATE-LIMIT] Saindo de espera após {$totalWait}s para loja {$store->id}");
         }
 
         RateLimiter::hit($rateLimitKey, 60);
@@ -1207,6 +1259,165 @@ class NuvemshopService
     }
 
     // ==========================================
+    // CUSTOMER UPSERT FROM ORDERS
+    // ==========================================
+
+    /**
+     * Upsert synced_customers records derived from a batch of raw Nuvemshop order data.
+     *
+     * This runs after every saveOrders() call so that:
+     *  - New customers who placed their first order today are created immediately
+     *    without waiting for the separate SyncCustomersJob to complete.
+     *  - Guest checkout customers (not present in the /customers API) still get a record.
+     *  - Existing customers have their first_order_at / last_order_at date range extended
+     *    when the incoming orders fall outside the currently stored range.
+     *
+     * For existing customers, total_orders and total_spent are intentionally NOT modified
+     * here because those authoritative values come from Nuvemshop's /customers API and
+     * would be double-counted if incremented per batch. The full SyncCustomersJob writes
+     * the correct totals from the API.
+     *
+     * For new customers (no record yet), totals are seeded from this order batch as a
+     * best-effort value that SyncCustomersJob will overwrite with the API's authoritative
+     * figure on the next sync cycle.
+     *
+     * The derived external_id uses "order-derived-{md5(email+store_id)}" and never
+     * collides with real Nuvemshop customer IDs. If SyncCustomersJob later fetches the
+     * real customer record (by actual Nuvemshop ID), a separate row is created. The
+     * order-derived row persists as the authoritative record for guest checkouts.
+     */
+    private function upsertCustomersFromOrders(Store $store, array $orders): void
+    {
+        if (empty($orders)) {
+            return;
+        }
+
+        // Group orders by normalised customer_email, aggregating date range and totals.
+        $byEmail = [];
+        foreach ($orders as $order) {
+            $orderData = $this->orderAdapter->transform($order);
+            $email = $orderData['customer_email'] ?? null;
+
+            if (empty($email)) {
+                continue;
+            }
+
+            $email = strtolower(trim($email));
+
+            if (! isset($byEmail[$email])) {
+                $byEmail[$email] = [
+                    'email' => $email,
+                    'name' => $orderData['customer_name'] ?? 'Desconhecido',
+                    'phone' => $orderData['customer_phone'] ?? null,
+                    'total_spent' => 0.0,
+                    'order_count' => 0,
+                    'first_order_at' => null,
+                    'last_order_at' => null,
+                ];
+            }
+
+            $byEmail[$email]['total_spent'] += (float) ($orderData['total'] ?? 0);
+            $byEmail[$email]['order_count']++;
+
+            // Use raw created_at from the API response to determine order date.
+            $orderDate = $this->parseDateTime($order['created_at'] ?? null);
+            if ($orderDate) {
+                $formatted = $this->formatDateTimeForDb($orderDate);
+                if ($byEmail[$email]['first_order_at'] === null || $formatted < $byEmail[$email]['first_order_at']) {
+                    $byEmail[$email]['first_order_at'] = $formatted;
+                }
+                if ($byEmail[$email]['last_order_at'] === null || $formatted > $byEmail[$email]['last_order_at']) {
+                    $byEmail[$email]['last_order_at'] = $formatted;
+                }
+            }
+        }
+
+        if (empty($byEmail)) {
+            return;
+        }
+
+        $emails = array_keys($byEmail);
+
+        // Fetch existing records using case-insensitive match (matches the unique index).
+        $existing = SyncedCustomer::where('store_id', $store->id)
+            ->whereIn(DB::raw('lower(email)'), $emails)
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy(fn ($c) => strtolower($c->email));
+
+        $newCount = 0;
+        $updatedCount = 0;
+
+        foreach ($byEmail as $email => $derived) {
+            $customer = $existing->get($email);
+
+            if ($customer) {
+                // Extend the known date range only — do not touch total_orders / total_spent
+                // because those come from the authoritative /customers API.
+                $changed = false;
+
+                $storedFirst = $customer->first_order_at?->format('Y-m-d H:i:s');
+                if ($derived['first_order_at'] && (! $storedFirst || $derived['first_order_at'] < $storedFirst)) {
+                    $customer->first_order_at = $derived['first_order_at'];
+                    $changed = true;
+                }
+
+                $storedLast = $customer->last_order_at?->format('Y-m-d H:i:s');
+                if ($derived['last_order_at'] && (! $storedLast || $derived['last_order_at'] > $storedLast)) {
+                    $customer->last_order_at = $derived['last_order_at'];
+                    $changed = true;
+                }
+
+                if ($changed) {
+                    $customer->save();
+                    $updatedCount++;
+                }
+            } else {
+                // No record yet — create a best-effort record from order data.
+                // SyncCustomersJob will overwrite total_orders/total_spent with API values.
+                // Use updateOrCreate to handle race conditions with the unique email index.
+                try {
+                    SyncedCustomer::updateOrCreate(
+                        [
+                            'store_id' => $store->id,
+                            'external_id' => 'order-derived-'.md5($email.$store->id),
+                        ],
+                        [
+                            'name' => $derived['name'],
+                            'email' => $email,
+                            'phone' => $derived['phone'],
+                            'total_orders' => $derived['order_count'],
+                            'total_spent' => $derived['total_spent'],
+                            'first_order_at' => $derived['first_order_at'],
+                            'last_order_at' => $derived['last_order_at'],
+                            'external_created_at' => $derived['first_order_at'],
+                        ]
+                    );
+                    $newCount++;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Unique constraint violation — a record with this email was inserted
+                    // concurrently (e.g., by SyncCustomersJob). Safe to skip.
+                    if (str_contains($e->getMessage(), 'synced_customers_store_email_unique')) {
+                        Log::channel('sync')->debug('[ORDERS] Cliente já existe com este email, ignorando', [
+                            'store_id' => $store->id,
+                            'email' => $email,
+                        ]);
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
+        }
+
+        Log::channel('sync')->debug('[ORDERS] Clientes atualizados a partir de pedidos', [
+            'store_id' => $store->id,
+            'emails_processed' => count($byEmail),
+            'existing_updated' => $updatedCount,
+            'new_created' => $newCount,
+        ]);
+    }
+
+    // ==========================================
     // BULK UPSERT METHODS - Customers
     // ==========================================
 
@@ -1235,8 +1446,18 @@ class NuvemshopService
     /**
      * Bulk upsert customers using database upsert for performance.
      *
-     * Deduplica clientes pelo par store_id+external_id antes do upsert
-     * para evitar erro "ON CONFLICT DO UPDATE cannot affect row a second time"
+     * Before upserting real Nuvemshop customers (numeric external_id), removes any
+     * order-derived placeholder records with the same email so the real record becomes
+     * the single authoritative row. This prevents the "one customer, two rows" problem
+     * that occurs when upsertCustomersFromOrders() runs before syncCustomers().
+     *
+     * Deduplicates by store_id+external_id AND store_id+email to avoid
+     * constraint violations on both unique indexes.
+     *
+     * Nuvemshop can return multiple customer records with different external_ids
+     * but the same email (e.g., customer re-registered). The DB has a unique index
+     * on (store_id, lower(email)), so we must keep only one record per email.
+     * We keep the one with the highest total_orders (then total_spent as tiebreaker).
      */
     private function bulkUpsertCustomers(array $customers): void
     {
@@ -1244,16 +1465,99 @@ class NuvemshopService
             return;
         }
 
-        // Deduplica clientes pelo par store_id+external_id, mantendo o último
+        // Step 1: Deduplica pelo par store_id+external_id, mantendo o último
         $uniqueCustomers = [];
         foreach ($customers as $customer) {
             $key = $customer['store_id'].'_'.$customer['external_id'];
             $uniqueCustomers[$key] = $customer;
         }
-        $customers = array_values($uniqueCustomers);
+
+        // Step 2: Deduplica pelo par store_id+lower(email), mantendo o mais relevante.
+        // Nuvemshop pode ter múltiplos registros com external_ids diferentes mas mesmo email.
+        // O índice unique (store_id, lower(email)) impede que ambos existam no banco.
+        $byEmail = [];
+        foreach ($uniqueCustomers as $customer) {
+            if (empty($customer['email'])) {
+                continue;
+            }
+            $emailKey = $customer['store_id'].'_'.strtolower($customer['email']);
+            if (! isset($byEmail[$emailKey])) {
+                $byEmail[$emailKey] = $customer;
+            } else {
+                $existing = $byEmail[$emailKey];
+                // Mantém o com mais pedidos; em empate, o com maior gasto
+                if ($customer['total_orders'] > $existing['total_orders']
+                    || ($customer['total_orders'] === $existing['total_orders']
+                        && $customer['total_spent'] > $existing['total_spent'])) {
+                    $byEmail[$emailKey] = $customer;
+                }
+            }
+        }
+
+        // Reconstruir array final: registros sem email + vencedores por email
+        $emailWinners = [];
+        foreach ($byEmail as $customer) {
+            $emailWinners[$customer['store_id'].'_'.$customer['external_id']] = true;
+        }
+
+        $finalCustomers = [];
+        foreach ($uniqueCustomers as $key => $customer) {
+            if (empty($customer['email'])) {
+                $finalCustomers[] = $customer;
+            } elseif (isset($emailWinners[$key])) {
+                $finalCustomers[] = $customer;
+            }
+            // Descarta duplicatas de email que perderam a comparação
+        }
+
+        if (empty($finalCustomers)) {
+            return;
+        }
+
+        // Step 3: Remove order-derived placeholder rows for the same (store_id, email) pairs.
+        $emailsByStore = [];
+        foreach ($finalCustomers as $customer) {
+            if (! empty($customer['email'])) {
+                $emailsByStore[$customer['store_id']][] = strtolower($customer['email']);
+            }
+        }
+
+        foreach ($emailsByStore as $storeId => $emails) {
+            $uniqueEmails = array_unique($emails);
+
+            // Remove order-derived placeholders
+            SyncedCustomer::where('store_id', $storeId)
+                ->where('external_id', 'LIKE', 'order-derived-%')
+                ->whereIn(DB::raw('lower(email)'), $uniqueEmails)
+                ->forceDelete();
+
+            // Step 4: Remove existing records with the same email but DIFFERENT external_id.
+            // This handles the case where a customer re-registered on Nuvemshop with a new ID
+            // but the same email. The new record from the API replaces the old one.
+            $externalIdsByEmail = [];
+            foreach ($finalCustomers as $customer) {
+                if (! empty($customer['email']) && $customer['store_id'] === $storeId) {
+                    $externalIdsByEmail[strtolower($customer['email'])] = $customer['external_id'];
+                }
+            }
+
+            foreach (array_chunk(array_keys($externalIdsByEmail), 500) as $emailChunk) {
+                $existing = SyncedCustomer::where('store_id', $storeId)
+                    ->whereIn(DB::raw('lower(email)'), $emailChunk)
+                    ->whereNull('deleted_at')
+                    ->get(['id', 'email', 'external_id']);
+
+                foreach ($existing as $record) {
+                    $expectedExternalId = $externalIdsByEmail[strtolower($record->email)] ?? null;
+                    if ($expectedExternalId && $record->external_id !== $expectedExternalId) {
+                        $record->forceDelete();
+                    }
+                }
+            }
+        }
 
         SyncedCustomer::upsert(
-            $customers,
+            $finalCustomers,
             uniqueBy: ['store_id', 'external_id'],
             update: [
                 'name',

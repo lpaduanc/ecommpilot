@@ -3,17 +3,13 @@
 namespace App\Notifications;
 
 use App\Services\EmailConfigurationService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 
-class ResetPasswordNotification extends Notification implements ShouldQueue
+class ResetPasswordNotification extends Notification
 {
-    use Queueable;
-
     /**
      * The password reset token.
      */
@@ -22,7 +18,7 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
     /**
      * Email configuration identifier to use from admin panel.
      */
-    protected string $emailConfigIdentifier = 'password-reset';
+    protected string $emailConfigIdentifier = 'change-password';
 
     /**
      * Create a new notification instance.

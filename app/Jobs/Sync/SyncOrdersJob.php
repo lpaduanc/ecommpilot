@@ -142,7 +142,10 @@ class SyncOrdersJob implements ShouldBeUnique, ShouldQueue
             }
 
             // Verifica limite do plano novamente (pode ter mudado durante execução)
-            if ($user && $planLimitService->hasExceededOrdersLimit($user)) {
+            // getRemainingOrdersQuota retorna -1 para ilimitado, 0 para bloqueado
+            $remainingQuota = $user ? $planLimitService->getRemainingOrdersQuota($user) : -1;
+
+            if ($remainingQuota === 0) {
                 Log::channel('sync')->info('>>> [ORDERS] Sync interrompido - limite do plano atingido', [
                     'store_id' => $this->store->id,
                     'current_page' => $currentPage,
@@ -174,6 +177,17 @@ class SyncOrdersJob implements ShouldBeUnique, ShouldQueue
                     'orders_count' => $ordersCount,
                 ]);
 
+                // Trunca pedidos ao quota restante para não ultrapassar o limite
+                if ($ordersCount > 0 && $remainingQuota !== -1 && $ordersCount > $remainingQuota) {
+                    Log::channel('sync')->info('[ORDERS] Truncando página ao quota restante', [
+                        'store_id' => $this->store->id,
+                        'original_count' => $ordersCount,
+                        'remaining_quota' => $remainingQuota,
+                    ]);
+                    $orders = array_slice($orders, 0, $remainingQuota);
+                    $ordersCount = count($orders);
+                }
+
                 // Salva pedidos no banco
                 if ($ordersCount > 0) {
                     $nuvemshopService->saveOrders($this->store, $orders);
@@ -185,6 +199,16 @@ class SyncOrdersJob implements ShouldBeUnique, ShouldQueue
                         'orders_count' => $ordersCount,
                         'total_synced' => $totalSynced,
                     ]);
+                }
+
+                // Se truncou, atingiu o limite — encerra
+                if ($remainingQuota !== -1 && $ordersCount >= $remainingQuota) {
+                    Log::channel('sync')->info('[ORDERS] Limite do plano atingido após salvar página', [
+                        'store_id' => $this->store->id,
+                        'total_synced' => $totalSynced,
+                    ]);
+                    Cache::forget($checkpointKey);
+                    break;
                 }
 
                 // Atualiza checkpoint no cache

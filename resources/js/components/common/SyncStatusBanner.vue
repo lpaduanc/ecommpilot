@@ -1,9 +1,10 @@
 <script setup>
-import { computed, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useIntegrationStore } from '../../stores/integrationStore';
 import {
     ArrowPathIcon,
     ExclamationTriangleIcon,
+    XMarkIcon,
 } from '@heroicons/vue/24/outline';
 
 const integrationStore = useIntegrationStore();
@@ -13,11 +14,19 @@ const isActiveStoreSyncing = computed(() => integrationStore.isActiveStoreSyncin
 const isActiveStoreFailed = computed(() => integrationStore.isActiveStoreFailed);
 const activeStore = computed(() => integrationStore.activeStore);
 
-// Show banner if syncing or failed
-const showBanner = computed(() =>
-    isActiveStoreSyncing.value ||
-    isActiveStoreFailed.value
-);
+// Track dismissed state (resets when store changes or sync restarts)
+const dismissed = ref(false);
+
+// Show banner if syncing or failed (and not dismissed)
+const showBanner = computed(() => {
+    if (dismissed.value && isActiveStoreFailed.value) return false;
+    return isActiveStoreSyncing.value || isActiveStoreFailed.value;
+});
+
+// Reset dismissed when sync starts again or store changes
+watch([isActiveStoreSyncing, () => activeStore.value?.id], () => {
+    dismissed.value = false;
+});
 
 // Banner variant based on status
 const bannerVariant = computed(() => {
@@ -51,6 +60,11 @@ async function handleAction() {
     if (isActiveStoreFailed.value && activeStore.value?.id) {
         await integrationStore.syncStore(activeStore.value.id);
     }
+}
+
+// Dismiss the failed banner
+function dismissBanner() {
+    dismissed.value = true;
 }
 
 // Start/stop polling based on sync status
@@ -142,19 +156,28 @@ onUnmounted(() => {
                     </p>
                 </div>
 
-                <!-- Action button -->
-                <button
-                    v-if="actionLabel"
-                    @click="handleAction"
-                    :class="[
-                        'px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-bold shadow-lg transition-all hover:scale-105 active:scale-95 flex-shrink-0',
-                        bannerVariant === 'warning'
-                            ? 'bg-white text-orange-600 hover:bg-orange-50'
-                            : 'bg-white text-indigo-600 hover:bg-indigo-50'
-                    ]"
-                >
-                    {{ actionLabel }}
-                </button>
+                <!-- Action buttons for failed state -->
+                <div v-if="actionLabel" class="flex items-center gap-2 flex-shrink-0">
+                    <button
+                        @click="handleAction"
+                        :class="[
+                            'px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-bold shadow-lg transition-all hover:scale-105 active:scale-95',
+                            bannerVariant === 'warning'
+                                ? 'bg-white text-orange-600 hover:bg-orange-50'
+                                : 'bg-white text-indigo-600 hover:bg-indigo-50'
+                        ]"
+                    >
+                        {{ actionLabel }}
+                    </button>
+                    <button
+                        v-if="isActiveStoreFailed"
+                        @click="dismissBanner"
+                        class="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-all"
+                        title="Fechar aviso"
+                    >
+                        <XMarkIcon class="w-5 h-5" />
+                    </button>
+                </div>
 
                 <!-- Progress dots for syncing state -->
                 <div

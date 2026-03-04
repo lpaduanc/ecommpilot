@@ -116,6 +116,13 @@ const menuItems = computed(() => [
         permission: 'orders.view',
     },
     {
+        name: 'Clientes',
+        label: 'Clientes',
+        icon: UsersIcon,
+        route: 'customers',
+        permission: 'customers.view',
+    },
+    {
         name: 'Marketing',
         label: 'Marketing',
         icon: MegaphoneIcon,
@@ -313,7 +320,7 @@ async function handleLogout() {
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center shadow-lg shadow-primary-500/30">
                         <SparklesIcon class="w-6 h-6 text-white" />
                     </div>
-                    <span class="font-display font-bold text-xl text-gray-900 dark:text-gray-100 dark:text-white">Ecommpilot</span>
+                    <span class="font-display font-bold text-xl text-gray-900 dark:text-gray-100 dark:text-white">EPilot</span>
                 </div>
             </div>
 
@@ -468,7 +475,7 @@ async function handleLogout() {
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center shadow-lg shadow-primary-500/30">
                     <SparklesIcon class="w-6 h-6 text-white" />
                 </div>
-                <span class="font-display font-bold text-xl text-gray-900 dark:text-gray-100 dark:text-white">Ecommpilot</span>
+                <span class="font-display font-bold text-xl text-gray-900 dark:text-gray-100 dark:text-white">EPilot</span>
             </div>
             <div v-else class="w-full flex justify-center">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center shadow-lg shadow-primary-500/30">

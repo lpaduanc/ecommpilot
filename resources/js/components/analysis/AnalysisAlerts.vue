@@ -6,6 +6,7 @@ import {
     XMarkIcon,
 } from '@heroicons/vue/24/outline';
 import { ref } from 'vue';
+import InfoTooltip from '../common/InfoTooltip.vue';
 
 const props = defineProps({
     alerts: { type: Array, default: () => [] },
@@ -102,6 +103,14 @@ function isVisible(index) {
 
 <template>
     <div class="space-y-3">
+        <!-- Header row -->
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Alertas</span>
+            <InfoTooltip
+                text="Esses alertas mostram problemas importantes que a IA encontrou nos seus dados. Eles precisam de atenção para evitar impacto nas suas vendas."
+                position="bottom"
+            />
+        </div>
         <transition-group name="alert">
             <div
                 v-for="(alert, index) in alerts"

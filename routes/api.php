@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StoreConfigController;
@@ -92,6 +93,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/export', [OrderController::class, 'export']);
         Route::get('/stats', [OrderController::class, 'stats']);
         Route::get('/{order}', [OrderController::class, 'show']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Customers
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('customers')->middleware('can:customers.view')->group(function () {
+        Route::get('/', [CustomerController::class, 'index']);
+        Route::get('/filters', [CustomerController::class, 'filters']);
+        Route::get('/rfm-summary', [CustomerController::class, 'rfmSummary']);
     });
 
     /*

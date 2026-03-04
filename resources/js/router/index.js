@@ -32,7 +32,7 @@ const routes = [
         meta: { guest: true },
     },
     {
-        path: '/reset-password/:token',
+        path: '/reset-password',
         name: 'reset-password',
         component: () => import(
             /* webpackChunkName: "auth-reset-password" */
@@ -80,6 +80,16 @@ const routes = [
             '../views/OrdersView.vue'
         ),
         meta: { requiresAuth: true, permission: 'orders.view' },
+    },
+    {
+        path: '/customers',
+        name: 'customers',
+        component: () => import(
+            /* webpackChunkName: "customers" */
+            /* webpackPrefetch: true */
+            '../views/CustomersView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'customers.view' },
     },
     {
         path: '/marketing/discounts',

@@ -5,6 +5,7 @@ import {
     ArrowTrendingUpIcon,
     SparklesIcon,
 } from '@heroicons/vue/24/outline';
+import InfoTooltip from '../common/InfoTooltip.vue';
 
 const props = defineProps({
     summary: { type: Object, required: true },
@@ -173,6 +174,10 @@ watch(score, (newScore) => {
                     <div class="flex items-center gap-2">
                         <HeartIcon class="w-6 h-6 text-gray-400" />
                         <h3 class="text-xl font-display font-bold text-gray-900 dark:text-gray-100">Saúde da Loja</h3>
+                        <InfoTooltip
+                            text="Essa nota de 0 a 100 mostra como sua loja está no geral. A IA analisa seus pedidos, produtos e clientes dos últimos 15 dias. Acima de 80 é excelente, entre 60-80 está saudável, entre 40-60 precisa de atenção e abaixo de 40 é crítico."
+                            position="bottom"
+                        />
                     </div>
                     <span
                         :class="[

@@ -14,7 +14,7 @@ const notificationStore = useNotificationStore();
 
 const form = reactive({
     email: route.query.email || '',
-    token: route.params.token,
+    token: route.query.token || '',
     password: '',
     password_confirmation: '',
 });

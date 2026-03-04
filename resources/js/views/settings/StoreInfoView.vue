@@ -53,6 +53,41 @@ const errors = reactive({
     competitors: '',
 });
 
+// Currency mask (live formatting as user types)
+const currencyDisplay = reactive({
+    monthly_goal: '',
+    annual_goal: '',
+    target_ticket: '',
+    monthly_revenue: '',
+});
+
+function formatFromCents(cents) {
+    if (!cents) return '';
+    const value = cents / 100;
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function onCurrencyInput(field, event) {
+    const digits = event.target.value.replace(/\D/g, '');
+    const cents = parseInt(digits, 10) || 0;
+
+    form[field] = cents > 0 ? cents / 100 : null;
+    currencyDisplay[field] = cents > 0 ? formatFromCents(cents) : '';
+
+    event.target.value = currencyDisplay[field];
+}
+
+function initCurrencyDisplays() {
+    for (const field of ['monthly_goal', 'annual_goal', 'target_ticket', 'monthly_revenue']) {
+        if (form[field] !== null && form[field] !== undefined) {
+            const cents = Math.round(Number(form[field]) * 100);
+            currencyDisplay[field] = formatFromCents(cents);
+        } else {
+            currencyDisplay[field] = '';
+        }
+    }
+}
+
 const selectedNiche = computed(() => {
     return niches.value.find(n => n.value === form.niche);
 });
@@ -115,6 +150,8 @@ async function loadConfig(storeId) {
         form.monthly_revenue = data.monthly_revenue;
         form.monthly_visits = data.monthly_visits;
         form.competitors = data.competitors || [];
+
+        initCurrencyDisplays();
     } catch {
         notificationStore.error('Erro ao carregar configurações da loja');
     } finally {
@@ -466,49 +503,109 @@ onMounted(async () => {
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <BaseInput
-                        v-model="form.monthly_goal"
-                        type="number"
-                        label="Meta Mensal (R$)"
-                        placeholder="Ex: 50000"
-                        :error="errors.monthly_goal"
-                        :disabled="!canEdit || isLoadingConfig"
-                        step="0.01"
-                        min="0"
-                    />
+                    <!-- Meta Mensal -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Meta Mensal
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium pointer-events-none select-none">R$</span>
+                            <input
+                                type="text"
+                                inputmode="decimal"
+                                :value="currencyDisplay.monthly_goal"
+                                @input="onCurrencyInput('monthly_goal', $event)"
+                                placeholder="0,00"
+                                :disabled="!canEdit || isLoadingConfig"
+                                class="w-full pl-11 pr-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
+                                :class="[
+                                    errors.monthly_goal
+                                        ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20'
+                                        : 'border-gray-200 dark:border-gray-700 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20',
+                                    (!canEdit || isLoadingConfig) ? 'bg-gray-50 dark:bg-gray-900 cursor-not-allowed opacity-70' : ''
+                                ]"
+                            />
+                        </div>
+                        <p v-if="errors.monthly_goal" class="text-sm text-danger-500">{{ errors.monthly_goal }}</p>
+                    </div>
 
-                    <BaseInput
-                        v-model="form.annual_goal"
-                        type="number"
-                        label="Meta Anual (R$)"
-                        placeholder="Ex: 600000"
-                        :error="errors.annual_goal"
-                        :disabled="!canEdit || isLoadingConfig"
-                        step="0.01"
-                        min="0"
-                    />
+                    <!-- Meta Anual -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Meta Anual
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium pointer-events-none select-none">R$</span>
+                            <input
+                                type="text"
+                                inputmode="decimal"
+                                :value="currencyDisplay.annual_goal"
+                                @input="onCurrencyInput('annual_goal', $event)"
+                                placeholder="0,00"
+                                :disabled="!canEdit || isLoadingConfig"
+                                class="w-full pl-11 pr-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
+                                :class="[
+                                    errors.annual_goal
+                                        ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20'
+                                        : 'border-gray-200 dark:border-gray-700 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20',
+                                    (!canEdit || isLoadingConfig) ? 'bg-gray-50 dark:bg-gray-900 cursor-not-allowed opacity-70' : ''
+                                ]"
+                            />
+                        </div>
+                        <p v-if="errors.annual_goal" class="text-sm text-danger-500">{{ errors.annual_goal }}</p>
+                    </div>
 
-                    <BaseInput
-                        v-model="form.target_ticket"
-                        type="number"
-                        label="Ticket Médio Alvo (R$)"
-                        placeholder="Ex: 150"
-                        :error="errors.target_ticket"
-                        :disabled="!canEdit || isLoadingConfig"
-                        step="0.01"
-                        min="0"
-                    />
+                    <!-- Ticket Médio Alvo -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Ticket Médio Alvo
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium pointer-events-none select-none">R$</span>
+                            <input
+                                type="text"
+                                inputmode="decimal"
+                                :value="currencyDisplay.target_ticket"
+                                @input="onCurrencyInput('target_ticket', $event)"
+                                placeholder="0,00"
+                                :disabled="!canEdit || isLoadingConfig"
+                                class="w-full pl-11 pr-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
+                                :class="[
+                                    errors.target_ticket
+                                        ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20'
+                                        : 'border-gray-200 dark:border-gray-700 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20',
+                                    (!canEdit || isLoadingConfig) ? 'bg-gray-50 dark:bg-gray-900 cursor-not-allowed opacity-70' : ''
+                                ]"
+                            />
+                        </div>
+                        <p v-if="errors.target_ticket" class="text-sm text-danger-500">{{ errors.target_ticket }}</p>
+                    </div>
 
-                    <BaseInput
-                        v-model="form.monthly_revenue"
-                        type="number"
-                        label="Faturamento Mensal Atual (R$)"
-                        placeholder="Ex: 35000"
-                        :error="errors.monthly_revenue"
-                        :disabled="!canEdit || isLoadingConfig"
-                        step="0.01"
-                        min="0"
-                    />
+                    <!-- Faturamento Mensal Atual -->
+                    <div class="space-y-1.5">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Faturamento Mensal Atual
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium pointer-events-none select-none">R$</span>
+                            <input
+                                type="text"
+                                inputmode="decimal"
+                                :value="currencyDisplay.monthly_revenue"
+                                @input="onCurrencyInput('monthly_revenue', $event)"
+                                placeholder="0,00"
+                                :disabled="!canEdit || isLoadingConfig"
+                                class="w-full pl-11 pr-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
+                                :class="[
+                                    errors.monthly_revenue
+                                        ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20'
+                                        : 'border-gray-200 dark:border-gray-700 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20',
+                                    (!canEdit || isLoadingConfig) ? 'bg-gray-50 dark:bg-gray-900 cursor-not-allowed opacity-70' : ''
+                                ]"
+                            />
+                        </div>
+                        <p v-if="errors.monthly_revenue" class="text-sm text-danger-500">{{ errors.monthly_revenue }}</p>
+                    </div>
                 </div>
             </BaseCard>
 

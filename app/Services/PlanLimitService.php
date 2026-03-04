@@ -370,15 +370,53 @@ class PlanLimitService
     public function hasExceededOrdersLimit(User $user): bool
     {
         $owner = $this->resolveOwnerUser($user);
+
+        // Admins nunca são bloqueados
+        if ($owner->isAdmin()) {
+            return false;
+        }
+
         $plan = $owner->currentPlan();
 
-        if (! $plan || $plan->isUnlimited('orders_limit')) {
+        // Sem plano ativo = bloqueado (subscription expirada ou inexistente)
+        if (! $plan) {
+            return true;
+        }
+
+        if ($plan->isUnlimited('orders_limit')) {
             return false;
         }
 
         $monthlyOrders = $this->getMonthlyOrdersCount($owner);
 
         return $monthlyOrders >= $plan->orders_limit;
+    }
+
+    /**
+     * Retorna quantos pedidos ainda podem ser sincronizados no mês.
+     * Retorna -1 se ilimitado, 0 se bloqueado.
+     */
+    public function getRemainingOrdersQuota(User $user): int
+    {
+        $owner = $this->resolveOwnerUser($user);
+
+        if ($owner->isAdmin()) {
+            return -1;
+        }
+
+        $plan = $owner->currentPlan();
+
+        if (! $plan) {
+            return 0;
+        }
+
+        if ($plan->isUnlimited('orders_limit')) {
+            return -1;
+        }
+
+        $monthlyOrders = $this->getMonthlyOrdersCount($owner);
+
+        return max(0, $plan->orders_limit - $monthlyOrders);
     }
 
     /**

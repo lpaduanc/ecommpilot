@@ -37,6 +37,8 @@ class SyncedCustomer extends Model
         'phone',
         'total_orders',
         'total_spent',
+        'first_order_at',
+        'last_order_at',
         'external_created_at',
     ];
 
@@ -46,8 +48,18 @@ class SyncedCustomer extends Model
             'uuid' => 'string',
             'total_orders' => 'integer',
             'total_spent' => 'decimal:2',
+            'first_order_at' => 'datetime',
+            'last_order_at' => 'datetime',
             'external_created_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get the number of days since the customer's last purchase.
+     */
+    public function getDaysWithoutPurchaseAttribute(): ?int
+    {
+        return $this->last_order_at ? (int) abs(now()->diffInDays($this->last_order_at)) : null;
     }
 
     public function store(): BelongsTo
@@ -75,7 +87,8 @@ class SyncedCustomer extends Model
 
         return $query->where(function ($q) use ($pattern) {
             $q->where('name', 'ILIKE', $pattern)
-                ->orWhere('email', 'ILIKE', $pattern);
+                ->orWhere('email', 'ILIKE', $pattern)
+                ->orWhere('phone', 'ILIKE', $pattern);
         });
     }
 }

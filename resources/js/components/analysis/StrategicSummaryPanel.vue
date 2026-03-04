@@ -16,6 +16,7 @@ import {
     ArrowRightIcon,
     LightBulbIcon,
 } from '@heroicons/vue/24/outline';
+import InfoTooltip from '../common/InfoTooltip.vue';
 
 const props = defineProps({
     premiumSummary: {
@@ -92,7 +93,14 @@ onMounted(() => {
                         <RocketLaunchIcon class="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h3 class="text-lg font-display font-bold text-white">Resumo Estratégico</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-lg font-display font-bold text-white">Resumo Estratégico</h3>
+                            <InfoTooltip
+                                text="Esse é o resumo completo feito pela IA sobre sua loja. Aqui você vê o diagnóstico geral, os pontos fortes e o que precisa melhorar."
+                                position="bottom"
+                                icon-class="text-white/60 hover:text-white"
+                            />
+                        </div>
                         <p class="text-purple-100 text-sm">Growth Intelligence</p>
                     </div>
                 </div>
@@ -146,7 +154,13 @@ onMounted(() => {
             </div>
 
             <!-- 3 Insight Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div class="flex items-center gap-2 mt-6 mb-0">
+                <InfoTooltip
+                    text="Esses três cards destacam os pontos mais críticos da sua loja: o maior problema que trava seu crescimento, a melhor oportunidade para aproveitar e o risco que você deve ficar de olho."
+                    position="right"
+                />
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                 <!-- Gargalo -->
                 <div v-if="executiveSummary.maior_gargalo" class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
                     <div class="flex items-start gap-3">
@@ -189,6 +203,13 @@ onMounted(() => {
 
             <!-- Growth Score Bars -->
             <div v-if="growthScore.overall_score" class="mt-6 space-y-3">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Scores de Crescimento</span>
+                    <InfoTooltip
+                        text="Essas barras mostram como sua loja está em 4 áreas: Eficiência (uso de recursos), Margem (saúde financeira), Retenção (clientes que voltam) e Crescimento (potencial de expansão). Quanto maior, melhor."
+                        position="right"
+                    />
+                </div>
                 <!-- Eficiência -->
                 <div v-if="growthScore.efficiency_score !== undefined" class="space-y-1">
                     <div class="flex items-center justify-between text-sm">
@@ -282,6 +303,10 @@ onMounted(() => {
             <div class="flex items-center gap-2 mb-4">
                 <CalendarDaysIcon class="w-5 h-5 text-gray-500" />
                 <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Plano de Ação 90 Dias</h4>
+                <InfoTooltip
+                    text="Esse plano divide as ações em 3 fases: os primeiros 30 dias são para ganhos rápidos, 60 dias para estruturar melhorias e 90 dias para escalar os resultados."
+                    position="right"
+                />
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -355,6 +380,10 @@ onMounted(() => {
             <div class="flex items-center gap-2 mb-4">
                 <BanknotesIcon class="w-5 h-5 text-gray-500" />
                 <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Impacto Financeiro</h4>
+                <InfoTooltip
+                    text="Aqui você vê quanto dinheiro cada ação pode trazer para sua loja. A matriz mostra o que dá mais resultado com menos esforço e a tabela estima os valores mensais e anuais."
+                    position="right"
+                />
             </div>
 
             <!-- Matriz Impacto x Esforço -->
@@ -479,6 +508,10 @@ onMounted(() => {
             <div class="flex items-center gap-2 mb-4">
                 <PresentationChartBarIcon class="w-5 h-5 text-gray-500" />
                 <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Cenários de Crescimento</h4>
+                <InfoTooltip
+                    text="Três projeções de como sua loja pode crescer: Conservador (melhorias mínimas), Base (o que a IA recomenda) e Agressivo (implementando tudo). Os valores são estimativas baseadas nos seus dados."
+                    position="right"
+                />
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

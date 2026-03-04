@@ -21,6 +21,7 @@ import OpportunitiesPanel from '../components/analysis/OpportunitiesPanel.vue';
 import StrategicSummaryPanel from '../components/analysis/StrategicSummaryPanel.vue';
 import AnalysisTypeSelector from '../components/analysis/AnalysisTypeSelector.vue';
 import ChatContainer from '../components/chat/ChatContainer.vue';
+import InfoTooltip from '../components/common/InfoTooltip.vue';
 import {
     SparklesIcon,
     ClockIcon,
@@ -738,7 +739,14 @@ onUnmounted(() => {
                                     <LightBulbIcon class="w-6 h-6 text-white" />
                                 </div>
                                 <div>
-                                    <h2 class="text-lg font-bold text-white">Sugestões Estratégicas</h2>
+                                    <div class="flex items-center gap-2">
+                                        <h2 class="text-lg font-bold text-white">Sugestões Estratégicas</h2>
+                                        <InfoTooltip
+                                            text="Essas são ações práticas que a IA recomenda. Cada sugestão tem uma categoria (ex: Marketing, Estoque) e um nível de impacto. Você pode aceitar para implementar ou rejeitar."
+                                            position="bottom"
+                                            icon-class="text-white/60 hover:text-white"
+                                        />
+                                    </div>
                                     <p class="text-blue-100 text-sm">Ações recomendadas pela IA para impulsionar seus resultados</p>
                                 </div>
                                 <div class="ml-auto">
@@ -758,7 +766,13 @@ onUnmounted(() => {
                                         <BoltIcon class="w-4 h-4 text-danger-600 dark:text-danger-400" />
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
+                                            <InfoTooltip
+                                                text="Ações urgentes que podem trazer resultados rápidos. Comece por essas para ter o maior impacto no menor tempo."
+                                                position="right"
+                                            />
+                                        </div>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
                                     </div>
                                 </div>
@@ -781,7 +795,13 @@ onUnmounted(() => {
                                         <ChartBarIcon class="w-4 h-4 text-accent-600 dark:text-accent-400" />
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
+                                            <InfoTooltip
+                                                text="Melhorias estratégicas para o médio prazo. São importantes, mas não tão urgentes quanto as de alta prioridade."
+                                                position="right"
+                                            />
+                                        </div>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
                                     </div>
                                 </div>
@@ -804,7 +824,13 @@ onUnmounted(() => {
                                         <RocketLaunchIcon class="w-4 h-4 text-success-600 dark:text-success-400" />
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
+                                            <InfoTooltip
+                                                text="Otimizações extras que complementam as demais. Implemente quando as prioridades maiores já estiverem em andamento."
+                                                position="right"
+                                            />
+                                        </div>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">Otimizações complementares</p>
                                     </div>
                                 </div>

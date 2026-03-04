@@ -1,4 +1,5 @@
-import { defineAsyncComponent, Component } from 'vue';
+import { defineAsyncComponent } from 'vue';
+import type { Component } from 'vue';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import { logger } from '@/utils/logger';
 

@@ -8,7 +8,6 @@ import ThemeToggle from '../common/ThemeToggle.vue';
 import NotificationDropdown from '../notifications/NotificationDropdown.vue';
 import {
     BellIcon,
-    MagnifyingGlassIcon,
     UserCircleIcon,
     Cog6ToothIcon,
     ArrowLeftOnRectangleIcon,
@@ -23,8 +22,6 @@ const notificationStore = useSystemNotificationStore();
 
 const showUserMenu = ref(false);
 const showNotifications = ref(false);
-const showMobileSearch = ref(false);
-const searchQuery = ref('');
 
 const userName = computed(() => authStore.userName);
 const userEmail = computed(() => authStore.userEmail);
@@ -58,13 +55,6 @@ function toggleNotifications() {
 function closeMenus() {
     showUserMenu.value = false;
     showNotifications.value = false;
-}
-
-function handleSearch() {
-    if (searchQuery.value.trim()) {
-        router.push({ name: 'products', query: { search: searchQuery.value } });
-        showMobileSearch.value = false;
-    }
 }
 
 function goToSettings() {
@@ -113,7 +103,7 @@ onUnmounted(() => {
 <template>
     <header class="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-700">
         <div class="flex items-center justify-between h-16 lg:h-20 px-4 lg:px-8">
-            <!-- Left Section: Mobile Menu + Search -->
+            <!-- Left Section: Mobile Menu -->
             <div class="flex items-center gap-3">
                 <!-- Mobile Menu Button -->
                 <button
@@ -121,28 +111,6 @@ onUnmounted(() => {
                     class="lg:hidden p-2 -ml-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                 >
                     <Bars3Icon class="w-6 h-6" />
-                </button>
-
-                <!-- Search Bar - Desktop -->
-                <div class="hidden md:block flex-1 max-w-xl">
-                    <div class="relative">
-                        <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                            v-model="searchQuery"
-                            @keyup.enter="handleSearch"
-                            type="text"
-                            placeholder="Buscar produtos, pedidos..."
-                            class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
-                        />
-                    </div>
-                </div>
-
-                <!-- Mobile Search Button -->
-                <button
-                    @click="showMobileSearch = !showMobileSearch"
-                    class="md:hidden p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                    <MagnifyingGlassIcon class="w-6 h-6" />
                 </button>
             </div>
 
@@ -249,28 +217,5 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- Mobile Search Bar -->
-        <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 -translate-y-2"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 -translate-y-2"
-        >
-            <div v-if="showMobileSearch" class="md:hidden px-4 pb-4">
-                <div class="relative">
-                    <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                        v-model="searchQuery"
-                        @keyup.enter="handleSearch"
-                        type="text"
-                        placeholder="Buscar produtos, pedidos..."
-                        class="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:bg-white dark:bg-gray-800 dark:focus:bg-gray-600 focus:border-primary-200 dark:focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none"
-                        autofocus
-                    />
-                </div>
-            </div>
-        </Transition>
     </header>
 </template>

@@ -27,19 +27,19 @@ const isLoading = ref(false);
 
 async function handleSubmit() {
     clearErrors();
-    
+
     if (!validateForm()) return;
-    
+
     isLoading.value = true;
-    
+
     const result = await authStore.login({
         email: form.email,
         password: form.password,
         remember: form.remember,
     });
-    
+
     isLoading.value = false;
-    
+
     if (result.success) {
         notificationStore.success('Login realizado com sucesso!');
         const redirect = route.query.redirect || '/';
@@ -58,7 +58,7 @@ async function handleSubmit() {
 
 function validateForm() {
     let valid = true;
-    
+
     if (!form.email) {
         errors.email = 'O e-mail é obrigatório';
         valid = false;
@@ -66,12 +66,12 @@ function validateForm() {
         errors.email = 'Digite um e-mail válido';
         valid = false;
     }
-    
+
     if (!form.password) {
         errors.password = 'A senha é obrigatória';
         valid = false;
     }
-    
+
     return valid;
 }
 
@@ -95,7 +95,7 @@ function clearErrors() {
                     <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center">
                         <SparklesIcon class="w-7 h-7 text-white" />
                     </div>
-                    <span class="font-display font-bold text-2xl text-gray-900">Ecommpilot</span>
+                    <span class="font-display font-bold text-2xl text-gray-900">EPilot</span>
                 </div>
 
                 <!-- Header -->
@@ -159,7 +159,7 @@ function clearErrors() {
                 </form>
 
                 <!-- Register Link -->
-                <p class="mt-8 text-center text-gray-500">
+                <!-- <p class="mt-8 text-center text-gray-500">
                     Não tem uma conta?
                     <router-link
                         :to="{ name: 'register' }"
@@ -167,7 +167,7 @@ function clearErrors() {
                     >
                         Criar conta
                     </router-link>
-                </p>
+                </p> -->
             </div>
         </div>
 
@@ -177,7 +177,7 @@ function clearErrors() {
             <div class="absolute inset-0 opacity-10">
                 <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
             </div>
-            
+
             <!-- Content -->
             <div class="relative z-10 text-white text-center max-w-lg">
                 <div class="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-8">
@@ -189,7 +189,7 @@ function clearErrors() {
                 <p class="text-white/80 text-lg">
                     Análises inteligentes e sugestões personalizadas para aumentar suas vendas
                 </p>
-                
+
                 <!-- Features -->
                 <div class="mt-12 grid grid-cols-2 gap-6 text-left">
                     <div class="flex items-start gap-3">
@@ -207,7 +207,7 @@ function clearErrors() {
                         </div>
                         <div>
                             <h4 class="font-medium">IA Avançada</h4>
-                            <p class="text-sm text-white/60">GPT-4 para análises</p>
+                            <p class="text-sm text-white/60">Modelos mais avançados para análises</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-3">

@@ -3,6 +3,7 @@
 namespace App\Jobs\Sync;
 
 use App\Models\Store;
+use App\Services\CustomerRfmService;
 use App\Services\Integration\NuvemshopService;
 use Carbon\Carbon;
 use Illuminate\Bus\Batchable;
@@ -66,6 +67,9 @@ class SyncCustomersJob implements ShouldQueue
 
         try {
             $nuvemshopService->syncCustomers($this->store, $this->updatedSince);
+
+            // Invalidate RFM cache so next page load recalculates
+            app(CustomerRfmService::class)->invalidateCache($this->store);
 
             $elapsed = round((microtime(true) - $startTime) * 1000, 2);
             Log::channel('sync')->info('<<< [PARALLEL] Sync de CLIENTES concluido', [
