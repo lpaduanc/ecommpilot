@@ -40,6 +40,7 @@ const defaultForm = {
     analysis_history_limit: 4,
     data_retention_months: 12,
     has_ai_analysis: true,
+    has_auto_analysis: false,
     has_ai_chat: false,
     has_suggestion_discussion: false,
     has_suggestion_history: false,
@@ -302,6 +303,9 @@ onMounted(fetchPlans);
                         />
                         <span :class="plan.has_ai_analysis ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">
                             Análises IA
+                            <template v-if="plan.has_ai_analysis && plan.has_auto_analysis">
+                                (auto diária)
+                            </template>
                         </span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -541,6 +545,17 @@ onMounted(fetchPlans);
                         />
                         <span class="text-sm text-gray-700 dark:text-gray-300">
                             Análises IA
+                        </span>
+                    </label>
+
+                    <label v-if="form.has_ai_analysis" class="flex items-center gap-3 cursor-pointer ml-7">
+                        <input
+                            type="checkbox"
+                            v-model="form.has_auto_analysis"
+                            class="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                        />
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            Análise Automática Diária
                         </span>
                     </label>
 

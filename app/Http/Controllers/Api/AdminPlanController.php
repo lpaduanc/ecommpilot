@@ -68,6 +68,7 @@ class AdminPlanController extends Controller
             'analysis_history_limit' => ['required', 'integer', 'min:-1'],
             'data_retention_months' => ['required', 'integer', 'min:-1'],
             'has_ai_analysis' => ['boolean'],
+            'has_auto_analysis' => ['boolean'],
             'has_ai_chat' => ['boolean'],
             'has_suggestion_discussion' => ['boolean'],
             'has_suggestion_history' => ['boolean'],
@@ -105,6 +106,7 @@ class AdminPlanController extends Controller
             'analysis_history_limit' => ['sometimes', 'integer', 'min:-1'],
             'data_retention_months' => ['sometimes', 'integer', 'min:-1'],
             'has_ai_analysis' => ['sometimes', 'boolean'],
+            'has_auto_analysis' => ['sometimes', 'boolean'],
             'has_ai_chat' => ['sometimes', 'boolean'],
             'has_suggestion_discussion' => ['sometimes', 'boolean'],
             'has_suggestion_history' => ['sometimes', 'boolean'],
@@ -118,6 +120,9 @@ class AdminPlanController extends Controller
         // Garantir que campos booleanos sejam atualizados mesmo quando false
         if ($request->has('has_ai_analysis')) {
             $validated['has_ai_analysis'] = (bool) $request->input('has_ai_analysis');
+        }
+        if ($request->has('has_auto_analysis')) {
+            $validated['has_auto_analysis'] = (bool) $request->input('has_auto_analysis');
         }
         if ($request->has('has_ai_chat')) {
             $validated['has_ai_chat'] = (bool) $request->input('has_ai_chat');
