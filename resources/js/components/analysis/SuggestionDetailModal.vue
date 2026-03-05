@@ -165,7 +165,7 @@ function handleManageWorkflow() {
                 ></div>
 
                 <!-- Modal -->
-                <div class="relative w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl z-10 m-2 sm:m-4">
+                <div class="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-800 rounded-3xl shadow-2xl z-10 m-2 sm:m-4">
                     <!-- Header with Gradient based on Priority -->
                     <div class="relative px-4 sm:px-6 lg:px-8 py-4 sm:py-6 bg-gradient-to-r overflow-hidden" :class="priority.color">
                         <!-- Background Pattern -->
@@ -230,8 +230,8 @@ function handleManageWorkflow() {
                             <ActionTimeline :recommended-action="suggestion.recommended_action" />
                         </div>
 
-                        <!-- Quick Actions -->
-                        <div v-if="isOnTrackingPage" class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl p-5 border border-primary-200 dark:border-primary-800">
+                        <!-- Quick Actions (hidden) -->
+                        <!-- <div v-if="isOnTrackingPage" class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl p-5 border border-primary-200 dark:border-primary-800">
                             <h3 class="flex items-center gap-2 font-semibold text-primary-900 dark:text-primary-200 mb-3">
                                 <BoltIcon class="w-5 h-5 text-primary-600 dark:text-primary-400" />
                                 Gerenciar Workflow
@@ -246,7 +246,7 @@ function handleManageWorkflow() {
                                 <BoltIcon class="w-5 h-5" />
                                 Abrir Página de Workflow
                             </button>
-                        </div>
+                        </div> -->
 
                     </div>
 

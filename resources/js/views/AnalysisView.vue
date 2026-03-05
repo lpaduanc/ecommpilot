@@ -22,6 +22,8 @@ import StrategicSummaryPanel from '../components/analysis/StrategicSummaryPanel.
 import AnalysisTypeSelector from '../components/analysis/AnalysisTypeSelector.vue';
 import ChatContainer from '../components/chat/ChatContainer.vue';
 import InfoTooltip from '../components/common/InfoTooltip.vue';
+import SectionGuideLink from '../components/analysis/SectionGuideLink.vue';
+import AnalysisGuideModal from '../components/analysis/AnalysisGuideModal.vue';
 import {
     SparklesIcon,
     ClockIcon,
@@ -78,6 +80,13 @@ const dismissedEmailAlerts = ref(new Set());
 const showChatPanel = ref(false);
 const chatPanelContext = ref(null);
 const showAIDisclaimer = ref(false);
+const showAnalysisGuide = ref(false);
+const guideModalSection = ref('');
+
+function openAnalysisGuide(section) {
+    guideModalSection.value = section;
+    showAnalysisGuide.value = true;
+}
 
 // Análises anteriores
 const selectedHistoricalId = ref(null);
@@ -719,8 +728,8 @@ onUnmounted(() => {
                 <div class="flex-1 min-w-0 space-y-6">
                     <!-- Health Score + Alerts Row -->
                     <div v-if="summary || alerts.length > 0" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <HealthScore v-if="summary" :summary="summary" />
-                        <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" />
+                        <HealthScore v-if="summary" :summary="summary" @open-analysis-guide="openAnalysisGuide" />
+                        <AnalysisAlerts v-if="alerts.length > 0" :alerts="alerts" @open-analysis-guide="openAnalysisGuide" />
                     </div>
 
                     <!-- Resumo Estratégico -->
@@ -728,6 +737,7 @@ onUnmounted(() => {
                         v-if="premiumSummary"
                         :premium-summary="premiumSummary"
                         :store-name="integrationStore.activeStore?.name"
+                        @open-analysis-guide="openAnalysisGuide"
                     />
 
                     <!-- Suggestions -->
@@ -739,15 +749,14 @@ onUnmounted(() => {
                                     <LightBulbIcon class="w-6 h-6 text-white" />
                                 </div>
                                 <div>
-                                    <div class="flex items-center gap-2">
-                                        <h2 class="text-lg font-bold text-white">Sugestões Estratégicas</h2>
-                                        <InfoTooltip
-                                            text="Essas são ações práticas que a IA recomenda. Cada sugestão tem uma categoria (ex: Marketing, Estoque) e um nível de impacto. Você pode aceitar para implementar ou rejeitar."
-                                            position="bottom"
-                                            icon-class="text-white/60 hover:text-white"
-                                        />
-                                    </div>
-                                    <p class="text-blue-100 text-sm">Ações recomendadas pela IA para impulsionar seus resultados</p>
+                                    <h2 class="text-lg font-bold text-white">Sugestões Estratégicas</h2>
+                                    <SectionGuideLink
+                                        tooltip-text="Essas são ações práticas que a IA recomenda. Cada sugestão tem uma categoria (ex: Marketing, Estoque) e um nível de impacto. Você pode aceitar para implementar ou rejeitar."
+                                        tooltip-position="bottom"
+                                        icon-class="text-white/60 hover:text-white"
+                                        :light-variant="true"
+                                        @open-guide="openAnalysisGuide('strategic-suggestions')"
+                                    />
                                 </div>
                                 <div class="ml-auto">
                                     <span class="bg-white/20 text-white text-sm font-semibold px-3 py-1 rounded-full">
@@ -766,14 +775,12 @@ onUnmounted(() => {
                                         <BoltIcon class="w-4 h-4 text-danger-600 dark:text-danger-400" />
                                     </div>
                                     <div>
-                                        <div class="flex items-center gap-2">
-                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
-                                            <InfoTooltip
-                                                text="Ações urgentes que podem trazer resultados rápidos. Comece por essas para ter o maior impacto no menor tempo."
-                                                position="right"
-                                            />
-                                        </div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">Ações com maior impacto imediato</p>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Alta Prioridade</h3>
+                                        <SectionGuideLink
+                                            tooltip-text="Ações urgentes que podem trazer resultados rápidos. Comece por essas para ter o maior impacto no menor tempo."
+                                            tooltip-position="right"
+                                            @open-guide="openAnalysisGuide('priority-levels')"
+                                        />
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -795,14 +802,12 @@ onUnmounted(() => {
                                         <ChartBarIcon class="w-4 h-4 text-accent-600 dark:text-accent-400" />
                                     </div>
                                     <div>
-                                        <div class="flex items-center gap-2">
-                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
-                                            <InfoTooltip
-                                                text="Melhorias estratégicas para o médio prazo. São importantes, mas não tão urgentes quanto as de alta prioridade."
-                                                position="right"
-                                            />
-                                        </div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">Melhorias estratégicas recomendadas</p>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Média Prioridade</h3>
+                                        <SectionGuideLink
+                                            tooltip-text="Melhorias estratégicas para o médio prazo. São importantes, mas não tão urgentes quanto as de alta prioridade."
+                                            tooltip-position="right"
+                                            @open-guide="openAnalysisGuide('priority-levels')"
+                                        />
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -824,14 +829,12 @@ onUnmounted(() => {
                                         <RocketLaunchIcon class="w-4 h-4 text-success-600 dark:text-success-400" />
                                     </div>
                                     <div>
-                                        <div class="flex items-center gap-2">
-                                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
-                                            <InfoTooltip
-                                                text="Otimizações extras que complementam as demais. Implemente quando as prioridades maiores já estiverem em andamento."
-                                                position="right"
-                                            />
-                                        </div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">Otimizações complementares</p>
+                                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Baixa Prioridade</h3>
+                                        <SectionGuideLink
+                                            tooltip-text="Otimizações extras que complementam as demais. Implemente quando as prioridades maiores já estiverem em andamento."
+                                            tooltip-position="right"
+                                            @open-guide="openAnalysisGuide('priority-levels')"
+                                        />
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1013,6 +1016,13 @@ onUnmounted(() => {
             :show="showChatPanel"
             :initial-context="chatPanelContext"
             @close="showChatPanel = false"
+        />
+
+        <!-- Analysis Guide Modal -->
+        <AnalysisGuideModal
+            :show="showAnalysisGuide"
+            :section="guideModalSection"
+            @close="showAnalysisGuide = false"
         />
 
         </template>

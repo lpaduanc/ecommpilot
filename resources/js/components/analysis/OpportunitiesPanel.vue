@@ -5,13 +5,13 @@ import {
     SparklesIcon,
     ChevronRightIcon,
 } from '@heroicons/vue/24/outline';
-import InfoTooltip from '../common/InfoTooltip.vue';
+import SectionGuideLink from './SectionGuideLink.vue';
 
 const props = defineProps({
     opportunities: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['view-detail']);
+const emit = defineEmits(['view-detail', 'open-analysis-guide']);
 
 // Mapeamento para traduzir tipos de oportunidade que possam vir com underscore
 const opportunityTypeLabels = {
@@ -56,15 +56,14 @@ function formatOpportunityTitle(title) {
                     <ArrowTrendingUpIcon class="w-5 h-5 text-white" />
                 </div>
                 <div>
-                    <div class="flex items-center gap-2">
-                        <h3 class="text-lg font-display font-bold text-white">Oportunidades</h3>
-                        <InfoTooltip
-                            text="Oportunidades são áreas onde a IA identificou potencial de receita extra. Clique em cada uma para ver os detalhes."
-                            position="bottom"
-                            icon-class="text-white/60 hover:text-white"
-                        />
-                    </div>
-                    <p class="text-emerald-100 text-sm">Potencial de receita identificado</p>
+                    <h3 class="text-lg font-display font-bold text-white">Oportunidades</h3>
+                    <SectionGuideLink
+                        tooltip-text="Oportunidades são áreas onde a IA identificou potencial de receita extra. Clique em cada uma para ver os detalhes."
+                        tooltip-position="bottom"
+                        icon-class="text-white/60 hover:text-white"
+                        :light-variant="true"
+                        @open-guide="emit('open-analysis-guide', 'opportunities')"
+                    />
                 </div>
             </div>
         </div>

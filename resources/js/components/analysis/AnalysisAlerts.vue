@@ -6,11 +6,13 @@ import {
     XMarkIcon,
 } from '@heroicons/vue/24/outline';
 import { ref } from 'vue';
-import InfoTooltip from '../common/InfoTooltip.vue';
+import SectionGuideLink from './SectionGuideLink.vue';
 
 const props = defineProps({
     alerts: { type: Array, default: () => [] },
 });
+
+const emit = defineEmits(['open-analysis-guide']);
 
 const dismissedAlerts = ref([]);
 
@@ -104,11 +106,12 @@ function isVisible(index) {
 <template>
     <div class="space-y-3">
         <!-- Header row -->
-        <div class="flex items-center gap-2">
+        <div>
             <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Alertas</span>
-            <InfoTooltip
-                text="Esses alertas mostram problemas importantes que a IA encontrou nos seus dados. Eles precisam de atenção para evitar impacto nas suas vendas."
-                position="bottom"
+            <SectionGuideLink
+                tooltip-text="Esses alertas mostram problemas importantes que a IA encontrou nos seus dados. Eles precisam de atenção para evitar impacto nas suas vendas."
+                tooltip-position="bottom"
+                @open-guide="emit('open-analysis-guide', 'alerts')"
             />
         </div>
         <transition-group name="alert">

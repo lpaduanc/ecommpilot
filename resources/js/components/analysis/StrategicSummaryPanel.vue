@@ -16,7 +16,9 @@ import {
     ArrowRightIcon,
     LightBulbIcon,
 } from '@heroicons/vue/24/outline';
-import InfoTooltip from '../common/InfoTooltip.vue';
+import SectionGuideLink from './SectionGuideLink.vue';
+
+const emit = defineEmits(['open-analysis-guide']);
 
 const props = defineProps({
     premiumSummary: {
@@ -93,15 +95,14 @@ onMounted(() => {
                         <RocketLaunchIcon class="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-lg font-display font-bold text-white">Resumo Estratégico</h3>
-                            <InfoTooltip
-                                text="Esse é o resumo completo feito pela IA sobre sua loja. Aqui você vê o diagnóstico geral, os pontos fortes e o que precisa melhorar."
-                                position="bottom"
-                                icon-class="text-white/60 hover:text-white"
-                            />
-                        </div>
-                        <p class="text-purple-100 text-sm">Growth Intelligence</p>
+                        <h3 class="text-lg font-display font-bold text-white">Resumo Estratégico</h3>
+                        <SectionGuideLink
+                            tooltip-text="Esse é o resumo completo feito pela IA sobre sua loja. Aqui você vê o diagnóstico geral, os pontos fortes e o que precisa melhorar."
+                            tooltip-position="bottom"
+                            icon-class="text-white/60 hover:text-white"
+                            :light-variant="true"
+                            @open-guide="emit('open-analysis-guide', 'strategic-summary')"
+                        />
                     </div>
                 </div>
 
@@ -154,10 +155,11 @@ onMounted(() => {
             </div>
 
             <!-- 3 Insight Cards -->
-            <div class="flex items-center gap-2 mt-6 mb-0">
-                <InfoTooltip
-                    text="Esses três cards destacam os pontos mais críticos da sua loja: o maior problema que trava seu crescimento, a melhor oportunidade para aproveitar e o risco que você deve ficar de olho."
-                    position="right"
+            <div class="mt-6 mb-0">
+                <SectionGuideLink
+                    tooltip-text="Esses três cards destacam os pontos mais críticos da sua loja: o maior problema que trava seu crescimento, a melhor oportunidade para aproveitar e o risco que você deve ficar de olho."
+                    tooltip-position="right"
+                    @open-guide="emit('open-analysis-guide', 'insight-cards')"
                 />
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
@@ -203,11 +205,12 @@ onMounted(() => {
 
             <!-- Growth Score Bars -->
             <div v-if="growthScore.overall_score" class="mt-6 space-y-3">
-                <div class="flex items-center gap-2 mb-1">
+                <div class="mb-1">
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Scores de Crescimento</span>
-                    <InfoTooltip
-                        text="Essas barras mostram como sua loja está em 4 áreas: Eficiência (uso de recursos), Margem (saúde financeira), Retenção (clientes que voltam) e Crescimento (potencial de expansão). Quanto maior, melhor."
-                        position="right"
+                    <SectionGuideLink
+                        tooltip-text="Essas barras mostram como sua loja está em 4 áreas: Eficiência (uso de recursos), Margem (saúde financeira), Retenção (clientes que voltam) e Crescimento (potencial de expansão). Quanto maior, melhor."
+                        tooltip-position="right"
+                        @open-guide="emit('open-analysis-guide', 'growth-scores')"
                     />
                 </div>
                 <!-- Eficiência -->
@@ -300,12 +303,15 @@ onMounted(() => {
 
         <!-- Section 2: Plano de Ação 90 Dias -->
         <div v-if="prioritizedRoadmap['30_dias'] || prioritizedRoadmap['60_dias'] || prioritizedRoadmap['90_dias']" class="px-6 py-6 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-2 mb-4">
-                <CalendarDaysIcon class="w-5 h-5 text-gray-500" />
-                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Plano de Ação 90 Dias</h4>
-                <InfoTooltip
-                    text="Esse plano divide as ações em 3 fases: os primeiros 30 dias são para ganhos rápidos, 60 dias para estruturar melhorias e 90 dias para escalar os resultados."
-                    position="right"
+            <div class="mb-4">
+                <div class="flex items-center gap-2">
+                    <CalendarDaysIcon class="w-5 h-5 text-gray-500" />
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Plano de Ação 90 Dias</h4>
+                </div>
+                <SectionGuideLink
+                    tooltip-text="Esse plano divide as ações em 3 fases: os primeiros 30 dias são para ganhos rápidos, 60 dias para estruturar melhorias e 90 dias para escalar os resultados."
+                    tooltip-position="right"
+                    @open-guide="emit('open-analysis-guide', 'action-plan-90')"
                 />
             </div>
 
@@ -377,12 +383,15 @@ onMounted(() => {
 
         <!-- Section 3: Impacto Financeiro -->
         <div v-if="impactEffortMatrix.quick_wins || financialOpportunities.length" class="px-6 py-6 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-2 mb-4">
-                <BanknotesIcon class="w-5 h-5 text-gray-500" />
-                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Impacto Financeiro</h4>
-                <InfoTooltip
-                    text="Aqui você vê quanto dinheiro cada ação pode trazer para sua loja. A matriz mostra o que dá mais resultado com menos esforço e a tabela estima os valores mensais e anuais."
-                    position="right"
+            <div class="mb-4">
+                <div class="flex items-center gap-2">
+                    <BanknotesIcon class="w-5 h-5 text-gray-500" />
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Impacto Financeiro</h4>
+                </div>
+                <SectionGuideLink
+                    tooltip-text="Aqui você vê quanto dinheiro cada ação pode trazer para sua loja. A matriz mostra o que dá mais resultado com menos esforço e a tabela estima os valores mensais e anuais."
+                    tooltip-position="right"
+                    @open-guide="emit('open-analysis-guide', 'financial-impact')"
                 />
             </div>
 
@@ -505,12 +514,15 @@ onMounted(() => {
 
         <!-- Section 4: Cenários de Crescimento -->
         <div v-if="growthScenarios.conservador || growthScenarios.base || growthScenarios.agressivo" class="px-6 py-6 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-2 mb-4">
-                <PresentationChartBarIcon class="w-5 h-5 text-gray-500" />
-                <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Cenários de Crescimento</h4>
-                <InfoTooltip
-                    text="Três projeções de como sua loja pode crescer: Conservador (melhorias mínimas), Base (o que a IA recomenda) e Agressivo (implementando tudo). Os valores são estimativas baseadas nos seus dados."
-                    position="right"
+            <div class="mb-4">
+                <div class="flex items-center gap-2">
+                    <PresentationChartBarIcon class="w-5 h-5 text-gray-500" />
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Cenários de Crescimento</h4>
+                </div>
+                <SectionGuideLink
+                    tooltip-text="Três projeções de como sua loja pode crescer: Conservador (melhorias mínimas), Base (o que a IA recomenda) e Agressivo (implementando tudo). Os valores são estimativas baseadas nos seus dados."
+                    tooltip-position="right"
+                    @open-guide="emit('open-analysis-guide', 'growth-scenarios')"
                 />
             </div>
 

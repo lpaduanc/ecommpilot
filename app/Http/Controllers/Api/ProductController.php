@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\SyncedProduct;
 use App\Services\ProductAnalyticsService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,7 +30,7 @@ class ProductController extends Controller
             ]);
         }
 
-        $periodDays = $this->resolvePeriodDays($request);
+        [$startDate, $endDate] = $this->resolvePeriodDates($request);
 
         // Build base query with filters that can be applied at database level
         $query = SyncedProduct::where('store_id', $store->id)
@@ -47,7 +48,7 @@ class ProductController extends Controller
         // For ABC category filter, use cached categories and filter at DB level
         $abcCategory = $request->input('abc_category');
         if ($abcCategory) {
-            $abcCategories = $this->analyticsService->getABCCategories($store, $periodDays);
+            $abcCategories = $this->analyticsService->getABCCategories($store, $startDate, $endDate);
             $productIdsInCategory = array_keys(array_filter($abcCategories, fn ($cat) => strtoupper($cat) === strtoupper($abcCategory)));
 
             if (empty($productIdsInCategory)) {
@@ -57,7 +58,7 @@ class ProductController extends Controller
                     'last_page' => 1,
                     'current_page' => 1,
                     'totals' => $this->analyticsService->getEmptyTotals(),
-                    'abc_analysis' => $this->analyticsService->calculateABCAnalysisSummary($store, $periodDays),
+                    'abc_analysis' => $this->analyticsService->calculateABCAnalysisSummary($store, $startDate, $endDate),
                 ]);
             }
 
@@ -68,7 +69,7 @@ class ProductController extends Controller
         // This is cached and much faster than the previous approach
         $stockHealth = $request->input('stock_health');
         if ($stockHealth) {
-            $stockHealthData = $this->analyticsService->getStockHealthMapping($store, $periodDays);
+            $stockHealthData = $this->analyticsService->getStockHealthMapping($store, $startDate, $endDate);
             $productIdsWithHealth = array_keys(array_filter($stockHealthData, fn ($health) => $health === $stockHealth));
 
             if (empty($productIdsWithHealth)) {
@@ -78,7 +79,7 @@ class ProductController extends Controller
                     'last_page' => 1,
                     'current_page' => 1,
                     'totals' => $this->analyticsService->getEmptyTotals(),
-                    'abc_analysis' => $this->analyticsService->calculateABCAnalysisSummary($store, $periodDays),
+                    'abc_analysis' => $this->analyticsService->calculateABCAnalysisSummary($store, $startDate, $endDate),
                 ]);
             }
 
@@ -90,7 +91,7 @@ class ProductController extends Controller
         $paginator = $query->orderBy('name')->paginate($perPage);
 
         // Calculate analytics ONLY for products on current page
-        $analyticsData = $this->analyticsService->calculateProductAnalytics($store, $paginator->getCollection(), $periodDays);
+        $analyticsData = $this->analyticsService->calculateProductAnalytics($store, $paginator->getCollection(), $startDate, $endDate);
 
         // Fix total_products to reflect all matching products, not just current page
         $analyticsData['totals']['total_products'] = $paginator->total();
@@ -193,36 +194,42 @@ class ProductController extends Controller
     }
 
     /**
-     * Convert named period to days, falling back to period_days param or default.
+     * Resolve named period or custom dates into a [Carbon $startDate, Carbon $endDate] pair.
+     *
+     * @return array{0: Carbon, 1: Carbon}
      */
-    private function resolvePeriodDays(Request $request): int
+    private function resolvePeriodDates(Request $request): array
     {
         $period = $request->input('period');
 
         if ($period === 'custom') {
-            $startDate = $request->input('start_date');
-            $endDate = $request->input('end_date');
-            if ($startDate && $endDate) {
-                return max(1, (int) \Carbon\Carbon::parse($startDate)->diffInDays(\Carbon\Carbon::parse($endDate)) + 1);
+            $start = $request->input('start_date');
+            $end = $request->input('end_date');
+            if ($start && $end) {
+                return [
+                    Carbon::parse($start)->startOfDay(),
+                    Carbon::parse($end)->endOfDay(),
+                ];
             }
 
-            return 30;
+            return [now()->subDays(30)->startOfDay(), now()->endOfDay()];
         }
 
         if ($period) {
             return match ($period) {
-                'yesterday' => 1,
-                'today' => 1,
-                'last_7_days' => 7,
-                'last_15_days' => 15,
-                'last_30_days' => 30,
-                'this_month' => (int) now()->day,
-                'last_month' => (int) now()->subMonth()->daysInMonth,
-                'all_time' => 3650,
-                default => (int) $request->input('period_days', 30),
+                'yesterday' => [now()->subDay()->startOfDay(), now()->subDay()->endOfDay()],
+                'today' => [now()->startOfDay(), now()->endOfDay()],
+                'last_7_days' => [now()->subDays(7)->startOfDay(), now()->endOfDay()],
+                'last_15_days' => [now()->subDays(15)->startOfDay(), now()->endOfDay()],
+                'last_30_days' => [now()->subDays(30)->startOfDay(), now()->endOfDay()],
+                'this_month' => [now()->startOfMonth()->startOfDay(), now()->endOfDay()],
+                'last_month' => [now()->subMonth()->startOfMonth()->startOfDay(), now()->subMonth()->endOfMonth()->endOfDay()],
+                'all_time' => [now()->subYears(10)->startOfDay(), now()->endOfDay()],
+                default => [now()->subDays(30)->startOfDay(), now()->endOfDay()],
             };
         }
 
-        return (int) $request->input('period_days', 1); // default: yesterday (1 day)
+        // Default: yesterday
+        return [now()->subDay()->startOfDay(), now()->subDay()->endOfDay()];
     }
 }

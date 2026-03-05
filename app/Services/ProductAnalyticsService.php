@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Store;
 use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ class ProductAnalyticsService
     /**
      * Calculate analytics for products in a store
      */
-    public function calculateProductAnalytics(Store $store, Collection $products, int $periodDays = 30): array
+    public function calculateProductAnalytics(Store $store, Collection $products, Carbon $startDate, Carbon $endDate): array
     {
         if ($products->isEmpty()) {
             return [
@@ -25,14 +26,16 @@ class ProductAnalyticsService
             ];
         }
 
+        $periodDays = max(1, (int) $startDate->diffInDays($endDate) + 1);
+
         // Get aggregated sales metrics using database queries (much faster than PHP loops)
-        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $periodDays);
+        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $startDate, $endDate);
 
         // Get ABC categories from cache (or calculate if needed)
-        $abcCategories = $this->getABCCategories($store, $periodDays);
+        $abcCategories = $this->getABCCategories($store, $startDate, $endDate);
 
         // Get total orders count for conversion rate calculation
-        $totalOrders = $this->getTotalOrdersCount($store, $periodDays);
+        $totalOrders = $this->getTotalOrdersCount($store, $startDate, $endDate);
 
         // Build product data array
         $productData = [];
@@ -62,7 +65,7 @@ class ProductAnalyticsService
 
         // Calculate totals and ABC analysis
         $totals = $this->calculateTotals($productData);
-        $abcAnalysis = $this->calculateABCAnalysisFromCache($store, $periodDays);
+        $abcAnalysis = $this->calculateABCAnalysisFromCache($store, $startDate, $endDate);
 
         return [
             'products' => $productData,
@@ -76,10 +79,10 @@ class ProductAnalyticsService
      * This replaces the O(n*m) PHP loops with efficient database queries.
      * Now with caching for improved performance.
      */
-    private function calculateSalesMetricsFromDatabase(Store $store, Collection $products, int $periodDays): array
+    private function calculateSalesMetricsFromDatabase(Store $store, Collection $products, Carbon $startDate, Carbon $endDate): array
     {
         // Use cached store-wide sales data and filter to requested products
-        $allSalesMetrics = $this->getStoreSalesMetricsFromCache($store, $periodDays);
+        $allSalesMetrics = $this->getStoreSalesMetricsFromCache($store, $startDate, $endDate);
 
         // Filter to only requested products
         $productIds = $products->pluck('id')->toArray();
@@ -93,11 +96,12 @@ class ProductAnalyticsService
     /**
      * Get store-wide sales metrics from cache
      */
-    private function getStoreSalesMetricsFromCache(Store $store, int $periodDays): array
+    private function getStoreSalesMetricsFromCache(Store $store, Carbon $startDate, Carbon $endDate): array
     {
-        $cacheKey = "sales_metrics:{$store->id}:{$periodDays}";
+        $v = $this->getCacheVersion($store);
+        $cacheKey = "sales_metrics:{$store->id}:v{$v}:{$startDate->toDateString()}:{$endDate->toDateString()}";
 
-        return Cache::remember($cacheKey, now()->addHours(1), function () use ($store, $periodDays) {
+        return Cache::remember($cacheKey, now()->addHours(1), function () use ($store, $startDate, $endDate) {
             // Get all products for this store (excluding gifts/brindes)
             $products = SyncedProduct::where('store_id', $store->id)
                 ->excludeGifts()
@@ -119,9 +123,9 @@ class ProductAnalyticsService
             $driver = DB::connection()->getDriverName();
 
             if ($driver === 'pgsql') {
-                return $this->calculateSalesMetricsPostgresOptimized($store, $periodDays, $externalIdToId, $nameToId);
+                return $this->calculateSalesMetricsPostgresOptimized($store, $startDate, $endDate, $externalIdToId, $nameToId);
             } else {
-                return $this->calculateSalesMetricsFallback($store, $products, $periodDays);
+                return $this->calculateSalesMetricsFallback($store, $products, $startDate, $endDate);
             }
         });
     }
@@ -130,7 +134,7 @@ class ProductAnalyticsService
      * PostgreSQL optimized query using JSON operators
      * Optimized version that gets all products at once
      */
-    private function calculateSalesMetricsPostgresOptimized(Store $store, int $periodDays, array $externalIdToId, array $nameToId): array
+    private function calculateSalesMetricsPostgresOptimized(Store $store, Carbon $startDate, Carbon $endDate, array $externalIdToId, array $nameToId): array
     {
         // Query to aggregate sales by product from JSON items array
         $salesData = DB::select("
@@ -142,6 +146,7 @@ class ProductAnalyticsService
                 WHERE store_id = ?
                     AND payment_status = ?
                     AND external_created_at >= ?
+                    AND external_created_at <= ?
                     AND deleted_at IS NULL
             )
             SELECT
@@ -157,7 +162,7 @@ class ProductAnalyticsService
                 ) as total_revenue
             FROM order_items
             GROUP BY item->>'product_id', item->>'name'
-        ", [$store->id, PaymentStatus::Paid->value, now()->subDays($periodDays)]);
+        ", [$store->id, PaymentStatus::Paid->value, $startDate, $endDate]);
 
         // Map results to product IDs
         $metrics = [];
@@ -188,11 +193,12 @@ class ProductAnalyticsService
     /**
      * Fallback for SQLite and other databases
      */
-    private function calculateSalesMetricsFallback(Store $store, Collection $products, int $periodDays): array
+    private function calculateSalesMetricsFallback(Store $store, Collection $products, Carbon $startDate, Carbon $endDate): array
     {
         $orders = SyncedOrder::where('store_id', $store->id)
             ->paid()
-            ->where('external_created_at', '>=', now()->subDays($periodDays))
+            ->where('external_created_at', '>=', $startDate)
+            ->where('external_created_at', '<=', $endDate)
             ->get(['id', 'items']);
 
         $metrics = [];
@@ -316,30 +322,32 @@ class ProductAnalyticsService
     /**
      * Get total orders count for conversion rate calculation
      */
-    private function getTotalOrdersCount(Store $store, int $periodDays): int
+    private function getTotalOrdersCount(Store $store, Carbon $startDate, Carbon $endDate): int
     {
         return SyncedOrder::where('store_id', $store->id)
             ->paid()
-            ->where('external_created_at', '>=', now()->subDays($periodDays))
+            ->where('external_created_at', '>=', $startDate)
+            ->where('external_created_at', '<=', $endDate)
             ->count();
     }
 
     /**
      * Get or calculate ABC categories with caching (public for controller access)
      */
-    public function getABCCategories(Store $store, int $periodDays): array
+    public function getABCCategories(Store $store, Carbon $startDate, Carbon $endDate): array
     {
-        $cacheKey = "abc_categories:{$store->id}:{$periodDays}";
+        $v = $this->getCacheVersion($store);
+        $cacheKey = "abc_categories:{$store->id}:v{$v}:{$startDate->toDateString()}:{$endDate->toDateString()}";
 
-        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $periodDays) {
-            return $this->calculateABCCategoriesForAllProducts($store, $periodDays);
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $startDate, $endDate) {
+            return $this->calculateABCCategoriesForAllProducts($store, $startDate, $endDate);
         });
     }
 
     /**
      * Calculate ABC categories for all products in the store
      */
-    private function calculateABCCategoriesForAllProducts(Store $store, int $periodDays): array
+    private function calculateABCCategoriesForAllProducts(Store $store, Carbon $startDate, Carbon $endDate): array
     {
         // Get all products with sales data (excluding gifts/brindes)
         $products = SyncedProduct::where('store_id', $store->id)
@@ -350,7 +358,7 @@ class ProductAnalyticsService
             return [];
         }
 
-        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $periodDays);
+        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $startDate, $endDate);
 
         // Create array of [product_id => revenue]
         $productRevenues = [];
@@ -392,19 +400,20 @@ class ProductAnalyticsService
      * Get or calculate stock health mapping with caching
      * Returns [product_id => 'Alto'|'Adequado'|'Baixo'|'Crítico']
      */
-    public function getStockHealthMapping(Store $store, int $periodDays): array
+    public function getStockHealthMapping(Store $store, Carbon $startDate, Carbon $endDate): array
     {
-        $cacheKey = "stock_health:{$store->id}:{$periodDays}";
+        $v = $this->getCacheVersion($store);
+        $cacheKey = "stock_health:{$store->id}:v{$v}:{$startDate->toDateString()}:{$endDate->toDateString()}";
 
-        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $periodDays) {
-            return $this->calculateStockHealthForAllProducts($store, $periodDays);
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $startDate, $endDate) {
+            return $this->calculateStockHealthForAllProducts($store, $startDate, $endDate);
         });
     }
 
     /**
      * Calculate stock health for all products
      */
-    private function calculateStockHealthForAllProducts(Store $store, int $periodDays): array
+    private function calculateStockHealthForAllProducts(Store $store, Carbon $startDate, Carbon $endDate): array
     {
         $products = SyncedProduct::where('store_id', $store->id)
             ->excludeGifts()
@@ -414,8 +423,9 @@ class ProductAnalyticsService
             return [];
         }
 
-        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $periodDays);
+        $salesMetrics = $this->calculateSalesMetricsFromDatabase($store, $products, $startDate, $endDate);
 
+        $periodDays = max(1, (int) $startDate->diffInDays($endDate) + 1);
         $stockHealthMap = [];
 
         foreach ($products as $product) {
@@ -438,16 +448,19 @@ class ProductAnalyticsService
 
     /**
      * Invalidate all product analytics cache (call after order sync)
+     * Uses a version counter so date-based cache keys expire naturally.
      */
     public function invalidateABCCache(Store $store): void
     {
-        $periods = [7, 30, 90];
-        foreach ($periods as $period) {
-            Cache::forget("abc_categories:{$store->id}:{$period}");
-            Cache::forget("abc_analysis:{$store->id}:{$period}");
-            Cache::forget("stock_health:{$store->id}:{$period}");
-            Cache::forget("sales_metrics:{$store->id}:{$period}");
-        }
+        Cache::put("analytics_version:{$store->id}", now()->timestamp, now()->addDays(30));
+    }
+
+    /**
+     * Get cache version for a store (used in cache keys to enable invalidation)
+     */
+    private function getCacheVersion(Store $store): int
+    {
+        return Cache::get("analytics_version:{$store->id}", 0);
     }
 
     /**
@@ -528,20 +541,21 @@ class ProductAnalyticsService
     /**
      * Calculate ABC analysis summary from cache (public alias for controller access)
      */
-    public function calculateABCAnalysisSummary(Store $store, int $periodDays): array
+    public function calculateABCAnalysisSummary(Store $store, Carbon $startDate, Carbon $endDate): array
     {
-        return $this->calculateABCAnalysisFromCache($store, $periodDays);
+        return $this->calculateABCAnalysisFromCache($store, $startDate, $endDate);
     }
 
     /**
      * Calculate ABC analysis summary from cache
      */
-    private function calculateABCAnalysisFromCache(Store $store, int $periodDays): array
+    private function calculateABCAnalysisFromCache(Store $store, Carbon $startDate, Carbon $endDate): array
     {
-        $cacheKey = "abc_analysis:{$store->id}:{$periodDays}";
+        $v = $this->getCacheVersion($store);
+        $cacheKey = "abc_analysis:{$store->id}:v{$v}:{$startDate->toDateString()}:{$endDate->toDateString()}";
 
-        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $periodDays) {
-            $categories = $this->getABCCategories($store, $periodDays);
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($store, $startDate, $endDate) {
+            $categories = $this->getABCCategories($store, $startDate, $endDate);
 
             $total = count($categories);
             $categoryA = count(array_filter($categories, fn ($cat) => $cat === 'A'));

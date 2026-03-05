@@ -1351,7 +1351,9 @@ class ChatContextBuilder
             return ['available' => false];
         }
 
-        $analytics = $this->productAnalyticsService->calculateProductAnalytics($store, $products, $days);
+        $startDate = now()->subDays($days)->startOfDay();
+        $endDate = now()->endOfDay();
+        $analytics = $this->productAnalyticsService->calculateProductAnalytics($store, $products, $startDate, $endDate);
         $abcAnalysis = $analytics['abc_analysis'] ?? [];
         $productData = $analytics['products'] ?? [];
 

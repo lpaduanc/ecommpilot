@@ -10,6 +10,7 @@ use App\Models\SyncedOrder;
 use App\Models\SyncedProduct;
 use App\Models\User;
 use App\Services\ProductAnalyticsService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -80,7 +81,7 @@ class ProductAnalyticsTest extends TestCase
         ]);
 
         // Calculate analytics
-        $result = $this->service->calculateProductAnalytics($this->store, collect([$product]));
+        $result = $this->service->calculateProductAnalytics($this->store, collect([$product]), now()->subDays(30)->startOfDay(), now()->endOfDay());
 
         $analytics = $result['products'][$product->id];
 
@@ -112,7 +113,7 @@ class ProductAnalyticsTest extends TestCase
         }
 
         // Calculate analytics
-        $result = $this->service->calculateProductAnalytics($this->store, collect([$product]));
+        $result = $this->service->calculateProductAnalytics($this->store, collect([$product]), now()->subDays(30)->startOfDay(), now()->endOfDay());
 
         $analytics = $result['products'][$product->id];
 
@@ -144,7 +145,7 @@ class ProductAnalyticsTest extends TestCase
         ]);
 
         // Calculate analytics
-        $result = $this->service->calculateProductAnalytics($this->store, collect([$product]));
+        $result = $this->service->calculateProductAnalytics($this->store, collect([$product]), now()->subDays(30)->startOfDay(), now()->endOfDay());
 
         $analytics = $result['products'][$product->id];
 
@@ -211,7 +212,7 @@ class ProductAnalyticsTest extends TestCase
         }
 
         // Calculate analytics
-        $result = $this->service->calculateProductAnalytics($this->store, $products, 30);
+        $result = $this->service->calculateProductAnalytics($this->store, $products, now()->subDays(30)->startOfDay(), now()->endOfDay());
 
         // Product 1: 100 stock / 2 per day = 50 days -> Alto
         $this->assertEquals('Alto', $result['products'][$products[0]->id]['stock_health']);
@@ -286,7 +287,7 @@ class ProductAnalyticsTest extends TestCase
         ]);
 
         // Calculate analytics
-        $result = $this->service->calculateProductAnalytics($this->store, $products);
+        $result = $this->service->calculateProductAnalytics($this->store, $products, now()->subDays(30)->startOfDay(), now()->endOfDay());
 
         // Products 1 and 2 should be category A (80% of sales)
         $this->assertEquals('A', $result['products'][$products[0]->id]['abc_category']);

@@ -94,13 +94,13 @@ const menuItems = computed(() => [
         route: 'suggestions',
         permission: 'analysis.view',
     },
-    {
-        name: 'Impacto nas Vendas',
-        label: 'Impacto nas Vendas',
-        icon: ArrowTrendingUpIcon,
-        route: 'impact-dashboard',
-        highlight: true,
-    },
+    // {
+    //     name: 'Impacto nas Vendas',
+    //     label: 'Impacto nas Vendas',
+    //     icon: ArrowTrendingUpIcon,
+    //     route: 'impact-dashboard',
+    //     highlight: true,
+    // },
     {
         name: 'Produtos',
         label: 'Produtos',
