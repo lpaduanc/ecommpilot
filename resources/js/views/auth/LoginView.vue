@@ -207,7 +207,7 @@ function clearErrors() {
                         </div>
                         <div>
                             <h4 class="font-medium">IA Avançada</h4>
-                            <p class="text-sm text-white/60">Modelos mais avançados para análises</p>
+                            <p class="text-sm text-white/60">Análises cognitivas avançadas</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-3">

@@ -24,6 +24,7 @@ import ChatContainer from '../components/chat/ChatContainer.vue';
 import InfoTooltip from '../components/common/InfoTooltip.vue';
 import SectionGuideLink from '../components/analysis/SectionGuideLink.vue';
 import AnalysisGuideModal from '../components/analysis/AnalysisGuideModal.vue';
+import SuggestionFeedbackModal from '../components/analysis/SuggestionFeedbackModal.vue';
 import {
     SparklesIcon,
     ClockIcon,
@@ -80,6 +81,9 @@ const dismissedEmailAlerts = ref(new Set());
 const showChatPanel = ref(false);
 const chatPanelContext = ref(null);
 const showAIDisclaimer = ref(false);
+const showFeedbackGate = ref(false);
+const feedbackGateInfo = ref(null);
+const pendingFeedbackData = ref(null);
 const showAnalysisGuide = ref(false);
 const guideModalSection = ref('');
 
@@ -144,7 +148,7 @@ const recentAnalyses = computed(() => {
         .slice(0, 4);  // Mostra todas até 4 análises
 });
 
-function handleRequestAnalysis() {
+async function handleRequestAnalysis() {
     if (isStoreSyncing.value) {
         notificationStore.warning('Aguarde a sincronização da loja ser concluída antes de solicitar uma nova análise.');
         return;
@@ -158,6 +162,20 @@ function handleRequestAnalysis() {
         return;
     }
 
+    // Feedback gate check
+    const gateData = await analysisStore.checkFeedbackGate();
+    if (gateData.requires_feedback) {
+        feedbackGateInfo.value = gateData;
+        showFeedbackGate.value = true;
+        return;
+    }
+
+    showAIDisclaimer.value = true;
+}
+
+function handleFeedbackGateProceed(feedbackData) {
+    showFeedbackGate.value = false;
+    pendingFeedbackData.value = feedbackData;
     showAIDisclaimer.value = true;
 }
 
@@ -165,7 +183,8 @@ async function confirmAnalysisRequest() {
     showAIDisclaimer.value = false;
 
     const analysisType = featureModulesEnabled ? selectedAnalysisType.value : 'general';
-    const result = await analysisStore.requestNewAnalysis(analysisType);
+    const result = await analysisStore.requestNewAnalysis(analysisType, pendingFeedbackData.value);
+    pendingFeedbackData.value = null;
 
     if (result.success) {
         notificationStore.success('Análise iniciada! Você será notificado quando ela for concluída.');
@@ -988,6 +1007,16 @@ onUnmounted(() => {
                 </div>
             </div>
         </BaseModal>
+
+        <!-- Feedback Gate Modal -->
+        <SuggestionFeedbackModal
+            :show="showFeedbackGate"
+            :reviewed-suggestions="feedbackGateInfo?.reviewed_suggestions ?? 0"
+            :total-suggestions="feedbackGateInfo?.total_suggestions ?? 0"
+            :completed-analyses="feedbackGateInfo?.completed_analyses ?? 0"
+            @close="showFeedbackGate = false"
+            @proceed="handleFeedbackGateProceed"
+        />
 
         <!-- Suggestion Detail Modal -->
         <SuggestionDetailModal

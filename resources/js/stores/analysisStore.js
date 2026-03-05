@@ -181,14 +181,26 @@ export const useAnalysisStore = defineStore('analysis', () => {
         }
     }
 
-    async function requestNewAnalysis(analysisType = 'general') {
+    async function checkFeedbackGate() {
+        try {
+            const response = await api.get('/analysis/pre-check');
+            return response.data;
+        } catch {
+            return { requires_feedback: false };
+        }
+    }
+
+    async function requestNewAnalysis(analysisType = 'general', feedbackData = null) {
         isRequesting.value = true;
         error.value = null;
 
         try {
-            const response = await api.post('/analysis/request', {
-                analysis_type: analysisType,
-            });
+            const payload = { analysis_type: analysisType };
+            if (feedbackData) {
+                payload.feedback_gate_skipped = true;
+                payload.feedback_gate_reason = feedbackData.reason || null;
+            }
+            const response = await api.post('/analysis/request', payload);
             pendingAnalysis.value = response.data.pending_analysis;
 
             // Start polling to check when analysis completes
@@ -656,6 +668,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
         // Analysis actions
         fetchCurrentAnalysis,
         fetchAnalysisHistory,
+        checkFeedbackGate,
         requestNewAnalysis,
         getAnalysisById,
         setCurrentAnalysis,

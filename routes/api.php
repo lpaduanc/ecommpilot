@@ -160,6 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('types', [AnalysisController::class, 'types']);
             Route::get('current', [AnalysisController::class, 'current']);
             Route::get('history', [AnalysisController::class, 'history']);
+            Route::get('pre-check', [AnalysisController::class, 'preCheck']);
             Route::get('{analysis}', [AnalysisController::class, 'show']);
             Route::post('{analysis}/resend-email', [AnalysisController::class, 'resendEmail']);
         });

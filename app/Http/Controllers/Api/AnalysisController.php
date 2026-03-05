@@ -98,6 +98,46 @@ class AnalysisController extends Controller
         ]);
     }
 
+    public function preCheck(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (!$store) {
+            return response()->json(['requires_feedback' => false]);
+        }
+
+        $ownerUserId = $user->getOwnerUser()->id;
+
+        $completedAnalysesCount = Analysis::where('user_id', $ownerUserId)
+            ->where('store_id', $store->id)
+            ->completed()
+            ->count();
+
+        if ($completedAnalysesCount < 2) {
+            return response()->json([
+                'requires_feedback' => false,
+                'completed_analyses' => $completedAnalysesCount,
+                'reviewed_suggestions' => 0,
+                'total_suggestions' => 0,
+            ]);
+        }
+
+        // Conta sugestoes avaliadas (aceitas, rejeitadas, ignoradas, em progresso, completadas)
+        $reviewedCount = Suggestion::where('store_id', $store->id)
+            ->whereIn('status', ['accepted', 'rejected', 'ignored', 'in_progress', 'completed'])
+            ->count();
+
+        $totalSuggestions = Suggestion::where('store_id', $store->id)->count();
+
+        return response()->json([
+            'requires_feedback' => $reviewedCount < 4,
+            'completed_analyses' => $completedAnalysesCount,
+            'reviewed_suggestions' => $reviewedCount,
+            'total_suggestions' => $totalSuggestions,
+        ]);
+    }
+
     public function request(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -170,6 +210,8 @@ class AnalysisController extends Controller
         $availableValues = array_map(fn ($type) => $type->value, AnalysisType::availableTypes());
         $validated = $request->validate([
             'analysis_type' => ['sometimes', 'string', 'in:'.implode(',', $availableValues)],
+            'feedback_gate_skipped' => ['sometimes', 'boolean'],
+            'feedback_gate_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $ownerUserId = $user->getOwnerUser()->id;
@@ -185,6 +227,12 @@ class AnalysisController extends Controller
         ]);
 
         ActivityLog::log('analysis.requested', $analysis);
+
+        if (!empty($validated['feedback_gate_skipped'])) {
+            ActivityLog::log('analysis.feedback_gate_skipped', $analysis, [
+                'reason' => $validated['feedback_gate_reason'] ?? null,
+            ]);
+        }
 
         // Process analysis
         ProcessAnalysisJob::dispatch($analysis);
