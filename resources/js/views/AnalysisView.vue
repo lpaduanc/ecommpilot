@@ -934,27 +934,28 @@ onUnmounted(() => {
         <BaseModal
             :show="showRateLimitWarning"
             @close="showRateLimitWarning = false"
+            size="lg"
         >
-            <div class="text-center py-4">
-                <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-500/30">
-                    <ClockIcon class="w-10 h-10 text-white" />
+            <div class="text-center py-8 px-4">
+                <div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-500 flex items-center justify-center mx-auto mb-8 shadow-lg shadow-primary-500/30">
+                    <ClockIcon class="w-12 h-12 text-white" />
                 </div>
-                <h3 class="text-xl font-display font-bold text-gray-900 mb-2">Análise em Andamento</h3>
-                <p class="text-gray-500 mb-6">
+                <h3 class="text-2xl font-display font-bold text-gray-900 dark:text-white mb-3">Análise em Andamento</h3>
+                <p class="text-base text-gray-500 dark:text-gray-400 mb-8">
                     Você já solicitou uma análise recentemente.
                 </p>
-                <div class="bg-gradient-to-r from-primary-50 to-secondary-50 rounded-2xl p-6 mb-6">
-                    <p class="text-sm text-gray-600 mb-2">Próxima análise disponível em:</p>
-                    <p class="text-4xl font-display font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                <div class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl p-8 mb-8">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Próxima análise disponível em:</p>
+                    <p class="text-5xl font-display font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
                         {{ timeUntilNext || '00:00' }}
                     </p>
                 </div>
-                <p class="text-sm text-gray-400 mb-6">
+                <p class="text-sm text-gray-400 dark:text-gray-500 mb-8">
                     Enquanto isso, você pode revisar as sugestões anteriores ou conversar com o assistente.
                 </p>
                 <button
                     @click="showRateLimitWarning = false"
-                    class="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all"
+                    class="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all"
                 >
                     Entendi
                 </button>
@@ -965,26 +966,26 @@ onUnmounted(() => {
         <BaseModal
             :show="showAIDisclaimer"
             @close="showAIDisclaimer = false"
-            size="md"
+            size="lg"
         >
-            <div class="py-4">
-                <div class="flex justify-center mb-5">
-                    <div class="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-                        <ShieldExclamationIcon class="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            <div class="py-8 px-4">
+                <div class="flex justify-center mb-8">
+                    <div class="w-24 h-24 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                        <ShieldExclamationIcon class="w-12 h-12 text-amber-600 dark:text-amber-400" />
                     </div>
                 </div>
 
-                <h3 class="text-xl font-bold text-gray-900 dark:text-white text-center mb-4">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-6">
                     Antes de iniciar a an&aacute;lise
                 </h3>
 
-                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-5">
-                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6 mb-8">
+                    <p class="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
                         As an&aacute;lises s&atilde;o geradas por <span class="font-semibold">intelig&ecirc;ncia artificial</span> com base nos dados da sua loja.
                         Embora nosso sistema utilize modelos avan&ccedil;ados e m&uacute;ltiplas camadas de valida&ccedil;&atilde;o, os resultados s&atilde;o
                         <span class="font-semibold">recomenda&ccedil;&otilde;es &mdash; n&atilde;o garantias</span>.
                     </p>
-                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mt-3">
+                    <p class="text-base text-gray-700 dark:text-gray-300 leading-relaxed mt-4">
                         A IA pode interpretar dados de forma imprecisa ou sugerir a&ccedil;&otilde;es que n&atilde;o se aplicam ao seu contexto espec&iacute;fico.
                         <span class="font-semibold">Valide sempre as informa&ccedil;&otilde;es</span> e use seu conhecimento do neg&oacute;cio antes de tomar decis&otilde;es.
                     </p>
@@ -993,15 +994,15 @@ onUnmounted(() => {
                 <div class="flex gap-3">
                     <button
                         @click="showAIDisclaimer = false"
-                        class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        class="flex-1 px-4 py-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
                         Cancelar
                     </button>
                     <button
                         @click="confirmAnalysisRequest"
-                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary-500 to-secondary-500 shadow-md hover:shadow-lg transition-all"
+                        class="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary-500 to-secondary-500 shadow-md hover:shadow-lg transition-all"
                     >
-                        <SparklesIcon class="w-4 h-4" />
+                        <SparklesIcon class="w-5 h-5" />
                         Entendi, iniciar an&aacute;lise
                     </button>
                 </div>

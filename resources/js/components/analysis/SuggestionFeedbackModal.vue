@@ -74,25 +74,25 @@ watch(() => props.show, (val) => {
 <template>
     <BaseModal
         :show="show"
-        size="md"
+        size="lg"
         @close="handleClose"
     >
-        <div class="py-2">
+        <div class="py-8 px-4">
             <!-- Icon -->
-            <div class="flex justify-center mb-5">
-                <div class="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-                    <ChatBubbleLeftRightIcon class="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            <div class="flex justify-center mb-8">
+                <div class="w-24 h-24 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                    <ChatBubbleLeftRightIcon class="w-12 h-12 text-amber-600 dark:text-amber-400" />
                 </div>
             </div>
 
             <!-- Title -->
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white text-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-6">
                 Revise suas sugest&otilde;es anteriores
             </h3>
 
             <!-- Context box -->
-            <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-4">
-                <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+            <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6 mb-6">
+                <p class="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
                     Voc&ecirc; tem
                     <span class="font-semibold">{{ completedAnalyses }} {{ completedAnalyses === 1 ? 'an&aacute;lise completa' : 'an&aacute;lises completas' }}</span>
                     com
@@ -104,12 +104,12 @@ watch(() => props.show, (val) => {
             </div>
 
             <!-- Explanation paragraph -->
-            <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-5">
+            <p class="text-base text-gray-600 dark:text-gray-400 leading-relaxed mb-8">
                 Avaliar as sugest&otilde;es anteriores &mdash; indicando se funcionaram ou n&atilde;o &mdash; ajuda a IA a aprender com o contexto da sua loja e gerar recomenda&ccedil;&otilde;es cada vez mais precisas e relevantes nas pr&oacute;ximas an&aacute;lises.
             </p>
 
             <!-- Checkbox -->
-            <label class="flex items-start gap-3 cursor-pointer mb-4 group">
+            <label class="flex items-start gap-3 cursor-pointer mb-6 group">
                 <div class="relative flex-shrink-0 mt-0.5">
                     <input
                         v-model="notHelpful"
@@ -175,11 +175,11 @@ watch(() => props.show, (val) => {
             </Transition>
 
             <!-- Footer buttons -->
-            <div class="flex gap-3 mt-2">
+            <div class="flex gap-3 mt-4">
                 <button
                     type="button"
                     @click="handleClose"
-                    class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    class="flex-1 px-4 py-3 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                     Voltar e revisar
                 </button>
@@ -188,7 +188,7 @@ watch(() => props.show, (val) => {
                     @click="handleProceed"
                     :disabled="!canProceed"
                     :class="[
-                        'flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all',
+                        'flex-1 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all',
                         canProceed
                             ? 'bg-gradient-to-r from-primary-500 to-secondary-500 shadow-md hover:shadow-lg'
                             : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed opacity-60'

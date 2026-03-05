@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 export const useSystemNotificationStore = defineStore('systemNotification', () => {
     const notifications = ref([]);
     const unreadNotifications = ref([]);
+    const totalUnreadCount = ref(0);
     const isLoading = ref(false);
     const error = ref(null);
 
@@ -17,7 +18,7 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
     });
 
     // Computed
-    const unreadCount = computed(() => unreadNotifications.value.length);
+    const unreadCount = computed(() => totalUnreadCount.value);
 
     const hasUnread = computed(() => unreadCount.value > 0);
 
@@ -96,6 +97,7 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
         try {
             const response = await api.get('/notifications/unread');
             unreadNotifications.value = response.data.data || [];
+            totalUnreadCount.value = response.data.unread_count ?? unreadNotifications.value.length;
         } catch (err) {
             logger.error('Erro ao carregar notificações não lidas:', err);
         }
@@ -113,6 +115,7 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
 
             // Remove from unread
             unreadNotifications.value = unreadNotifications.value.filter(n => n.id !== notificationId);
+            totalUnreadCount.value = Math.max(0, totalUnreadCount.value - 1);
         } catch (err) {
             error.value = err.response?.data?.message || 'Erro ao marcar notificação como lida';
             throw err;
@@ -129,6 +132,7 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
             });
 
             unreadNotifications.value = [];
+            totalUnreadCount.value = 0;
         } catch (err) {
             error.value = err.response?.data?.message || 'Erro ao marcar todas como lidas';
             throw err;
@@ -140,8 +144,12 @@ export const useSystemNotificationStore = defineStore('systemNotification', () =
             await api.delete(`/notifications/${notificationId}`);
 
             // Remove from local state
+            const wasUnread = unreadNotifications.value.some(n => n.id === notificationId);
             notifications.value = notifications.value.filter(n => n.id !== notificationId);
             unreadNotifications.value = unreadNotifications.value.filter(n => n.id !== notificationId);
+            if (wasUnread) {
+                totalUnreadCount.value = Math.max(0, totalUnreadCount.value - 1);
+            }
         } catch (err) {
             error.value = err.response?.data?.message || 'Erro ao deletar notificação';
             throw err;

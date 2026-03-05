@@ -47,7 +47,7 @@ function viewAll() {
                     v-if="notificationStore.unreadCount > 0"
                     class="px-2 py-0.5 text-xs font-medium rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
                 >
-                    {{ notificationStore.unreadCount }}
+                    {{ notificationStore.unreadCount > 99 ? '99+' : notificationStore.unreadCount }}
                 </span>
             </div>
             <button

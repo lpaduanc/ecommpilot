@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\SyncStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
@@ -294,6 +295,7 @@ class UserManagementController extends Controller
         $owner = $user->isEmployee() ? $user->getOwnerUser() : $user;
 
         $stores = $owner->stores()
+            ->where('sync_status', '!=', SyncStatus::Disconnected)
             ->select('id', 'name', 'platform', 'sync_status')
             ->orderBy('name')
             ->get();

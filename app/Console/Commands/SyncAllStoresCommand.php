@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\SyncStatus;
 use App\Jobs\SyncStoreDataJob;
 use App\Models\Store;
 use Illuminate\Console\Command;
@@ -47,8 +48,10 @@ class SyncAllStoresCommand extends Command
 
         $useDelay = ! $this->option('no-delay');
 
-        // Busca todas as lojas
-        $stores = Store::query()->get();
+        // Busca todas as lojas (excluindo desconectadas)
+        $stores = Store::query()
+            ->where('sync_status', '!=', SyncStatus::Disconnected)
+            ->get();
 
         if ($stores->isEmpty()) {
             $this->warn('Nenhuma loja encontrada para sincronização.');
@@ -124,7 +127,9 @@ class SyncAllStoresCommand extends Command
      */
     private function syncSpecificStores(array $storeIds): int
     {
-        $stores = Store::whereIn('id', $storeIds)->get();
+        $stores = Store::whereIn('id', $storeIds)
+            ->where('sync_status', '!=', SyncStatus::Disconnected)
+            ->get();
 
         if ($stores->isEmpty()) {
             $this->error('Nenhuma loja encontrada com os IDs fornecidos.');
