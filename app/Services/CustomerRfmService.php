@@ -151,7 +151,8 @@ class CustomerRfmService
 
     /**
      * Calculate RFM scores and segments for every customer in the store.
-     * Kept for backward compatibility. Prefer scoreCustomers() for paginated use.
+     * Warning: For large stores this loads all customers into memory.
+     * Prefer scoreCustomers() for paginated use.
      *
      * @return array<int, array{segment: string, scores: array{r: int, f: int, m: int}}>
      */
@@ -159,7 +160,38 @@ class CustomerRfmService
     {
         $this->ensureCacheWarmed($store);
 
-        return Cache::get("rfm_data:{$store->id}", []);
+        $boundaries = Cache::get("rfm_boundaries:{$store->id}");
+
+        if (! $boundaries || ($boundaries['r'] === [0, 0, 0, 0] && $boundaries['f'] === [0, 0, 0, 0])) {
+            return [];
+        }
+
+        $rfmMap = [];
+
+        $cursor = $this->buildCustomerJoinQuery($store)
+            ->selectRaw(
+                'synced_customers.id,
+                 COALESCE(ord.real_orders_count, synced_customers.total_orders) AS total_orders,
+                 COALESCE(ord.real_orders_total, synced_customers.total_spent) AS total_spent,
+                 COALESCE(ord.real_last_order, synced_customers.last_order_at) AS last_order_at'
+            )
+            ->cursor();
+
+        foreach ($cursor as $customer) {
+            $lastOrderAt = $customer->last_order_at ? Carbon::parse($customer->last_order_at) : null;
+
+            if ($lastOrderAt === null) {
+                $rfmMap[$customer->id] = ['segment' => 'Perdidos', 'scores' => ['r' => 1, 'f' => 1, 'm' => 1]];
+            } else {
+                $recencyDays = (float) abs(now()->diffInDays($lastOrderAt));
+                $r = $this->scoreValue($recencyDays, $boundaries['r'], true);
+                $f = $this->scoreValue((float) $customer->total_orders, $boundaries['f']);
+                $m = $this->scoreValue((float) $customer->total_spent, $boundaries['m']);
+                $rfmMap[$customer->id] = ['segment' => $this->matchSegment($r, $f, $m), 'scores' => ['r' => $r, 'f' => $f, 'm' => $m]];
+            }
+        }
+
+        return $rfmMap;
     }
 
     /**
@@ -168,7 +200,6 @@ class CustomerRfmService
      */
     public function invalidateCache(Store $store): void
     {
-        Cache::forget("rfm_data:{$store->id}");
         Cache::forget("rfm_boundaries:{$store->id}");
         Cache::forget("rfm_summary:{$store->id}");
         Cache::forget("rfm_filters:{$store->id}");
@@ -326,12 +357,12 @@ class CustomerRfmService
      */
     private const VALID_ORDER_STATUSES = ['pending', 'paid', 'shipped', 'delivered'];
 
-    private function computeAndCacheAll(Store $store): void
+    /**
+     * Build the orders aggregate subquery for a store.
+     */
+    private function buildOrdersSubqueryForRfm(Store $store)
     {
-        $ttl = now()->addHours(self::CACHE_TTL_HOURS);
-
-        // Build orders aggregate subquery to get real order data per customer email
-        $ordersSubquery = SyncedOrder::selectRaw(
+        return SyncedOrder::selectRaw(
             'LOWER(TRIM(customer_email)) AS agg_email,
              COUNT(*) AS real_orders_count,
              SUM(total) AS real_orders_total,
@@ -344,34 +375,42 @@ class CustomerRfmService
             ->whereIn('status', self::VALID_ORDER_STATUSES)
             ->whereNull('deleted_at')
             ->groupByRaw('LOWER(TRIM(customer_email))');
+    }
 
-        $customers = SyncedCustomer::query()
+    /**
+     * Build the base query (join only, no select) for customer + orders aggregation.
+     */
+    private function buildCustomerJoinQuery(Store $store)
+    {
+        return SyncedCustomer::query()
             ->leftJoinSub(
-                $ordersSubquery,
+                $this->buildOrdersSubqueryForRfm($store),
                 'ord',
                 fn ($join) => $join->whereRaw('LOWER(TRIM(synced_customers.email)) = ord.agg_email')
             )
-            ->where('synced_customers.store_id', $store->id)
-            ->selectRaw(
-                'synced_customers.id,
-                 COALESCE(ord.real_orders_count, synced_customers.total_orders) AS total_orders,
-                 COALESCE(ord.real_orders_total, synced_customers.total_spent) AS total_spent,
-                 COALESCE(ord.real_last_order, synced_customers.last_order_at) AS last_order_at'
-            )
-            ->get();
+            ->where('synced_customers.store_id', $store->id);
+    }
 
-        // Cast attributes to proper types after the raw select
-        $customers->each(function ($c) {
-            $c->total_orders = (int) $c->total_orders;
-            $c->total_spent = (float) $c->total_spent;
-            $c->last_order_at = $c->last_order_at ? Carbon::parse($c->last_order_at) : null;
-        });
+    private function computeAndCacheAll(Store $store): void
+    {
+        $ttl = now()->addHours(self::CACHE_TTL_HOURS);
 
-        if ($customers->isEmpty()) {
+        // Step 1: Get aggregate stats using SQL (no full load)
+        $stats = $this->buildCustomerJoinQuery($store)->selectRaw(
+            'COUNT(*) AS total_customers,
+             COUNT(COALESCE(ord.real_last_order, synced_customers.last_order_at)) AS total_with_orders,
+             MIN(COALESCE(ord.real_orders_count, synced_customers.total_orders)::int) AS min_orders,
+             MAX(COALESCE(ord.real_orders_count, synced_customers.total_orders)::int) AS max_orders,
+             MIN(COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS min_spent,
+             MAX(COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS max_spent,
+             AVG(COALESCE(ord.real_orders_count, synced_customers.total_orders)::float) AS avg_frequency,
+             AVG(COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS avg_monetary'
+        )->first();
+
+        if (! $stats || (int) $stats->total_customers === 0) {
             $emptyBounds = ['r' => [0, 0, 0, 0], 'f' => [0, 0, 0, 0], 'm' => [0, 0, 0, 0]];
             $emptyFilters = ['segments' => [], 'orders_range' => ['min' => 0, 'max' => 0], 'spent_range' => ['min' => 0, 'max' => 0]];
 
-            Cache::put("rfm_data:{$store->id}", [], $ttl);
             Cache::put("rfm_boundaries:{$store->id}", $emptyBounds, $ttl);
             Cache::put("rfm_summary:{$store->id}", $this->emptyRfmSummary(), $ttl);
             Cache::put("rfm_filters:{$store->id}", $emptyFilters, $ttl);
@@ -380,72 +419,80 @@ class CustomerRfmService
             return;
         }
 
-        // Split customers: those with and without order history
-        $withOrders = $customers->filter(fn ($c) => $c->last_order_at !== null);
-        $withoutOrders = $customers->filter(fn ($c) => $c->last_order_at === null);
+        $totalCustomers = (int) $stats->total_customers;
+        $totalWithOrders = (int) $stats->total_with_orders;
 
-        $rfmMap = [];
-        $segmentIds = [];
-        $segmentData = [];
-
-        // Customers without orders => Perdidos, scores [1,1,1]
-        foreach ($withoutOrders as $customer) {
-            $rfmMap[$customer->id] = ['segment' => 'Perdidos', 'scores' => ['r' => 1, 'f' => 1, 'm' => 1]];
-            $segmentIds['Perdidos'][] = $customer->id;
-
-            if (! isset($segmentData['Perdidos'])) {
-                $segmentData['Perdidos'] = ['count' => 0, 'total_monetary' => 0.0];
-            }
-            $segmentData['Perdidos']['count']++;
-            $segmentData['Perdidos']['total_monetary'] += (float) $customer->total_spent;
-        }
-
+        // Step 2: Calculate quintile boundaries using SQL percentiles (memory-efficient)
         $rBounds = [0, 0, 0, 0];
         $fBounds = [0, 0, 0, 0];
         $mBounds = [0, 0, 0, 0];
 
-        if ($withOrders->isNotEmpty()) {
-            $recencyValues = $withOrders->map(fn ($c) => (float) abs(now()->diffInDays($c->last_order_at)))->values()->all();
-            $frequencyValues = $withOrders->map(fn ($c) => (float) $c->total_orders)->values()->all();
-            $monetaryValues = $withOrders->map(fn ($c) => (float) $c->total_spent)->values()->all();
+        if ($totalWithOrders > 0) {
+            $percentiles = $this->buildCustomerJoinQuery($store)
+                ->whereRaw('COALESCE(ord.real_last_order, synced_customers.last_order_at) IS NOT NULL')
+                ->selectRaw("
+                percentile_cont(0.2) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (NOW() - COALESCE(ord.real_last_order, synced_customers.last_order_at))) / 86400.0) AS r_p20,
+                percentile_cont(0.4) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (NOW() - COALESCE(ord.real_last_order, synced_customers.last_order_at))) / 86400.0) AS r_p40,
+                percentile_cont(0.6) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (NOW() - COALESCE(ord.real_last_order, synced_customers.last_order_at))) / 86400.0) AS r_p60,
+                percentile_cont(0.8) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (NOW() - COALESCE(ord.real_last_order, synced_customers.last_order_at))) / 86400.0) AS r_p80,
+                percentile_cont(0.2) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_count, synced_customers.total_orders)::float) AS f_p20,
+                percentile_cont(0.4) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_count, synced_customers.total_orders)::float) AS f_p40,
+                percentile_cont(0.6) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_count, synced_customers.total_orders)::float) AS f_p60,
+                percentile_cont(0.8) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_count, synced_customers.total_orders)::float) AS f_p80,
+                percentile_cont(0.2) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS m_p20,
+                percentile_cont(0.4) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS m_p40,
+                percentile_cont(0.6) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS m_p60,
+                percentile_cont(0.8) WITHIN GROUP (ORDER BY COALESCE(ord.real_orders_total, synced_customers.total_spent)::float) AS m_p80,
+                AVG(EXTRACT(EPOCH FROM (NOW() - COALESCE(ord.real_last_order, synced_customers.last_order_at))) / 86400.0) AS avg_recency_days
+            ")->first();
 
-            $rBounds = $this->calculateQuintiles($recencyValues);
-            $fBounds = $this->calculateQuintiles($frequencyValues);
-            $mBounds = $this->calculateQuintiles($monetaryValues);
+            $rBounds = [(float) $percentiles->r_p20, (float) $percentiles->r_p40, (float) $percentiles->r_p60, (float) $percentiles->r_p80];
+            $fBounds = [(float) $percentiles->f_p20, (float) $percentiles->f_p40, (float) $percentiles->f_p60, (float) $percentiles->f_p80];
+            $mBounds = [(float) $percentiles->m_p20, (float) $percentiles->m_p40, (float) $percentiles->m_p60, (float) $percentiles->m_p80];
+            $avgRecencyDays = round((float) $percentiles->avg_recency_days, 1);
+        } else {
+            $avgRecencyDays = null;
+        }
 
-            foreach ($withOrders as $customer) {
-                $recencyDays = (float) abs(now()->diffInDays($customer->last_order_at));
+        // Step 3: Process customers using cursor (single query, streamed results)
+        $segmentIds = [];
+        $segmentData = [];
+
+        $cursor = $this->buildCustomerJoinQuery($store)
+            ->selectRaw(
+                'synced_customers.id,
+                 COALESCE(ord.real_orders_count, synced_customers.total_orders) AS total_orders,
+                 COALESCE(ord.real_orders_total, synced_customers.total_spent) AS total_spent,
+                 COALESCE(ord.real_last_order, synced_customers.last_order_at) AS last_order_at'
+            )
+            ->cursor();
+
+        foreach ($cursor as $customer) {
+            $totalSpent = (float) $customer->total_spent;
+            $lastOrderAt = $customer->last_order_at ? Carbon::parse($customer->last_order_at) : null;
+
+            if ($lastOrderAt === null) {
+                $segment = 'Perdidos';
+            } else {
+                $recencyDays = (float) abs(now()->diffInDays($lastOrderAt));
                 $r = $this->scoreValue($recencyDays, $rBounds, true);
                 $f = $this->scoreValue((float) $customer->total_orders, $fBounds);
-                $m = $this->scoreValue((float) $customer->total_spent, $mBounds);
+                $m = $this->scoreValue($totalSpent, $mBounds);
                 $segment = $this->matchSegment($r, $f, $m);
-
-                $rfmMap[$customer->id] = ['segment' => $segment, 'scores' => ['r' => $r, 'f' => $f, 'm' => $m]];
-                $segmentIds[$segment][] = $customer->id;
-
-                if (! isset($segmentData[$segment])) {
-                    $segmentData[$segment] = ['count' => 0, 'total_monetary' => 0.0];
-                }
-                $segmentData[$segment]['count']++;
-                $segmentData[$segment]['total_monetary'] += (float) $customer->total_spent;
             }
+
+            $segmentIds[$segment][] = $customer->id;
+
+            if (! isset($segmentData[$segment])) {
+                $segmentData[$segment] = ['count' => 0, 'total_monetary' => 0.0];
+            }
+            $segmentData[$segment]['count']++;
+            $segmentData[$segment]['total_monetary'] += $totalSpent;
         }
 
         // --- Build summary ---
-        $totalCustomers = count($rfmMap);
-        $totalWithOrders = $withOrders->count();
-
-        $avgRecencyDays = $withOrders->isNotEmpty()
-            ? round($withOrders->average(fn ($c) => abs(now()->diffInDays($c->last_order_at))), 1)
-            : null;
-
-        $avgFrequency = $totalCustomers > 0
-            ? round($customers->average(fn ($c) => (float) $c->total_orders), 1)
-            : null;
-
-        $avgMonetary = $totalCustomers > 0
-            ? round($customers->average(fn ($c) => (float) $c->total_spent), 2)
-            : null;
+        $avgFrequency = round((float) $stats->avg_frequency, 1);
+        $avgMonetary = round((float) $stats->avg_monetary, 2);
 
         $segmentsDistribution = [];
         $monetaryBySegment = [];
@@ -478,7 +525,7 @@ class CustomerRfmService
             'totals' => [
                 'total_customers' => $totalCustomers,
                 'total_with_orders' => $totalWithOrders,
-                'avg_recency_days' => $avgRecencyDays,
+                'avg_recency_days' => $avgRecencyDays ?? null,
                 'avg_frequency' => $avgFrequency,
                 'avg_monetary' => $avgMonetary,
             ],
@@ -491,17 +538,16 @@ class CustomerRfmService
         $filters = [
             'segments' => $presentSegments,
             'orders_range' => [
-                'min' => (int) $customers->min('total_orders'),
-                'max' => (int) $customers->max('total_orders'),
+                'min' => (int) $stats->min_orders,
+                'max' => (int) $stats->max_orders,
             ],
             'spent_range' => [
-                'min' => (float) $customers->min(fn ($c) => (float) $c->total_spent),
-                'max' => (float) $customers->max(fn ($c) => (float) $c->total_spent),
+                'min' => (float) $stats->min_spent,
+                'max' => (float) $stats->max_spent,
             ],
         ];
 
         // --- Write all cache keys ---
-        Cache::put("rfm_data:{$store->id}", $rfmMap, $ttl);
         Cache::put("rfm_boundaries:{$store->id}", ['r' => $rBounds, 'f' => $fBounds, 'm' => $mBounds], $ttl);
         Cache::put("rfm_summary:{$store->id}", $summary, $ttl);
         Cache::put("rfm_filters:{$store->id}", $filters, $ttl);
