@@ -12,15 +12,23 @@ class JsonExtractor
     public static function extract(string $content, string $agentName = 'Unknown'): ?array
     {
         // Method 1: Try to find JSON in markdown code blocks (```json ... ```)
-        if (preg_match('/```(?:json)?\s*\n?([\s\S]*?)\n?```/m', $content, $matches)) {
-            $jsonStr = trim($matches[1]);
-            $decoded = json_decode($jsonStr, true);
-            if ($decoded !== null) {
-                Log::debug("{$agentName}: Extracted JSON from markdown code block");
+        // Use preg_match_all to handle responses with multiple code blocks,
+        // then try the largest valid JSON block first (the main response is usually the biggest).
+        if (preg_match_all('/```(?:json)?\s*\n?([\s\S]*?)\n?```/m', $content, $allMatches)) {
+            // Sort candidates by length descending — the full JSON is typically the largest block
+            $candidates = $allMatches[1];
+            usort($candidates, fn ($a, $b) => strlen($b) - strlen($a));
 
-                return $decoded;
+            foreach ($candidates as $candidate) {
+                $jsonStr = trim($candidate);
+                $decoded = json_decode($jsonStr, true);
+                if ($decoded !== null) {
+                    Log::debug("{$agentName}: Extracted JSON from markdown code block (tried ".count($candidates).' candidates)');
+
+                    return $decoded;
+                }
             }
-            Log::debug("{$agentName}: Found code block but JSON decode failed: ".json_last_error_msg());
+            Log::debug("{$agentName}: Found ".count($candidates).' code block(s) but none contained valid JSON: '.json_last_error_msg());
         }
 
         // Method 2: Try direct parse (response is pure JSON)
