@@ -304,6 +304,7 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
                 }
 
                 $freshStore->markAsSynced();
+                $freshStore->updateMonthlyRevenue();
 
                 // Clear all caches after successful sync
                 $dashboardService->clearCache($freshStore);
@@ -515,6 +516,7 @@ class SyncStoreDataJob implements ShouldBeUnique, ShouldQueue
         }
 
         $this->store->markAsSynced();
+        $this->store->updateMonthlyRevenue();
         $this->clearCheckpoint();
 
         // Clear all caches after successful sync

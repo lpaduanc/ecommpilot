@@ -142,7 +142,7 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Content -->
-                        <div :id="descriptionId" class="px-4 sm:px-6 py-4 max-h-[70vh] sm:max-h-[80vh] overflow-y-auto">
+                        <div :id="descriptionId" class="px-4 sm:px-6 py-4 max-h-[90vh] sm:max-h-[95vh] overflow-y-auto">
                             <slot />
                         </div>
 

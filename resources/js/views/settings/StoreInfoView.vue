@@ -36,7 +36,6 @@ const form = reactive({
     monthly_goal: null,
     annual_goal: null,
     target_ticket: null,
-    monthly_revenue: null,
     monthly_visits: null,
     competitors: [],
 });
@@ -48,7 +47,6 @@ const errors = reactive({
     monthly_goal: '',
     annual_goal: '',
     target_ticket: '',
-    monthly_revenue: '',
     monthly_visits: '',
     competitors: '',
 });
@@ -58,8 +56,11 @@ const currencyDisplay = reactive({
     monthly_goal: '',
     annual_goal: '',
     target_ticket: '',
-    monthly_revenue: '',
 });
+
+// Read-only monthly revenue (auto-calculated)
+const monthlyRevenueDisplay = ref('');
+const monthlyRevenueUpdatedAt = ref(null);
 
 function formatFromCents(cents) {
     if (!cents) return '';
@@ -78,7 +79,7 @@ function onCurrencyInput(field, event) {
 }
 
 function initCurrencyDisplays() {
-    for (const field of ['monthly_goal', 'annual_goal', 'target_ticket', 'monthly_revenue']) {
+    for (const field of ['monthly_goal', 'annual_goal', 'target_ticket']) {
         if (form[field] !== null && form[field] !== undefined) {
             const cents = Math.round(Number(form[field]) * 100);
             currencyDisplay[field] = formatFromCents(cents);
@@ -147,8 +148,16 @@ async function loadConfig(storeId) {
         form.monthly_goal = data.monthly_goal;
         form.annual_goal = data.annual_goal;
         form.target_ticket = data.target_ticket;
-        form.monthly_revenue = data.monthly_revenue;
         form.monthly_visits = data.monthly_visits;
+
+        // Monthly revenue is auto-calculated (read-only)
+        if (data.monthly_revenue !== null && data.monthly_revenue !== undefined) {
+            const cents = Math.round(Number(data.monthly_revenue) * 100);
+            monthlyRevenueDisplay.value = formatFromCents(cents);
+        } else {
+            monthlyRevenueDisplay.value = '';
+        }
+        monthlyRevenueUpdatedAt.value = data.monthly_revenue_updated_at || null;
         form.competitors = data.competitors || [];
 
         initCurrencyDisplays();
@@ -581,30 +590,27 @@ onMounted(async () => {
                         <p v-if="errors.target_ticket" class="text-sm text-danger-500">{{ errors.target_ticket }}</p>
                     </div>
 
-                    <!-- Faturamento Mensal Atual -->
+                    <!-- Faturamento Mensal Médio (auto-calculado) -->
                     <div class="space-y-1.5">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Faturamento Mensal Atual
+                            Faturamento Mensal Médio
                         </label>
                         <div class="relative">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium pointer-events-none select-none">R$</span>
                             <input
                                 type="text"
-                                inputmode="decimal"
-                                :value="currencyDisplay.monthly_revenue"
-                                @input="onCurrencyInput('monthly_revenue', $event)"
-                                placeholder="0,00"
-                                :disabled="!canEdit || isLoadingConfig"
-                                class="w-full pl-11 pr-4 py-2.5 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
-                                :class="[
-                                    errors.monthly_revenue
-                                        ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500/20'
-                                        : 'border-gray-200 dark:border-gray-700 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500/20',
-                                    (!canEdit || isLoadingConfig) ? 'bg-gray-50 dark:bg-gray-900 cursor-not-allowed opacity-70' : ''
-                                ]"
+                                :value="monthlyRevenueDisplay"
+                                placeholder="Sem dados"
+                                disabled
+                                class="w-full pl-11 pr-4 py-2.5 rounded-lg border bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-70"
                             />
                         </div>
-                        <p v-if="errors.monthly_revenue" class="text-sm text-danger-500">{{ errors.monthly_revenue }}</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500">
+                            Calculado automaticamente — média dos últimos 3 meses (excl. Nov/Dez)
+                            <span v-if="monthlyRevenueUpdatedAt" class="ml-1">
+                                · Atualizado em: {{ new Date(monthlyRevenueUpdatedAt).toLocaleDateString('pt-BR') }}
+                            </span>
+                        </p>
                     </div>
                 </div>
             </BaseCard>

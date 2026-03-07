@@ -33,6 +33,7 @@ class Analysis extends Model
     protected $fillable = [
         'uuid',
         'user_id',
+        'requested_by_user_id',
         'store_id',
         'status',
         'analysis_type',
@@ -89,6 +90,11 @@ class Analysis extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function requestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 
     public function store(): BelongsTo

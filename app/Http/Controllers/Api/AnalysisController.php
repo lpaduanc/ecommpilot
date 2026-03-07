@@ -103,7 +103,7 @@ class AnalysisController extends Controller
         $user = $request->user();
         $store = $user->activeStore;
 
-        if (!$store) {
+        if (! $store) {
             return response()->json(['requires_feedback' => false]);
         }
 
@@ -219,6 +219,7 @@ class AnalysisController extends Controller
         // Create analysis
         $analysis = Analysis::create([
             'user_id' => $ownerUserId,
+            'requested_by_user_id' => $user->id,
             'store_id' => $store->id,
             'status' => AnalysisStatus::Pending,
             'analysis_type' => $validated['analysis_type'] ?? 'general',
@@ -228,7 +229,7 @@ class AnalysisController extends Controller
 
         ActivityLog::log('analysis.requested', $analysis);
 
-        if (!empty($validated['feedback_gate_skipped'])) {
+        if (! empty($validated['feedback_gate_skipped'])) {
             ActivityLog::log('analysis.feedback_gate_skipped', $analysis, [
                 'reason' => $validated['feedback_gate_reason'] ?? null,
             ]);

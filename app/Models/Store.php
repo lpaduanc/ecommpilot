@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class Store extends Model
 {
@@ -53,6 +54,7 @@ class Store extends Model
         'annual_goal',
         'target_ticket',
         'monthly_revenue',
+        'monthly_revenue_updated_at',
         'monthly_visits',
         'competitors',
         'tracking_settings',
@@ -81,6 +83,7 @@ class Store extends Model
             'annual_goal' => 'decimal:2',
             'target_ticket' => 'decimal:2',
             'monthly_revenue' => 'decimal:2',
+            'monthly_revenue_updated_at' => 'datetime',
             'monthly_visits' => 'integer',
             'competitors' => 'array',
             'tracking_settings' => 'array',
@@ -203,6 +206,72 @@ class Store extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Calcula a receita mensal média dos últimos 3 meses elegíveis (excluindo Nov/Dez).
+     */
+    public function calculateAverageMonthlyRevenue(?Carbon $referenceDate = null): ?float
+    {
+        $referenceDate = $referenceDate ?? now();
+        $eligibleMonths = $this->getEligibleMonths($referenceDate, 3);
+
+        if (empty($eligibleMonths)) {
+            return null;
+        }
+
+        $totalRevenue = 0;
+        $monthsWithData = 0;
+
+        foreach ($eligibleMonths as [$year, $month]) {
+            $start = Carbon::create($year, $month, 1)->startOfMonth();
+            $end = $start->copy()->endOfMonth();
+
+            $revenue = $this->orders()
+                ->paid()
+                ->whereBetween('external_created_at', [$start, $end])
+                ->sum('total');
+
+            if ($revenue > 0) {
+                $totalRevenue += (float) $revenue;
+                $monthsWithData++;
+            }
+        }
+
+        return $monthsWithData > 0 ? round($totalRevenue / $monthsWithData, 2) : null;
+    }
+
+    /**
+     * Retorna N meses elegíveis voltando no tempo, pulando Nov(11) e Dez(12).
+     *
+     * @return array<array{0: int, 1: int}> Array de [year, month]
+     */
+    private function getEligibleMonths(Carbon $referenceDate, int $count): array
+    {
+        $months = [];
+        $current = $referenceDate->copy()->startOfMonth();
+        $maxIterations = $count + 4;
+
+        for ($i = 0; $i < $maxIterations && count($months) < $count; $i++) {
+            if ($current->month !== 11 && $current->month !== 12) {
+                $months[] = [$current->year, $current->month];
+            }
+            $current->subMonth();
+        }
+
+        return $months;
+    }
+
+    /**
+     * Atualiza o faturamento mensal médio com base nos pedidos pagos.
+     */
+    public function updateMonthlyRevenue(): void
+    {
+        $revenue = $this->calculateAverageMonthlyRevenue();
+        $this->update([
+            'monthly_revenue' => $revenue,
+            'monthly_revenue_updated_at' => now(),
+        ]);
     }
 
     public function getFormattedGoals(): array

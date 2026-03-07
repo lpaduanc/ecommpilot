@@ -52,6 +52,7 @@ const createForm = ref({
     phone: '',
     password: '',
     is_active: true,
+    permissions: [],
 });
 const editForm = ref({
     name: '',
@@ -144,6 +145,7 @@ function openCreateModal() {
         phone: '',
         password: '',
         is_active: true,
+        permissions: [],
     };
     showCreateModal.value = true;
 }
@@ -302,6 +304,34 @@ function toggleAllPermissions() {
         editForm.value.permissions = [];
     } else {
         editForm.value.permissions = [...availablePermissions.value];
+    }
+}
+
+// Create form: toggle categoria
+function toggleCreateCategoryPermissions(category) {
+    const categoryPerms = permissionCategories[category];
+    const allSelected = categoryPerms.every(p => createForm.value.permissions.includes(p));
+
+    if (allSelected) {
+        createForm.value.permissions = createForm.value.permissions.filter(p => !categoryPerms.includes(p));
+    } else {
+        categoryPerms.forEach(p => {
+            if (!createForm.value.permissions.includes(p)) {
+                createForm.value.permissions.push(p);
+            }
+        });
+    }
+}
+
+function isCreateCategorySelected(category) {
+    return permissionCategories[category].every(p => createForm.value.permissions.includes(p));
+}
+
+function toggleCreateAllPermissions() {
+    if (createForm.value.permissions.length === availablePermissions.value.length) {
+        createForm.value.permissions = [];
+    } else {
+        createForm.value.permissions = [...availablePermissions.value];
     }
 }
 
@@ -562,19 +592,125 @@ onMounted(() => {
         </BaseCard>
 
         <!-- Create Client Modal -->
-        <BaseModal :show="showCreateModal" title="Novo Cliente" @close="showCreateModal = false">
-            <form @submit.prevent="submitCreateClient" class="space-y-4">
-                <BaseInput v-model="createForm.name" label="Nome *" placeholder="Nome completo" required />
-                <BaseInput v-model="createForm.email" type="email" label="E-mail *" placeholder="email@exemplo.com" required />
-                <BaseInput v-model="createForm.phone" label="Telefone" placeholder="(00) 00000-0000" />
-                <BaseInput v-model="createForm.password" type="password" label="Senha *" placeholder="Mínimo 8 caracteres" required />
-                <label class="flex items-center gap-2">
-                    <input type="checkbox" v-model="createForm.is_active" class="rounded border-gray-300 text-primary-600" />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">Cliente ativo</span>
-                </label>
+        <BaseModal :show="showCreateModal" title="Novo Cliente" size="xl" @close="showCreateModal = false">
+            <form @submit.prevent="submitCreateClient" class="space-y-6">
+                <div class="space-y-4">
+                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Dados do Cliente
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <BaseInput v-model="createForm.name" label="Nome *" placeholder="Nome completo" required />
+                        <BaseInput v-model="createForm.email" type="email" label="E-mail *" placeholder="email@exemplo.com" required />
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <BaseInput v-model="createForm.phone" label="Telefone" placeholder="(00) 00000-0000" />
+                        <BaseInput v-model="createForm.password" type="password" label="Senha *" placeholder="Mínimo 8 caracteres" required />
+                    </div>
+
+                    <div class="flex items-center md:pt-2">
+                        <label class="flex items-center gap-3 cursor-pointer select-none group">
+                            <div class="relative flex-shrink-0">
+                                <input
+                                    v-model="createForm.is_active"
+                                    type="checkbox"
+                                    class="sr-only peer"
+                                />
+                                <div :class="[
+                                    'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
+                                    createForm.is_active
+                                        ? 'bg-primary-600 border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                                        : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 group-hover:border-primary-400',
+                                ]" @click="createForm.is_active = !createForm.is_active">
+                                    <svg v-if="createForm.is_active" class="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Cliente ativo</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Permissões -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Permissões
+                        </h4>
+                        <button
+                            type="button"
+                            @click="toggleCreateAllPermissions"
+                            class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                        >
+                            {{ createForm.permissions.length === availablePermissions.length ? 'Desmarcar todas' : 'Selecionar todas' }}
+                        </button>
+                    </div>
+
+                    <div class="max-h-[800px] overflow-y-auto pr-1 scrollbar-thin">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div
+                                v-for="(perms, category) in permissionCategories"
+                                :key="category"
+                                class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
+                            >
+                                <label class="flex items-center gap-2.5 cursor-pointer group mb-3">
+                                    <div class="relative flex-shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            :checked="isCreateCategorySelected(category)"
+                                            @change="toggleCreateCategoryPermissions(category)"
+                                            class="sr-only"
+                                        />
+                                        <div :class="[
+                                            'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                                            isCreateCategorySelected(category)
+                                                ? 'bg-primary-600 border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 group-hover:border-primary-400',
+                                        ]" @click="toggleCreateCategoryPermissions(category)">
+                                            <svg v-if="isCreateCategorySelected(category)" class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ category }}</span>
+                                </label>
+
+                                <div class="space-y-2 pl-6">
+                                    <label
+                                        v-for="perm in perms"
+                                        :key="perm"
+                                        class="flex items-center gap-2.5 cursor-pointer group"
+                                    >
+                                        <div class="relative flex-shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                :value="perm"
+                                                v-model="createForm.permissions"
+                                                class="sr-only"
+                                            />
+                                            <div :class="[
+                                                'w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors',
+                                                createForm.permissions.includes(perm)
+                                                    ? 'bg-primary-600 border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                                                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 group-hover:border-primary-400',
+                                            ]" @click="createForm.permissions.includes(perm) ? createForm.permissions.splice(createForm.permissions.indexOf(perm), 1) : createForm.permissions.push(perm)">
+                                                <svg v-if="createForm.permissions.includes(perm)" class="w-2 h-2 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="3">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatPermissionLabel(perm) }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </form>
             <template #footer>
-                <div class="flex justify-end gap-3">
+                <div class="flex items-center justify-between gap-3">
                     <BaseButton variant="secondary" @click="showCreateModal = false">Cancelar</BaseButton>
                     <BaseButton @click="submitCreateClient" :loading="isSubmitting">Criar Cliente</BaseButton>
                 </div>
@@ -600,38 +736,57 @@ onMounted(() => {
         </BaseModal>
 
         <!-- Edit Client Modal -->
-        <BaseModal :show="showEditModal" @close="showEditModal = false" title="Editar Cliente" size="lg">
+        <BaseModal :show="showEditModal" @close="showEditModal = false" title="Editar Cliente" size="xl">
             <form @submit.prevent="submitEditClient" class="space-y-6">
                 <!-- Dados Básicos -->
                 <div class="space-y-4">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Dados do Cliente</h3>
+                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Dados do Cliente
+                    </h4>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <BaseInput
                             v-model="editForm.name"
-                            label="Nome"
+                            label="Nome *"
                             placeholder="Nome do cliente"
                             required
                         />
                         <BaseInput
                             v-model="editForm.email"
-                            label="E-mail"
+                            label="E-mail *"
                             type="email"
                             placeholder="email@exemplo.com"
                             required
                         />
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <BaseInput
                             v-model="editForm.phone"
                             label="Telefone"
                             placeholder="(00) 00000-0000"
                         />
-                        <div class="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="edit-is-active"
-                                v-model="editForm.is_active"
-                                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                            />
-                            <label for="edit-is-active" class="text-sm text-gray-700 dark:text-gray-300">Cliente ativo</label>
+                        <div class="flex items-center md:pt-7">
+                            <label class="flex items-center gap-3 cursor-pointer select-none group">
+                                <div class="relative flex-shrink-0">
+                                    <input
+                                        v-model="editForm.is_active"
+                                        type="checkbox"
+                                        class="sr-only peer"
+                                    />
+                                    <div :class="[
+                                        'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
+                                        editForm.is_active
+                                            ? 'bg-primary-600 border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                                            : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 group-hover:border-primary-400',
+                                    ]" @click="editForm.is_active = !editForm.is_active">
+                                        <svg v-if="editForm.is_active" class="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Cliente ativo</span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -639,60 +794,90 @@ onMounted(() => {
                 <!-- Permissões -->
                 <div class="space-y-4">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Permissões</h3>
+                        <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Permissões
+                        </h4>
                         <button
                             type="button"
                             @click="toggleAllPermissions"
-                            class="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                            class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                         >
                             {{ editForm.permissions.length === availablePermissions.length ? 'Desmarcar todas' : 'Selecionar todas' }}
                         </button>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div
-                            v-for="(perms, category) in permissionCategories"
-                            :key="category"
-                            class="border border-gray-200 dark:border-gray-700 rounded-lg p-3"
-                        >
-                            <div class="flex items-center gap-2 mb-2">
-                                <input
-                                    type="checkbox"
-                                    :checked="isCategorySelected(category)"
-                                    @change="toggleCategoryPermissions(category)"
-                                    class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                                />
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ category }}</span>
-                            </div>
-                            <div class="space-y-1 ml-6">
-                                <label
-                                    v-for="perm in perms"
-                                    :key="perm"
-                                    class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        :value="perm"
-                                        v-model="editForm.permissions"
-                                        class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
-                                    />
-                                    {{ formatPermissionLabel(perm) }}
+                    <div class="max-h-[800px] overflow-y-auto pr-1 scrollbar-thin">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div
+                                v-for="(perms, category) in permissionCategories"
+                                :key="category"
+                                class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
+                            >
+                                <label class="flex items-center gap-2.5 cursor-pointer group mb-3">
+                                    <div class="relative flex-shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            :checked="isCategorySelected(category)"
+                                            @change="toggleCategoryPermissions(category)"
+                                            class="sr-only"
+                                        />
+                                        <div :class="[
+                                            'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                                            isCategorySelected(category)
+                                                ? 'bg-primary-600 border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 group-hover:border-primary-400',
+                                        ]" @click="toggleCategoryPermissions(category)">
+                                            <svg v-if="isCategorySelected(category)" class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ category }}</span>
                                 </label>
+
+                                <div class="space-y-2 pl-6">
+                                    <label
+                                        v-for="perm in perms"
+                                        :key="perm"
+                                        class="flex items-center gap-2.5 cursor-pointer group"
+                                    >
+                                        <div class="relative flex-shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                :value="perm"
+                                                v-model="editForm.permissions"
+                                                class="sr-only"
+                                            />
+                                            <div :class="[
+                                                'w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors',
+                                                editForm.permissions.includes(perm)
+                                                    ? 'bg-primary-600 border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                                                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 group-hover:border-primary-400',
+                                            ]" @click="editForm.permissions.includes(perm) ? editForm.permissions.splice(editForm.permissions.indexOf(perm), 1) : editForm.permissions.push(perm)">
+                                                <svg v-if="editForm.permissions.includes(perm)" class="w-2 h-2 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="3">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatPermissionLabel(perm) }}</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </form>
 
-                <!-- Actions -->
-                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
-                    <BaseButton type="button" variant="secondary" @click="showEditModal = false">
+            <template #footer>
+                <div class="flex items-center justify-between gap-3">
+                    <BaseButton variant="secondary" @click="showEditModal = false">
                         Cancelar
                     </BaseButton>
-                    <BaseButton type="submit" :loading="isSubmitting">
+                    <BaseButton @click="submitEditClient" :loading="isSubmitting">
                         Salvar Alterações
                     </BaseButton>
                 </div>
-            </form>
+            </template>
         </BaseModal>
 
         <!-- Delete Confirmation Modal -->

@@ -1103,7 +1103,7 @@ PROMPT;
             'monthly_goal' => 'Meta Mensal de Faturamento',
             'annual_goal' => 'Meta Anual de Faturamento',
             'target_ticket' => 'Ticket Médio Alvo',
-            'monthly_revenue' => 'Receita Mensal Atual',
+            'monthly_revenue' => 'Receita Mensal Média (3 meses, excl. Nov/Dez)',
             'monthly_visits' => 'Visitas Mensais',
         ];
 

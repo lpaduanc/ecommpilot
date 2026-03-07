@@ -7,6 +7,7 @@ use App\Mail\AnalysisCompletedMail;
 use App\Models\ActivityLog;
 use App\Models\Analysis;
 use App\Models\SystemSetting;
+use App\Models\User;
 use App\Services\AI\Agents\LiteStoreAnalysisService;
 use App\Services\AI\Agents\StoreAnalysisService;
 use App\Services\AnalysisService;
@@ -18,6 +19,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
@@ -396,6 +398,43 @@ class ProcessAnalysisJob implements ShouldQueue
     }
 
     /**
+     * Determine the list of recipients for the completion email.
+     *
+     * - Manual analysis: only the user who requested it (requested_by_user_id).
+     * - Automatic analysis: owner + employees that have access to the store.
+     */
+    private function getEmailRecipients(): Collection
+    {
+        $analysis = $this->analysis;
+
+        // Manual analysis: send only to who requested it
+        if ($analysis->requested_by_user_id) {
+            $requester = $analysis->requestedBy;
+
+            return $requester ? collect([$requester]) : collect();
+        }
+
+        // Automatic analysis: owner + employees with access to this store
+        $owner = $analysis->user;
+        $recipients = collect([$owner]);
+
+        // Employees explicitly assigned to this store via pivot store_user
+        $employeesWithStore = User::where('parent_user_id', $owner->id)
+            ->whereHas('assignedStores', fn ($q) => $q->where('store_id', $analysis->store_id))
+            ->get();
+
+        // Employees with no store assignments (legacy: access to all stores)
+        $employeesWithNoAssignments = User::where('parent_user_id', $owner->id)
+            ->whereDoesntHave('assignedStores')
+            ->get();
+
+        return $recipients
+            ->merge($employeesWithStore)
+            ->merge($employeesWithNoAssignments)
+            ->unique('id');
+    }
+
+    /**
      * Send completion email to the user.
      */
     private function sendCompletionEmail(NotificationService $notificationService): void
@@ -403,98 +442,130 @@ class ProcessAnalysisJob implements ShouldQueue
         try {
             // Refresh to get latest data with relationships
             $this->analysis->refresh();
-            $this->analysis->load(['user', 'store', 'persistentSuggestions']);
+            $this->analysis->load(['user', 'requestedBy', 'store', 'persistentSuggestions']);
 
-            $user = $this->analysis->user;
+            $recipients = $this->getEmailRecipients()->filter(fn ($r) => ! empty($r->email));
 
-            if (! $user || empty($user->email)) {
+            if ($recipients->isEmpty()) {
                 $this->analysis->update([
-                    'email_error' => 'Usuário sem e-mail cadastrado.',
+                    'email_error' => 'Nenhum destinatário com e-mail cadastrado.',
                 ]);
 
-                Log::channel($this->logChannel)->warning('>>> Email de conclusao nao enviado - usuario sem email', [
+                Log::channel($this->logChannel)->warning('>>> Email de conclusao nao enviado - nenhum destinatario com email', [
                     'analysis_id' => $this->analysis->id,
                     'user_id' => $this->analysis->user_id,
+                    'requested_by_user_id' => $this->analysis->requested_by_user_id,
                 ]);
 
                 return;
             }
 
-            // Log tentativa de envio (safe log)
-            $this->safeMailLog('info', 'Tentando enviar email de conclusao de analise', [
-                'analysis_id' => $this->analysis->id,
-                'user_email' => $user->email,
-                'store_name' => $this->analysis->store->name ?? 'N/A',
-            ]);
+            $storeName = $this->analysis->store->name ?? 'N/A';
 
-            // Prepare email data using AnalysisCompletedMail for data extraction
+            // Build shared mail data once (extracts store/analysis fields)
             $mailData = new AnalysisCompletedMail($this->analysis);
 
-            // Render the email template to HTML
-            $htmlContent = View::make('emails.analysis-completed', [
-                'userName' => $mailData->userName,
-                'storeName' => $mailData->storeName,
-                'periodStart' => $mailData->periodStart,
-                'periodEnd' => $mailData->periodEnd,
-                'healthScore' => $mailData->healthScore,
-                'healthStatus' => $mailData->healthStatus,
-                'mainInsight' => $mailData->mainInsight,
-                'suggestions' => $mailData->suggestions,
-                'analysisType' => $mailData->analysisType,
-                'analysisTypeLabel' => $mailData->analysisTypeLabel,
-                'premiumSummary' => $mailData->premiumSummary,
-                'alerts' => $mailData->alerts,
-            ])->render();
-
-            // Send email directly via EmailConfigurationService (bypasses Laravel Mail caching)
             $emailService = app(EmailConfigurationService::class);
-            $result = $emailService->sendHtmlEmail(
-                'ai-analysis',
-                $user->email,
-                $user->name ?? '',
-                "Análise de IA Concluída - {$mailData->storeName}",
-                $htmlContent
-            );
 
-            if (! $result['success']) {
-                throw new \RuntimeException($result['message']);
+            $atLeastOneSent = false;
+            $errors = [];
+
+            foreach ($recipients as $recipient) {
+                try {
+                    $this->safeMailLog('info', 'Tentando enviar email de conclusao de analise', [
+                        'analysis_id' => $this->analysis->id,
+                        'recipient_email' => $recipient->email,
+                        'recipient_id' => $recipient->id,
+                        'store_name' => $storeName,
+                    ]);
+
+                    // Render template with the specific recipient's name
+                    $htmlContent = View::make('emails.analysis-completed', [
+                        'userName' => $recipient->name ?? $mailData->userName,
+                        'storeName' => $mailData->storeName,
+                        'periodStart' => $mailData->periodStart,
+                        'periodEnd' => $mailData->periodEnd,
+                        'healthScore' => $mailData->healthScore,
+                        'healthStatus' => $mailData->healthStatus,
+                        'mainInsight' => $mailData->mainInsight,
+                        'suggestions' => $mailData->suggestions,
+                        'analysisType' => $mailData->analysisType,
+                        'analysisTypeLabel' => $mailData->analysisTypeLabel,
+                        'premiumSummary' => $mailData->premiumSummary,
+                        'alerts' => $mailData->alerts,
+                    ])->render();
+
+                    $result = $emailService->sendHtmlEmail(
+                        'ai-analysis',
+                        $recipient->email,
+                        $recipient->name ?? '',
+                        "Análise de IA Concluída - {$mailData->storeName}",
+                        $htmlContent
+                    );
+
+                    if (! $result['success']) {
+                        throw new \RuntimeException($result['message']);
+                    }
+
+                    $atLeastOneSent = true;
+
+                    $notificationService->notifyEmailSent($recipient, 'analysis_completed', $recipient->email);
+
+                    $this->safeMailLog('info', 'Email de conclusao de analise enviado com sucesso', [
+                        'analysis_id' => $this->analysis->id,
+                        'recipient_email' => $recipient->email,
+                        'store_name' => $storeName,
+                    ]);
+
+                    Log::channel($this->logChannel)->info('>>> Email de conclusao enviado com sucesso', [
+                        'analysis_id' => $this->analysis->id,
+                        'recipient_email' => $recipient->email,
+                        'store_name' => $storeName,
+                    ]);
+
+                    ActivityLog::log('email.analysis_sent', $this->analysis, [
+                        'user_email' => $recipient->email,
+                        'store_name' => $storeName,
+                    ]);
+                } catch (\Throwable $e) {
+                    $errors[] = "[{$recipient->email}] {$e->getMessage()}";
+
+                    $notificationService->notifyEmailFailed($recipient, 'analysis_completed', $recipient->email, $e->getMessage());
+
+                    $this->safeMailLog('error', 'Falha ao enviar email de conclusao de analise para destinatario', [
+                        'analysis_id' => $this->analysis->id,
+                        'recipient_email' => $recipient->email,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    Log::channel($this->logChannel)->warning('>>> Falha ao enviar email de conclusao para destinatario', [
+                        'analysis_id' => $this->analysis->id,
+                        'recipient_email' => $recipient->email,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    ActivityLog::log('email.analysis_failed', $this->analysis, [
+                        'recipient_email' => $recipient->email,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
-            // Atualizar campos de email com sucesso
-            $this->analysis->update([
-                'email_sent_at' => now(),
-                'email_error' => null,
-            ]);
-
-            // Notificar envio de email bem-sucedido
-            $notificationService->notifyEmailSent($user, 'analysis_completed', $user->email);
-
-            $this->safeMailLog('info', 'Email de conclusao de analise enviado com sucesso', [
-                'analysis_id' => $this->analysis->id,
-                'user_email' => $user->email,
-                'store_name' => $this->analysis->store->name ?? 'N/A',
-            ]);
-
-            Log::channel($this->logChannel)->info('>>> Email de conclusao enviado com sucesso', [
-                'analysis_id' => $this->analysis->id,
-                'user_email' => $user->email,
-                'store_name' => $this->analysis->store->name ?? 'N/A',
-            ]);
-
-            ActivityLog::log('email.analysis_sent', $this->analysis, [
-                'user_email' => $user->email,
-                'store_name' => $this->analysis->store->name ?? 'N/A',
-            ]);
+            if ($atLeastOneSent) {
+                $this->analysis->update([
+                    'email_sent_at' => now(),
+                    'email_error' => ! empty($errors) ? 'Falhas parciais: '.implode('; ', $errors) : null,
+                ]);
+            } else {
+                $this->analysis->update([
+                    'email_error' => implode('; ', $errors),
+                ]);
+            }
         } catch (\Throwable $e) {
             // Salvar erro no banco
             $this->analysis->update([
                 'email_error' => $e->getMessage(),
             ]);
-
-            // Notificar falha no envio de email
-            if ($user) {
-                $notificationService->notifyEmailFailed($user, 'analysis_completed', $user->email ?? '', $e->getMessage());
-            }
 
             // Log error but don't fail the job - email is secondary
             $this->safeMailLog('error', 'Falha ao enviar email de conclusao de analise', [

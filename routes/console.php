@@ -41,5 +41,18 @@ Schedule::command('analyses:auto')
         \Illuminate\Support\Facades\Log::channel('analysis')->error('Comando de análises automáticas falhou.');
     });
 
+// Update monthly revenue average on the last business day of each month at 23:59
+// Command runs daily but self-guards via isLastBusinessDay() check
+Schedule::command('stores:update-revenue')
+    ->dailyAt('23:59')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->onSuccess(function () {
+        \Illuminate\Support\Facades\Log::info('Atualização de faturamento mensal concluída.');
+    })
+    ->onFailure(function () {
+        \Illuminate\Support\Facades\Log::error('Atualização de faturamento mensal falhou.');
+    });
+
 // Sync Brazil locations from IBGE API every Sunday at 3:00 AM
 Schedule::job(new SyncBrazilLocationsJob)->weeklyOn(0, '3:00');
