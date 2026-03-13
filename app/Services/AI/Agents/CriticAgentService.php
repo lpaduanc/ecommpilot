@@ -84,7 +84,8 @@ class CriticAgentService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.1,
-            'max_tokens' => 32768, // Increased to prevent JSON truncation
+            'max_tokens' => 32768,
+            'json_mode' => true,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 

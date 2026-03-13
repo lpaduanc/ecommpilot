@@ -73,6 +73,11 @@ class GeminiProvider implements AIProviderInterface
             ],
         ];
 
+        // Enable JSON mode when requested - forces structurally valid JSON output
+        if (! empty($options['json_mode'])) {
+            $payload['generationConfig']['responseMimeType'] = 'application/json';
+        }
+
         // Add system instruction if present
         if ($systemInstruction) {
             $payload['systemInstruction'] = [

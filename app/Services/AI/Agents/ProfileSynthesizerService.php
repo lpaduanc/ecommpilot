@@ -82,6 +82,7 @@ class ProfileSynthesizerService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.1,
+            'json_mode' => true,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
