@@ -14,6 +14,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const pollingInterval = ref(null);
     const analysisTypes = ref([]);
 
+    // Paginated history state
+    const paginatedHistory = ref([]);
+    const historyPagination = ref({ current_page: 1, last_page: 1, per_page: 12, total: 0 });
+    const isLoadingHistory = ref(false);
+
     // Persistent suggestions state
     const persistentSuggestions = ref([]);
     const suggestionStats = ref(null);
@@ -172,6 +177,19 @@ export const useAnalysisStore = defineStore('analysis', () => {
         }
     }
     
+    async function fetchPaginatedHistory(page = 1) {
+        isLoadingHistory.value = true;
+        try {
+            const response = await api.get(`/analysis/history/paginated?page=${page}&per_page=12`);
+            paginatedHistory.value = response.data.data;
+            historyPagination.value = response.data.meta;
+        } catch {
+            paginatedHistory.value = [];
+        } finally {
+            isLoadingHistory.value = false;
+        }
+    }
+
     async function fetchAnalysisTypes() {
         try {
             const response = await api.get('/analysis/types');
@@ -664,6 +682,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
         // Analysis types
         analysisTypes,
         fetchAnalysisTypes,
+
+        // Paginated history
+        paginatedHistory,
+        historyPagination,
+        isLoadingHistory,
+        fetchPaginatedHistory,
 
         // Analysis actions
         fetchCurrentAnalysis,

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAnalysisStore } from '../stores/analysisStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
@@ -34,6 +34,7 @@ import {
     ChartBarIcon,
     CalendarIcon,
     ArrowLeftIcon,
+    ChevronRightIcon,
     EnvelopeIcon,
     LightBulbIcon,
     ShieldExclamationIcon,
@@ -48,6 +49,7 @@ import {
 } from '../mocks/previewMocks';
 
 const router = useRouter();
+const route = useRoute();
 const analysisStore = useAnalysisStore();
 const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
@@ -412,16 +414,24 @@ watch(showSuggestionDetail, (isOpen) => {
     }
 });
 
-onMounted(() => {
+onMounted(async () => {
     // Só busca dados se tiver acesso (não em preview mode)
     if (canAccessAnalysis.value) {
-        analysisStore.fetchCurrentAnalysis();
-        analysisStore.fetchAnalysisHistory();
+        await analysisStore.fetchCurrentAnalysis();
+        await analysisStore.fetchAnalysisHistory();
         startCountdown();
 
         // Inicia timer se já houver análise em andamento
         if (hasAnalysisInProgress.value) {
             startElapsedTimer();
+        }
+
+        // Handle ?view=ID query param — navigate directly to a historical analysis
+        const viewId = route.query.view;
+        if (viewId) {
+            await viewHistoricalAnalysis(viewId);
+            // Clean up the query param from URL without triggering a reload
+            router.replace({ name: 'analysis' });
         }
     }
 });
@@ -686,14 +696,23 @@ onUnmounted(() => {
                         Histórico de Análises
                     </h2>
                 </div>
-                <button
-                    v-if="isViewingHistorical"
-                    @click="returnToCurrentAnalysis"
-                    class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors shadow-sm"
-                >
-                    <ArrowLeftIcon class="w-4 h-4" />
-                    Voltar para análise atual
-                </button>
+                <div class="flex items-center gap-3">
+                    <button
+                        v-if="isViewingHistorical"
+                        @click="returnToCurrentAnalysis"
+                        class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors shadow-sm"
+                    >
+                        <ArrowLeftIcon class="w-4 h-4" />
+                        Voltar para análise atual
+                    </button>
+                    <RouterLink
+                        :to="{ name: 'analysis-history' }"
+                        class="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/40 border border-primary-300 dark:border-primary-700 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors shadow-sm"
+                    >
+                        Ver análises anteriores
+                        <ChevronRightIcon class="w-4 h-4" />
+                    </RouterLink>
+                </div>
             </div>
 
             <!-- Analyses List -->

@@ -80,14 +80,14 @@ onMounted(() => {
 <template>
     <div
         :class="[
-            'bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-700',
+            'bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-all duration-700',
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         ]"
     >
         <!-- Header Banner -->
-        <div class="relative px-6 py-5 bg-gradient-to-r from-purple-600 to-indigo-600 overflow-hidden">
+        <div class="relative px-6 py-5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-2xl overflow-visible">
             <!-- Background Pattern -->
-            <div class="absolute inset-0" style="background-image: radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 20px 20px;"></div>
+            <div class="absolute inset-0 rounded-t-2xl" style="background-image: radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 20px 20px;"></div>
 
             <div class="relative flex items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
@@ -98,7 +98,7 @@ onMounted(() => {
                         <h3 class="text-lg font-display font-bold text-white">Resumo Estratégico</h3>
                         <SectionGuideLink
                             tooltip-text="Esse é o resumo completo feito pela IA sobre sua loja. Aqui você vê o diagnóstico geral, os pontos fortes e o que precisa melhorar."
-                            tooltip-position="bottom"
+                            tooltip-position="right"
                             icon-class="text-white/60 hover:text-white"
                             :light-variant="true"
                             @open-guide="emit('open-analysis-guide', 'strategic-summary')"

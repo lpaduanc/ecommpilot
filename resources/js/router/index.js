@@ -110,6 +110,15 @@ const routes = [
         meta: { requiresAuth: true },
     },
     {
+        path: '/analysis/history',
+        name: 'analysis-history',
+        component: () => import(
+            /* webpackChunkName: "analysis-history" */
+            '../views/AnalysisHistoryView.vue'
+        ),
+        meta: { requiresAuth: true, permission: 'analysis.view' },
+    },
+    {
         path: '/analysis',
         name: 'analysis',
         component: () => import(

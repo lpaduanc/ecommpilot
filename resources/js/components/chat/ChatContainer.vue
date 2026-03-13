@@ -38,8 +38,8 @@ const suggestionQuestions = [
     'Quais produtos têm menor estoque?',
     'Quem são meus melhores clientes?',
     'Qual o ticket médio dos meus clientes?',
-    'Como estão performando minhas campanhas?',
-    'Qual canal traz mais conversões?',
+    // 'Como estão performando minhas campanhas?',
+    // 'Qual canal traz mais conversões?',
 ];
 
 async function handleSendMessage(content) {

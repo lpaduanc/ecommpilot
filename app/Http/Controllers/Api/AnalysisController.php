@@ -286,6 +286,35 @@ class AnalysisController extends Controller
         return response()->json(AnalysisResource::collection($analyses));
     }
 
+    public function historyPaginated(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $store = $user->activeStore;
+
+        if (! $store) {
+            return response()->json(['data' => [], 'meta' => ['total' => 0]]);
+        }
+
+        $ownerUserId = $user->getOwnerUser()->id;
+        $perPage = min((int) $request->input('per_page', 12), 50);
+
+        $analyses = Analysis::where('user_id', $ownerUserId)
+            ->where('store_id', $store->id)
+            ->completed()
+            ->latest()
+            ->paginate($perPage);
+
+        return response()->json([
+            'data' => AnalysisResource::collection($analyses),
+            'meta' => [
+                'current_page' => $analyses->currentPage(),
+                'last_page' => $analyses->lastPage(),
+                'per_page' => $analyses->perPage(),
+                'total' => $analyses->total(),
+            ],
+        ]);
+    }
+
     public function show(Request $request, Analysis $analysis): JsonResponse
     {
         $user = $request->user();
