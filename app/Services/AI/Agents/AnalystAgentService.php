@@ -88,6 +88,7 @@ class AnalystAgentService
             ['role' => 'user', 'content' => $prompt],
         ], [
             'temperature' => 0.2,
+            'json_mode' => true,
         ]);
         $apiTime = round((microtime(true) - $apiStart) * 1000, 2);
 
